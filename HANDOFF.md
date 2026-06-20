@@ -8,9 +8,9 @@ This file must be updated by every agent at task start, task completion, and int
 Project: HL Health Companion
 Current Sprint: Sprint 1
 Current Task: US-1.2.4 Client-Side Compression
-Current State: In Progress
-Last Completed Task: US-1.2.3 Foto atau Upload Attachment
-Last Updated: 2026-06-20 12:17 UTC
+Current State: In Progress (Resuming after Audit)
+Last Completed Task: AUDIT-FIX-US1.1.1-1.2.3
+Last Updated: 2026-06-20 12:40 UTC
 ```
 
 ## Current Owner
@@ -23,16 +23,16 @@ Branch: None
 
 ## Last Completed Work
 
-Completed US-1.2.3 Foto atau Upload Attachment:
-- Added `web/src/components/measurement/AttachmentUploader.tsx`.
-- Uploader accepts JPG/PNG/WebP only, supports native camera via `capture="environment"`, and shows a local preview.
-- Uploader mounts only for selected metrics where `requiresAttachment` is true.
-- This task does not upload to R2 and does not persist original images.
-- Updated `docs/design-system.md`.
+Completed AUDIT-FIX-US1.1.1-1.2.3:
+- Fixed RangeError in date parsing (`worker/src/index.ts`).
+- Added `/api/auth/logout` endpoint (`worker/src/index.ts`).
+- Added global error handler for DB exceptions (`worker/src/index.ts`).
+- Updated `schema.sql` and `seed.sql` with `HL_systemConfigs` to extract config constants.
+- Updated `TASKS.md`, `ARCHITECTURE.md`, `api-contract.md` to enforce DB configuration instead of hardcoding.
 
 ## Required First Implementation Step
 
-Continue Sprint 1 Measurement Input.
+Resume Sprint 1 Measurement Input.
 
 Recommended first task:
 
@@ -43,15 +43,14 @@ US-1.2.4 Client-Side Compression
 ## Files Changed In Last Task
 
 ```text
+worker/src/index.ts
+docs/schema.sql
+docs/seed.sql
+docs/ARCHITECTURE.md
+docs/api-contract.md
 docs/TASKS.md
-docs/design-system.md
 WORK_LOG.md
 HANDOFF.md
-web/src/components/measurement/DynamicMetricForm.tsx
-web/src/components/measurement/AttachmentUploader.tsx
-web/src/pages/measurement/SelectMetricPage.tsx
-web/src/App.css
-web/src/index.css
 ```
 
 ## Commands Run In Last Task

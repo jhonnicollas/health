@@ -1197,3 +1197,47 @@ Use this format for every task:
 
 ### Next Agent Notes
 - Continue US-1.2.4 only; do not start another checklist task until browser resize max 1280px and quality 50% compression are implemented and validated.
+
+## 2026-06-20 12:35 UTC - Agent: Antigravity (Audit Remediation)
+
+### Task
+- Task ID: AUDIT-FIX-US1.1.1-1.2.3
+- Sprint: Sprint 1
+- Status: Completed
+
+### Files Read
+- worker/src/index.ts
+- worker/test/register.test.mjs
+- docs/schema.sql
+- docs/seed.sql
+
+### Files Changed
+- worker/src/index.ts
+- docs/schema.sql
+- docs/seed.sql
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/TASKS.md
+
+### What Changed
+- Executed recommendations from audit for US-1.1.1 to US-1.2.3.
+- Fixed RangeError during date validation by properly handling invalid times in `validateOnboardingInput`.
+- Added `/api/auth/logout` endpoint in worker to clear session and HTTP-only cookie.
+- Added global error handler (`app.onError`) in worker to gracefully handle uncaught database or internal exceptions.
+- Updated database schema, seed data, and documentation to prepare `HL_systemConfigs` for dynamic limit and timeout extraction without hardcoding.
+
+### Validation
+- `npm --prefix worker run typecheck` - passed
+- `npm --prefix worker test` - passed (all 22 tests)
+
+### Documentation Updated
+- TASKS.md
+- ARCHITECTURE.md
+- api-contract.md
+- schema.sql
+- seed.sql
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue with US-1.2.4 (Client-Side Compression) since the audit fixes for earlier tasks are complete.
+- Make sure the UI fetches `maxUploadSizeBytes` dynamically from the config API once US-ADMIN.1 is implemented.

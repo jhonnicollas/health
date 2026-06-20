@@ -286,17 +286,19 @@ function validateOnboardingInput(input: OnboardingInput) {
 
   const birthDateMatches = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   const parsedBirthDate = new Date(`${birthDate}T00:00:00Z`)
-  const ageMs = Date.now() - parsedBirthDate.getTime()
+  const parsedTime = parsedBirthDate.getTime()
+  const ageMs = Date.now() - parsedTime
   const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000)
   const isRoundTripDate =
     birthDateMatches !== null &&
+    !Number.isNaN(parsedTime) &&
     parsedBirthDate.toISOString().slice(0, 10) === birthDate
 
   if (
     !birthDate ||
-    Number.isNaN(parsedBirthDate.getTime()) ||
+    Number.isNaN(parsedTime) ||
     !isRoundTripDate ||
-    parsedBirthDate.getTime() > Date.now()
+    parsedTime > Date.now()
   ) {
     details.push({ field: 'birthDate', message: 'Tanggal lahir wajib valid dan tidak boleh di masa depan.' })
   } else if (ageYears < MIN_ONBOARDING_AGE_YEARS) {
@@ -1583,6 +1585,34 @@ app.get('/api/metrics/catalog', async (c) => {
     const result = failure('INTERNAL_ERROR', 'Katalog metrik gagal diproses.', 500, [], startedAt)
     return jsonResponse(c, result)
   }
+})
+
+app.post('/api/auth/logout', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const revokeCurrentSessionStatement = await revokeCurrentSession(c)
+    if (revokeCurrentSessionStatement) {
+      await revokeCurrentSessionStatement.run()
+    }
+  } catch (error) {
+    console.error('logout failed', error)
+  }
+
+  setCookie(c, 'hlSession', '', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 0
+  })
+
+  return jsonResponse(c, success({ loggedOut: true }, 200, startedAt))
+})
+
+app.onError((error, c) => {
+  console.error('Unhandled Exception:', error)
+  const result = failure('INTERNAL_ERROR', 'Terjadi kesalahan sistem.', 500, [])
+  return jsonResponse(c, result)
 })
 
 export {
