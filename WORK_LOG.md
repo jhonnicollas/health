@@ -1543,3 +1543,68 @@ Final state of audit + fixes:
 - Audit US-1.2.4 to US-2.5.4 fully complete
 - E2E script at worker/scripts/e2e-uat.sh for future regression
 - All bugs found and fixed, no outstanding work
+
+
+## 2026-06-20 22:45 UTC — Agent: Antigravity
+
+### Task
+- Task ID: Audit Fixes (US-1.2.4 to US-2.5.4)
+- Sprint: 1
+- Status: Completed
+
+### Files Read
+- worker/src/index.ts
+- docs/seed-rules.generated.sql
+- docs/schema.sql
+- docs/seed.sql
+
+### Files Changed
+- worker/src/index.ts
+- docs/seed-rules.generated.sql
+- docs/schema.sql
+- docs/seed.sql
+
+### What Changed
+- Refactored /submit endpoint to use DB.batch() for atomic transactions.
+- Fixed AI Vision extraction endpoint timeout logic (aiTimeout to aiTimedOut).
+- Updated AI Vision model to @cf/meta/llama-3.2-11b-vision-instruct.
+- Fixed timezone retrieval logic in /dashboard/today, /reports/daily, and /caregiver/monitor/:userId endpoints to use user's local timezone.
+- Updated boundary overlaps/gaps in seed-rules.generated.sql (changed .9 to .999).
+- Added HL_systemConfigs schema definition to schema.sql and initial seed data in seed.sql.
+
+### Validation
+- npm run typecheck completed successfully.
+
+### Documentation Updated
+- HANDOFF.md
+
+
+## 2026-06-20 22:50 UTC — Agent: Antigravity
+
+### Task
+- Task ID: Agent Prompt & Commit/Push
+- Sprint: 2/3
+- Status: Completed
+
+### Files Read
+- docs/TASKS.md
+- HANDOFF.md
+
+### Files Changed
+- docs/PROMPT_SPRINT_3_4.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Created `docs/PROMPT_SPRINT_3_4.md` containing the highly detailed prompt for Sprint 3 and 4 execution based on the user's requirements.
+- Updated `HANDOFF.md` to reference the generated prompt.
+- Staged all changes and pushed them to the `main` branch.
+
+### Validation
+- git push successful.
+
+### Documentation Updated
+- docs/PROMPT_SPRINT_3_4.md
+- WORK_LOG.md
+- HANDOFF.md
+
