@@ -35,7 +35,7 @@ Rules:
 
 ### Epic 1.0.5 — Admin Configuration Management
 
-- [ ] **US-ADMIN.1 Config Management API**
+- [-] **US-ADMIN.1 Config Management API**
   - **Deskripsi**: CRUD API for HL_systemConfigs with role validation and cache invalidation.
   - **API Route**: `GET /api/admin/configs`, `PUT /api/admin/configs/:key`
   - **DB Table**: `HL_systemConfigs`

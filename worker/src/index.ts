@@ -17,6 +17,7 @@ type ApiErrorCode =
   | 'VALIDATION_ERROR'
   | 'EMAIL_ALREADY_EXISTS'
   | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
@@ -2980,95 +2981,6 @@ app.post('/api/privacy/deleteAccount', async (c) => {
   }
 })
 
-// Admin configs
-async function getSystemConfigNumberLocal(c: Context<{ Bindings: Env }>, configKey: string): Promise<number> {
-  const row = await c.env.DB.prepare(
-    `SELECT configValue FROM HL_systemConfigs WHERE configKey = ? LIMIT 1`
-  ).bind(configKey).first<{ configValue: string }>()
-  const value = Number(row?.configValue)
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new Error(`Invalid numeric system config: ${configKey}`)
-  }
-  return value
-}
-
-app.get('/api/admin/configs', async (c) => {
-  const startedAt = Date.now()
-  try {
-    const userId = await getCurrentSession(c)
-    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const user = await c.env.DB.prepare(`SELECT email FROM HL_users WHERE id = ?`).bind(userId).first<{ email: string }>()
-    const ADMIN_EMAILS = (c.env.ADMIN_EMAILS || '').split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean)
-    if (!user || !ADMIN_EMAILS.includes(user.email.toLowerCase())) return jsonResponse(c, failure('UNAUTHORIZED', 'Hanya admin.', 403, [], startedAt))
-    const rows = await c.env.DB.prepare(`SELECT configKey, configValue, dataType, description, updatedAt FROM HL_systemConfigs ORDER BY configKey ASC`).all()
-    return jsonResponse(c, success({ configs: rows.results || [] }, 200, startedAt))
-  } catch (error) {
-    console.error('admin configs error:', error)
-    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal muat config.', 500, [], startedAt))
-  }
-})
-
-app.put('/api/admin/configs/:key', async (c) => {
-  const startedAt = Date.now()
-  try {
-    const userId = await getCurrentSession(c)
-    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const user = await c.env.DB.prepare(`SELECT role FROM HL_users WHERE id = ?`).bind(userId).first<{ role: string }>()
-    if (!user || user.role !== 'admin') return jsonResponse(c, failure('UNAUTHORIZED', 'Hanya admin.', 403, [], startedAt))
-    const key = c.req.param('key')
-    const body = await c.req.json() as { configValue: string }
-    if (body.configValue === undefined) return jsonResponse(c, failure('VALIDATION_ERROR', 'configValue wajib.', 400, [], startedAt))
-    await c.env.DB.prepare(
-      `INSERT INTO HL_systemConfigs (configKey, configValue, dataType, updatedAt) VALUES (?, ?, 'string', CURRENT_TIMESTAMP)
-       ON CONFLICT(configKey) DO UPDATE SET configValue = excluded.configValue, updatedAt = CURRENT_TIMESTAMP`
-    ).bind(key, String(body.configValue)).run()
-    return jsonResponse(c, success({ updated: true, configKey: key }, 200, startedAt))
-  } catch (error) {
-    console.error('admin config update error:', error)
-    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update.', 500, [], startedAt))
-  }
-})
-
-// Telegram Webhook - receives messages from bot, links chat_id to user via verification code
-app.post('/api/telegram/webhook', async (c) => {
-  const startedAt = Date.now()
-  try {
-    const body = await c.req.json() as any
-    const message = body?.message
-    if (!message || !message.text || !message.chat) {
-      return c.json({ ok: true })
-    }
-    const chatId = String(message.chat.id)
-    const text = message.text.trim()
-    if (!/^\d{6}$/.test(text)) {
-      return c.json({ ok: true })
-    }
-    const codeHash = await sha256Token(text)
-    const link = await c.env.DB.prepare(
-      `SELECT userId FROM HL_telegramLinks WHERE verificationCodeHash = ? AND verified = 0`
-    ).bind(codeHash).first<{ userId: string }>()
-    if (!link) {
-      return c.json({ ok: true })
-    }
-    await c.env.DB.prepare(
-      `UPDATE HL_telegramLinks SET telegramChatId = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?`
-    ).bind(chatId, link.userId).run()
-    await c.env.DB.prepare(
-      `UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`
-    ).bind(link.userId).run()
-    if (c.env.TELEGRAM_BOT_TOKEN) {
-      await fetch(`https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: 'Telegram berhasil terhubung ke HL Health Companion. Notifikasi aktif.' })
-      }).catch(() => {})
-    }
-    return c.json({ ok: true })
-  } catch (error) {
-    console.error('telegram webhook error:', error)
-    return c.json({ ok: true })
-  }
-})
 
 app.onError((error, c) => {
   console.error('Unhandled Exception:', error)
@@ -3411,3 +3323,375 @@ app.post('/api/measurements/extract', async (c) => {
   }
 })
 
+
+// ============================================================
+// Sprint 3 - Family & Alert System Endpoints
+// ============================================================
+
+function isAdminUser(c: Context<{ Bindings: Env }>, user: UserRow): boolean {
+  const adminEmails = (c.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+  return adminEmails.includes(user.email.toLowerCase())
+}
+
+app.get('/api/admin/configs', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
+    const rows = await c.env.DB.prepare(
+      'SELECT configKey, configValue, dataType, description, updatedAt FROM HL_systemConfigs ORDER BY configKey'
+    ).all()
+    return jsonResponse(c, success({ configs: rows.results || [] }, 200, startedAt))
+  } catch (error) {
+    console.error('admin configs list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat konfigurasi.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/admin/configs/:configKey', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
+    const configKey = c.req.param('configKey')
+    const body = await c.req.json() as { configValue?: string }
+    if (!body.configValue && body.configValue !== '0' && body.configValue !== '') {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'configValue wajib.', 400, [], startedAt))
+    }
+    const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
+    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
+    await c.env.DB.prepare('UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = ?').bind(body.configValue, configKey).run()
+    await c.env.DB.prepare(
+      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configUpdate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(createId('aud'), user.id, configKey, JSON.stringify({ configKey, newValue: body.configValue })).run()
+    return jsonResponse(c, success({ updated: true, cacheInvalidated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin config update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update konfigurasi.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/telegram/verify', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { verificationCode?: string; telegramChatId?: string; telegramUsername?: string }
+    if (!body.verificationCode || !body.telegramChatId) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'verificationCode dan telegramChatId wajib.', 400, [], startedAt))
+    }
+    const codeHash = await sha256Token(body.verificationCode)
+    const link = await c.env.DB.prepare('SELECT id, verificationCodeHash FROM HL_telegramLinks WHERE userId = ? AND verified = 0').bind(userId).first<{ id: string; verificationCodeHash: string }>()
+    if (!link) return jsonResponse(c, failure('NOT_FOUND', 'Tidak ada kode verifikasi aktif.', 404, [], startedAt))
+    if (link.verificationCodeHash !== codeHash) return jsonResponse(c, failure('VALIDATION_ERROR', 'Kode verifikasi salah.', 400, [], startedAt))
+    await c.env.DB.batch([
+      c.env.DB.prepare('UPDATE HL_telegramLinks SET telegramChatId = ?, telegramUsername = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(body.telegramChatId, body.telegramUsername || null, link.id),
+      c.env.DB.prepare('UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId)
+    ])
+    await c.env.DB.prepare(
+      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(createId('aud'), userId, link.id, JSON.stringify({ telegramChatId: body.telegramChatId })).run()
+    return jsonResponse(c, success({ verified: true, enabled: true }, 200, startedAt))
+  } catch (error) {
+    console.error('telegram verify error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal verifikasi Telegram.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/telegram/settings', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { telegramSubmitSummary?: boolean; telegramEmergencyAlert?: boolean }
+    await c.env.DB.prepare(
+      "INSERT INTO HL_notificationSettings (id, userId, telegramSubmitSummary, telegramEmergencyAlert, createdAt, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(userId) DO UPDATE SET telegramSubmitSummary = excluded.telegramSubmitSummary, telegramEmergencyAlert = excluded.telegramEmergencyAlert, updatedAt = CURRENT_TIMESTAMP"
+    ).bind(createId('nts'), userId, body.telegramSubmitSummary ? 1 : 0, body.telegramEmergencyAlert ? 1 : 0).run()
+    return jsonResponse(c, success({ updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('telegram settings error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update pengaturan.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/family/links', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const owned = await c.env.DB.prepare(
+      "SELECT fl.id, fl.linkedUserId, u.displayName as linkedDisplayName, fl.role, fl.status, fl.canViewDashboard, fl.canInputMeasurement, fl.canReceiveAlert FROM HL_familyLinks fl LEFT JOIN HL_users u ON u.id = fl.linkedUserId WHERE fl.ownerUserId = ? ORDER BY fl.createdAt DESC"
+    ).bind(userId).all()
+    const linked = await c.env.DB.prepare(
+      "SELECT fl.id, fl.ownerUserId, u.displayName as ownerDisplayName, fl.role, fl.status, fl.canViewDashboard, fl.canInputMeasurement, fl.canReceiveAlert FROM HL_familyLinks fl LEFT JOIN HL_users u ON u.id = fl.ownerUserId WHERE fl.linkedUserId = ? ORDER BY fl.createdAt DESC"
+    ).bind(userId).all()
+    return jsonResponse(c, success({ ownedLinks: owned.results || [], linkedToMe: linked.results || [] }, 200, startedAt))
+  } catch (error) {
+    console.error('family links error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat data keluarga.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/family/caregiver/dashboard', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const caregiverId = await getCurrentSession(c)
+    if (!caregiverId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const links = await c.env.DB.prepare(
+      "SELECT fl.id, fl.ownerUserId, u.displayName, fl.role, fl.canViewDashboard, fl.canInputMeasurement, fl.canReceiveAlert FROM HL_familyLinks fl JOIN HL_users u ON u.id = fl.ownerUserId WHERE fl.linkedUserId = ? AND fl.status = 'active' AND fl.canViewDashboard = 1"
+    ).bind(caregiverId).all()
+    const profiles: Array<Record<string, unknown>> = []
+    for (const link of (links.results || []) as Array<{ ownerUserId: string; displayName: string; role: string; canViewDashboard: number; canInputMeasurement: number; canReceiveAlert: number }>) {
+      const lastSession = await c.env.DB.prepare('SELECT measuredAt FROM HL_measurementSessions WHERE userId = ? ORDER BY measuredAt DESC LIMIT 1').bind(link.ownerUserId).first<{ measuredAt: string }>()
+      const alerts = await c.env.DB.prepare('SELECT id, metricCode, finalValue, unit, severity, message, createdAt FROM HL_alerts WHERE userId = ? AND acknowledged = 0 ORDER BY createdAt DESC LIMIT 5').bind(link.ownerUserId).all()
+      profiles.push({ ownerUserId: link.ownerUserId, displayName: link.displayName, role: link.role, permissions: { canViewDashboard: !!link.canViewDashboard, canInputMeasurement: !!link.canInputMeasurement, canReceiveAlert: !!link.canReceiveAlert }, lastMeasurementAt: lastSession?.measuredAt || null, latestAlerts: alerts.results || [] })
+    }
+    return jsonResponse(c, success({ profiles }, 200, startedAt))
+  } catch (error) {
+    console.error('caregiver dashboard error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat dashboard caregiver.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/alerts/:id/acknowledge', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const alertId = c.req.param('id')
+    const alert = await c.env.DB.prepare('SELECT id, userId, acknowledged FROM HL_alerts WHERE id = ?').bind(alertId).first<{ id: string; userId: string; acknowledged: number }>()
+    if (!alert) return jsonResponse(c, failure('NOT_FOUND', 'Alert tidak ditemukan.', 404, [], startedAt))
+    if (alert.acknowledged === 1) return jsonResponse(c, success({ alreadyAcknowledged: true }, 200, startedAt))
+    if (alert.userId !== userId) {
+      const link = await c.env.DB.prepare("SELECT id FROM HL_familyLinks WHERE ownerUserId = ? AND linkedUserId = ? AND status = 'active' AND canReceiveAlert = 1").bind(alert.userId, userId).first()
+      if (!link) return jsonResponse(c, failure('FORBIDDEN', 'Tidak memiliki akses.', 403, [], startedAt))
+    }
+    await c.env.DB.prepare('UPDATE HL_alerts SET acknowledged = 1, acknowledgedBy = ?, acknowledgedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId, alertId).run()
+    await c.env.DB.prepare(
+      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'alertAcknowledge', 'HL_alerts', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(createId('aud'), userId, alertId, JSON.stringify({ alertId })).run()
+    return jsonResponse(c, success({ acknowledged: true, acknowledgedAt: new Date().toISOString() }, 200, startedAt))
+  } catch (error) {
+    console.error('alert acknowledge error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal acknowledge alert.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/alerts', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const severity = c.req.query('severity')
+    const acked = c.req.query('acknowledged')
+    const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100)
+    let sql = 'SELECT id, metricCode, finalValue, unit, status, severity, alertType, message, acknowledged, acknowledgedAt, createdAt FROM HL_alerts WHERE userId = ?'
+    const params: unknown[] = [userId]
+    if (severity) { sql += ' AND severity = ?'; params.push(severity) }
+    if (acked === 'false') { sql += ' AND acknowledged = 0' }
+    sql += ' ORDER BY createdAt DESC LIMIT ?'
+    params.push(limit)
+    const rows = await c.env.DB.prepare(sql).bind(...params).all()
+    return jsonResponse(c, success({ alerts: rows.results || [] }, 200, startedAt))
+  } catch (error) {
+    console.error('alerts list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat alert.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/notifications', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const status = c.req.query('status')
+    const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100)
+    let sql = 'SELECT id, channel, notificationType, title, message, status, createdAt FROM HL_notifications WHERE userId = ?'
+    const params: unknown[] = [userId]
+    if (status) { sql += ' AND status = ?'; params.push(status) }
+    sql += ' ORDER BY createdAt DESC LIMIT ?'
+    params.push(limit)
+    const rows = await c.env.DB.prepare(sql).bind(...params).all()
+    return jsonResponse(c, success({ notifications: rows.results || [] }, 200, startedAt))
+  } catch (error) {
+    console.error('notifications list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat notifikasi.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/notifications/browser/subscribe', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { endpoint?: string; keys?: { p256dh?: string; auth?: string }; userAgent?: string }
+    if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'endpoint, keys.p256dh, dan keys.auth wajib.', 400, [], startedAt))
+    }
+    await c.env.DB.prepare(
+      "INSERT INTO HL_pushSubscriptions (id, userId, endpoint, p256dh, auth, userAgent, enabled, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(endpoint) DO UPDATE SET userId = excluded.userId, p256dh = excluded.p256dh, auth = excluded.auth, userAgent = excluded.userAgent, updatedAt = CURRENT_TIMESTAMP"
+    ).bind(createId('psh'), userId, body.endpoint, body.keys.p256dh, body.keys.auth, body.userAgent || null).run()
+    await c.env.DB.prepare('UPDATE HL_users SET browserPushEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId).run()
+    return jsonResponse(c, success({ subscribed: true }, 201, startedAt))
+  } catch (error) {
+    console.error('push subscribe error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal subscribe push.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/reminders/:id', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const reminderId = c.req.param('id')
+    const body = await c.req.json() as { enabled?: boolean; time?: string; label?: string }
+    const existing = await c.env.DB.prepare('SELECT id FROM HL_reminderSettings WHERE id = ? AND userId = ?').bind(reminderId, userId).first()
+    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Reminder tidak ditemukan.', 404, [], startedAt))
+    const updates: string[] = []
+    const params: unknown[] = []
+    if (body.time) { updates.push('scheduleTime = ?'); params.push(body.time) }
+    if (body.enabled !== undefined) { updates.push('enabled = ?'); params.push(body.enabled ? 1 : 0) }
+    if (body.label) { updates.push('payloadJson = ?'); params.push(JSON.stringify({ label: body.label })) }
+    if (updates.length > 0) {
+      updates.push('updatedAt = CURRENT_TIMESTAMP')
+      params.push(reminderId, userId)
+      await c.env.DB.prepare(`UPDATE HL_reminderSettings SET ${updates.join(', ')} WHERE id = ? AND userId = ?`).bind(...params).run()
+    }
+    return jsonResponse(c, success({ updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('reminder update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update reminder.', 500, [], startedAt))
+  }
+})
+
+app.delete('/api/reminders/:id', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const reminderId = c.req.param('id')
+    await c.env.DB.prepare('DELETE FROM HL_reminderSettings WHERE id = ? AND userId = ?').bind(reminderId, userId).run()
+    return jsonResponse(c, success({ deleted: true }, 200, startedAt))
+  } catch (error) {
+    console.error('reminder delete error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal hapus reminder.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/medications', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const rows = await c.env.DB.prepare('SELECT id, medicationName, dosageText, scheduleText, active, createdAt FROM HL_medications WHERE userId = ? ORDER BY createdAt DESC').bind(userId).all()
+    return jsonResponse(c, success({ medications: rows.results || [] }, 200, startedAt))
+  } catch (error) {
+    console.error('medications list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat obat.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/medications', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { medicationName?: string; dosageText?: string; scheduleText?: string; active?: boolean; schedules?: Array<{ scheduleTime: string; timezone?: string }> }
+    if (!body.medicationName) return jsonResponse(c, failure('VALIDATION_ERROR', 'medicationName wajib.', 400, [], startedAt))
+    const medId = createId('med')
+    await c.env.DB.prepare('INSERT INTO HL_medications (id, userId, medicationName, dosageText, scheduleText, active, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(medId, userId, body.medicationName, body.dosageText || null, body.scheduleText || null, body.active !== false ? 1 : 0).run()
+    if (body.schedules && body.schedules.length > 0) {
+      for (const s of body.schedules) {
+        await c.env.DB.prepare('INSERT INTO HL_medicationSchedules (id, userId, medicationId, scheduleTime, timezone, active, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(createId('msc'), userId, medId, s.scheduleTime, s.timezone || 'Asia/Jakarta').run()
+      }
+    }
+    return jsonResponse(c, success({ medicationId: medId }, 201, startedAt))
+  } catch (error) {
+    console.error('medication create error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal tambah obat.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/medications/:id', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const medId = c.req.param('id')
+    const body = await c.req.json() as { medicationName?: string; dosageText?: string; scheduleText?: string; active?: boolean }
+    const existing = await c.env.DB.prepare('SELECT id FROM HL_medications WHERE id = ? AND userId = ?').bind(medId, userId).first()
+    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Obat tidak ditemukan.', 404, [], startedAt))
+    await c.env.DB.prepare('UPDATE HL_medications SET medicationName = COALESCE(?, medicationName), dosageText = COALESCE(?, dosageText), scheduleText = COALESCE(?, scheduleText), active = COALESCE(?, active), updatedAt = CURRENT_TIMESTAMP WHERE id = ? AND userId = ?').bind(body.medicationName || null, body.dosageText || null, body.scheduleText || null, body.active !== undefined ? (body.active ? 1 : 0) : null, medId, userId).run()
+    return jsonResponse(c, success({ updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('medication update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update obat.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/medications/:id/log', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const medId = c.req.param('id')
+    const body = await c.req.json() as { takenAt?: string; status?: string; note?: string }
+    const med = await c.env.DB.prepare('SELECT id FROM HL_medications WHERE id = ? AND userId = ?').bind(medId, userId).first()
+    if (!med) return jsonResponse(c, failure('NOT_FOUND', 'Obat tidak ditemukan.', 404, [], startedAt))
+    if (!['taken', 'skipped', 'missed', 'unknown'].includes(body.status || '')) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Status harus taken, skipped, missed, atau unknown.', 400, [], startedAt))
+    }
+    const logId = createId('mlog')
+    await c.env.DB.prepare('INSERT INTO HL_medicationLogs (id, userId, medicationId, takenAt, status, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(logId, userId, medId, body.takenAt || new Date().toISOString(), body.status, body.note || null).run()
+    return jsonResponse(c, success({ logId }, 201, startedAt))
+  } catch (error) {
+    console.error('medication log error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal log obat.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/medications/logs', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const from = c.req.query('from') || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const to = c.req.query('to') || new Date().toISOString()
+    const rows = await c.env.DB.prepare(
+      'SELECT ml.id, ml.medicationId, m.medicationName, ml.takenAt, ml.status, ml.note FROM HL_medicationLogs ml JOIN HL_medications m ON m.id = ml.medicationId WHERE ml.userId = ? AND ml.takenAt >= ? AND ml.takenAt <= ? ORDER BY ml.takenAt DESC LIMIT 100'
+    ).bind(userId, from, to).all()
+    return jsonResponse(c, success({ logs: rows.results || [] }, 200, startedAt))
+  } catch (error) {
+    console.error('medication logs error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat log obat.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/telegram/webhook', async (c) => {
+  try {
+    const body = await c.req.json() as { message?: { chat?: { id?: number; username?: string }; text?: string } }
+    const message = body?.message
+    if (!message?.text || !message?.chat?.id) return c.json({ ok: true })
+    const text = message.text.trim()
+    if (/^HL-\d{6}$/.test(text)) {
+      const codeHash = await sha256Token(text)
+      const link = await c.env.DB.prepare('SELECT id, userId FROM HL_telegramLinks WHERE verificationCodeHash = ? AND verified = 0').bind(codeHash).first<{ id: string; userId: string }>()
+      if (link) {
+        await c.env.DB.batch([
+          c.env.DB.prepare('UPDATE HL_telegramLinks SET telegramChatId = ?, telegramUsername = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(String(message.chat.id), message.chat.username || null, link.id),
+          c.env.DB.prepare('UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(link.userId)
+        ])
+        await c.env.DB.prepare(
+          "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
+        ).bind(createId('aud'), link.userId, link.id, JSON.stringify({ telegramChatId: String(message.chat.id) })).run()
+      }
+    }
+    return c.json({ ok: true })
+  } catch (error) {
+    console.error('telegram webhook error:', error)
+    return c.json({ ok: true })
+  }
+})
