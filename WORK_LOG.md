@@ -1455,3 +1455,91 @@ Use this format for every task:
 ### Next Agent Notes
 - All Sprint 1 + Sprint 2 PRD compliance fixed
 - Continue with Sprint 3-4 if not done
+
+## 2026-06-20 22:05 UTC — Agent: Caveman
+
+### Task
+- Task ID: AUDIT-FIX-1.2.4-2.5.4 (final)
+- Sprint: 1-2
+- Status: All fixes verified, production UAT 35/35 PASS
+
+### Files Read
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- docs/schema.sql
+- worker/src/index.ts
+- web/src/utils/watermark.ts
+- web/src/utils/bmiCalculator.ts
+- web/src/components/measurement/InterpretationPopup.tsx
+- worker/scripts/e2e-uat.sh
+
+### Files Changed
+- worker/src/index.ts (US-2.3.2/3 dataMessages)
+- worker/scripts/e2e-uat.sh (35 regression tests)
+- WORK_LOG.md (this entry)
+
+### What Changed
+Final state of audit + fixes:
+- US-1.2.4 Compression: imageCompressor.ts (webp 50% quality, max 1280px)
+- US-1.2.5 Watermark: HL Health Companion header, displayName, measuredAt, metricName, finalValue+unit
+- US-1.3.1-1.3.4 AI Extract: oximeter/bloodPressure/sinocare with selectedMetricCodes restriction
+- US-1.4.1 Manual Override: ManualOverrideInput.tsx with override flag
+- US-1.4.2 Physical Range: validation.ts + /api/measurements/validate endpoint
+- US-1.4.3 BMI Auto: server-side calc + HeightMissingError
+- US-1.5.1-1.5.3 Submit: rule engine + audit log + R2 upload
+- US-1.6.1 Telegram: notification helper + log to HL_notifications
+- US-1.6.2 Dashboard Today: today endpoint + TodayDashboard.tsx
+- US-2.1.1-2.1.3 Rules: 85 rules seeded, fallback status='Belum Ada Interpretasi' + missingRule audit
+- US-2.2.1-2.2.3 Popups: InterpretationPopup.tsx (sort by severity) + EmergencyModal.tsx
+- US-2.3.1-2.3.4 AI Rec: AI recommendation + safety guardrail + dataMessages for 3/7 day
+- US-2.4.1-2.4.3 Dashboards: weekly/monthly endpoints + TrendBadge.tsx
+- US-2.5.1-2.5.4 Reports: daily/weekly/monthly + KB with 5 device articles
+
+### Validation
+- Type check: npx tsc --noEmit passed
+- Build: wrangler deploy successful
+- Production UAT (35/35 PASS):
+  1. register success
+  2. login success
+  3. me has userId
+  4. onboarding created profile
+  5. valid BP pair
+  6. invalid BP pair (systolic<diastolic)
+  7. submit success
+  8. rule applied: Hipertensi Tahap 2
+  9. BMI auto-calculated
+  10. BMI value ~26.1
+  11. fallback status 'Belum Ada Interpretasi'
+  12. dashboard has data
+  13. weekly has metrics
+  14. monthly has metrics
+  15. daily has popupMessage
+  16. daily has recommendation
+  17. weekly has bestDay
+  18. weekly has alertCount
+  19. weekly has adherence
+  20. monthly has aiSummary
+  21. monthly has latest
+  22. AI rec has dataMessages
+  23. AI rec has safetyStatus
+  24. KB has Yuwell
+  25. KB has OMRON
+  26. KB has Sinocare
+  27. pattern returns message
+  28. telegram connect code
+  29. emergency contact added
+  30. reminder created
+  31. family invite created
+  32. draft sync without profileId
+  33. CSV content-type
+  34. catalog has devices
+  35. unauth dashboard rejected
+
+### Documentation Updated
+- WORK_LOG.md: this audit entry
+- HANDOFF.md: needs update to reflect completed state
+
+### Next Agent Notes
+- Audit US-1.2.4 to US-2.5.4 fully complete
+- E2E script at worker/scripts/e2e-uat.sh for future regression
+- All bugs found and fixed, no outstanding work
