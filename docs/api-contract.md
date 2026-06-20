@@ -240,6 +240,7 @@ Cache-Control: public, max-age=300
 | `FORBIDDEN` | 403 | User tidak punya permission |
 | `NOT_FOUND` | 404 | Resource tidak ditemukan |
 | `VALIDATION_ERROR` | 400 | Input tidak valid |
+| `EMAIL_ALREADY_EXISTS` | 409 | Email register sudah terdaftar |
 | `RATE_LIMITED` | 429 | Terlalu banyak request |
 | `AI_TIMEOUT` | 408 | AI Vision melewati batas 5 detik |
 | `AI_PARSE_FAILED` | 422 | AI response tidak bisa diparse |
@@ -441,6 +442,24 @@ POST /api/auth/register
 }
 ```
 
+### Duplicate Email Response 409
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "EMAIL_ALREADY_EXISTS",
+    "message": "Email sudah terdaftar.",
+    "details": [
+      {
+        "field": "email",
+        "message": "Gunakan email lain atau login."
+      }
+    ]
+  }
+}
+```
+
 ### Writes
 
 ```text
@@ -475,9 +494,12 @@ POST /api/auth/login
     "user": {
       "id": "usr_01h...",
       "email": "user@example.com",
-      "displayName": "Budi"
+      "displayName": "Budi",
+      "telegramEnabled": false,
+      "browserPushEnabled": false
     },
-    "requiresOnboarding": false
+    "profile": null,
+    "requiresOnboarding": true
   }
 }
 ```
@@ -562,6 +584,13 @@ GET /api/auth/me
 GET /api/profile
 ```
 
+### Auth
+
+```text
+Requires authenticated `hlSession` cookie.
+Returns 404 NOT_FOUND if onboarding/profile is not complete.
+```
+
 ### Response 200
 
 ```json
@@ -606,6 +635,19 @@ POST /api/profile/onboarding
 }
 ```
 
+### Validation
+
+```text
+Requires authenticated `hlSession` cookie.
+displayName: minimum 2 characters.
+sex: one of male, female, other.
+birthDate: valid YYYY-MM-DD date, not future, minimum age 13 years.
+heightCm: numeric, 50 to 250 cm.
+timezone: valid IANA timezone string, e.g. Asia/Jakarta.
+theme: one of light, warm, dark, highContrast.
+accessibilityMode: one of normal, senior, highContrast.
+```
+
 ### Response 201
 
 ```json
@@ -618,11 +660,30 @@ POST /api/profile/onboarding
 }
 ```
 
+### Already Completed Response 400
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Onboarding sudah selesai.",
+    "details": [
+      {
+        "field": "profile",
+        "message": "Profil kesehatan sudah dibuat."
+      }
+    ]
+  }
+}
+```
+
 ### Writes
 
 ```text
 HL_userProfiles
 HL_userConsents
+HL_users.displayName update
 HL_auditLogs
 ```
 
@@ -643,6 +704,18 @@ PUT /api/profile
   "theme": "warm",
   "accessibilityMode": "senior"
 }
+```
+
+### Validation
+
+```text
+Requires authenticated `hlSession` cookie.
+heightCm: numeric, 50 to 250 cm.
+timezone: valid IANA timezone string, e.g. Asia/Jakarta.
+theme: optional; one of light, warm, dark, highContrast.
+accessibilityMode: optional; one of normal, senior, highContrast.
+Returns 404 NOT_FOUND if onboarding/profile is not complete.
+Writes `profileUpdate` to HL_auditLogs.
 ```
 
 ### Response 200
@@ -688,8 +761,12 @@ active=true
             "metricCode": "spo2",
             "metricName": "Saturasi Oksigen",
             "unit": "%",
+            "inputType": "mixed",
             "requiresAttachment": true,
+            "requiresSex": false,
             "requiresFasting": false,
+            "isCalculated": false,
+            "requiredMetric": true,
             "physicalMin": 0,
             "physicalMax": 100
           }
@@ -707,6 +784,13 @@ active=true
 HL_devices
 HL_metricCatalog
 HL_deviceMetrics
+```
+
+### Notes
+
+```text
+Frontend checklist must render from the active database rows returned by this endpoint.
+requiredMetric comes from HL_deviceMetrics and identifies required vs optional device metrics.
 ```
 
 ---
@@ -2644,6 +2728,16 @@ PUT /api/settings/ui
   "theme": "dark",
   "accessibilityMode": "senior"
 }
+```
+
+### Validation
+
+```text
+Requires authenticated `hlSession` cookie.
+theme: one of light, warm, dark, highContrast.
+accessibilityMode: one of normal, senior, highContrast.
+Returns 404 NOT_FOUND if onboarding/profile is not complete.
+Writes `uiSettingsUpdate` to HL_auditLogs.
 ```
 
 ### Response 200

@@ -211,6 +211,24 @@ Saving base64 image to D1
 Saving unwatermarked evidence image
 ```
 
+## 6.2.1 Onboarding Profile Gate
+
+New users must complete `POST /api/profile/onboarding` before reaching the
+dashboard. The Worker authenticates the existing `hlSession` cookie, validates
+profile fields, writes `HL_userProfiles`, records AI consent in
+`HL_userConsents`, updates `HL_users.displayName`, and appends a
+`profileOnboardingComplete` audit log. The frontend refreshes
+`GET /api/auth/me` after success so `requiresOnboarding` becomes `false` and the
+SPA continues to `/dashboard`.
+
+After onboarding, `GET /api/profile`, `PUT /api/profile`, and
+`PUT /api/settings/ui` operate only on the authenticated user's existing
+`HL_userProfiles` row. Profile updates validate height and timezone, UI updates
+validate theme/accessibility enums, and both write `HL_auditLogs` entries. The
+React app applies `profile.theme` to `data-theme` and
+`profile.accessibilityMode` to `data-accessibility` on the document root after
+auth refresh.
+
 ---
 
 ## 6.3 Fast Path First
@@ -528,6 +546,10 @@ HL_alerts
 HL_notifications
 HL_auditLogs
 ```
+
+The measurement checklist is catalog-driven. `GET /api/metrics/catalog` reads
+`HL_devices`, `HL_deviceMetrics`, and `HL_metricCatalog`, then the frontend
+renders active device/metric rows without a hardcoded metric whitelist.
 
 ### 12.2 Notification and Sharing Tables
 

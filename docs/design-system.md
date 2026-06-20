@@ -510,6 +510,11 @@ Validation status
 Interpretation preview
 ```
 
+Sprint 1 dynamic cards are rendered by `DynamicMetricForm` from the selected
+metric checklist rows. Hidden cards must unmount when the related checkbox is
+unchecked, and calculated metrics render a disabled value field until BMI/other
+calculated logic is implemented.
+
 State:
 
 ```text
@@ -546,6 +551,10 @@ Upload Gambar
 Ganti Foto
 Hapus Foto
 ```
+
+Sprint 1 `AttachmentUploader` accepts only JPG/PNG/WebP, uses
+`capture="environment"` for native camera support, shows a local preview, and
+does not upload or persist original images.
 
 ---
 
@@ -723,6 +732,34 @@ Required fields harus jelas.
 Tidak boleh lanjut jika heightCm invalid.
 ```
 
+Sprint 1 implementation note:
+
+```text
+Until the shared wizard shell exists, onboarding may render the four logical
+steps as one responsive form if required fields, inline validation, and large
+tap targets are preserved.
+```
+
+## 11.2.1 Profile Settings Page
+
+Profile settings can reuse the same form primitives as onboarding for Sprint 1.
+It must allow editing:
+
+```text
+heightCm
+timezone
+theme
+accessibilityMode
+```
+
+Saving theme and accessibility mode must refresh auth/profile state and apply
+the current values to document attributes:
+
+```text
+data-theme
+data-accessibility
+```
+
 ---
 
 ## 11.3 New Measurement Page
@@ -736,6 +773,10 @@ Validate button
 Interpretation popup
 Submit button
 ```
+
+Checklist metric renders active device groups and metric rows from
+`GET /api/metrics/catalog`. Each row shows unit/calculated state plus required
+photo, fasting, sex-profile, and optional flags.
 
 Mobile layout:
 

@@ -55,7 +55,7 @@ Rules:
 
 ### Epic 1.1 — Auth and User Profile
 
-- [ ] **US-1.1.1 Register User**
+- [x] **US-1.1.1 Register User**
   - **Deskripsi**: Create registration API, validation, password hashing, audit log.
   - **API Route**: `POST /api/auth/register`
   - **DB Table**: `HL_users`, `HL_auditLogs` (insert)
@@ -65,17 +65,17 @@ Rules:
     - Password di-hash (bcrypt/argon2 equivalen).
     - Mencetak log `userRegister` ke audit log.
 
-- [ ] **US-1.1.2 Login User**
+- [x] **US-1.1.2 Login User**
   - **Deskripsi**: Create login API, session/JWT handling, protected route behavior.
   - **API Route**: `POST /api/auth/login`
   - **DB Table**: `HL_users` (read)
   - **Frontend**: `web/src/pages/auth/LoginPage.tsx`, `web/src/context/AuthContext.tsx`
   - **Acceptance Criteria**:
     - Menolak password salah.
-    - Mengembalikan `sessionToken` / JWT.
+    - Mengembalikan session melalui cookie HTTP-only `hlSession`.
     - Autentikasi persisten di frontend.
 
-- [ ] **US-1.1.3 Onboarding Profil Kesehatan**
+- [x] **US-1.1.3 Onboarding Profil Kesehatan**
   - **Deskripsi**: Create onboarding form/API for displayName, sex, birthDate, heightCm, timezone.
   - **API Route**: `POST /api/profile/onboarding`
   - **DB Table**: `HL_userProfiles` (insert)
@@ -84,7 +84,7 @@ Rules:
     - Validasi umur minimum.
     - Validasi `heightCm` logis.
 
-- [ ] **US-1.1.4 Edit Profil Dasar**
+- [x] **US-1.1.4 Edit Profil Dasar**
   - **Deskripsi**: Settings page/API for heightCm, timezone, theme, accessibilityMode.
   - **API Route**: `PUT /api/settings/ui`, `PUT /api/profile`
   - **DB Table**: `HL_userProfiles` (update)
@@ -95,7 +95,7 @@ Rules:
 
 ### Epic 1.2 — Measurement Input
 
-- [ ] **US-1.2.1 Checklist Jenis Pengukuran**
+- [x] **US-1.2.1 Checklist Jenis Pengukuran**
   - **Deskripsi**: Dynamic checklist for all supported measurement types.
   - **API Route**: `GET /api/metrics/catalog`
   - **DB Table**: `HL_metricCatalog`, `HL_devices` (read)
@@ -103,7 +103,7 @@ Rules:
   - **Acceptance Criteria**:
     - Checklist merender metrik dari database.
 
-- [ ] **US-1.2.2 Dynamic Form per Metric**
+- [x] **US-1.2.2 Dynamic Form per Metric**
   - **Deskripsi**: Show/hide metric cards based on checklist.
   - **API Route**: -
   - **DB Table**: -
@@ -111,7 +111,7 @@ Rules:
   - **Acceptance Criteria**:
     - Form dinamis muncul hanya untuk metrik yang dicentang.
 
-- [ ] **US-1.2.3 Foto atau Upload Attachment**
+- [x] **US-1.2.3 Foto atau Upload Attachment**
   - **Deskripsi**: Camera/upload input, preview, file validation.
   - **API Route**: -
   - **DB Table**: -
@@ -120,7 +120,7 @@ Rules:
     - Hanya menerima format gambar.
     - Bisa membuka kamera native (`capture="environment"`).
 
-- [ ] **US-1.2.4 Client-Side Compression**
+- [-] **US-1.2.4 Client-Side Compression**
   - **Deskripsi**: Browser resize max 1280px and quality 50%.
   - **API Route**: -
   - **DB Table**: -

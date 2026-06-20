@@ -7,37 +7,71 @@ This file must be updated by every agent at task start, task completion, and int
 ```text
 Project: HL Health Companion
 Current Sprint: Sprint 1
-Current Task: None assigned
-Current State: Ready for implementation
-Last Completed Task: DOC-README (Created root README.md)
-Last Updated: 2026-06-20 09:30 UTC
+Current Task: US-1.2.4 Client-Side Compression
+Current State: In Progress
+Last Completed Task: US-1.2.3 Foto atau Upload Attachment
+Last Updated: 2026-06-20 12:17 UTC
 ```
 
 ## Current Owner
 
 ```text
-Agent: None
-Task ID: None
+Agent: Codex
+Task ID: US-1.2.4
 Branch: None
 ```
 
 ## Last Completed Work
 
-Completed document audit, DB configuration updates, and workspace configuration:
-- Added root `README.md` containing tech stack, structure, configurations, and protocols.
-- Added missing `profileId` to API validate endpoint, and maxFileSize to AI extract endpoint limit.
-- Added `/api/measurements/sync` for PWA offline drafts and R2 orphan cleanup cron job.
-- Cleaned schema.sql to be DDL-only and added missing metric rules to seed.sql.
-- Configured monorepo with `web` and `worker` workspaces.
+Completed US-1.2.3 Foto atau Upload Attachment:
+- Added `web/src/components/measurement/AttachmentUploader.tsx`.
+- Uploader accepts JPG/PNG/WebP only, supports native camera via `capture="environment"`, and shows a local preview.
+- Uploader mounts only for selected metrics where `requiresAttachment` is true.
+- This task does not upload to R2 and does not persist original images.
+- Updated `docs/design-system.md`.
 
 ## Required First Implementation Step
 
-Start Sprint 1 Auth and User Profile.
+Continue Sprint 1 Measurement Input.
 
 Recommended first task:
 
 ```text
-US-1.1.1 Register User
+US-1.2.4 Client-Side Compression
+```
+
+## Files Changed In Last Task
+
+```text
+docs/TASKS.md
+docs/design-system.md
+WORK_LOG.md
+HANDOFF.md
+web/src/components/measurement/DynamicMetricForm.tsx
+web/src/components/measurement/AttachmentUploader.tsx
+web/src/pages/measurement/SelectMetricPage.tsx
+web/src/App.css
+web/src/index.css
+```
+
+## Commands Run In Last Task
+
+```text
+npm --prefix web run build
+npm --prefix web run lint
+Mobile viewport smoke via Chrome/Playwright at 390x844
+git diff --check
+```
+
+## Known Issues
+
+```text
+User/context supplied docs/PRD.docx.md and docs/PRD_UserStory.docx.md; original DOCX files currently appear deleted in git status. Do not restore them unless explicitly requested.
+No known issues for US-1.1.3.
+No known issues for US-1.1.4.
+No known issues for US-1.2.1.
+No known issues for US-1.2.2.
+No known issues for US-1.2.3.
 ```
 
 
@@ -63,8 +97,8 @@ agent.ai
 TASKS.md
 WORK_LOG.md
 HANDOFF.md
-PRD.docx
-PRD_UserStory.docx
+PRD.docx.md
+PRD_UserStory.docx.md
 ARCHITECTURE.md
 api-contract.md
 schema.sql

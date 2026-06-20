@@ -25,8 +25,8 @@ Every agent must prioritize resume-safe work. Any sprint may be interrupted, so 
 
 Before starting any task, every agent must read these files in this order:
 
-1. `PRD.docx` or exported PRD markdown, if available
-2. `PRD_UserStory.docx` or exported user story markdown, if available
+1. `PRD.docx.md` or exported PRD markdown, if available
+2. `PRD_UserStory.docx.md` or exported user story markdown, if available
 3. `ARCHITECTURE.md`
 4. `api-contract.md`
 5. `schema.sql`
@@ -518,7 +518,7 @@ Use this prompt when assigning a task to an AI agent:
 
 ```text
 You are working on HL Health Companion.
-Read AGENTS.md first, then TASKS.md, WORK_LOG.md, HANDOFF.md, PRD, User Stories, ARCHITECTURE.md, api-contract.md, schema.sql, seed.sql, and design-system.md.
+Read AGENTS.md first, then TASKS.md, WORK_LOG.md, HANDOFF.md, PRD.docx.md, User Stories, ARCHITECTURE.md, api-contract.md, schema.sql, seed.sql, and design-system.md.
 Pick only the specified task.
 Do not work on unrelated files.
 Use TASKS.md as the absolute single source of truth. Before coding, mark the task as In Progress [-] in TASKS.md and append a Started entry in WORK_LOG.md.
