@@ -120,7 +120,7 @@ Rules:
     - Hanya menerima format gambar.
     - Bisa membuka kamera native (`capture="environment"`).
 
-- [-] **US-1.2.4 Client-Side Compression**
+- [x] **US-1.2.4 Client-Side Compression**
   - **Deskripsi**: Browser resize max 1280px and quality 50%.
   - **API Route**: -
   - **DB Table**: -
@@ -128,7 +128,7 @@ Rules:
   - **Acceptance Criteria**:
     - Gambar di-*resize* secara lokal sebelum upload.
 
-- [ ] **US-1.2.5 Watermark Attachment Final**
+- [x] **US-1.2.5 Watermark Attachment Final**
   - **Deskripsi**: Browser canvas watermark before submit.
   - **API Route**: -
   - **DB Table**: -
@@ -138,7 +138,7 @@ Rules:
 
 ### Epic 1.3 — AI Vision Extraction
 
-- [ ] **US-1.3.1 AI Extract Oximeter**
+- [x] **US-1.3.1 AI Extract Oximeter**
   - **Deskripsi**: Extract spo2 and heartRate with 5s timeout.
   - **API Route**: `POST /api/measurements/extract`
   - **DB Table**: `HL_aiExtractions` (insert)
@@ -148,7 +148,7 @@ Rules:
     - Max limit 2MB harus dibaca dari HL_systemConfigs (maxUploadSizeBytes).
     - AI Vision mengambil nilai Spo2 & HR.
 
-- [ ] **US-1.3.2 AI Extract Tensimeter**
+- [x] **US-1.3.2 AI Extract Tensimeter**
   - **Deskripsi**: Extract systolic, diastolic, bloodPressurePulse.
   - **API Route**: `POST /api/measurements/extract`
   - **DB Table**: `HL_aiExtractions` (insert)
@@ -156,7 +156,7 @@ Rules:
   - **Acceptance Criteria**:
     - AI Vision mengambil nilai tekanan darah dengan akurat.
 
-- [ ] **US-1.3.3 AI Extract Sinocare GCU**
+- [x] **US-1.3.3 AI Extract Sinocare GCU**
   - **Deskripsi**: Extract only selected Sinocare metric (Glucose/Cholesterol/Uric Acid).
   - **API Route**: `POST /api/measurements/extract`
   - **DB Table**: `HL_aiExtractions` (insert)
@@ -164,7 +164,7 @@ Rules:
   - **Acceptance Criteria**:
     - Bisa membedakan mode metrik sesuai form terpilih.
 
-- [ ] **US-1.3.4 AI Timeout 5 Detik**
+- [x] **US-1.3.4 AI Timeout 5 Detik**
   - **Deskripsi**: Implement timeout fallback and HL_aiExtractions log.
   - **API Route**: `POST /api/measurements/extract`
   - **DB Table**: `HL_aiExtractions`
@@ -176,7 +176,7 @@ Rules:
 
 ### Epic 1.4 — Manual Override and Validation
 
-- [ ] **US-1.4.1 Manual Override Angka AI**
+- [x] **US-1.4.1 Manual Override Angka AI**
   - **Deskripsi**: Compare rawAiValue vs finalValue.
   - **API Route**: -
   - **DB Table**: -
@@ -185,7 +185,7 @@ Rules:
     - Field AI hasil ekstraksi bisa diedit.
     - Flag `manualOverride` di-set true jika diedit.
 
-- [ ] **US-1.4.2 Validasi Physical Range**
+- [x] **US-1.4.2 Validasi Physical Range**
   - **Deskripsi**: Reject impossible values and invalid BP pairs.
   - **API Route**: `POST /api/measurements/validate`
   - **DB Table**: -
@@ -193,7 +193,7 @@ Rules:
   - **Acceptance Criteria**:
     - Diastolic tidak boleh lebih besar dari Systolic.
 
-- [ ] **US-1.4.3 BMI Auto Calculate**
+- [x] **US-1.4.3 BMI Auto Calculate**
   - **Deskripsi**: Calculate BMI from bodyWeight and heightCm.
   - **API Route**: -
   - **DB Table**: -
@@ -203,7 +203,7 @@ Rules:
 
 ### Epic 1.5 — Submit and Storage
 
-- [ ] **US-1.5.1 Submit Measurement Session**
+- [x] **US-1.5.1 Submit Measurement Session**
   - **Deskripsi**: Batch insert session and values into D1.
   - **API Route**: `POST /api/measurements/submit`
   - **DB Table**: `HL_measurementSessions`, `HL_measurementValues`
@@ -211,7 +211,7 @@ Rules:
   - **Acceptance Criteria**:
     - Disimpan dalam transaksi D1 yang atomik.
 
-- [ ] **US-1.5.2 Save Final Attachment ke R2**
+- [x] **US-1.5.2 Save Final Attachment ke R2**
   - **Deskripsi**: Upload only final compressed watermarked file.
   - **API Route**: `POST /api/measurements/submit`
   - **DB Table**: `HL_measurementAttachments`, R2 (`LOGS`)
@@ -219,7 +219,7 @@ Rules:
   - **Acceptance Criteria**:
     - Gambar masuk ke R2 bucket dengan key UUID yang aman.
 
-- [ ] **US-1.5.3 Audit Log Submit**
+- [x] **US-1.5.3 Audit Log Submit**
   - **Deskripsi**: Log measurementSubmit and manualOverride metadata.
   - **API Route**: `POST /api/measurements/submit`
   - **DB Table**: `HL_auditLogs`
@@ -229,7 +229,7 @@ Rules:
 
 ### Epic 1.6 — Telegram Push and Daily Dashboard
 
-- [ ] **US-1.6.1 Telegram Push Setelah Submit**
+- [x] **US-1.6.1 Telegram Push Setelah Submit**
   - **Deskripsi**: Enqueue/send non-blocking Telegram summary.
   - **API Route**: Queue Event `telegramSubmitSummary`
   - **DB Table**: `HL_notifications`
@@ -237,7 +237,7 @@ Rules:
   - **Acceptance Criteria**:
     - API tidak menunggu balasan Telegram untuk merespons 200 OK.
 
-- [ ] **US-1.6.2 Dashboard Hari Ini**
+- [x] **US-1.6.2 Dashboard Hari Ini**
   - **Deskripsi**: Show latest daily values and empty states.
   - **API Route**: `GET /api/dashboard/today`
   - **DB Table**: `HL_measurementValues`
@@ -251,7 +251,7 @@ Rules:
 
 ### Epic 2.1 — Metric Rules Engine
 
-- [ ] **US-2.1.1 Seed Metric Rules dari CSV**
+- [x] **US-2.1.1 Seed Metric Rules dari CSV**
   - **Deskripsi**: Seed HL_metricRules idempotently.
   - **API Route**: - (Seeder script)
   - **DB Table**: `HL_metricRules` (insert)
@@ -259,7 +259,7 @@ Rules:
   - **Acceptance Criteria**:
     - Data rule dari CSV/SQL seed berhasil dimasukkan ke D1.
 
-- [ ] **US-2.1.2 Evaluate Metric Status**
+- [x] **US-2.1.2 Evaluate Metric Status**
   - **Deskripsi**: Resolve rule by metric, sex, age, finalValue.
   - **API Route**: `POST /api/measurements/validate`
   - **DB Table**: `HL_metricRules` (read)
@@ -267,7 +267,7 @@ Rules:
   - **Acceptance Criteria**:
     - Menghasilkan status dan severity yang akurat sesuai range.
 
-- [ ] **US-2.1.3 Rule Fallback**
+- [x] **US-2.1.3 Rule Fallback**
   - **Deskripsi**: Safe fallback when rule is missing.
   - **API Route**: `POST /api/measurements/validate`
   - **DB Table**: `HL_metricRules`
@@ -277,7 +277,7 @@ Rules:
 
 ### Epic 2.2 — Popup Interpretasi
 
-- [ ] **US-2.2.1 Popup Setelah Validasi**
+- [x] **US-2.2.1 Popup Setelah Validasi**
   - **Deskripsi**: Show metricName, finalValue, status, severity, sourceLabel.
   - **API Route**: -
   - **DB Table**: -
@@ -285,7 +285,7 @@ Rules:
   - **Acceptance Criteria**:
     - Menampilkan penjelasan dari rules engine secara pop-up.
 
-- [ ] **US-2.2.2 Popup Multi Metric**
+- [x] **US-2.2.2 Popup Multi Metric**
   - **Deskripsi**: Show grouped interpretation for all metrics in session.
   - **API Route**: -
   - **DB Table**: -
@@ -293,7 +293,7 @@ Rules:
   - **Acceptance Criteria**:
     - UI menangani kasus tensimeter di mana 3 metrik divalidasi sekaligus.
 
-- [ ] **US-2.2.3 Emergency Warning Modal**
+- [x] **US-2.2.3 Emergency Warning Modal**
   - **Deskripsi**: Require acknowledgment for emergency severity.
   - **API Route**: -
   - **DB Table**: -
@@ -303,7 +303,7 @@ Rules:
 
 ### Epic 2.3 — AI Recommendation
 
-- [ ] **US-2.3.1 Generate AI Recommendation Setelah Submit**
+- [x] **US-2.3.1 Generate AI Recommendation Setelah Submit**
   - **Deskripsi**: Generate safe recommendation after submit.
   - **API Route**: `POST /api/ai/recommendation`
   - **DB Table**: `HL_recommendations`
@@ -311,7 +311,7 @@ Rules:
   - **Acceptance Criteria**:
     - Menggunakan Worker AI text model.
 
-- [ ] **US-2.3.2 Compare Hari Ini vs 3 Hari**
+- [x] **US-2.3.2 Compare Hari Ini vs 3 Hari**
   - **Deskripsi**: Compute today vs previous 3-day average.
   - **API Route**: `POST /api/ai/recommendation`
   - **DB Table**: `HL_measurementValues`
@@ -319,7 +319,7 @@ Rules:
   - **Acceptance Criteria**:
     - Input ke LLM mencakup data 3 hari terakhir.
 
-- [ ] **US-2.3.3 Compare Hari Ini vs 7 Hari**
+- [x] **US-2.3.3 Compare Hari Ini vs 7 Hari**
   - **Deskripsi**: Compute today vs previous 7-day average.
   - **API Route**: `POST /api/ai/recommendation`
   - **DB Table**: `HL_measurementValues`
@@ -327,7 +327,7 @@ Rules:
   - **Acceptance Criteria**:
     - Input ke LLM mencakup data 7 hari terakhir.
 
-- [ ] **US-2.3.4 AI Safety Guardrail**
+- [x] **US-2.3.4 AI Safety Guardrail**
   - **Deskripsi**: Reject diagnosis/prescription-like AI output.
   - **API Route**: `POST /api/ai/recommendation`
   - **DB Table**: -
@@ -337,7 +337,7 @@ Rules:
 
 ### Epic 2.4 — Dashboard Mingguan dan Bulanan
 
-- [ ] **US-2.4.1 Weekly Dashboard**
+- [x] **US-2.4.1 Weekly Dashboard**
   - **Deskripsi**: 7-day trend charts.
   - **API Route**: `GET /api/dashboard/weekly`
   - **DB Table**: `HL_measurementValues`
@@ -345,7 +345,7 @@ Rules:
   - **Acceptance Criteria**:
     - Menampilkan Line/Bar chart 7 hari.
 
-- [ ] **US-2.4.2 Monthly Dashboard**
+- [x] **US-2.4.2 Monthly Dashboard**
   - **Deskripsi**: 30-day summary cards.
   - **API Route**: `GET /api/dashboard/monthly`
   - **DB Table**: `HL_measurementValues`
@@ -353,7 +353,7 @@ Rules:
   - **Acceptance Criteria**:
     - Rekapan nilai max/min rata-rata 30 hari.
 
-- [ ] **US-2.4.3 Trend Indicator**
+- [x] **US-2.4.3 Trend Indicator**
   - **Deskripsi**: Naik/turun/stabil/belum cukup data indicator.
   - **API Route**: `GET /api/dashboard/*`
   - **DB Table**: -
@@ -363,7 +363,7 @@ Rules:
 
 ### Epic 2.5 — Reports and Knowledge Base
 
-- [ ] **US-2.5.1 Daily Report**
+- [x] **US-2.5.1 Daily Report**
   - **Deskripsi**: Daily metric report with status and recommendation.
   - **API Route**: `GET /api/reports/daily`
   - **DB Table**: -
@@ -371,7 +371,7 @@ Rules:
   - **Acceptance Criteria**:
     - Tampilan laporan satu hari.
 
-- [ ] **US-2.5.2 Weekly Report**
+- [x] **US-2.5.2 Weekly Report**
   - **Deskripsi**: 7-day report with trend and adherence.
   - **API Route**: `GET /api/reports/weekly`
   - **DB Table**: -
@@ -379,7 +379,7 @@ Rules:
   - **Acceptance Criteria**:
     - Tampilan komparasi mingguan.
 
-- [ ] **US-2.5.3 Monthly Report**
+- [x] **US-2.5.3 Monthly Report**
   - **Deskripsi**: 30-day metric summary and AI monthly summary.
   - **API Route**: `GET /api/reports/monthly`
   - **DB Table**: -
@@ -387,7 +387,7 @@ Rules:
   - **Acceptance Criteria**:
     - Tampilan naratif ringkasan 30 hari.
 
-- [ ] **US-2.5.4 Knowledge Base Alat Ukur**
+- [x] **US-2.5.4 Knowledge Base Alat Ukur**
   - **Deskripsi**: Articles for all supported devices.
   - **API Route**: `GET /api/kb`
   - **DB Table**: `HL_knowledgeArticles`

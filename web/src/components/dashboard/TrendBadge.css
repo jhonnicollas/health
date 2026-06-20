@@ -1,0 +1,6 @@
+.trend-badge { display:inline-flex; align-items:center; gap:0.25rem; padding:0.125rem 0.5rem; border-radius:999px; font-size:0.75rem; font-weight:600; }
+.trend-badge .arrow { font-size:0.875rem; }
+.trend-good { background:#d1fae5; color:#065f46; }
+.trend-bad { background:#fee2e2; color:#991b1b; }
+.trend-neutral { background:#e5e7eb; color:#374151; }
+.trend-badge .pct { margin-left:0.25rem; font-weight:500; }

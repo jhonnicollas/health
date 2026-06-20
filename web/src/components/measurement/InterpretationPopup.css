@@ -1,0 +1,29 @@
+.popup-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem; }
+.popup-card { background:white; border-radius:12px; max-width:600px; width:100%; max-height:90vh; overflow:auto; padding:1.5rem; }
+.popup-title { margin-top:0; font-size:1.25rem; }
+.popup-item { border:1px solid #e5e7eb; border-radius:8px; padding:1rem; margin-bottom:0.75rem; }
+.popup-item.severity-emergency { border-color:#dc2626; background:#fef2f2; }
+.popup-item.severity-critical { border-color:#ea580c; background:#fff7ed; }
+.popup-item.severity-high { border-color:#f59e0b; background:#fffbeb; }
+.popup-item.severity-warning { border-color:#eab308; background:#fefce8; }
+.popup-item.severity-info { border-color:#3b82f6; background:#eff6ff; }
+.popup-item.severity-normal { border-color:#10b981; background:#f0fdf4; }
+.popup-item-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; }
+.badge { padding:0.125rem 0.5rem; border-radius:999px; font-size:0.75rem; font-weight:600; }
+.badge-emergency { background:#dc2626; color:white; }
+.badge-critical { background:#ea580c; color:white; }
+.badge-high { background:#f59e0b; color:white; }
+.badge-warning { background:#eab308; color:white; }
+.badge-info { background:#3b82f6; color:white; }
+.badge-normal { background:#10b981; color:white; }
+.popup-item-value { font-size:1.125rem; margin-bottom:0.5rem; }
+.popup-item-value .unit { color:#6b7280; font-size:0.875rem; }
+.popup-item-value .status { color:#374151; margin-left:0.5rem; }
+.popup-item-popup-title { font-weight:600; margin:0.5rem 0 0.25rem; }
+.popup-item-popup-message { color:#374151; margin:0.25rem 0; }
+.popup-item-recommendation { color:#1e40af; background:#eff6ff; padding:0.5rem; border-radius:6px; margin:0.5rem 0 0; }
+.popup-item-source { color:#6b7280; font-size:0.75rem; }
+.popup-actions { display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem; }
+.btn-primary, .btn-secondary { padding:0.5rem 1.25rem; border-radius:8px; font-weight:600; border:none; cursor:pointer; }
+.btn-primary { background:#2563eb; color:white; }
+.btn-secondary { background:#e5e7eb; color:#374151; }

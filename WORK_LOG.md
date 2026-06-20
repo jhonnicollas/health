@@ -1241,3 +1241,159 @@ Use this format for every task:
 ### Next Agent Notes
 - Continue with US-1.2.4 (Client-Side Compression) since the audit fixes for earlier tasks are complete.
 - Make sure the UI fetches `maxUploadSizeBytes` dynamically from the config API once US-ADMIN.1 is implemented.
+
+## 2026-06-20 20:05 UTC — Agent: Caveman
+
+### Task
+- Task ID: US-1.2.4, US-1.2.5
+- Sprint: 1
+- Status: Completed US-1.2.4, Started US-1.2.5
+
+### Files Read
+- web/src/utils/imageCompressor.ts
+- web/package.json
+- web/tsconfig.json
+- docs/TASKS.md
+
+### Files Changed
+- docs/TASKS.md
+
+### What Changed
+- Marked US-1.2.4 as [x] Done (imageCompressor.ts already implemented correctly)
+- Marked US-1.2.5 as [-] In Progress
+
+### Validation
+- Type check: npx tsc --noEmit passed
+- Build: npm run build successful
+- Lint: npm run lint passed
+- Image compression utility already implements max 1280px resize and 50% quality WebP conversion
+
+### Documentation Updated
+- TASKS.md: Updated task status
+
+### Next Agent Notes
+- Continue with US-1.2.5 Watermark Attachment Final
+- Create watermark utility with timestamp and user info
+
+## 2026-06-20 20:10 UTC — Agent: Caveman
+
+### Task
+- Task ID: US-1.2.5, US-1.3.1
+- Sprint: 1
+- Status: Completed US-1.2.5, Started US-1.3.1
+
+### Files Read
+- docs/TASKS.md
+- docs/api-contract.md
+- docs/schema.sql
+
+### Files Changed
+- web/src/utils/watermark.ts (created)
+- docs/TASKS.md
+
+### What Changed
+- Created watermark.ts utility with timestamp and user info overlay
+- Supports configurable positioning and responsive font sizing
+- Marked US-1.2.5 as [x] Done
+- Marked US-1.3.1 as [-] In Progress
+
+### Validation
+- Type check: npx tsc --noEmit passed
+- Build: npm run build successful
+- Watermark utility implements canvas-based text overlay with user info and timestamp
+
+### Documentation Updated
+- TASKS.md: Updated task status
+
+### Next Agent Notes
+- Continue with US-1.3.1 AI Extract Oximeter
+- Need to implement AI extraction endpoint in worker
+- Must read maxUploadSizeBytes from HL_systemConfigs
+- Must implement 5s timeout for AI Vision
+
+## 2026-06-20 20:25 UTC — Agent: Caveman
+
+### Task
+- Task ID: US-1.3.1, US-1.3.2, US-1.3.3, US-1.3.4, US-1.4.1
+- Sprint: 1
+- Status: Completed US-1.3.x, Started US-1.4.1
+
+### Files Read
+- docs/TASKS.md
+- docs/schema.sql
+- docs/api-contract.md
+
+### Files Changed
+- worker/src/index.ts (added AI extraction endpoint)
+- web/src/hooks/useAiExtract.ts (created)
+- docs/TASKS.md (updated statuses)
+
+### What Changed
+- Implemented /api/measurements/extract endpoint with timeout handling
+- Added HL_systemConfigs integration for maxUploadSizeBytes and aiVisionTimeoutMs
+- Implemented AI extraction logging to HL_aiExtractions table
+- Created useAiExtract hook for frontend integration
+- Completed US-1.3.1 (Oximeter), US-1.3.2 (Tensimeter), US-1.3.3 (Sinocare GCU)
+- Completed US-1.3.4 (Timeout 5 Detik) with configurable timeout from DB
+- Started US-1.4.1 (Manual Override)
+
+### Validation
+- Type check: npx tsc --noEmit passed
+- Build: npm run build successful (both web and worker)
+- AI endpoint implements 5s timeout fallback
+- Config values read from HL_systemConfigs instead of hardcoded
+- Timeout status logged to D1 HL_aiExtractions
+
+### Documentation Updated
+- TASKS.md: Updated US-1.3.x tasks to [x] Done, US-1.4.1 to [-] In Progress
+
+### Next Agent Notes
+- Continue with US-1.4.1 Manual Override Angka AI
+- Need to create ManualOverrideInput component
+- Track manualOverride flag when user edits AI-extracted values
+
+## 2026-06-20 20:50 UTC — Agent: Caveman
+
+### Task
+- Task ID: US-1.4.2, US-1.4.3, US-1.5.1, US-1.5.2, US-1.5.3, US-1.6.1, US-1.6.2
+- Sprint: 1
+- Status: All Completed + Sprint 1 UAT Passed
+
+### Files Read
+- docs/schema.sql
+- docs/api-contract.md
+- worker/src/index.ts
+
+### Files Changed
+- worker/src/index.ts (validate, submit, upload, dashboard endpoints; telegram helper; fixed PBKDF2 + sha256Token awaits + audit log field names + measurementValues/Attachments field names)
+- web/src/utils/validation.ts (created)
+- web/src/utils/bmiCalculator.ts (created)
+- web/src/pages/dashboard/TodayDashboard.tsx (created)
+- web/src/components/measurement/ManualOverrideInput.tsx (created previously)
+- docs/TASKS.md (status updates)
+
+### What Changed
+- Added POST /api/measurements/validate with BP pair validation
+- Added POST /api/measurements/submit with rule engine integration
+- Added POST /api/measurements/attachments/upload to R2
+- Added GET /api/dashboard/today
+- Added Telegram notification helper (sendTelegramNotification + logNotification)
+- Fixed PBKDF2 iteration count (310000→100000, Cloudflare max)
+- Fixed sha256Token missing await in 3 places
+- Fixed HL_auditLogs column names (targetType→entityType, targetId→entityId, metadata→metadataJson)
+- Fixed HL_measurementSessions insert (added createdAt, updatedAt)
+- Fixed HL_measurementValues insert (added emergencyLevel, measuredAt, updatedAt)
+- Fixed HL_measurementAttachments insert (use real column names)
+
+### Validation
+- Type check: npx tsc --noEmit passed
+- Build: wrangler deploy successful
+- LIVE UAT: register→login→me→onboarding→validate(valid/invalid)→submit(3 values, rule engine applied statuses Hipertensi Tahap 2 + Normal)→dashboard(3 metrics, 1 session) all returned success
+- Production URL: https://hl-health-companion.indiehomesungairaya.workers.dev
+
+### Documentation Updated
+- TASKS.md: All Sprint 1 tasks marked [x] Done
+
+### Next Agent Notes
+- Sprint 1 complete with production UAT passing
+- Move to Sprint 2: Metric Rules Engine, AI Recommendations, Telegram link, etc.

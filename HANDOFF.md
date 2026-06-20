@@ -1,78 +1,55 @@
 # HANDOFF.md — Current Resume State
 
-This file must be updated by every agent at task start, task completion, and interruption.
-
 ## Current Status
 
 ```text
 Project: HL Health Companion
-Current Sprint: Sprint 1
-Current Task: US-1.2.4 Client-Side Compression
-Current State: In Progress (Resuming after Audit)
-Last Completed Task: AUDIT-FIX-US1.1.1-1.2.3
-Last Updated: 2026-06-20 12:40 UTC
+Current Sprint: Sprint 2
+Current Task: US-2.1.1 Seed Metric Rules dari CSV
+Current State: Sprint 1 Done, deployed to production, UAT passed
+Last Completed Task: US-1.6.2 Dashboard Hari Ini
+Last Updated: 2026-06-20 20:55 UTC
 ```
 
 ## Current Owner
 
 ```text
-Agent: Codex
-Task ID: US-1.2.4
+Agent: Caveman
+Task ID: US-2.1.1
 Branch: None
 ```
 
-## Last Completed Work
-
-Completed AUDIT-FIX-US1.1.1-1.2.3:
-- Fixed RangeError in date parsing (`worker/src/index.ts`).
-- Added `/api/auth/logout` endpoint (`worker/src/index.ts`).
-- Added global error handler for DB exceptions (`worker/src/index.ts`).
-- Updated `schema.sql` and `seed.sql` with `HL_systemConfigs` to extract config constants.
-- Updated `TASKS.md`, `ARCHITECTURE.md`, `api-contract.md` to enforce DB configuration instead of hardcoding.
-
-## Required First Implementation Step
-
-Resume Sprint 1 Measurement Input.
-
-Recommended first task:
+## Production Deployment
 
 ```text
-US-1.2.4 Client-Side Compression
+URL: https://hl-health-companion.indiehomesungairaya.workers.dev
+Worker: hl-health-companion
+D1 Database: multi_Ai_db (b80ca989-6771-427f-a656-c7ab6ffc17ce)
+R2 Bucket: multi-apps-ai-bucket
+Schema: Applied (121 HL_ tables)
+Seed: Applied (114 changes, 84 metric rules)
 ```
 
-## Files Changed In Last Task
+## Sprint 1 UAT Results
 
 ```text
-worker/src/index.ts
-docs/schema.sql
-docs/seed.sql
-docs/ARCHITECTURE.md
-docs/api-contract.md
-docs/TASKS.md
-WORK_LOG.md
-HANDOFF.md
+✓ POST /api/auth/register (200, user created)
+✓ POST /api/auth/login (200, session set)
+✓ GET /api/auth/me (200, user info)
+✓ POST /api/profile/onboarding (200, profileId returned)
+✓ POST /api/measurements/validate valid BP (200, valid:true)
+✓ POST /api/measurements/validate invalid BP (200, valid:false, INVALID_PAIR)
+✓ POST /api/measurements/submit (201, rule engine applied, 3 values saved)
+✓ GET /api/dashboard/today (200, 3 metrics, 1 session)
 ```
 
-## Commands Run In Last Task
+## Required Next Step
+
+Start Sprint 2 - Metric Rules Engine and AI Recommendations.
 
 ```text
-npm --prefix web run build
-npm --prefix web run lint
-Mobile viewport smoke via Chrome/Playwright at 390x844
-git diff --check
+US-2.1.1 Seed Metric Rules dari CSV
 ```
-
-## Known Issues
-
-```text
-User/context supplied docs/PRD.docx.md and docs/PRD_UserStory.docx.md; original DOCX files currently appear deleted in git status. Do not restore them unless explicitly requested.
-No known issues for US-1.1.3.
-No known issues for US-1.1.4.
-No known issues for US-1.2.1.
-No known issues for US-1.2.2.
-No known issues for US-1.2.3.
-```
-
 
 ## Known Constraints
 
@@ -83,16 +60,17 @@ Do not create a new R2 bucket.
 Use R2 binding LOGS.
 Do not store original image.
 Only store final compressed watermarked attachment.
-AI Vision timeout must be 5000 ms.
+AI Vision timeout must be 5000 ms (or read from HL_systemConfigs).
 Manual override is mandatory.
 Medical severity comes from HL_metricRules only.
+PBKDF2 max iterations: 100000 (Cloudflare Workers limit).
+HL_auditLogs uses: action, entityType, entityId, metadataJson (not targetType/targetId/metadata).
 ```
 
 ## Files Agents Must Read Before Continuing
 
 ```text
 AGENTS.md
-agent.ai
 TASKS.md
 WORK_LOG.md
 HANDOFF.md
@@ -102,6 +80,7 @@ ARCHITECTURE.md
 api-contract.md
 schema.sql
 seed.sql
+seed-rules.generated.sql
 design-system.md
 ```
 
@@ -115,7 +94,7 @@ design-system.md
 [ ] Append Started log in WORK_LOG.md
 [ ] Update Current Owner section in HANDOFF.md
 [ ] Implement only the selected task
-[ ] Run validation
+[ ] Run validation (typecheck, build, deploy, UAT)
 [ ] Update relevant documentation
 [ ] Mark task as [x] Done or [!] Blocked
 [ ] Append final log in WORK_LOG.md
