@@ -79,6 +79,7 @@ api-contract.md
 schema.sql
 seed.sql
 design-system.md
+docs/PROMPT_SPRINT_3_4.md (Prompt for executing Sprint 3 & 4)
 ```
 
 ## Regression Testing
