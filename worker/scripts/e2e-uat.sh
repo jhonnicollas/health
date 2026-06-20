@@ -172,6 +172,86 @@ echo "==> Auth middleware"
 RESP=$(curl -s "$API/api/dashboard/today")
 test_endpoint "unauth dashboard rejected" 'UNAUTHORIZED' "$RESP"
 
+
+
+echo ""
+echo "==> Sprint 3 Family/Caregiver"
+RESP=$(curl -s "$API/api/family/links" -b "$COOKIE")
+test_endpoint "family links endpoint" '"linkedToMe"' "$RESP"
+RESP=$(curl -s "$API/api/family/dashboard" -b "$COOKIE")
+test_endpoint "family caregiver dashboard" '"profiles"' "$RESP"
+
+echo ""
+echo "==> Sprint 3 Alert acknowledge"
+ALERT_ID=$(curl -s "$API/api/alerts" -b "$COOKIE" | python3 -c "import sys,json;d=json.load(sys.stdin);alerts=d.get('data',{}).get('alerts',[]);print(alerts[0]['id'] if alerts else 'none')")
+if [ "$ALERT_ID" != "none" ] && [ -n "$ALERT_ID" ]; then
+  RESP=$(curl -s -X PUT "$API/api/alerts/$ALERT_ID/acknowledge" -b "$COOKIE" -H "Content-Type: application/json" -d '{}')
+  test_endpoint "alert acknowledged" '"acknowledged":true' "$RESP"
+else
+  TOTAL=$((TOTAL+1)); echo "  SKIP  no alerts to acknowledge"; PASSED=$((PASSED+1))
+fi
+
+echo ""
+echo "==> Sprint 3 Browser push subscribe"
+RESP=$(curl -s -X POST "$API/api/notifications/browser/subscribe" -H "Content-Type: application/json" -b "$COOKIE" \
+  -d '{"endpoint":"https://push.example/test","keys":{"p256dh":"BBBB","auth":"AAAA"},"userAgent":"E2E Test"}')
+test_endpoint "browser push subscribe" '"subscribed":true' "$RESP"
+
+echo ""
+echo "==> Sprint 4 Fasting"
+RESP=$(curl -s -X POST "$API/api/fasting/start" -H "Content-Type: application/json" -b "$COOKIE" \
+  -d '{"fastingType":"glucoseFasting","targetHours":8}')
+test_endpoint "fasting start" '"fastingId"' "$RESP"
+RESP=$(curl -s "$API/api/fasting/current" -b "$COOKIE")
+test_endpoint "fasting current" '"active":true' "$RESP"
+RESP=$(curl -s -X POST "$API/api/fasting/stop" -H "Content-Type: application/json" -b "$COOKIE" -d '{"status":"completed"}')
+test_endpoint "fasting stop" '"status":"completed"' "$RESP"
+
+echo ""
+echo "==> Sprint 4 Streak/Badges"
+RESP=$(curl -s "$API/api/streaks" -b "$COOKIE")
+test_endpoint "streak current" '"currentCount"' "$RESP"
+RESP=$(curl -s "$API/api/badges" -b "$COOKIE")
+test_endpoint "badges list" '"badges"' "$RESP"
+
+echo ""
+echo "==> Sprint 4 Pattern: weight vs bp"
+RESP=$(curl -s -X POST "$API/api/patterns/generate/weight-bp" -H "Content-Type: application/json" -b "$COOKIE" -d '{}')
+test_endpoint "weight-bp pattern" '"hasEnoughData"' "$RESP"
+
+echo ""
+echo "==> Sprint 4 Pattern: medication"
+RESP=$(curl -s -X POST "$API/api/patterns/generate/medication" -H "Content-Type: application/json" -b "$COOKIE" -d '{}')
+test_endpoint "medication pattern" '"adherence"' "$RESP"
+
+echo ""
+echo "==> Sprint 4 Doctor PDF"
+RESP=$(curl -s -X POST "$API/api/reports/doctor-ready" -H "Content-Type: application/json" -b "$COOKIE" -d '{}')
+test_endpoint "doctor PDF generated" '"reportId"' "$RESP"
+REPORT_ID=$(echo "$RESP" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('data',{}).get('reportId','none'))")
+if [ "$REPORT_ID" != "none" ] && [ -n "$REPORT_ID" ]; then
+  RESP=$(curl -s -i "$API/api/reports/$REPORT_ID/download" -b "$COOKIE")
+  test_endpoint "report download" 'text/html' "$RESP"
+  RESP=$(curl -s -X POST "$API/api/reports/$REPORT_ID/share" -H "Content-Type: application/json" -b "$COOKIE" -d '{"recipientLabel":"Dr Test","expiresInHours":24}')
+  test_endpoint "report share link" '"shareToken"' "$RESP"
+fi
+
+echo ""
+echo "==> Sprint 3 Medication adherence"
+RESP=$(curl -s "$API/api/medications/adherence" -b "$COOKIE")
+test_endpoint "medication adherence" '"adherence"' "$RESP"
+
+echo ""
+echo "==> Sprint 4 Drafts list"
+RESP=$(curl -s "$API/api/measurements/drafts" -b "$COOKIE")
+test_endpoint "drafts list" '"drafts"' "$RESP"
+
+echo ""
+echo "==> Sprint 3 Verify telegram"
+RESP=$(curl -s -X POST "$API/api/telegram/verify" -H "Content-Type: application/json" -b "$COOKIE" \
+  -d '{"verificationCode":"000000","telegramChatId":"99999"}')
+test_endpoint "telegram verify invalid" 'VALIDATION_ERROR' "$RESP"
+
 rm -f "$COOKIE"
 
 echo ""

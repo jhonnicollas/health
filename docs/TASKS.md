@@ -35,7 +35,7 @@ Rules:
 
 ### Epic 1.0.5 — Admin Configuration Management
 
-- [-] **US-ADMIN.1 Config Management API**
+- [x] **US-ADMIN.1 Config Management API**
   - **Deskripsi**: CRUD API for HL_systemConfigs with role validation and cache invalidation.
   - **API Route**: `GET /api/admin/configs`, `PUT /api/admin/configs/:key`
   - **DB Table**: `HL_systemConfigs`
@@ -44,7 +44,7 @@ Rules:
     - Hanya bisa diakses role admin.
     - Worker melakukan caching hasil query D1 untuk menghemat kuota.
 
-- [ ] **US-ADMIN.2 Admin Config Dashboard**
+- [x] **US-ADMIN.2 Admin Config Dashboard**
   - **Deskripsi**: UI for managing global system configs dynamically.
   - **API Route**: `GET /api/admin/configs`, `PUT /api/admin/configs/:key`
   - **DB Table**: -
@@ -401,7 +401,7 @@ Rules:
 
 ### Epic 3.1 — Telegram Integration
 
-- [ ] **US-3.1.1 Connect Telegram**
+- [x] **US-3.1.1 Connect Telegram**
   - **Deskripsi**: Verification token and chat linking.
   - **API Route**: `POST /api/telegram/connect`
   - **DB Table**: `HL_userProfiles` (update telegramChatId)
@@ -409,7 +409,7 @@ Rules:
   - **Acceptance Criteria**:
     - Generate token 6 digit, user kirim ke bot.
 
-- [ ] **US-3.1.2 Test Telegram Notification**
+- [x] **US-3.1.2 Test Telegram Notification**
   - **Deskripsi**: Send test message and log notification status.
   - **API Route**: `POST /api/telegram/test`
   - **DB Table**: `HL_notifications`
@@ -417,7 +417,7 @@ Rules:
   - **Acceptance Criteria**:
     - Terkirim chat test dari bot.
 
-- [ ] **US-3.1.3 Telegram Summary After Submit**
+- [x] **US-3.1.3 Telegram Summary After Submit**
   - **Deskripsi**: Background summary after measurement submit.
   - **API Route**: Queue (telegramSubmitSummary)
   - **DB Table**: `HL_notifications`
@@ -427,7 +427,7 @@ Rules:
 
 ### Epic 3.2 — Family and Caregiver
 
-- [ ] **US-3.2.1 Invite Family / Caregiver**
+- [x] **US-3.2.1 Invite Family / Caregiver**
   - **Deskripsi**: Create pending family invitation.
   - **API Route**: `POST /api/family/invite`
   - **DB Table**: `HL_familyInvites`
@@ -435,7 +435,7 @@ Rules:
   - **Acceptance Criteria**:
     - Generate link shareToken (aktif 24 jam).
 
-- [ ] **US-3.2.2 Accept Family Invitation**
+- [x] **US-3.2.2 Accept Family Invitation**
   - **Deskripsi**: Accept or reject expired invitation.
   - **API Route**: `POST /api/family/accept`
   - **DB Table**: `HL_familyMembers`
@@ -443,7 +443,7 @@ Rules:
   - **Acceptance Criteria**:
     - Membentuk relasi antara Owner dan Caregiver.
 
-- [ ] **US-3.2.3 Role Permission**
+- [x] **US-3.2.3 Role Permission**
   - **Deskripsi**: Owner configures role and permissions.
   - **API Route**: `PUT /api/family/members/:id/permissions`
   - **DB Table**: `HL_familyMembers`
@@ -451,7 +451,7 @@ Rules:
   - **Acceptance Criteria**:
     - Bisa toggle akses baca/tulis/darurat.
 
-- [ ] **US-3.2.4 Caregiver Dashboard**
+- [x] **US-3.2.4 Caregiver Dashboard**
   - **Deskripsi**: Caregiver sees linked user dashboards by permission.
   - **API Route**: `GET /api/family/dashboard`
   - **DB Table**: -
@@ -461,7 +461,7 @@ Rules:
 
 ### Epic 3.3 — Emergency Alert System
 
-- [ ] **US-3.3.1 Create Emergency Alert**
+- [x] **US-3.3.1 Create Emergency Alert**
   - **Deskripsi**: Create HL_alerts row from emergency severity.
   - **API Route**: Queue (emergencyAlert)
   - **DB Table**: `HL_alerts`
@@ -469,7 +469,7 @@ Rules:
   - **Acceptance Criteria**:
     - D1 menyimpan record alert saat nilai darurat di-submit.
 
-- [ ] **US-3.3.2 Send Emergency Telegram**
+- [x] **US-3.3.2 Send Emergency Telegram**
   - **Deskripsi**: Send to emergency contacts with consent.
   - **API Route**: Worker Queue
   - **DB Table**: `HL_notifications`
@@ -477,7 +477,7 @@ Rules:
   - **Acceptance Criteria**:
     - Dicek field `emergencyConsent`. Jika false, jangan kirim.
 
-- [ ] **US-3.3.3 Acknowledge Alert**
+- [x] **US-3.3.3 Acknowledge Alert**
   - **Deskripsi**: User/caregiver acknowledges alert and audit log.
   - **API Route**: `PUT /api/alerts/:id/acknowledge`
   - **DB Table**: `HL_alerts` (update status)
@@ -487,7 +487,7 @@ Rules:
 
 ### Epic 3.4 — Reminder and Browser Notification
 
-- [ ] **US-3.4.1 Reminder Settings**
+- [x] **US-3.4.1 Reminder Settings**
   - **Deskripsi**: Set reminder type and schedule.
   - **API Route**: `POST /api/reminders`
   - **DB Table**: `HL_reminderSettings`
@@ -495,7 +495,7 @@ Rules:
   - **Acceptance Criteria**:
     - Menyimpan jam dan preferensi tipe notifikasi (Telegram/Web Push).
 
-- [ ] **US-3.4.2 Daily Reminder Cron**
+- [x] **US-3.4.2 Daily Reminder Cron**
   - **Deskripsi**: Cron creates due notification jobs.
   - **API Route**: Scheduled Worker
   - **DB Table**: `HL_notifications`
@@ -503,7 +503,7 @@ Rules:
   - **Acceptance Criteria**:
     - Cron mengecek jadwal dan melempar event ke Queue.
 
-- [ ] **US-3.4.3 Browser Notification Opt-In**
+- [x] **US-3.4.3 Browser Notification Opt-In**
   - **Deskripsi**: Push subscription and permission flow.
   - **API Route**: `POST /api/push/subscribe`
   - **DB Table**: `HL_pushSubscriptions`
@@ -513,7 +513,7 @@ Rules:
 
 ### Epic 3.5 — Medication Tracker
 
-- [ ] **US-3.5.1 Add Medication**
+- [x] **US-3.5.1 Add Medication**
   - **Deskripsi**: Medication CRUD basic create/update active.
   - **API Route**: `POST /api/medications`
   - **DB Table**: `HL_medications`
@@ -521,7 +521,7 @@ Rules:
   - **Acceptance Criteria**:
     - Bisa menyimpan nama obat, dosis, dan frekuensi.
 
-- [ ] **US-3.5.2 Checklist Medication Taken**
+- [x] **US-3.5.2 Checklist Medication Taken**
   - **Deskripsi**: Log taken/skipped/missed medication.
   - **API Route**: `POST /api/medication-logs`
   - **DB Table**: `HL_medicationLogs`
@@ -529,7 +529,7 @@ Rules:
   - **Acceptance Criteria**:
     - Log harian status minum obat.
 
-- [ ] **US-3.5.3 Medication Insight on Dashboard**
+- [x] **US-3.5.3 Medication Insight on Dashboard**
   - **Deskripsi**: Adherence summary without dosage advice.
   - **API Route**: `GET /api/dashboard/today`
   - **DB Table**: -
@@ -543,7 +543,7 @@ Rules:
 
 ### Epic 4.1 — Doctor Ready PDF
 
-- [ ] **US-4.1.1 Generate Doctor Ready PDF 30 Hari**
+- [x] **US-4.1.1 Generate Doctor Ready PDF 30 Hari**
   - **Deskripsi**: Build 30-day PDF from health data.
   - **API Route**: Queue (generateDoctorReadyPdf)
   - **DB Table**: `HL_reports`
@@ -551,7 +551,7 @@ Rules:
   - **Acceptance Criteria**:
     - Server menyusun HTML ke PDF (Puppeteer/sejenisnya) di background.
 
-- [ ] **US-4.1.2 Save PDF to R2**
+- [x] **US-4.1.2 Save PDF to R2**
   - **Deskripsi**: Store generated PDF and HL_reports metadata.
   - **API Route**: Queue (generateDoctorReadyPdf)
   - **DB Table**: `HL_reports`, R2 (`LOGS`)
@@ -559,7 +559,7 @@ Rules:
   - **Acceptance Criteria**:
     - PDF disimpan ke R2 secara aman.
 
-- [ ] **US-4.1.3 Download PDF**
+- [x] **US-4.1.3 Download PDF**
   - **Deskripsi**: Authorized download/stream/signed URL.
   - **API Route**: `GET /api/reports/:id/download`
   - **DB Table**: -
@@ -567,7 +567,7 @@ Rules:
   - **Acceptance Criteria**:
     - Hanya pemilik/caregiver yang bisa mendownload.
 
-- [ ] **US-4.1.4 Doctor Viewer Share Link**
+- [x] **US-4.1.4 Doctor Viewer Share Link**
   - **Deskripsi**: Expiring limited report link.
   - **API Route**: `POST /api/reports/:id/share`
   - **DB Table**: `HL_reports` (update shareToken)
@@ -577,7 +577,7 @@ Rules:
 
 ### Epic 4.2 — Fasting Timer
 
-- [ ] **US-4.2.1 Start Fasting Timer**
+- [x] **US-4.2.1 Start Fasting Timer**
   - **Deskripsi**: Create active fasting session.
   - **API Route**: `POST /api/fasting/start`
   - **DB Table**: `HL_fastingSessions`
@@ -585,7 +585,7 @@ Rules:
   - **Acceptance Criteria**:
     - Status puasa menjadi aktif.
 
-- [ ] **US-4.2.2 Stop Fasting Timer**
+- [x] **US-4.2.2 Stop Fasting Timer**
   - **Deskripsi**: Complete or cancel fasting session.
   - **API Route**: `POST /api/fasting/stop`
   - **DB Table**: `HL_fastingSessions`
@@ -593,7 +593,7 @@ Rules:
   - **Acceptance Criteria**:
     - Status puasa diselesaikan dan tercatat durasinya.
 
-- [ ] **US-4.2.3 Fasting Reminder**
+- [x] **US-4.2.3 Fasting Reminder**
   - **Deskripsi**: Notify when targetHours is reached.
   - **API Route**: Scheduled Cron
   - **DB Table**: `HL_notifications`
@@ -603,7 +603,7 @@ Rules:
 
 ### Epic 4.3 — Gamification
 
-- [ ] **US-4.3.1 Measurement Streak**
+- [x] **US-4.3.1 Measurement Streak**
   - **Deskripsi**: Update daily streak on submit.
   - **API Route**: `POST /api/measurements/submit`
   - **DB Table**: `HL_userStreaks`
@@ -611,7 +611,7 @@ Rules:
   - **Acceptance Criteria**:
     - Streak bertambah jika submit berturut-turut beda hari.
 
-- [ ] **US-4.3.2 Earn Badge**
+- [x] **US-4.3.2 Earn Badge**
   - **Deskripsi**: Award idempotent consistency badges.
   - **API Route**: `POST /api/measurements/submit`
   - **DB Table**: `HL_userBadges`
@@ -619,7 +619,7 @@ Rules:
   - **Acceptance Criteria**:
     - Mendapat lencana "3 Hari Konsisten" jika syarat terpenuhi.
 
-- [ ] **US-4.3.3 Safe Gamification**
+- [x] **US-4.3.3 Safe Gamification**
   - **Deskripsi**: Prevent excessive measurement incentives.
   - **API Route**: -
   - **DB Table**: -
@@ -629,7 +629,7 @@ Rules:
 
 ### Epic 4.4 — Pattern Detection
 
-- [ ] **US-4.4.1 Sleep vs Blood Pressure Pattern**
+- [x] **US-4.4.1 Sleep vs Blood Pressure Pattern**
   - **Deskripsi**: Safe correlation wording with minimum 14 days.
   - **API Route**: `POST /api/patterns/generate`
   - **DB Table**: `HL_patternInsights`
@@ -637,7 +637,7 @@ Rules:
   - **Acceptance Criteria**:
     - AI menganalisis tren tidur dan tekanan darah. Menolak analisis jika data < 14 hari.
 
-- [ ] **US-4.4.2 Weight vs Blood Pressure Pattern**
+- [x] **US-4.4.2 Weight vs Blood Pressure Pattern**
   - **Deskripsi**: Trend insight if enough data.
   - **API Route**: `POST /api/patterns/generate`
   - **DB Table**: `HL_patternInsights`
@@ -645,7 +645,7 @@ Rules:
   - **Acceptance Criteria**:
     - Insight korelasional aman.
 
-- [ ] **US-4.4.3 Medication vs Metric Pattern**
+- [x] **US-4.4.3 Medication vs Metric Pattern**
   - **Deskripsi**: Adherence insight without dosage advice.
   - **API Route**: `POST /api/patterns/generate`
   - **DB Table**: `HL_patternInsights`
@@ -655,7 +655,7 @@ Rules:
 
 ### Epic 4.5 — Accessibility Mode Lansia
 
-- [ ] **US-4.5.1 Enable Senior Mode**
+- [x] **US-4.5.1 Enable Senior Mode**
   - **Deskripsi**: Larger typography, buttons, simplified nav.
   - **API Route**: -
   - **DB Table**: -
@@ -663,7 +663,7 @@ Rules:
   - **Acceptance Criteria**:
     - CSS root variable berubah drastis menjadi besar jika `accessibilityMode === 'senior'`.
 
-- [ ] **US-4.5.2 High Contrast Mode**
+- [x] **US-4.5.2 High Contrast Mode**
   - **Deskripsi**: High-contrast theme with readable components.
   - **API Route**: -
   - **DB Table**: -
@@ -671,7 +671,7 @@ Rules:
   - **Acceptance Criteria**:
     - Tampilan hitam-putih-kuning mencolok untuk visibilitas maksimal.
 
-- [ ] **US-4.5.3 Senior Measurement Flow**
+- [x] **US-4.5.3 Senior Measurement Flow**
   - **Deskripsi**: One metric per screen flow.
   - **API Route**: -
   - **DB Table**: -
@@ -681,7 +681,7 @@ Rules:
 
 ### Epic 4.6 — PWA Full
 
-- [ ] **US-4.6.1 Installable PWA**
+- [x] **US-4.6.1 Installable PWA**
   - **Deskripsi**: Manifest, icons, standalone mode.
   - **API Route**: -
   - **DB Table**: -
@@ -689,7 +689,7 @@ Rules:
   - **Acceptance Criteria**:
     - Muncul prompt instalasi di browser.
 
-- [ ] **US-4.6.2 Offline Shell**
+- [x] **US-4.6.2 Offline Shell**
   - **Deskripsi**: App shell works offline and draft is local.
   - **API Route**: -
   - **DB Table**: -
@@ -697,7 +697,7 @@ Rules:
   - **Acceptance Criteria**:
     - Aplikasi tetap bisa dirender saat internet mati.
 
-- [ ] **US-4.6.3 Sync Draft When Online**
+- [x] **US-4.6.3 Sync Draft When Online**
   - **Deskripsi**: User-approved draft sync.
   - **API Route**: `POST /api/measurements/sync`
   - **DB Table**: `HL_measurementDrafts`
@@ -707,7 +707,7 @@ Rules:
 
 ### Epic 4.7 — Data Export
 
-- [ ] **US-4.7.1 Export CSV**
+- [x] **US-4.7.1 Export CSV**
   - **Deskripsi**: Export measurements by date range.
   - **API Route**: `GET /api/export/csv`
   - **DB Table**: `HL_measurementValues`
@@ -715,7 +715,7 @@ Rules:
   - **Acceptance Criteria**:
     - Unduhan otomatis file CSV dengan MIME type `text/csv`.
 
-- [ ] **US-4.7.2 Delete Account Data**
+- [x] **US-4.7.2 Delete Account Data**
   - **Deskripsi**: Privacy flow with confirmation and audit log.
   - **API Route**: `POST /api/privacy/deleteAccount`
   - **DB Table**: (Soft delete / hapus dari seluruh tabel yang relasi ke userId)
@@ -727,10 +727,10 @@ Rules:
 
 ## Global Documentation Tasks
 
-- [ ] DOC-1 Keep `api-contract.md` updated for every API change
-- [ ] DOC-2 Keep `ARCHITECTURE.md` updated for every architecture/flow change
-- [ ] DOC-3 Keep `design-system.md` updated for every UI component/theme change
-- [ ] DOC-4 Keep `schema.sql` updated for every database change
-- [ ] DOC-5 Keep `seed.sql` updated for every seed data change
-- [ ] DOC-6 Keep `WORK_LOG.md` append-only and current
-- [ ] DOC-7 Keep `HANDOFF.md` accurate after every task
+- [x] DOC-1 Keep `api-contract.md` updated for every API change
+- [x] DOC-2 Keep `ARCHITECTURE.md` updated for every architecture/flow change
+- [x] DOC-3 Keep `design-system.md` updated for every UI component/theme change
+- [x] DOC-4 Keep `schema.sql` updated for every database change
+- [x] DOC-5 Keep `seed.sql` updated for every seed data change
+- [x] DOC-6 Keep `WORK_LOG.md` append-only and current
+- [x] DOC-7 Keep `HANDOFF.md` accurate after every task

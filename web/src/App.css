@@ -444,3 +444,88 @@
 [data-accessibility="senior"] .metric-option {
   min-height: 56px;
 }
+
+.admin-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.admin-config-table th,
+.admin-config-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft, #e0e0e0);
+  vertical-align: top;
+}
+
+.admin-config-table th {
+  background: var(--surface-soft, #f5f5f5);
+  font-weight: 600;
+}
+
+.admin-config-table .meta {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+}
+
+.admin-config-table code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  background: var(--code-bg, rgba(0, 0, 0, 0.05));
+  padding: 0 0.25rem;
+  border-radius: 4px;
+}
+
+.admin-config-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-config-form input {
+  flex: 1 1 auto;
+  min-width: 6rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-soft, #ccc);
+  border-radius: 4px;
+  font: inherit;
+  background: var(--input-bg, #fff);
+  color: inherit;
+}
+
+.admin-config-form button {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .admin-config-table,
+  .admin-config-table thead,
+  .admin-config-table tbody,
+  .admin-config-table tr,
+  .admin-config-table td,
+  .admin-config-table th {
+    display: block;
+  }
+
+  .admin-config-table thead {
+    display: none;
+  }
+
+  .admin-config-table tr {
+    border: 1px solid var(--border-soft, #e0e0e0);
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .admin-config-table td {
+    border: none;
+    padding: 0.25rem 0;
+  }
+}

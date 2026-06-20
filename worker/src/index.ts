@@ -1,6 +1,15 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
+import {
+  mountExtraRoutes,
+  scheduledHandler,
+  updateDailyStreak,
+  awardBadges,
+  createEmergencyAlert,
+  sendEmergencyToContacts,
+  type ExtraEnv
+} from './routes-extra'
 
 export interface Env {
   CLOUDFLARE_ACCOUNT_ID?: string
@@ -9,6 +18,7 @@ export interface Env {
   ADMIN_EMAILS?: string
   DB: D1Database
   LOGS: R2Bucket
+  TELEGRAM_QUEUE?: Queue
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -556,7 +566,37 @@ function jsonResponse(
   return c.json(result.body, result.status)
 }
 
+const SYSTEM_CONFIG_TTL_MS = 60_000
+const systemConfigCache: Map<string, { value: string; expiresAt: number }> = new Map()
+
+function readSystemConfigCache(configKey: string): string | null {
+  const entry = systemConfigCache.get(configKey)
+  if (!entry) return null
+  if (entry.expiresAt < Date.now()) {
+    systemConfigCache.delete(configKey)
+    return null
+  }
+  return entry.value
+}
+
+function writeSystemConfigCache(configKey: string, value: string) {
+  systemConfigCache.set(configKey, { value, expiresAt: Date.now() + SYSTEM_CONFIG_TTL_MS })
+}
+
+function invalidateSystemConfigCache(configKey?: string) {
+  if (configKey) {
+    systemConfigCache.delete(configKey)
+    return
+  }
+  systemConfigCache.clear()
+}
+
 async function getSystemConfigNumber(c: Context<{ Bindings: Env }>, configKey: string) {
+  const cached = readSystemConfigCache(configKey)
+  if (cached !== null) {
+    const value = Number(cached)
+    if (Number.isFinite(value) && value > 0) return value
+  }
   const row = await c.env.DB.prepare(
     'SELECT configValue FROM HL_systemConfigs WHERE configKey = ? LIMIT 1'
   )
@@ -566,6 +606,10 @@ async function getSystemConfigNumber(c: Context<{ Bindings: Env }>, configKey: s
 
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`Invalid numeric system config: ${configKey}`)
+  }
+
+  if (row?.configValue !== undefined) {
+    writeSystemConfigCache(configKey, row.configValue)
   }
 
   return value
@@ -1941,7 +1985,9 @@ app.post('/api/measurements/submit', async (c) => {
 
     const ageYears = calculateAgeYears(profile.birthDate)
     const sex = profile.sex || 'all'
-    const measuredAt = body.measuredAt || new Date().toISOString()
+    const tzRow = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ timezone: string }>()
+    const userTz = tzRow?.timezone || 'UTC'
+    const measuredAt = body.measuredAt || new Intl.DateTimeFormat('sv-SE', { timeZone: userTz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date()).replace(' ', ' ')
 
     // US-1.4.3: Auto-calculate BMI when bodyWeight present and heightCm available and bmi not in values
     const hasBmi = body.values.some(v => v.metricCode === 'bmi')
@@ -2114,22 +2160,60 @@ app.post('/api/measurements/submit', async (c) => {
     const notifMessage = hasEmergency === 1
       ? `Terdeteksi nilai darurat.\n${lines}\nSegera konsultasi ke dokter.`
       : `${body.values.length} nilai tersimpan.\n${lines}`
+    // US-3.3.1 + US-4.3.1 + US-4.3.2: create HL_alerts for emergency severity, update daily streak, award badges.
     try {
-      const tg = await sendTelegramNotification(c, userId, notifType, notifTitle, notifMessage)
-      await logNotification(c, userId, 'telegram', notifType, notifTitle, notifMessage,
-        tg.sent ? 'sent' : 'skipped',
-        { sessionId, hasEmergency: hasEmergency === 1 },
-        tg.error)
-    } catch (tgErr) {
-      console.error('telegram notify failed:', tgErr)
-      await logNotification(c, userId, 'telegram', notifType, notifTitle, notifMessage,
-        'failed', { sessionId }, tgErr instanceof Error ? tgErr.message : 'unknown')
+      const profileInfo = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ timezone: string }>()
+      const tz = profileInfo?.timezone || 'UTC'
+      for (const v of savedValues) {
+        if (v.severity === 'emergency' || v.severity === 'critical') {
+          await createEmergencyAlert(c as any, userId, sessionId, v.metricCode, v.finalValue, v.unit, v.severity, `Nilai ${v.metricCode} ${v.finalValue} ${v.unit} masuk kategori darurat.`)
+        }
+      }
+      const streak = await updateDailyStreak(c as any, userId, tz)
+      const badges = await awardBadges(c as any, userId, streak.currentCount)
+      // attach to response later
+      ;(globalThis as any).__hlStreak = streak
+      ;(globalThis as any).__hlBadges = badges
+    } catch (hookErr) {
+      console.error('streak/alert hook error:', hookErr)
     }
 
+    // US-3.1.3: enqueue async; if queue is not bound, fall back to in-request send.
+    const queued = await enqueueTelegramSummary(c, {
+      userId,
+      notificationType: notifType as 'submit_summary' | 'emergency_alert',
+      title: notifTitle,
+      message: notifMessage,
+      sessionId,
+      hasEmergency: hasEmergency === 1
+    })
+    if (!queued.enqueued) {
+      try {
+        const tg = await sendTelegramNotification(c, userId, notifType, notifTitle, notifMessage)
+        await logNotification(c, userId, 'telegram', notifType, notifTitle, notifMessage,
+          tg.sent ? 'sent' : 'skipped',
+          { sessionId, hasEmergency: hasEmergency === 1, via: 'sync_fallback' },
+          tg.error)
+      } catch (tgErr) {
+        console.error('telegram notify failed:', tgErr)
+        await logNotification(c, userId, 'telegram', notifType, notifTitle, notifMessage,
+          'failed', { sessionId }, tgErr instanceof Error ? tgErr.message : 'unknown')
+      }
+    } else {
+      await logNotification(c, userId, 'telegram', notifType, notifTitle, notifMessage,
+        'pending', { sessionId, hasEmergency: hasEmergency === 1, via: 'queue' }, undefined)
+    }
+
+    const streakData = (globalThis as any).__hlStreak
+    const badgesData = (globalThis as any).__hlBadges
+    ;(globalThis as any).__hlStreak = undefined
+    ;(globalThis as any).__hlBadges = undefined
     return jsonResponse(c, success({
       sessionId,
       values: savedValues,
-      hasEmergency: hasEmergency === 1
+      hasEmergency: hasEmergency === 1,
+      streak: streakData,
+      badges: badgesData
     }, 201, startedAt))
   } catch (error) {
     console.error('submit endpoint error:', error)
@@ -2997,6 +3081,8 @@ app.onError((error, c) => {
   return jsonResponse(c, result)
 })
 
+mountExtraRoutes(app as any)
+
 export {
   app,
   hashPassword,
@@ -3011,7 +3097,76 @@ export {
   metricCatalogResponse
 }
 
-export default app
+
+
+// US-3.1.3: Async Telegram summary via Cloudflare Queue.
+interface TelegramQueueMessage {
+  userId: string
+  notificationType: 'submit_summary' | 'emergency_alert'
+  title: string
+  message: string
+  sessionId?: string
+  hasEmergency?: boolean
+}
+
+async function enqueueTelegramSummary(
+  c: Context<{ Bindings: Env }>,
+  payload: TelegramQueueMessage
+): Promise<{ enqueued: boolean; reason?: string }> {
+  if (!c.env.TELEGRAM_QUEUE) {
+    // Queue not bound: fall back to in-request send so user is not blocked.
+    return { enqueued: false, reason: 'queue_not_configured' }
+  }
+  try {
+    await c.env.TELEGRAM_QUEUE.send(payload)
+    return { enqueued: true }
+  } catch (err) {
+    console.error('telegram enqueue error:', err)
+    return { enqueued: false, reason: err instanceof Error ? err.message : 'unknown' }
+  }
+}
+
+export async function telegramQueueHandler(
+  batch: MessageBatch<TelegramQueueMessage>,
+  env: Env,
+  _ctx: ExecutionContext
+): Promise<void> {
+  for (const message of batch.messages) {
+    try {
+      const data = message.body
+      if (!data?.userId) continue
+      const c = {
+        env,
+        req: { header: () => undefined } as any,
+        res: undefined,
+      } as unknown as Context<{ Bindings: Env }>
+      const tg = await sendTelegramNotification(
+        c,
+        data.userId,
+        data.notificationType,
+        data.title,
+        data.message
+      )
+      await logNotification(
+        c,
+        data.userId,
+        'telegram',
+        data.notificationType,
+        data.title,
+        data.message,
+        tg.sent ? 'sent' : 'skipped',
+        { sessionId: data.sessionId, hasEmergency: data.hasEmergency === true, via: 'queue' },
+        tg.error
+      )
+      message.ack()
+    } catch (err) {
+      console.error('telegram queue consumer error:', err)
+      message.retry()
+    }
+  }
+}
+
+// US-3.1.3: default export moved to end of file
 
 // AI Extraction Endpoint
 type ExtractInput = {
@@ -3372,6 +3527,7 @@ app.put('/api/admin/configs/:configKey', async (c) => {
     const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
     if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
     await c.env.DB.prepare('UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = ?').bind(body.configValue, configKey).run()
+    invalidateSystemConfigCache(configKey)
     await c.env.DB.prepare(
       "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configUpdate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
     ).bind(createId('aud'), user.id, configKey, JSON.stringify({ configKey, newValue: body.configValue })).run()
@@ -3443,7 +3599,7 @@ app.get('/api/family/links', async (c) => {
   }
 })
 
-app.get('/api/family/caregiver/dashboard', async (c) => {
+async function caregiverDashboardHandler(c: Context<{ Bindings: Env }>) {
   const startedAt = Date.now()
   try {
     const caregiverId = await getCurrentSession(c)
@@ -3462,7 +3618,10 @@ app.get('/api/family/caregiver/dashboard', async (c) => {
     console.error('caregiver dashboard error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat dashboard caregiver.', 500, [], startedAt))
   }
-})
+}
+
+app.get('/api/family/dashboard', caregiverDashboardHandler)
+app.get('/api/family/caregiver/dashboard', caregiverDashboardHandler)
 
 app.post('/api/alerts/:id/acknowledge', async (c) => {
   const startedAt = Date.now()
@@ -3704,3 +3863,16 @@ app.post('/api/telegram/webhook', async (c) => {
     return c.json({ ok: true })
   }
 })
+
+// US-3.1.3 + US-3.4.2: Worker default export includes fetch, queue, and scheduled handler.
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return app.fetch(request as any, env as any, ctx as any)
+  },
+  async queue(batch: MessageBatch<TelegramQueueMessage>, env: Env, _ctx: ExecutionContext): Promise<void> {
+    return telegramQueueHandler(batch, env, _ctx)
+  },
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    return scheduledHandler(event, env as unknown as ExtraEnv, ctx)
+  }
+}

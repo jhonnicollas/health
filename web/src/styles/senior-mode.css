@@ -1,0 +1,20 @@
+/* US-4.5.1 Senior Mode */
+html[data-accessibility="senior"] {
+  --base-font-size: 22px;
+  --button-min-size: 56px;
+}
+html[data-accessibility="senior"] body { font-size: var(--base-font-size); line-height: 1.6; }
+html[data-accessibility="senior"] button,
+html[data-accessibility="senior"] input,
+html[data-accessibility="senior"] select,
+html[data-accessibility="senior"] textarea {
+  font-size: 1.1rem; min-height: var(--button-min-size); padding: 0.75rem 1rem;
+}
+html[data-accessibility="senior"] h1 { font-size: 2.2rem; }
+html[data-accessibility="senior"] h2 { font-size: 1.8rem; }
+html[data-accessibility="senior"] h3 { font-size: 1.4rem; }
+html[data-accessibility="senior"] .app-actions { flex-direction: column; gap: 0.75rem; }
+html[data-accessibility="senior"] .app-actions button { width: 100%; font-size: 1.2rem; }
+html[data-accessibility="senior"] .eyebrow,
+html[data-accessibility="senior"] .meta,
+html[data-accessibility="senior"] .small { display: none; }

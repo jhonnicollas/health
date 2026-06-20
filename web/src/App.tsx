@@ -5,6 +5,8 @@ import { LoginPage } from './pages/auth/LoginPage'
 import { SelectMetricPage } from './pages/measurement/SelectMetricPage'
 import { OnboardingPage } from './pages/onboarding/OnboardingPage'
 import { ProfileSettingsPage } from './pages/settings/ProfileSettingsPage'
+import { ConfigDashboardPage } from './pages/admin/ConfigDashboardPage'
+import { SeniorMeasurementFlow } from './pages/measurement/SeniorMeasurementFlow'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import './App.css'
 
@@ -63,7 +65,7 @@ function AppRoutes() {
   }
 
   const appPath = currentPath
-  const allowedAppPaths = ['/dashboard', '/measurements/new', '/settings/profile']
+  const allowedAppPaths = ['/dashboard', '/measurements/new', '/settings/profile', '/admin/configs', '/measurements/senior']
   const effectiveAppPath = allowedAppPaths.includes(appPath) ? appPath : '/dashboard'
 
   if (!allowedAppPaths.includes(appPath)) {
@@ -91,10 +93,15 @@ function AppRoutes() {
           <button onClick={() => navigate('/settings/profile')} type="button">
             Profil
           </button>
+          <button onClick={() => navigate('/admin/configs')} type="button">
+            Admin
+          </button>
         </div>
       </section>
       {effectiveAppPath === '/measurements/new' ? <SelectMetricPage /> : null}
       {effectiveAppPath === '/settings/profile' ? <ProfileSettingsPage /> : null}
+      {effectiveAppPath === '/admin/configs' ? <ConfigDashboardPage /> : null}
+      {effectiveAppPath === '/measurements/senior' ? <SeniorMeasurementFlow /> : null}
     </main>
   )
 }

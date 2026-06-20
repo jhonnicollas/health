@@ -1,0 +1,22 @@
+/* US-4.5.2 High Contrast Mode */
+html[data-accessibility="highContrast"] {
+  --hc-bg: #000;
+  --hc-fg: #ffeb00;
+  --hc-border: #ffeb00;
+  --hc-error: #ff5050;
+  --hc-success: #00ff80;
+}
+html[data-accessibility="highContrast"] body { background: var(--hc-bg); color: var(--hc-fg); }
+html[data-accessibility="highContrast"] button,
+html[data-accessibility="highContrast"] input,
+html[data-accessibility="highContrast"] select,
+html[data-accessibility="highContrast"] textarea {
+  background: #000; color: var(--hc-fg); border: 2px solid var(--hc-border); font-weight: 600;
+}
+html[data-accessibility="highContrast"] a,
+html[data-accessibility="highContrast"] h1,
+html[data-accessibility="highContrast"] h2,
+html[data-accessibility="highContrast"] h3 { color: var(--hc-fg); text-decoration: underline; }
+html[data-accessibility="highContrast"] .form-message.error { color: var(--hc-error); font-weight: 700; }
+html[data-accessibility="highContrast"] .form-message.success { color: var(--hc-success); font-weight: 700; }
+html[data-accessibility="highContrast"] :focus-visible { outline: 3px solid var(--hc-fg); outline-offset: 2px; }
