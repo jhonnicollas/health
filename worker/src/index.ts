@@ -2409,10 +2409,20 @@ Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
       safetyStatus
     ).run()
 
+    // US-2.3.2/3: Append data availability messages
+    const has3Day = last3Days.length >= 3
+    const has7Day = last7Days.length >= 7
+    const dataMessages: string[] = []
+    if (!has3Day) dataMessages.push('Belum cukup data 3 hari untuk perbandingan.')
+    if (!has7Day) dataMessages.push('Belum cukup data 7 hari untuk perbandingan.')
+
     return jsonResponse(c, success({
       recommendationId: recId,
       recommendation: recommendationText,
       safetyStatus,
+      has3DayComparison: has3Day,
+      has7DayComparison: has7Day,
+      dataMessages,
       summary
     }, 200, startedAt))
   } catch (error) {
