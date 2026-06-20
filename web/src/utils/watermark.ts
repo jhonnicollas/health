@@ -1,88 +1,72 @@
 export type WatermarkOptions = {
   displayName: string
-  userId: string
-  timestamp?: Date
-  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+  measuredAt: string
+  metrics: Array<{ metricName: string; finalValue: number; unit: string }>
+  appName?: string
+  format?: 'webp' | 'jpeg'
+  position?: 'bottom' | 'top'
 }
 
-type WatermarkedImage = {
+export type WatermarkedImage = {
   file: File
   width: number
   height: number
+}
+
+const FALLBACK_APP_NAME = 'HL Health Companion'
+
+const METRIC_LABELS: Record<string, string> = {
+  spo2: 'SpO2',
+  heartRate: 'Heart Rate',
+  systolic: 'Sistolik',
+  diastolic: 'Diastolik',
+  bloodPressurePulse: 'Nadi',
+  glucoseFasting: 'Gula Darah Puasa',
+  glucosePostMeal: 'Gula Darah 2 Jam PP',
+  cholesterolTotal: 'Kolesterol Total',
+  uricAcid: 'Asam Urat',
+  bodyWeight: 'Berat Badan',
+  bmi: 'BMI',
+  waistCircumference: 'Lingkar Pinggang',
+  bodyTemperature: 'Suhu Tubuh',
+  sleepDuration: 'Durasi Tidur',
+  height: 'Tinggi Badan'
 }
 
 function loadImage(file: File) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
     const objectUrl = URL.createObjectURL(file)
-
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      resolve(image)
-    }
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      reject(new Error('Gambar tidak bisa dibaca.'))
-    }
+    image.onload = () => { URL.revokeObjectURL(objectUrl); resolve(image) }
+    image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Gambar tidak bisa dibaca.')) }
     image.src = objectUrl
   })
 }
 
-function formatTimestamp(date: Date): string {
-  return date.toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
+function formatTimestamp(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleString('id-ID', {
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
   })
 }
 
-function getPositionCoordinates(
-  width: number,
-  height: number,
-  textWidth: number,
-  textHeight: number,
-  position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left',
-  padding: number = 10
-): { x: number; y: number } {
-  switch (position) {
-    case 'bottom-right':
-      return {
-        x: width - textWidth - padding,
-        y: height - textHeight - padding
-      }
-    case 'bottom-left':
-      return {
-        x: padding,
-        y: height - textHeight - padding
-      }
-    case 'top-right':
-      return {
-        x: width - textWidth - padding,
-        y: textHeight + padding
-      }
-    case 'top-left':
-      return {
-        x: padding,
-        y: textHeight + padding
-      }
+function supportsWebp(): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    return canvas.toDataURL('image/webp').startsWith('data:image/webp')
+  } catch {
+    return false
   }
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+function canvasToBlob(canvas: HTMLCanvasElement, mime: string, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => {
-        if (blob) {
-          resolve(blob)
-          return
-        }
-        reject(new Error('Watermark gambar gagal.'))
-      },
-      'image/webp',
-      0.9
+      (blob) => blob ? resolve(blob) : reject(new Error('Watermark gambar gagal.')),
+      mime, quality
     )
   })
 }
@@ -91,83 +75,62 @@ export async function addWatermark(
   file: File,
   options: WatermarkOptions
 ): Promise<WatermarkedImage> {
-  const {
-    displayName,
-    userId,
-    timestamp = new Date(),
-    position = 'bottom-right'
-  } = options
+  const { displayName, measuredAt, metrics, appName = FALLBACK_APP_NAME, format, position = 'bottom' } = options
+  const useWebp = format ? format === 'webp' : supportsWebp()
+  const mime = useWebp ? 'image/webp' : 'image/jpeg'
 
   const image = await loadImage(file)
   const canvas = document.createElement('canvas')
-  const context = canvas.getContext('2d')
-
-  if (!context) {
-    throw new Error('Canvas browser tidak tersedia.')
-  }
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas browser tidak tersedia.')
 
   canvas.width = image.naturalWidth
   canvas.height = image.naturalHeight
+  ctx.drawImage(image, 0, 0)
 
-  // Draw original image
-  context.drawImage(image, 0, 0)
+  const baseFont = Math.max(14, Math.floor(image.naturalWidth / 50))
+  const lineH = Math.round(baseFont * 1.35)
+  const padding = Math.round(baseFont * 0.8)
 
-  // Calculate font size based on image dimensions
-  const fontSize = Math.max(12, Math.floor(image.naturalWidth / 40))
-  context.font = `${fontSize}px Arial, sans-serif`
-  context.textBaseline = 'bottom'
-
-  // Build watermark text
-  const timestampText = formatTimestamp(timestamp)
-  const userText = `${displayName} (${userId.slice(0, 8)}...)`
-  const watermarkText = `${userText}\n${timestampText}`
-
-  // Measure text for positioning
-  const lines = watermarkText.split('\n')
-  const lineHeight = fontSize * 1.2
-  const textWidth = Math.max(...lines.map(line => context.measureText(line).width))
-  const textHeight = lines.length * lineHeight
-
-  // Add semi-transparent background for readability
-  const { x, y } = getPositionCoordinates(
-    canvas.width,
-    canvas.height,
-    textWidth,
-    textHeight,
-    position
+  const appLine = appName
+  const userLine = `Pemilik: ${displayName}`
+  const dateLine = `Waktu: ${formatTimestamp(measuredAt)}`
+  const metricLines = metrics.map(m =>
+    `${m.metricName}: ${m.finalValue} ${m.unit}`
   )
+  const allLines = [appLine, userLine, dateLine, ...metricLines]
 
-  // Draw background rectangle
-  context.fillStyle = 'rgba(0, 0, 0, 0.5)'
-  const bgPadding = 8
-  const bgX = position.includes('right') ? x - bgPadding : x - bgPadding
-  const bgY = position.includes('bottom') ? y - textHeight - bgPadding : y - textHeight + bgPadding
-  const bgWidth = textWidth + bgPadding * 2
-  const bgHeight = textHeight + bgPadding * 2
+  ctx.font = `600 ${baseFont}px Arial, sans-serif`
+  const maxWidth = Math.max(...allLines.map(l => ctx.measureText(l).width))
+  const blockH = allLines.length * lineH + padding * 2
+  const blockW = maxWidth + padding * 2
 
-  context.fillRect(bgX, bgY, bgWidth, bgHeight)
+  const blockX = position === 'top' ? padding : canvas.width - blockW - padding
+  const blockY = position === 'top' ? padding : canvas.height - blockH - padding
 
-  // Draw watermark text
-  context.fillStyle = '#ffffff'
-  context.textBaseline = 'bottom'
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'
+  ctx.fillRect(blockX, blockY, blockW, blockH)
 
-  lines.forEach((line, index) => {
-    const lineX = position.includes('right') ? x : x
-    const lineY = position.includes('bottom') ? y - (lines.length - 1 - index) * lineHeight : y + bgPadding - (lines.length - 1 - index) * lineHeight + textHeight
-    context.fillText(line, lineX, lineY)
+  ctx.fillStyle = '#ffffff'
+  ctx.textBaseline = 'top'
+  ctx.font = `700 ${baseFont + 2}px Arial, sans-serif`
+  ctx.fillText(appLine, blockX + padding, blockY + padding)
+  ctx.font = `500 ${baseFont}px Arial, sans-serif`
+  allLines.slice(1).forEach((line, i) => {
+    ctx.fillText(line, blockX + padding, blockY + padding + (i + 1) * lineH)
   })
 
-  // Convert to blob and create File
-  const blob = await canvasToBlob(canvas)
-  const baseName = file.name.replace(/\.[^.]+$/, '') || 'watermarked'
-  const watermarkedFile = new File([blob], `${baseName}-watermarked.webp`, {
-    type: 'image/webp',
+  const blob = await canvasToBlob(canvas, mime, useWebp ? 0.85 : 0.85)
+  const baseName = file.name.replace(/\.[^.]+$/, '') || 'attachment'
+  const ext = useWebp ? 'webp' : 'jpg'
+  const watermarkedFile = new File([blob], `${baseName}-watermarked.${ext}`, {
+    type: mime,
     lastModified: Date.now()
   })
 
-  return {
-    file: watermarkedFile,
-    width: canvas.width,
-    height: canvas.height
-  }
+  return { file: watermarkedFile, width: canvas.width, height: canvas.height }
+}
+
+export function getMetricLabel(code: string): string {
+  return METRIC_LABELS[code] || code
 }

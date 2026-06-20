@@ -1765,12 +1765,12 @@ async function evaluateRule(
   ageYears: number
 ): Promise<RuleEvaluation> {
   const fallbackResult: RuleEvaluation = {
-    status: 'Unknown',
+    status: 'Belum Ada Interpretasi',
     severity: 'info',
     emergencyLevel: 'none',
-    popupTitle: 'Rule Tidak Ditemukan',
-    popupMessage: 'Tidak ada rule yang cocok untuk nilai ini. Nilai tetap tersimpan.',
-    recommendation: 'Pantau nilai dan konsultasikan dengan dokter jika perlu.',
+    popupTitle: 'Belum Ada Interpretasi',
+    popupMessage: 'Belum ada rule yang cocok untuk nilai ini. Nilai tetap tersimpan dan dapat dikonsultasikan dengan dokter.',
+    recommendation: 'Pantau nilai dan konsultasikan dengan dokter untuk interpretasi lebih lanjut.',
     ruleId: null
   }
   let rule: any = null
@@ -1942,6 +1942,22 @@ app.post('/api/measurements/submit', async (c) => {
     const sex = profile.sex || 'all'
     const measuredAt = body.measuredAt || new Date().toISOString()
 
+    // US-1.4.3: Auto-calculate BMI when bodyWeight present and heightCm available and bmi not in values
+    const hasBmi = body.values.some(v => v.metricCode === 'bmi')
+    const hasBw = body.values.some(v => v.metricCode === 'bodyWeight')
+    if (hasBw && !hasBmi && profile.heightCm && profile.heightCm > 0) {
+      const bw = body.values.find(v => v.metricCode === 'bodyWeight')!.finalValue
+      const heightM = profile.heightCm / 100
+      const bmi = Math.round((bw / (heightM * heightM)) * 10) / 10
+      body.values.push({
+        metricCode: 'bmi',
+        finalValue: bmi,
+        unit: 'kg/m2',
+        manualOverride: 0,
+        rawAiValue: null
+      })
+    }
+
     const sessionId = crypto.randomUUID()
     const hasAi = body.values.some(v => v.rawAiValue !== null && v.rawAiValue !== undefined) ? 1 : 0
     const hasAttachment = body.attachments && body.attachments.length > 0 ? 1 : 0
@@ -1963,6 +1979,7 @@ app.post('/api/measurements/submit', async (c) => {
 
     const savedValues: Array<{ id: string; metricCode: string; status: string; severity: string; ruleId: string | null; finalValue: number; unit: string }> = []
     let hasEmergency = 0
+    const missingRules: Array<{ metricCode: string; finalValue: number }> = []
 
     const catalogCodes = new Set<string>()
     const catalogRows = await c.env.DB.prepare('SELECT metricCode FROM HL_metricCatalog').all<{ metricCode: string }>()
@@ -1976,6 +1993,9 @@ app.post('/api/measurements/submit', async (c) => {
       }
 
       const rule = await evaluateRule(c, v.metricCode, v.finalValue, sex, ageYears)
+      if (!rule.ruleId) {
+        missingRules.push({ metricCode: v.metricCode, finalValue: v.finalValue })
+      }
       const valueId = crypto.randomUUID()
       const manualOverride = v.manualOverride ? 1 : 0
 
@@ -2059,6 +2079,18 @@ app.post('/api/measurements/submit', async (c) => {
       ).bind(sessionId).run()
     }
 
+    if (missingRules.length > 0) {
+      await c.env.DB.prepare(
+        `INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt)
+         VALUES (?, ?, 'missingRule', 'HL_measurementSessions', ?, ?, CURRENT_TIMESTAMP)`
+      ).bind(
+        crypto.randomUUID(),
+        userId,
+        sessionId,
+        JSON.stringify({ missing: missingRules })
+      ).run()
+    }
+
     await c.env.DB.prepare(
       `INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt)
        VALUES (?, ?, 'measurementSubmit', 'HL_measurementSessions', ?, ?, CURRENT_TIMESTAMP)`
@@ -2066,7 +2098,13 @@ app.post('/api/measurements/submit', async (c) => {
       crypto.randomUUID(),
       userId,
       sessionId,
-      JSON.stringify({ valueCount: body.values.length, hasAi, hasAttachment, hasEmergency })
+      JSON.stringify({
+        valueCount: body.values.length,
+        hasAi,
+        hasAttachment,
+        hasEmergency,
+        manualOverrideCount: body.values.filter(v => v.manualOverride).length
+      })
     ).run()
 
     const notifType = hasEmergency === 1 ? 'emergency_alert' : 'submit_summary'
@@ -2447,10 +2485,24 @@ app.get('/api/reports/daily', async (c) => {
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const today = new Date().toISOString().slice(0, 10)
     const values = await c.env.DB.prepare(
-      `SELECT metricCode, finalValue, unit, status, severity, manualOverride
-       FROM HL_measurementValues WHERE userId = ? AND substr(measuredAt, 1, 10) = ?`
+      `SELECT v.metricCode, v.finalValue, v.unit, v.status, v.severity, v.manualOverride, v.metricCode,
+              r.popupTitle, r.popupMessage, r.recommendation, r.sourceLabel
+       FROM HL_measurementValues v
+       LEFT JOIN HL_metricRules r ON r.id = v.ruleId
+       WHERE v.userId = ? AND substr(v.measuredAt, 1, 10) = ?`
     ).bind(userId, today).all()
-    return jsonResponse(c, success({ period: 'daily', date: today, values: values.results || [] }, 200, startedAt))
+    const sessions = await c.env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM HL_measurementSessions WHERE userId = ? AND substr(measuredAt, 1, 10) = ?`
+    ).bind(userId, today).first<{ cnt: number }>()
+    const sessionCount = sessions?.cnt || 0
+    return jsonResponse(c, success({
+      period: 'daily',
+      date: today,
+      sessionCount,
+      hasData: (values.results || []).length > 0,
+      values: values.results || [],
+      emptyMessage: sessionCount === 0 ? 'Belum ada pengukuran hari ini. Yuk mulai catat pengukuran.' : null
+    }, 200, startedAt))
   } catch (error) {
     console.error('daily report error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat laporan harian.', 500, [], startedAt))
@@ -2463,15 +2515,32 @@ app.get('/api/reports/weekly', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const values = await c.env.DB.prepare(
+    const metrics = await c.env.DB.prepare(
       `SELECT metricCode, AVG(finalValue) as avg, MIN(finalValue) as min, MAX(finalValue) as max, COUNT(*) as cnt
        FROM HL_measurementValues WHERE userId = ? AND measuredAt >= ? GROUP BY metricCode`
     ).bind(userId, since).all()
     const sessions = await c.env.DB.prepare(
       `SELECT COUNT(*) as cnt FROM HL_measurementSessions WHERE userId = ? AND measuredAt >= ?`
     ).bind(userId, since).first<{ cnt: number }>()
-    const adherence = sessions?.cnt ? Math.min(100, Math.round((sessions.cnt / 7) * 100)) : 0
-    return jsonResponse(c, success({ period: 'weekly', metrics: values.results || [], adherence }, 200, startedAt))
+    const sessionsList = await c.env.DB.prepare(
+      `SELECT substr(measuredAt, 1, 10) as day, COUNT(*) as cnt FROM HL_measurementSessions
+       WHERE userId = ? AND measuredAt >= ? GROUP BY day`
+    ).bind(userId, since).all<{ day: string; cnt: number }>()
+    const bestDay = (sessionsList.results || []).reduce((a, b) => (b.cnt > (a?.cnt || 0) ? b : a), null as any)
+    const worstDay = (sessionsList.results || []).reduce((a, b) => (b.cnt < (a?.cnt || 99) ? b : a), null as any)
+    const alertCount = await c.env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM HL_alerts WHERE userId = ? AND createdAt >= ?`
+    ).bind(userId, since).first<{ cnt: number }>()
+    const adherence = Math.min(100, Math.round(((sessionsList.results || []).length / 7) * 100))
+    return jsonResponse(c, success({
+      period: 'weekly',
+      metrics: metrics.results || [],
+      adherence,
+      alertCount: alertCount?.cnt || 0,
+      bestDay: bestDay?.day || null,
+      worstDay: worstDay?.day || null,
+      daysWithData: (sessionsList.results || []).length
+    }, 200, startedAt))
   } catch (error) {
     console.error('weekly report error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat laporan mingguan.', 500, [], startedAt))
@@ -2485,17 +2554,52 @@ app.get('/api/reports/monthly', async (c) => {
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     const values = await c.env.DB.prepare(
-      `SELECT metricCode, AVG(finalValue) as avg, MIN(finalValue) as min, MAX(finalValue) as max, COUNT(*) as cnt
+      `SELECT metricCode, AVG(finalValue) as avg, MIN(finalValue) as min, MAX(finalValue) as max,
+              (SELECT finalValue FROM HL_measurementValues v2 WHERE v2.userId = ? AND v2.metricCode = HL_measurementValues.metricCode ORDER BY measuredAt DESC LIMIT 1) as latest,
+              COUNT(*) as cnt
        FROM HL_measurementValues WHERE userId = ? AND measuredAt >= ? GROUP BY metricCode`
-    ).bind(userId, since).all()
+    ).bind(userId, userId, since).all()
     const sessionCount = await c.env.DB.prepare(
       `SELECT COUNT(*) as cnt FROM HL_measurementSessions WHERE userId = ? AND measuredAt >= ?`
     ).bind(userId, since).first<{ cnt: number }>()
+    const alertCount = await c.env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM HL_alerts WHERE userId = ? AND createdAt >= ?`
+    ).bind(userId, since).first<{ cnt: number }>()
+    const daysWithData = await c.env.DB.prepare(
+      `SELECT COUNT(DISTINCT substr(measuredAt, 1, 10)) as cnt FROM HL_measurementSessions WHERE userId = ? AND measuredAt >= ?`
+    ).bind(userId, since).first<{ cnt: number }>()
+
+    // AI monthly summary - use LLM if available, else rule-based
+    let aiSummary = 'Ringkasan 30 hari belum tersedia.'
+    if (c.env.CLOUDFLARE_ACCOUNT_ID && c.env.CLOUDFLARE_API_TOKEN) {
+      const summary = (values.results || []).map((m: any) =>
+        `${m.metricCode}: avg ${m.avg?.toFixed(1)} (min ${m.min}, max ${m.max}, latest ${m.latest})`
+      ).join('; ')
+      try {
+        const prompt = `Buat ringkasan naratif singkat 30 hari kesehatan user berdasarkan data berikut dalam Bahasa Indonesia. Jangan mendiagnosa. Hanya edukasi umum.\n\nData: ${summary}`
+        const aiRes = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-2-7b-chat-int8`,
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, max_tokens: 400 })
+          }
+        )
+        if (aiRes.ok) {
+          const d = await aiRes.json() as any
+          const txt = d?.result?.response || ''
+          if (txt) aiSummary = txt
+        }
+      } catch (err) { console.error('AI monthly error:', err) }
+    }
+
     return jsonResponse(c, success({
       period: 'monthly',
       metrics: values.results || [],
       sessionCount: sessionCount?.cnt || 0,
-      narrative: 'Ringkasan 30 hari: lihat metrik rata-rata dan jumlah pengukuran di bawah ini.'
+      alertCount: alertCount?.cnt || 0,
+      daysWithData: daysWithData?.cnt || 0,
+      aiMonthlySummary: aiSummary
     }, 200, startedAt))
   } catch (error) {
     console.error('monthly report error:', error)
@@ -2510,13 +2614,44 @@ app.get('/api/kb', async (c) => {
       `SELECT id, slug, title, category, contentMarkdown as body FROM HL_knowledgeArticles WHERE active = 1 ORDER BY sortOrder ASC`
     ).all().catch(() => ({ results: [] as any[] }))
     if ((articles.results || []).length === 0) {
-      return jsonResponse(c, success({
-        articles: [
-          { id: 'kb-oximeter', slug: 'oximeter', title: 'Cara Baca Pulse Oximeter', category: 'device', body: '## Cara Baca Pulse Oximeter\n\n1. Pasang sensor di jari telunjuk.\n2. Tunggu 5-10 detik.\n3. Catat angka SpO2 (%) dan Heart Rate (bpm).\n\n**Normal**: SpO2 95-100%, HR 60-100 bpm.' },
-          { id: 'kb-bp', slug: 'blood-pressure', title: 'Cara Baca Tensimeter', category: 'device', body: '## Cara Baca Tensimeter\n\n1. Pasang manset di lengan atas.\n2. Diam 5 menit sebelum pengukuran.\n3. Catat Sistolik/Diastolik (mmHg) dan Pulse.\n\n**Normal**: <120/<80 mmHg.' },
-          { id: 'kb-glucose', slug: 'glucose', title: 'Cara Baca Glucometer', category: 'device', body: '## Cara Baca Glucometer\n\n1. Cuci tangan, keringkan.\n2. Ambil sampel darah.\n3. Catat hasil mg/dL.\n\n**Normal puasa**: 70-99 mg/dL.' }
-        ]
-      }, 200, startedAt))
+      const fallback = [
+        {
+          id: 'kb-yuwell-yx106',
+          slug: 'yuwell-yx106',
+          title: 'Yuwell YX106 - Pulse Oximeter',
+          category: 'device',
+          body: '## Yuwell YX106 - Pulse Oximeter\n\n### Cara Pakai\n1. Buka klip sensor, pasang di jari telunjuk.\n2. Kuku menghadap atas, jari masuk sempurna.\n3. Tunggu 5-10 detik sampai angka stabil.\n4. Baca SpO2 (%) dan Heart Rate (bpm).\n\n### Tips Foto\n- Foto di tempat terang.\n- Hindari cahaya lampu neon langsung.\n- Posisikan layar menghadap kamera.\n\n### Kesalahan Umum\n- Catut dingin/kuku cat dapat mengganggu sensor.\n- Bergerak saat pengukuran bikin bacaan tak akurat.\n\n### Arti Metric\n- SpO2 normal 95-100%. < 92% perlu konsultasi dokter.\n- HR normal 60-100 bpm (dewasa).\n\n### Kapan Cek Ulang\n- SpO2 < 94% atau HR > 120 bpm saat istirahat.'
+        },
+        {
+          id: 'kb-omron-hem7194',
+          slug: 'omron-hem7194-t1-fl',
+          title: 'OMRON HEM 7194 T1 FL - Tensimeter Digital',
+          category: 'device',
+          body: '## OMRON HEM 7194 T1 FL - Tensimeter Digital\n\n### Cara Pakai\n1. Pasang manset di lengan atas 2-3 cm di atas siku.\n2. Duduk tenang 5 menit sebelum pengukuran.\n3. Tekan tombol Start, tunggu sampai manset kempes sendiri.\n4. Catat Sistolik/Diastolik (mmHg) dan Pulse.\n\n### Tips Foto\n- Layar menghadap kamera, tidak silau.\n- Ambil foto sebelum memori di-clear.\n\n### Kesalahan Umum\n- Manset terlalu longgar/ketat.\n- Bicara saat pengukuran.\n\n### Arti Metric\n- Normal: < 120/<80 mmHg.\n- Hipertensi Tahap 1: 130-139/80-89.\n- Hipertensi Tahap 2: >=140/>=90.\n\n### Kapan Cek Ulang\n- Sistolik > 180 atau Diastolik > 120 (krisis hipertensi).'
+        },
+        {
+          id: 'kb-sinocare-m101',
+          slug: 'sinocare-m101',
+          title: 'Sinocare M101 - GCU (Glucose/Cholesterol/Uric Acid)',
+          category: 'device',
+          body: '## Sinocare M101 - GCU (Glucose/Cholesterol/Uric Acid)\n\n### Cara Pakai\n1. Pilih mode test: Glu/Chol/UA sesuai kebutuhan.\n2. Masukkan strip sesuai mode.\n3. Cuci tangan, ambil sampel darah di ujung strip.\n4. Tunggu hitungan mundur selesai.\n5. Catat hasil mg/dL.\n\n### Tips Foto\n- Hanya foto di mode yang dipilih.\n- Pilih mode dulu sebelum foto agar AI tidak bingung.\n\n### Kesalahan Umum\n- Strip salah mode = hasil salah.\n- Darah terlalu sedikit / terlalu banyak.\n\n### Arti Metric\n- Glu Fasting: 70-99 mg/dL normal.\n- Glu 2 Jam PP: <140 mg/dL normal.\n- Cholesterol Total: <200 mg/dL optimal.\n- Uric Acid: <7 mg/dL (pria), <6 mg/dL (wanita).\n\n### Kapan Cek Ulang\n- Glu fasting >= 126 atau 2 jam PP >= 200.'
+        },
+        {
+          id: 'kb-thermometer',
+          slug: 'thermometer',
+          title: 'Termometer Digital',
+          category: 'device',
+          body: '## Termometer Digital\n\n### Cara Pakai\n1. Nyalakan, pastikan mode Celsius.\n2. Tempatkan di bawah lidah / ketiak / dahi sesuai alat.\n3. Tunggu bunyi bip.\n4. Catat suhu dalam C.\n\n### Tips Foto\n- Layar sejajar kamera.\n- Hindari uap/embun di sensor.\n\n### Kesalahan Umum\n- Makan/minum panas baru 30 menit lalu pengukuran oral.\n\n### Arti Metric\n- Normal: 36.1-37.2 C.\n- Demam: >=37.5 C.\n- Demam tinggi: >=39 C.\n\n### Kapan Cek Ulang\n- Suhu >= 40 C atau hipotermia < 35 C.'
+        },
+        {
+          id: 'kb-scale',
+          slug: 'timbangan-badan',
+          title: 'Timbangan Badan Digital',
+          category: 'device',
+          body: '## Timbangan Badan Digital\n\n### Cara Pakai\n1. Letakkan di lantai datar.\n2. Naik tanpa alas kaki, berdiri diam di tengah.\n3. Tunggu angka stabil.\n4. Catat berat kg.\n\n### Tips Foto\n- Layar sejajar kamera.\n- Foto di pagi hari setelah ke toilet untuk konsistensi.\n\n### Kesalahan Umum\n- Timbangan di karpet = bacaan tidak akurat.\n\n### Arti Metric\n- BMI = berat (kg) / (tinggi m)^2.\n- Underweight: <18.5, Normal: 18.5-24.9, Overweight: 25-29.9, Obesitas: >=30.\n\n### Kapan Cek Ulang\n- Perubahan > 2 kg dalam seminggu tanpa sebab jelas.'
+        }
+      ]
+      return jsonResponse(c, success({ articles: fallback }, 200, startedAt))
     }
     return jsonResponse(c, success({ articles: articles.results }, 200, startedAt))
   } catch (error) {
@@ -2774,10 +2909,11 @@ app.post('/api/measurements/sync', async (c) => {
     const synced: any[] = []
     for (const d of body.drafts) {
       const draftId = createId('drf')
+      const profileId = d.profileId && typeof d.profileId === 'string' ? d.profileId : null
       await c.env.DB.prepare(
         `INSERT INTO HL_measurementDrafts (id, userId, profileId, selectedMetricsJson, draftDataJson, status, createdAt, updatedAt, expiresAt)
-         VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)`
-      ).bind(draftId, userId, d.profileId, JSON.stringify(d.metrics || []), JSON.stringify(d), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()).run()
+         VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)`
+      ).bind(draftId, userId, profileId, JSON.stringify(d.metrics || []), JSON.stringify(d), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()).run()
       synced.push({ clientId: d.clientId, draftId })
     }
     return jsonResponse(c, success({ synced, count: synced.length }, 200, startedAt))
@@ -2880,6 +3016,47 @@ app.put('/api/admin/configs/:key', async (c) => {
   } catch (error) {
     console.error('admin config update error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update.', 500, [], startedAt))
+  }
+})
+
+// Telegram Webhook - receives messages from bot, links chat_id to user via verification code
+app.post('/api/telegram/webhook', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const body = await c.req.json() as any
+    const message = body?.message
+    if (!message || !message.text || !message.chat) {
+      return c.json({ ok: true })
+    }
+    const chatId = String(message.chat.id)
+    const text = message.text.trim()
+    if (!/^\d{6}$/.test(text)) {
+      return c.json({ ok: true })
+    }
+    const codeHash = await sha256Token(text)
+    const link = await c.env.DB.prepare(
+      `SELECT userId FROM HL_telegramLinks WHERE verificationCodeHash = ? AND verified = 0`
+    ).bind(codeHash).first<{ userId: string }>()
+    if (!link) {
+      return c.json({ ok: true })
+    }
+    await c.env.DB.prepare(
+      `UPDATE HL_telegramLinks SET telegramChatId = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?`
+    ).bind(chatId, link.userId).run()
+    await c.env.DB.prepare(
+      `UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`
+    ).bind(link.userId).run()
+    if (c.env.TELEGRAM_BOT_TOKEN) {
+      await fetch(`https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: 'Telegram berhasil terhubung ke HL Health Companion. Notifikasi aktif.' })
+      }).catch(() => {})
+    }
+    return c.json({ ok: true })
+  } catch (error) {
+    console.error('telegram webhook error:', error)
+    return c.json({ ok: true })
   }
 })
 
@@ -3052,6 +3229,10 @@ app.post('/api/measurements/extract', async (c) => {
             parsedJson = JSON.stringify(aiData.result)
             aiSuccess = true
 
+            // Per US-1.3.3: AI tidak boleh menebak metric yang tidak dipilih
+            const allow = (code: string) => selectedMetricCodes.includes(code)
+            const isSinocare = (deviceCode || '').toLowerCase().includes('sinocare') || metricGroup === 'sinocareGcu'
+
             // Extract metrics based on device group
             if (metricGroup === 'oximeter') {
               // Try to extract SpO2 and heart rate
@@ -3060,7 +3241,7 @@ app.post('/api/measurements/extract', async (c) => {
               const hrMatch = text.match(/heart["\s:=]+(\d+)/i) || text.match(/hr["\s:=]+(\d+)/i) || text.match(/pulse["\s:=]+(\d+)/i)
 
               if (spo2Match) {
-                extractedMetrics.push({
+                if (allow('spo2')) extractedMetrics.push({
                   metricCode: 'spo2',
                   rawAiValue: parseInt(spo2Match[1]),
                   unit: '%',
@@ -3069,7 +3250,7 @@ app.post('/api/measurements/extract', async (c) => {
               }
 
               if (hrMatch) {
-                extractedMetrics.push({
+                if (allow('heartRate')) extractedMetrics.push({
                   metricCode: 'heartRate',
                   rawAiValue: parseInt(hrMatch[1]),
                   unit: 'bpm',
@@ -3086,7 +3267,7 @@ app.post('/api/measurements/extract', async (c) => {
               const pulseMatch = text.match(/pulse["\s:=]+(\d+)/i)
 
               if (sysMatch) {
-                extractedMetrics.push({
+                if (allow('systolic')) extractedMetrics.push({
                   metricCode: 'systolic',
                   rawAiValue: parseInt(sysMatch[1]),
                   unit: 'mmHg',
@@ -3095,7 +3276,7 @@ app.post('/api/measurements/extract', async (c) => {
               }
 
               if (diaMatch) {
-                extractedMetrics.push({
+                if (allow('diastolic')) extractedMetrics.push({
                   metricCode: 'diastolic',
                   rawAiValue: parseInt(diaMatch[1]),
                   unit: 'mmHg',
@@ -3104,7 +3285,7 @@ app.post('/api/measurements/extract', async (c) => {
               }
 
               if (pulseMatch) {
-                extractedMetrics.push({
+                if (allow('bloodPressurePulse')) extractedMetrics.push({
                   metricCode: 'bloodPressurePulse',
                   rawAiValue: parseInt(pulseMatch[1]),
                   unit: 'bpm',
@@ -3113,6 +3294,22 @@ app.post('/api/measurements/extract', async (c) => {
               }
 
               confidence = extractedMetrics.length > 0 ? 0.86 : 0
+            } else if (metricGroup === 'sinocareGcu' || isSinocare) {
+              // US-1.3.3: Sinocare - only extract selected metric
+              const text = JSON.stringify(aiData.result)
+              if (allow('glucoseFasting') || allow('glucosePostMeal') || allow('cholesterolTotal') || allow('uricAcid')) {
+                const glu = text.match(/glu["\s:=]+(\d+(\.\d+)?)/i) || text.match(/glucose["\s:=]+(\d+(\.\d+)?)/i)
+                const chol = text.match(/chol["\s:=]+(\d+(\.\d+)?)/i) || text.match(/cholesterol["\s:=]+(\d+(\.\d+)?)/i)
+                const ua = text.match(/ua["\s:=]+(\d+(\.\d+)?)/i) || text.match(/uric["\s:=]+(\d+(\.\d+)?)/i)
+                if (glu && (allow('glucoseFasting') || allow('glucosePostMeal'))) {
+                  const unit = 'mg/dL'
+                  if (allow('glucoseFasting')) extractedMetrics.push({ metricCode: 'glucoseFasting', rawAiValue: parseFloat(glu[1]), unit, confidence: 0.84 })
+                  else if (allow('glucosePostMeal')) extractedMetrics.push({ metricCode: 'glucosePostMeal', rawAiValue: parseFloat(glu[1]), unit, confidence: 0.84 })
+                }
+                if (chol && allow('cholesterolTotal')) extractedMetrics.push({ metricCode: 'cholesterolTotal', rawAiValue: parseFloat(chol[1]), unit: 'mg/dL', confidence: 0.83 })
+                if (ua && allow('uricAcid')) extractedMetrics.push({ metricCode: 'uricAcid', rawAiValue: parseFloat(ua[1]), unit: 'mg/dL', confidence: 0.81 })
+                confidence = extractedMetrics.length > 0 ? 0.84 : 0
+              }
             } else {
               // Generic extraction for other device types
               confidence = 0.75

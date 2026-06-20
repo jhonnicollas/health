@@ -1397,3 +1397,61 @@ Use this format for every task:
 ### Next Agent Notes
 - Sprint 1 complete with production UAT passing
 - Move to Sprint 2: Metric Rules Engine, AI Recommendations, Telegram link, etc.
+
+## 2026-06-20 21:50 UTC — Agent: Caveman
+
+### Task
+- Task ID: AUDIT-US-1.2.4-2.5.4
+- Sprint: 1-2
+- Status: Audit + Fixes Completed
+
+### Files Read
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- worker/src/index.ts
+- web/src/utils/watermark.ts
+- web/src/utils/bmiCalculator.ts
+- web/src/components/measurement/InterpretationPopup.tsx
+- docs/schema.sql
+
+### Files Changed
+- worker/src/index.ts (rule fallback, missingRule audit, BMI auto-calc server-side, sync draft CHECK constraint fix, telegram webhook, reports enrichment, KB articles)
+- web/src/utils/watermark.ts (PRD spec fields: HL logo, displayName, measuredAt, metricName, finalValue+unit)
+- web/src/utils/bmiCalculator.ts (HeightMissingError)
+- web/src/components/measurement/InterpretationPopup.tsx (severity sort + emergency checkbox + Saya Mengerti button)
+
+### What Changed
+- US-2.1.3 Rule Fallback: status='Belum Ada Interpretasi', severity='info', missingRule audit log written
+- US-1.2.5 Watermark: now includes HL Health Companion, displayName, measuredAt, metricName, finalValue+unit
+- US-1.3.3 AI Sinocare: restrict extraction to selectedMetricCodes
+- US-1.4.3 BMI: server auto-calculates BMI when bodyWeight present and heightCm available
+- US-2.2.2 Popup: emergency/critical values sorted to top
+- US-2.2.3 Modal: "Saya mengerti bahwa ini bukan diagnosis dan perlu verifikasi ulang" checkbox
+- US-2.5.1 Daily Report: popupMessage/recommendation JOINed from rule, emptyMessage
+- US-2.5.2 Weekly Report: bestDay, worstDay, alertCount, daysWithData
+- US-2.5.3 Monthly Report: AI monthly summary (LLM with fallback), alertCount, daysWithData, latest
+- US-2.5.4 KB: 5 specific device articles (Yuwell YX106, OMRON HEM 7194 T1 FL, Sinocare M101, Termometer, Timbangan Badan)
+- Sync draft: profileId NULL allowed, status='active' per CHECK constraint
+- Telegram webhook: /api/telegram/webhook for chat_id linking
+
+### Validation
+- Type check: npx tsc --noEmit passed
+- Build: wrangler deploy successful
+- UAT Production:
+  - Register/Login/Onboarding: OK
+  - US-1.4.3 BMI auto-calc: bodyWeight 80kg + heightCm 175 -> BMI 26.1 (Overweight) ✓
+  - US-2.1.3 Fallback: height 175 -> status='Belum Ada Interpretasi', severity='info', missingRule audit log written ✓
+  - US-2.5.1 Daily report: includes popupMessage, recommendation, sourceLabel ✓
+  - US-2.5.2 Weekly report: bestDay, worstDay, alertCount ✓
+  - US-2.5.3 Monthly report: alertCount, daysWithData, aiMonthlySummary (fallback when no AI token) ✓
+  - US-2.5.4 KB: 5 device articles loaded ✓
+  - Sync draft without profileId: OK ✓
+  - US-1.3.3 selectedMetricCodes restriction: enforced ✓
+
+### Documentation Updated
+- WORK_LOG.md: audit entry added
+- TASKS.md: unchanged (audit was quality improvement not new feature)
+
+### Next Agent Notes
+- All Sprint 1 + Sprint 2 PRD compliance fixed
+- Continue with Sprint 3-4 if not done

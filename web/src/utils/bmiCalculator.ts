@@ -1,6 +1,6 @@
 export type BmiInput = {
   bodyWeight: number
-  heightCm: number
+  heightCm: number | null | undefined
 }
 
 export type BmiResult = {
@@ -9,12 +9,19 @@ export type BmiResult = {
   categoryLabel: string
 }
 
-export function calculateBmi(input: BmiInput): BmiResult | null {
-  if (!Number.isFinite(input.bodyWeight) || !Number.isFinite(input.heightCm)) {
-    return null
+export class HeightMissingError extends Error {
+  constructor() {
+    super('Tinggi badan belum tersedia. Lengkapi profil terlebih dahulu.')
+    this.name = 'HeightMissingError'
   }
-  if (input.bodyWeight <= 0 || input.heightCm <= 0) {
-    return null
+}
+
+export function calculateBmi(input: BmiInput): BmiResult {
+  if (!Number.isFinite(input.bodyWeight) || input.bodyWeight <= 0) {
+    throw new Error('Berat badan tidak valid.')
+  }
+  if (input.heightCm === null || input.heightCm === undefined || !Number.isFinite(input.heightCm) || input.heightCm <= 0) {
+    throw new HeightMissingError()
   }
   const heightM = input.heightCm / 100
   const bmi = input.bodyWeight / (heightM * heightM)
