@@ -1,0 +1,475 @@
+#!/usr/bin/env node
+/**
+ * HL Health Companion rules seeder
+ *
+ * Purpose:
+ * - Read Master_Data_Health_Metrics.csv
+ * - Normalize legacy CSV columns into HL_metricRules rows
+ * - Generate an idempotent SQL seed file
+ * - Optionally apply it to Cloudflare D1 using wrangler
+ *
+ * No external npm dependencies required.
+ *
+ * Usage:
+ *   node rules-seeder.js
+ *   node rules-seeder.js --input ./Master_Data_Health_Metrics.csv --output ./seed-rules.generated.sql
+ *   node rules-seeder.js --input ./Master_Data_Health_Metrics.csv --output ./seed-rules.generated.sql --apply
+ *   node rules-seeder.js --database multi_Ai_db --apply
+ *
+ * Notes:
+ * - This script assumes the schema has already been applied.
+ * - Table naming follows HL_*.
+ * - Field naming follows camelCase.
+ */
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+
+const args = parseArgs(process.argv.slice(2));
+const inputPath = args.input || './Master_Data_Health_Metrics.csv';
+const outputPath = args.output || './seed-rules.generated.sql';
+const databaseName = args.database || 'multi_Ai_db';
+const shouldApply = Boolean(args.apply);
+
+const indicatorMap = new Map([
+  ['spo2', 'spo2'],
+  ['saturasi oksigen', 'spo2'],
+  ['heart rate', 'heartRate'],
+  ['pulse', 'heartRate'],
+  ['denyut jantung', 'heartRate'],
+  ['sistolik', 'systolic'],
+  ['tekanan sistolik', 'systolic'],
+  ['diastolik', 'diastolic'],
+  ['tekanan diastolik', 'diastolic'],
+  ['puasa (fasting)', 'glucoseFasting'],
+  ['gula darah puasa', 'glucoseFasting'],
+  ['gdp', 'glucoseFasting'],
+  ['gula darah 2 jam pp', 'glucosePostMeal'],
+  ['gd2pp', 'glucosePostMeal'],
+  ['total', 'cholesterolTotal'],
+  ['kolesterol total', 'cholesterolTotal'],
+  ['uric acid', 'uricAcid'],
+  ['asam urat', 'uricAcid'],
+  ['bmi (body mass index)', 'bmi'],
+  ['bmi', 'bmi'],
+  ['lingkar perut', 'waistCircumference'],
+  ['suhu tubuh', 'bodyTemperature'],
+  ['durasi tidur', 'sleepDuration']
+]);
+
+const unitMap = new Map([
+  ['Index', 'index'],
+  ['%', '%'],
+  ['bpm', 'bpm'],
+  ['mmHg', 'mmHg'],
+  ['mg/dL', 'mg/dL'],
+  ['cm', 'cm'],
+  ['°C', '°C'],
+  ['hour', 'hour'],
+  ['jam', 'hour']
+]);
+
+const sexMap = new Map([
+  ['all', 'all'],
+  ['All', 'all'],
+  ['Pria', 'male'],
+  ['pria', 'male'],
+  ['Male', 'male'],
+  ['male', 'male'],
+  ['Wanita', 'female'],
+  ['wanita', 'female'],
+  ['Female', 'female'],
+  ['female', 'female']
+]);
+
+function main() {
+  if (!fs.existsSync(inputPath)) {
+    exitWithError(`Input CSV tidak ditemukan: ${inputPath}`);
+  }
+
+  const csvText = fs.readFileSync(inputPath, 'utf8');
+  const rows = parseLegacyCsv(csvText);
+  const rules = rows
+    .map((row, index) => normalizeCsvRule(row, index + 1))
+    .filter(Boolean);
+
+  const supplementedRules = mergeRules(rules, getSupplementalRules());
+  const sql = buildRulesSql(supplementedRules);
+
+  fs.writeFileSync(outputPath, sql, 'utf8');
+  console.log(`Generated ${supplementedRules.length} rules -> ${outputPath}`);
+
+  if (shouldApply) {
+    applyWithWrangler(databaseName, outputPath);
+  }
+}
+
+function parseArgs(argv) {
+  const result = {};
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+
+    if (token === '--apply') {
+      result.apply = true;
+      continue;
+    }
+
+    if (token.startsWith('--')) {
+      const key = token.slice(2);
+      const value = argv[i + 1];
+      if (!value || value.startsWith('--')) {
+        exitWithError(`Argument ${token} membutuhkan value.`);
+      }
+      result[key] = value;
+      i += 1;
+    }
+  }
+
+  return result;
+}
+
+function parseLegacyCsv(csvText) {
+  const lines = csvText
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const dataLines = lines.slice(1);
+
+  return dataLines.map((line) => {
+    const parts = splitCsvLineLoose(line);
+
+    return {
+      category: clean(parts[0]),
+      indicator: clean(parts[1]),
+      deviceName: clean(parts[2]),
+      sex: clean(parts[3]),
+      minValue: clean(parts[4]),
+      maxValue: clean(parts[5]),
+      unit: clean(parts[6]),
+      status: clean(parts[7]),
+      recommendation: clean(parts.slice(8).join(',')).replace(/,+$/g, '').trim()
+    };
+  });
+}
+
+function splitCsvLineLoose(line) {
+  const cells = [];
+  let current = '';
+  let quoted = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      i += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (char === ',' && !quoted) {
+      cells.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current);
+  return cells;
+}
+
+function normalizeCsvRule(row, rowNumber) {
+  const metricCode = mapIndicator(row.indicator);
+
+  if (!metricCode) {
+    console.warn(`Skip row ${rowNumber}: indicator tidak dikenali -> ${row.indicator}`);
+    return null;
+  }
+
+  const minValue = Number(row.minValue);
+  const maxValue = Number(row.maxValue);
+
+  if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+    console.warn(`Skip row ${rowNumber}: batas nilai tidak valid.`);
+    return null;
+  }
+
+  const sex = sexMap.get(row.sex) || 'all';
+  const unit = unitMap.get(row.unit) || row.unit;
+  const status = row.status || 'Belum Ada Status';
+  const severity = inferSeverity(metricCode, status, minValue, maxValue);
+  const emergencyLevel = inferEmergencyLevel(metricCode, severity, minValue, maxValue);
+  const id = makeRuleId(metricCode, sex, status, minValue, maxValue);
+  const popupTitle = makePopupTitle(metricCode, status);
+  const popupMessage = makePopupMessage(metricCode, status);
+  const recommendation = row.recommendation || makeFallbackRecommendation(severity);
+
+  return {
+    id,
+    metricCode,
+    sex,
+    ageMin: 0,
+    ageMax: 200,
+    minValue,
+    maxValue,
+    unit,
+    status,
+    severity,
+    popupTitle,
+    popupMessage,
+    recommendation,
+    sourceLabel: 'CSV internal',
+    emergencyLevel,
+    rulePriority: severity === 'emergency' ? 1 : 100,
+    active: 1
+  };
+}
+
+function mapIndicator(indicator) {
+  const normalized = normalizeKey(indicator);
+
+  if (indicatorMap.has(normalized)) {
+    return indicatorMap.get(normalized);
+  }
+
+  if (normalized.includes('spo2')) return 'spo2';
+  if (normalized.includes('heart')) return 'heartRate';
+  if (normalized.includes('sistolik')) return 'systolic';
+  if (normalized.includes('diastolik')) return 'diastolic';
+  if (normalized.includes('puasa')) return 'glucoseFasting';
+  if (normalized.includes('2 jam')) return 'glucosePostMeal';
+  if (normalized.includes('kolesterol')) return 'cholesterolTotal';
+  if (normalized.includes('uric') || normalized.includes('asam urat')) return 'uricAcid';
+  if (normalized.includes('bmi')) return 'bmi';
+
+  return null;
+}
+
+function inferSeverity(metricCode, status, minValue, maxValue) {
+  const s = normalizeKey(status);
+
+  if (s.includes('berat') || s.includes('krisis') || s.includes('darurat')) return 'emergency';
+  if (s.includes('demam tinggi')) return 'critical';
+  if (s.includes('diabetes') || s.includes('tinggi') || s.includes('tahap 2') || s.includes('obesitas')) return 'high';
+  if (s.includes('prediabetes') || s.includes('pra') || s.includes('ringan') || s.includes('underweight') || s.includes('overweight')) return 'warning';
+  if (s.includes('rendah')) return metricCode === 'glucoseFasting' || metricCode === 'bodyTemperature' ? 'critical' : 'info';
+  if (s.includes('normal') || s.includes('optimal')) return 'normal';
+  return 'info';
+}
+
+function inferEmergencyLevel(metricCode, severity, minValue, maxValue) {
+  if (severity === 'emergency') return 'emergency';
+  if (severity === 'critical') return 'urgent';
+  if (severity === 'high') return 'urgent';
+  if (severity === 'warning') return 'watch';
+  return 'none';
+}
+
+function makeRuleId(metricCode, sex, status, minValue, maxValue) {
+  const statusSlug = normalizeKey(status)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 32);
+
+  const minSlug = String(minValue).replace('.', 'p');
+  const maxSlug = String(maxValue).replace('.', 'p');
+  return `rule-${metricCode}-${sex}-${statusSlug}-${minSlug}-${maxSlug}`;
+}
+
+function makePopupTitle(metricCode, status) {
+  const metricName = metricDisplayName(metricCode);
+  return `${metricName} ${status}`;
+}
+
+function makePopupMessage(metricCode, status) {
+  return `${metricDisplayName(metricCode)} berada pada status ${status}. Gunakan hasil ini sebagai catatan dan verifikasi ulang angka pada alat.`;
+}
+
+function makeFallbackRecommendation(severity) {
+  if (severity === 'emergency') {
+    return 'Segera cek ulang. Jika nilai tetap kritis atau ada gejala berat, cari bantuan medis.';
+  }
+  if (severity === 'critical' || severity === 'high') {
+    return 'Cek ulang setelah istirahat dan konsultasikan ke tenaga medis jika hasil berulang.';
+  }
+  if (severity === 'warning') {
+    return 'Pantau hasil dan perbaiki pola hidup secara bertahap.';
+  }
+  return 'Pertahankan kebiasaan sehat dan catat hasil secara rutin.';
+}
+
+function getSupplementalRules() {
+  return [
+    rule('rule-gpp-low', 'glucosePostMeal', 'all', 20, 69.9, 'mg/dL', 'Rendah', 'critical', 'Gula Darah 2 Jam PP Rendah', 'Gula darah 2 jam setelah makan rendah.', 'Jika ada gejala hipoglikemia, cari bantuan dan ikuti arahan medis.', 'ADA/common clinical reference', 'urgent', 1),
+    rule('rule-gpp-normal', 'glucosePostMeal', 'all', 70, 139.9, 'mg/dL', 'Normal', 'normal', 'Gula Darah 2 Jam PP Normal', 'Gula darah 2 jam setelah makan berada dalam rentang umum normal.', 'Pertahankan pola makan seimbang.', 'ADA/common clinical reference', 'none', 10),
+    rule('rule-gpp-impaired', 'glucosePostMeal', 'all', 140, 199.9, 'mg/dL', 'Toleransi Glukosa Terganggu', 'warning', 'Gula Darah 2 Jam PP Meningkat', 'Gula darah setelah makan meningkat.', 'Kurangi porsi gula dan karbohidrat sederhana, serta konsultasikan jika sering terjadi.', 'ADA/common clinical reference', 'watch', 20),
+    rule('rule-gpp-high', 'glucosePostMeal', 'all', 200, 600, 'mg/dL', 'Tinggi', 'high', 'Gula Darah 2 Jam PP Tinggi', 'Gula darah 2 jam setelah makan tinggi.', 'Catat hasil dan konsultasikan ke dokter untuk evaluasi.', 'ADA/common clinical reference', 'urgent', 30),
+
+    rule('rule-waist-male-low', 'waistCircumference', 'male', 20, 93.9, 'cm', 'Risiko Rendah', 'normal', 'Lingkar Perut Risiko Rendah', 'Lingkar perut berada pada kategori risiko rendah untuk pria.', 'Pertahankan pola makan dan aktivitas fisik.', 'WHO waist circumference cutoff', 'none', 10),
+    rule('rule-waist-male-inc', 'waistCircumference', 'male', 94, 102, 'cm', 'Risiko Meningkat', 'warning', 'Lingkar Perut Meningkat', 'Lingkar perut meningkat untuk pria.', 'Mulai kendalikan porsi makan, aktivitas fisik, dan berat badan.', 'WHO waist circumference cutoff', 'watch', 20),
+    rule('rule-waist-male-high', 'waistCircumference', 'male', 102.1, 300, 'cm', 'Risiko Sangat Meningkat', 'high', 'Lingkar Perut Sangat Meningkat', 'Lingkar perut berada pada kategori risiko sangat meningkat untuk pria.', 'Fokus pada penurunan lemak perut secara bertahap dan konsultasikan jika ada faktor risiko lain.', 'WHO waist circumference cutoff', 'watch', 30),
+    rule('rule-waist-female-low', 'waistCircumference', 'female', 20, 79.9, 'cm', 'Risiko Rendah', 'normal', 'Lingkar Perut Risiko Rendah', 'Lingkar perut berada pada kategori risiko rendah untuk wanita.', 'Pertahankan pola makan dan aktivitas fisik.', 'WHO waist circumference cutoff', 'none', 10),
+    rule('rule-waist-female-inc', 'waistCircumference', 'female', 80, 88, 'cm', 'Risiko Meningkat', 'warning', 'Lingkar Perut Meningkat', 'Lingkar perut meningkat untuk wanita.', 'Mulai kendalikan porsi makan, aktivitas fisik, dan berat badan.', 'WHO waist circumference cutoff', 'watch', 20),
+    rule('rule-waist-female-high', 'waistCircumference', 'female', 88.1, 300, 'cm', 'Risiko Sangat Meningkat', 'high', 'Lingkar Perut Sangat Meningkat', 'Lingkar perut berada pada kategori risiko sangat meningkat untuk wanita.', 'Fokus pada penurunan lemak perut secara bertahap dan konsultasikan jika ada faktor risiko lain.', 'WHO waist circumference cutoff', 'watch', 30),
+
+    rule('rule-temp-low', 'bodyTemperature', 'all', 30, 34.9, '°C', 'Sangat Rendah', 'emergency', 'Suhu Tubuh Sangat Rendah', 'Suhu tubuh sangat rendah dan perlu perhatian segera.', 'Hangatkan tubuh dan cari bantuan medis, terutama jika menggigil berat, lemas, bingung, atau tidak sadar.', 'Clinical fever/hypothermia threshold', 'emergency', 1),
+    rule('rule-temp-normal', 'bodyTemperature', 'all', 35, 37.4, '°C', 'Normal', 'normal', 'Suhu Tubuh Normal', 'Suhu tubuh berada pada rentang umum normal.', 'Pertahankan hidrasi dan istirahat cukup.', 'Clinical common threshold', 'none', 10),
+    rule('rule-temp-raised', 'bodyTemperature', 'all', 37.5, 37.9, '°C', 'Meningkat', 'warning', 'Suhu Tubuh Meningkat', 'Suhu tubuh sedikit meningkat.', 'Pantau ulang, cukup minum, dan istirahat.', 'Clinical common threshold', 'watch', 20),
+    rule('rule-temp-fever', 'bodyTemperature', 'all', 38, 38.9, '°C', 'Demam', 'high', 'Demam', 'Suhu tubuh masuk kategori demam.', 'Istirahat, cukup cairan, dan konsultasikan jika demam berlanjut atau ada gejala berat.', 'CDC fever threshold', 'urgent', 30),
+    rule('rule-temp-highfever', 'bodyTemperature', 'all', 39, 45, '°C', 'Demam Tinggi', 'critical', 'Demam Tinggi', 'Suhu tubuh tinggi dan perlu perhatian.', 'Pantau ketat dan cari bantuan medis jika disertai sesak, bingung, kejang, lemas berat, atau tidak membaik.', 'Clinical common threshold', 'urgent', 40),
+
+    rule('rule-sleep-low', 'sleepDuration', 'all', 0, 5.9, 'hour', 'Kurang', 'warning', 'Durasi Tidur Kurang', 'Durasi tidur kurang dari kebutuhan umum dewasa.', 'Usahakan jadwal tidur konsisten dan kurangi layar sebelum tidur.', 'CDC sleep duration recommendation', 'watch', 20),
+    rule('rule-sleep-near', 'sleepDuration', 'all', 6, 6.9, 'hour', 'Hampir Cukup', 'info', 'Durasi Tidur Hampir Cukup', 'Durasi tidur mendekati rekomendasi minimal dewasa.', 'Coba tambah durasi tidur secara bertahap hingga minimal 7 jam jika memungkinkan.', 'CDC sleep duration recommendation', 'none', 15),
+    rule('rule-sleep-normal', 'sleepDuration', 'all', 7, 9, 'hour', 'Cukup', 'normal', 'Durasi Tidur Cukup', 'Durasi tidur berada dalam rentang umum yang direkomendasikan untuk dewasa.', 'Pertahankan kebiasaan tidur konsisten.', 'CDC sleep duration recommendation', 'none', 10),
+    rule('rule-sleep-long', 'sleepDuration', 'all', 9.1, 24, 'hour', 'Terlalu Lama', 'info', 'Durasi Tidur Panjang', 'Durasi tidur lebih panjang dari rentang umum.', 'Catat apakah ada kelelahan berlebih atau kualitas tidur buruk. Konsultasikan jika sering terjadi.', 'CDC sleep duration recommendation', 'watch', 30)
+  ];
+}
+
+function rule(id, metricCode, sex, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority) {
+  return {
+    id,
+    metricCode,
+    sex,
+    ageMin: 0,
+    ageMax: 200,
+    minValue,
+    maxValue,
+    unit,
+    status,
+    severity,
+    popupTitle,
+    popupMessage,
+    recommendation,
+    sourceLabel,
+    emergencyLevel,
+    rulePriority,
+    active: 1
+  };
+}
+
+function mergeRules(csvRules, supplementalRules) {
+  const byKey = new Map();
+
+  for (const item of [...csvRules, ...supplementalRules]) {
+    const key = `${item.metricCode}|${item.sex}|${item.minValue}|${item.maxValue}|${item.status}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, item);
+    }
+  }
+
+  return Array.from(byKey.values()).sort((a, b) => {
+    if (a.metricCode !== b.metricCode) return a.metricCode.localeCompare(b.metricCode);
+    if (a.sex !== b.sex) return a.sex.localeCompare(b.sex);
+    return a.minValue - b.minValue;
+  });
+}
+
+function buildRulesSql(rules) {
+  const lines = [];
+
+  lines.push('-- Generated by rules-seeder.js');
+  lines.push('-- Safe to run repeatedly.');
+  lines.push('PRAGMA foreign_keys = ON;');
+  lines.push('BEGIN TRANSACTION;');
+  lines.push('');
+  lines.push('INSERT OR IGNORE INTO HL_metricRules');
+  lines.push('(id, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority, active)');
+  lines.push('VALUES');
+
+  const valueLines = rules.map((item) => `(${[
+    sqlString(item.id),
+    sqlString(item.metricCode),
+    sqlString(item.sex),
+    item.ageMin,
+    item.ageMax,
+    item.minValue,
+    item.maxValue,
+    sqlString(item.unit),
+    sqlString(item.status),
+    sqlString(item.severity),
+    sqlString(item.popupTitle),
+    sqlString(item.popupMessage),
+    sqlString(item.recommendation),
+    sqlString(item.sourceLabel),
+    sqlString(item.emergencyLevel),
+    item.rulePriority,
+    item.active
+  ].join(', ')})`);
+
+  lines.push(valueLines.join(',\n') + ';');
+  lines.push('');
+  lines.push("INSERT OR IGNORE INTO HL_schemaMigrations (id, migrationName) VALUES ('seed-rules-generated', 'GeneratedMetricRulesSeed');");
+  lines.push('COMMIT;');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+function applyWithWrangler(database, file) {
+  console.log(`Applying ${file} to D1 database ${database}...`);
+
+  const result = spawnSync('wrangler', ['d1', 'execute', database, '--file', file], {
+    stdio: 'inherit',
+    shell: process.platform === 'win32'
+  });
+
+  if (result.error) {
+    exitWithError(`Gagal menjalankan wrangler: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    process.exit(result.status || 1);
+  }
+}
+
+function metricDisplayName(metricCode) {
+  const names = {
+    spo2: 'SpO2',
+    heartRate: 'Denyut Jantung',
+    systolic: 'Sistolik',
+    diastolic: 'Diastolik',
+    bloodPressurePulse: 'Pulse Tensimeter',
+    glucoseFasting: 'Gula Darah Puasa',
+    glucosePostMeal: 'Gula Darah 2 Jam PP',
+    cholesterolTotal: 'Kolesterol Total',
+    uricAcid: 'Asam Urat',
+    bodyWeight: 'Berat Badan',
+    bmi: 'BMI',
+    waistCircumference: 'Lingkar Perut',
+    bodyTemperature: 'Suhu Tubuh',
+    sleepDuration: 'Durasi Tidur'
+  };
+
+  return names[metricCode] || metricCode;
+}
+
+function normalizeKey(value) {
+  return clean(value).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function clean(value) {
+  return String(value ?? '').replace(/^"|"$/g, '').trim();
+}
+
+function sqlString(value) {
+  if (value === null || value === undefined) return 'NULL';
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function exitWithError(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+main();

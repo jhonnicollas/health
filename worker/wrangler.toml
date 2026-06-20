@@ -1,0 +1,12 @@
+name = "hl-health-companion"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "multi_Ai_db"
+database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"
+
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "multi-apps-ai-bucket"
