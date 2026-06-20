@@ -2229,7 +2229,10 @@ app.get('/api/dashboard/today', async (c) => {
       return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     }
 
-    const today = new Date().toISOString().slice(0, 10)
+    const profileInfo = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ? LIMIT 1').bind(userId).first<{ timezone: string }>()
+    const timezone = profileInfo?.timezone || 'UTC'
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const today = formatter.format(new Date())
 
     const sessions = await c.env.DB.prepare(
       `SELECT id, profileId, measuredAt, source, hasAi, hasAttachment, hasEmergency
@@ -2493,7 +2496,10 @@ app.get('/api/reports/daily', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const today = new Date().toISOString().slice(0, 10)
+    const profileInfo = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ? LIMIT 1').bind(userId).first<{ timezone: string }>()
+    const timezone = profileInfo?.timezone || 'UTC'
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const today = formatter.format(new Date())
     const values = await c.env.DB.prepare(
       `SELECT v.metricCode, v.finalValue, v.unit, v.status, v.severity, v.manualOverride, v.metricCode,
               r.popupTitle, r.popupMessage, r.recommendation, r.sourceLabel
@@ -2788,7 +2794,10 @@ app.get('/api/caregiver/monitor/:userId', async (c) => {
     ).bind(targetUserId, caregiverId).first<{ canViewDashboard: number }>()
     if (!link || link.canViewDashboard !== 1) return jsonResponse(c, failure('UNAUTHORIZED', 'Tidak ada akses.', 403, [], startedAt))
 
-    const today = new Date().toISOString().slice(0, 10)
+    const profileInfo = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ? LIMIT 1').bind(targetUserId).first<{ timezone: string }>()
+    const timezone = profileInfo?.timezone || 'UTC'
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const today = formatter.format(new Date())
     const values = await c.env.DB.prepare(
       `SELECT metricCode, finalValue, unit, status, severity, measuredAt FROM HL_measurementValues
        WHERE userId = ? AND substr(measuredAt, 1, 10) = ?`
@@ -3200,7 +3209,7 @@ app.post('/api/measurements/extract', async (c) => {
     let parsedJson: string | null = null
     let extractedMetrics: any[] = []
     let confidence = 0
-    let modelName = '@cf/meta/llama-2-7b-chat-int8' // Default model
+    let modelName = '@cf/meta/llama-3.2-11b-vision-instruct' // Default multimodal model
 
     try {
       // Convert file to base64 for AI Vision
@@ -3213,7 +3222,7 @@ app.post('/api/measurements/extract', async (c) => {
 
       try {
         const aiResponse = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/models/@cf/meta/llama-2-7b-chat-int8/inference`,
+          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/models/@cf/meta/llama-3.2-11b-vision-instruct/inference`,
           {
             method: 'POST',
             headers: {
@@ -3358,7 +3367,7 @@ app.post('/api/measurements/extract', async (c) => {
       parsedJson || null,
       durationMs,
       aiSuccess ? 1 : 0,
-      aiTimeout ? 1 : 0,
+      aiTimedOut ? 1 : 0,
       confidence || null,
       modelName
     ).run()
