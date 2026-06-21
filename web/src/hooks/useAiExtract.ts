@@ -57,6 +57,7 @@ export function useAiExtract() {
       }
 
       const response = await fetch('/api/measurements/extract', {
+        credentials: 'include',
         method: 'POST',
         body: formData
       })

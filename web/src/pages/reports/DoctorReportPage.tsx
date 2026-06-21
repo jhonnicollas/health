@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
 
-type Report = { reportId: string; r2Key: string; status: string }
+type Report = { reportId: string; status: string }
 
 export function DoctorReportPage() {
   const [report, setReport] = useState<Report | null>(null)

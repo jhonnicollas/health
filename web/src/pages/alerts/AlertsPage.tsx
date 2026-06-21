@@ -25,7 +25,7 @@ type Notif = {
 }
 
 type Streak = { currentCount: number; bestCount: number; lastDate: string | null }
-type Badge = { id: string; badgeCode: string; earnedAt: string }
+type Badge = { badgeCode: string; earnedAt: string }
 
 type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
 
@@ -69,7 +69,7 @@ export function AlertsPage() {
       <p>Sekarang: <strong>{streak?.currentCount ?? 0}</strong> hari | Terbaik: <strong>{streak?.bestCount ?? 0}</strong></p>
       <h3>Lencana</h3>
       {badges.length === 0 ? <p>Belum ada lencana.</p> : (
-        <ul>{badges.map(b => <li key={b.id}>{b.badgeCode} ({b.earnedAt})</li>)}</ul>
+        <ul>{badges.map(b => <li key={b.badgeCode}>{b.badgeCode} ({b.earnedAt})</li>)}</ul>
       )}
       <h3>Peringatan ({alerts.length})</h3>
       {alerts.length === 0 ? <p>Tidak ada peringatan.</p> : (

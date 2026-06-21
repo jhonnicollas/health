@@ -53,6 +53,10 @@ function createId(prefix: string): string {
   return `${prefix}_${ts}${rand}`
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 function jsonResponse(c: Context, body: unknown, status: ApiStatus = 200) {
   c.header('Content-Type', 'application/json; charset=utf-8')
   c.header('Cache-Control', 'no-store')
@@ -237,7 +241,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
         'SELECT metricCode, finalValue, unit, status, severity, measuredAt FROM HL_measurementValues WHERE userId = ? AND measuredAt BETWEEN ? AND ? ORDER BY measuredAt ASC'
       ).bind(userId, rangeStart, rangeEnd).all()
       const profile = await c.env.DB.prepare('SELECT displayName FROM HL_users WHERE id = ?').bind(userId).first<{ displayName: string }>()
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Laporan 30 Hari</title></head><body><h1>Laporan Kesehatan 30 Hari</h1><p>Nama: ${profile?.displayName || '-'}</p><p>Rentang: ${rangeStart} s/d ${rangeEnd}</p><table border="1" cellpadding="4"><tr><th>Tanggal</th><th>Metrik</th><th>Nilai</th><th>Unit</th><th>Status</th><th>Severity</th></tr>${(values.results || []).map((v: any) => `<tr><td>${v.measuredAt}</td><td>${v.metricCode}</td><td>${v.finalValue}</td><td>${v.unit}</td><td>${v.status}</td><td>${v.severity}</td></tr>`).join('')}</table><p><em>Laporan ini hanya data, bukan diagnosis. Konsultasikan dengan dokter.</em></p></body></html>`
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Laporan 30 Hari</title></head><body><h1>Laporan Kesehatan 30 Hari</h1><p>Nama: ${escapeHtml(profile?.displayName || '-')}</p><p>Rentang: ${rangeStart} s/d ${rangeEnd}</p><table border="1" cellpadding="4"><tr><th>Tanggal</th><th>Metrik</th><th>Nilai</th><th>Unit</th><th>Status</th><th>Severity</th></tr>${(values.results || []).map((v: any) => `<tr><td>${v.measuredAt}</td><td>${v.metricCode}</td><td>${v.finalValue}</td><td>${v.unit}</td><td>${v.status}</td><td>${v.severity}</td></tr>`).join('')}</table><p><em>Laporan ini hanya data, bukan diagnosis. Konsultasikan dengan dokter.</em></p></body></html>`
       const reportId = createId('rpt')
       const r2Key = `HL/users/${userId}/reports/${reportId}.html`
       await c.env.LOGS.put(r2Key, html, { httpMetadata: { contentType: 'text/html; charset=utf-8' } })
@@ -247,7 +251,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       await c.env.DB.prepare(
         "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'reportGenerate', 'HL_reports', ?, ?, CURRENT_TIMESTAMP)"
       ).bind(createId('aud'), userId, reportId, JSON.stringify({ reportType: 'doctorReady30d' })).run()
-      return jsonResponse(c, success({ reportId, r2Key, status: 'ready' }, 201, startedAt), 201)
+      return jsonResponse(c, success({ reportId, status: 'ready' }, 201, startedAt), 201)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal generate PDF.', 500, [], startedAt), 500)
     }
