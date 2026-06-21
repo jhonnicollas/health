@@ -2070,22 +2070,6 @@ app.post('/api/measurements/submit', async (c) => {
 
       if (rule.emergencyLevel === 'emergency' || rule.severity === 'emergency') {
         hasEmergency = 1
-        const alertId = crypto.randomUUID()
-        await c.env.DB.prepare(
-          `INSERT INTO HL_alerts
-           (id, userId, sessionId, metricCode, finalValue, unit, status, severity, alertType, message, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'rule', ?, CURRENT_TIMESTAMP)`
-        ).bind(
-          alertId,
-          userId,
-          sessionId,
-          v.metricCode,
-          v.finalValue,
-          v.unit,
-          rule.status,
-          rule.severity,
-          rule.popupMessage || 'Nilai darurat terdeteksi.'
-        ).run()
       }
 
       savedValues.push({
@@ -2161,6 +2145,8 @@ app.post('/api/measurements/submit', async (c) => {
       ? `Terdeteksi nilai darurat.\n${lines}\nSegera konsultasi ke dokter.`
       : `${body.values.length} nilai tersimpan.\n${lines}`
     // US-3.3.1 + US-4.3.1 + US-4.3.2: create HL_alerts for emergency severity, update daily streak, award badges.
+    let streakData: { currentCount: number; bestCount: number; today: string } | null = null
+    let badgesData: string[] = []
     try {
       const profileInfo = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ timezone: string }>()
       const tz = profileInfo?.timezone || 'UTC'
@@ -2169,11 +2155,8 @@ app.post('/api/measurements/submit', async (c) => {
           await createEmergencyAlert(c as any, userId, sessionId, v.metricCode, v.finalValue, v.unit, v.severity, `Nilai ${v.metricCode} ${v.finalValue} ${v.unit} masuk kategori darurat.`)
         }
       }
-      const streak = await updateDailyStreak(c as any, userId, tz)
-      const badges = await awardBadges(c as any, userId, streak.currentCount)
-      // attach to response later
-      ;(globalThis as any).__hlStreak = streak
-      ;(globalThis as any).__hlBadges = badges
+      streakData = await updateDailyStreak(c as any, userId, tz)
+      badgesData = await awardBadges(c as any, userId, streakData.currentCount)
     } catch (hookErr) {
       console.error('streak/alert hook error:', hookErr)
     }
@@ -2204,10 +2187,6 @@ app.post('/api/measurements/submit', async (c) => {
         'pending', { sessionId, hasEmergency: hasEmergency === 1, via: 'queue' }, undefined)
     }
 
-    const streakData = (globalThis as any).__hlStreak
-    const badgesData = (globalThis as any).__hlBadges
-    ;(globalThis as any).__hlStreak = undefined
-    ;(globalThis as any).__hlBadges = undefined
     return jsonResponse(c, success({
       sessionId,
       values: savedValues,
@@ -3075,6 +3054,27 @@ app.post('/api/privacy/deleteAccount', async (c) => {
 })
 
 
+
+// Alias for frontend /api/account/delete
+app.post('/api/account/delete', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const auditId = createId('aud')
+    await c.env.DB.batch([
+      c.env.DB.prepare(`INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'accountDelete', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`).bind(auditId, userId, userId, JSON.stringify({ requestedAt: new Date().toISOString() })),
+      c.env.DB.prepare(`UPDATE HL_users SET active = 0 WHERE id = ?`).bind(userId),
+      c.env.DB.prepare(`UPDATE HL_sessions SET revokedAt = CURRENT_TIMESTAMP WHERE userId = ? AND revokedAt IS NULL`).bind(userId)
+    ])
+    setCookie(c, 'hlSession', '', { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 0 })
+    return jsonResponse(c, success({ deleted: true, message: 'Akun dinonaktifkan.' }, 200, startedAt))
+  } catch (error) {
+    console.error('delete account error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal hapus.', 500, [], startedAt))
+  }
+})
+
 app.onError((error, c) => {
   console.error('Unhandled Exception:', error)
   const result = failure('INTERNAL_ERROR', 'Terjadi kesalahan sistem.', 500, [])
@@ -3844,8 +3844,10 @@ app.post('/api/telegram/webhook', async (c) => {
     const message = body?.message
     if (!message?.text || !message?.chat?.id) return c.json({ ok: true })
     const text = message.text.trim()
-    if (/^HL-\d{6}$/.test(text)) {
-      const codeHash = await sha256Token(text)
+    // Accept either plain 6-digit code (from /api/telegram/connect) or HL-prefixed format.
+    const stripped = text.replace(/^HL-/, '')
+    if (/^\d{6}$/.test(stripped)) {
+      const codeHash = await sha256Token(stripped)
       const link = await c.env.DB.prepare('SELECT id, userId FROM HL_telegramLinks WHERE verificationCodeHash = ? AND verified = 0').bind(codeHash).first<{ id: string; userId: string }>()
       if (link) {
         await c.env.DB.batch([
