@@ -4,10 +4,10 @@
 
 ```text
 Project: HL Health Companion
-Sprint: Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 COMPLETE + LIVE PRODUCTION UAT PASS
-Current Task: PROD-UAT-ALL-SPRINT
-Current State: Completed. Worker + Pages deployed, Pages Functions proxy bundled, and all 7 requested Sprint 1-4 production browser E2E flows passed against the live refactored UI.
-Last Updated: 2026-06-21 16:35 UTC
+Sprint: Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 COMPLETE + STITCH UI PARITY REMEDIATION PLANNED
+Current Task: STITCH-P0.3 Build Shared Visual Foundation
+Current State: In progress. Stitch baselines and current local screenshots are captured; shared shell/CSS foundation rebuild is next.
+Last Updated: 2026-06-21 17:03 UTC
 ```
 
 ## Production Deployment
@@ -57,6 +57,20 @@ Local Unit Tests:  22/22 PASSED
 19. Fixed Pages deploy process to include `web/functions` proxy via `npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true`.
 20. Fixed emergency contacts response normalization so senior Darurat tab no longer crashes.
 21. Final Playwright production E2E: 7/7 requested flows PASS live at `https://hl-health-companion.pages.dev`.
+
+### Stitch UI Parity Planning (2026-06-21)
+22. Created `docs/STITCH_UI_PARITY_TASK_PLAN.md`.
+23. Created `docs/STITCH_UI_PARITY_TEST_PLAN.md`.
+24. Next required task: `STITCH-P0.1 Capture Stitch Baselines`.
+25. Explicit constraint: no more token-only visual pass; visual parity must be proven route-by-route with Stitch screenshot baselines and owner review.
+
+### Stitch Baseline Capture (2026-06-21)
+26. `STITCH-P0.1` completed.
+27. P0 Stitch MCP screenshot/HTML artifact resources recorded in `docs/STITCH_UI_PARITY_TEST_PLAN.md`.
+28. Mapping corrected: true dashboard is `e28233a723ed48ed948e54172c3f516d`; true new measurement is `531f69e8d8cc4734865fd4f825c828a4`; polished AI is `c7a54284936b4292bb256cd2d35c4b56`; polished family is `b6c1a7b8ca6149b094e1b7a9343bf2b8`.
+29. `STITCH-P0.2 Capture Current Local Screens` completed.
+30. Current local screenshot artifacts saved outside repo at `C:\temp\stitch-parity-current`; manifest `C:\temp\stitch-parity-current\manifest.json`.
+31. `STITCH-P0.3 Build Shared Visual Foundation` started.
 
 ## Cloudflare Credentials
 

@@ -2258,3 +2258,228 @@ Final state of audit + fixes:
 - Production UAT is green.
 - Use `npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true` for future Pages deploys so `web/functions` proxy is included.
 - Existing known issue remains: Telegram bot token returns 401 from Telegram API if Telegram delivery is required.
+
+## 2026-06-21 16:48 UTC - Agent: Codex
+
+### Task
+- Task ID: STITCH-UI-PARITY-PLANNING
+- Sprint: UI parity remediation
+- Status: Completed
+
+### Files Read
+- docs/TASKS.md
+- docs/TEST_PLAN.md
+- Stitch MCP project `projects/5854270015643176038`
+
+### Files Changed
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Created a dedicated execution task plan for rebuilding the frontend UI from the Stitch project screen-by-screen.
+- Created a dedicated visual and functional test plan requiring Stitch baselines, screenshot comparison, route scoring, medical safety regression, and production UAT.
+- Defined the immediate next task as `STITCH-P0.1 Capture Stitch Baselines`; frontend code must not be edited before this baseline task is complete.
+
+### Validation
+- Documentation-only change; no build required.
+
+### Documentation Updated
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Start at `STITCH-P0.1 Capture Stitch Baselines`.
+- Do not repeat the token-only styling approach. Stitch visual screens are the source of truth.
+
+## 2026-06-21 16:51 UTC - Agent: Codex
+
+### Task
+- Task ID: STITCH-P0.1
+- Sprint: UI parity remediation
+- Status: Started
+
+### Files Read
+- C:\codex\health\.agents\skills\caveman\SKILL.md
+- AGENTS.md
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/design-system.md
+- docs/TASKS.md
+- docs/TEST_PLAN.md
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Files Changed
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- WORK_LOG.md
+
+### What Changed
+- Marked `STITCH-P0.1 Capture Stitch Baselines` as In Progress.
+- Started baseline capture cycle against Stitch project `projects/5854270015643176038`.
+
+### Validation
+- Not run yet; baseline capture in progress.
+
+### Documentation Updated
+- WORK_LOG.md
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+
+### Next Agent Notes
+- Continue `STITCH-P0.1` only.
+- Do not edit frontend UI before Stitch baselines are recorded.
+
+## 2026-06-21 16:56 UTC - Agent: Codex
+
+### Task
+- Task ID: STITCH-P0.1
+- Sprint: UI parity remediation
+- Status: Completed
+
+### Files Read
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- Stitch MCP screens from project `projects/5854270015643176038`
+
+### Files Changed
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Captured P0 Stitch baseline metadata for register, login, onboarding, shell, dashboard, new measurement, measurement history, tracker, alerts, AI assistant, settings, family/caregiver, and senior mode.
+- Captured P1 reference baselines for reports, auth/onboarding composite, and knowledge base.
+- Corrected wrong initial screen mapping: `184a...` and `aa610...` are auth screens, not dashboard; true dashboard baseline is `e28233a...`.
+- Recorded Stitch MCP screenshot and HTML artifact resource names in `docs/STITCH_UI_PARITY_TEST_PLAN.md`.
+
+### Validation
+- MCP `get_screen` succeeded for captured baselines.
+- Older hidden AI screen `22a886...` returned service unavailable; polished AI screen `c7a542...` captured instead.
+- No frontend code changed.
+
+### Documentation Updated
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue with `STITCH-P0.2 Capture Current Local Screens`.
+- Use captured MCP artifact resource names as Stitch visual source of truth.
+
+## 2026-06-21 16:56 UTC - Agent: Codex
+
+### Task
+- Task ID: STITCH-P0.2
+- Sprint: UI parity remediation
+- Status: Started
+
+### Files Read
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- HANDOFF.md
+
+### Files Changed
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- WORK_LOG.md
+
+### What Changed
+- Marked `STITCH-P0.2 Capture Current Local Screens` as In Progress.
+- Starting current local screenshot capture for mapped P0 routes.
+
+### Validation
+- Not run yet; local capture in progress.
+
+### Documentation Updated
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Capture local/current screens before any frontend parity implementation.
+
+## 2026-06-21 17:03 UTC - Agent: Codex
+
+### Task
+- Task ID: STITCH-P0.2
+- Sprint: UI parity remediation
+- Status: Completed
+
+### Files Read
+- web/src/context/AuthContext.tsx
+- web/src/context/auth.ts
+- web/src/App.tsx
+- web/src/pages/dashboard/TodayDashboard.tsx
+- web/src/pages/dashboard/WeeklyDashboard.tsx
+- web/src/pages/dashboard/MonthlyDashboard.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/medications/MedicationsPage.tsx
+- web/src/pages/family/FamilyPage.tsx
+- web/src/pages/fasting/FastingPage.tsx
+
+### Files Changed
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Started local Vite dev server at `http://127.0.0.1:5173`.
+- Captured 15 current local screenshots using Playwright with mocked API responses.
+- Saved non-committed screenshot artifacts to `C:\temp\stitch-parity-current`.
+- Recorded screenshot manifest and mismatch notes in `docs/STITCH_UI_PARITY_TEST_PLAN.md`.
+
+### Validation
+- `GET http://127.0.0.1:5173` - 200
+- `C:\temp\stitch-parity-current\manifest.json` exists
+- 15 desktop screenshots captured
+- No frontend code changed
+
+### Documentation Updated
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue with `STITCH-P0.3 Build Shared Visual Foundation`.
+- Current local captures prove visual mismatch; begin shared shell/CSS foundation from Stitch before route-specific rebuilds.
+
+## 2026-06-21 17:03 UTC - Agent: Codex
+
+### Task
+- Task ID: STITCH-P0.3
+- Sprint: UI parity remediation
+- Status: Started
+
+### Files Read
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+
+### Files Changed
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- WORK_LOG.md
+
+### What Changed
+- Marked `STITCH-P0.3 Build Shared Visual Foundation` as In Progress.
+- Preparing to align shared shell/CSS foundation to Stitch before route-specific page rebuilds.
+
+### Validation
+- Not run yet; implementation not started.
+
+### Documentation Updated
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Edit only shared foundation first: `web/src/App.tsx`, `web/src/App.css`, and existing shared JSX if required.

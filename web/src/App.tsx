@@ -34,6 +34,8 @@ type NavLink = {
   shortLabel: string
   section: 'overview' | 'capture' | 'care' | 'system'
   adminOnly?: boolean
+  visible?: boolean
+  badge?: string
 }
 
 type HistoryValue = {
@@ -81,30 +83,30 @@ type VitalSnapshot = {
 }
 
 const NAV: NavLink[] = [
-  { path: '/dashboard', label: 'Hari Ini', shortLabel: 'Hari Ini', section: 'overview' },
-  { path: '/dashboard/week', label: 'Mingguan', shortLabel: 'Minggu', section: 'overview' },
-  { path: '/dashboard/month', label: 'Bulanan', shortLabel: 'Bulan', section: 'overview' },
-  { path: '/measurements/new', label: 'Pengukuran', shortLabel: 'Input', section: 'capture' },
-  { path: '/measurements/history', label: 'Riwayat', shortLabel: 'Riwayat', section: 'capture' },
-  { path: '/measurements/senior', label: 'Mode Lansia', shortLabel: 'Lansia', section: 'capture' },
-  { path: '/tracker', label: 'Tracker', shortLabel: 'Track', section: 'care' },
+  { path: '/dashboard', label: 'Dashboard', shortLabel: 'Home', section: 'overview' },
+  { path: '/dashboard/week', label: 'Weekly View', shortLabel: 'Week', section: 'overview', visible: false },
+  { path: '/dashboard/month', label: 'Monthly Summary', shortLabel: 'Month', section: 'overview', visible: false },
+  { path: '/measurements/new', label: 'New Measurement', shortLabel: 'Input', section: 'capture' },
+  { path: '/measurements/history', label: 'History', shortLabel: 'History', section: 'capture' },
+  { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', section: 'capture', visible: false },
+  { path: '/tracker', label: 'Tracker', shortLabel: 'Track', section: 'care', visible: false },
   { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', section: 'overview' },
-  { path: '/reports/daily', label: 'Laporan Harian', shortLabel: 'Harian', section: 'overview' },
-  { path: '/reports/weekly', label: 'Laporan Mingguan', shortLabel: 'Minggu', section: 'overview' },
-  { path: '/reports/monthly', label: 'Laporan Bulanan', shortLabel: 'Bulan', section: 'overview' },
-  { path: '/reports/doctor', label: 'Laporan Dokter', shortLabel: 'Dokter', section: 'overview' },
-  { path: '/reminders', label: 'Pengingat', shortLabel: 'Ingat', section: 'care' },
-  { path: '/medications', label: 'Obat', shortLabel: 'Obat', section: 'care' },
-  { path: '/family', label: 'Keluarga', shortLabel: 'Keluarga', section: 'care' },
-  { path: '/caregiver', label: 'Caregiver', shortLabel: 'Care', section: 'care' },
-  { path: '/fasting', label: 'Puasa', shortLabel: 'Puasa', section: 'care' },
-  { path: '/emergency', label: 'Kontak Darurat', shortLabel: 'Darurat', section: 'care' },
-  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', section: 'system' },
-  { path: '/alerts', label: 'Inbox & Alert', shortLabel: 'Alert', section: 'system' },
-  { path: '/patterns', label: 'Pola', shortLabel: 'Pola', section: 'system' },
-  { path: '/kb', label: 'Pengetahuan', shortLabel: 'KB', section: 'system' },
-  { path: '/settings/profile', label: 'Profil', shortLabel: 'Profil', section: 'system' },
-  { path: '/settings/delete', label: 'Hapus Akun', shortLabel: 'Privasi', section: 'system' },
+  { path: '/reports/daily', label: 'Reports', shortLabel: 'Reports', section: 'overview' },
+  { path: '/reports/weekly', label: 'Weekly Report', shortLabel: 'W Report', section: 'overview', visible: false },
+  { path: '/reports/monthly', label: 'Monthly Report', shortLabel: 'M Report', section: 'overview', visible: false },
+  { path: '/reports/doctor', label: 'Doctor Report', shortLabel: 'Doctor', section: 'overview', visible: false },
+  { path: '/reminders', label: 'Reminders', shortLabel: 'Remind', section: 'care', visible: false },
+  { path: '/medications', label: 'Medication', shortLabel: 'Meds', section: 'care', visible: false },
+  { path: '/family', label: 'Family Link', shortLabel: 'Family', section: 'care' },
+  { path: '/caregiver', label: 'Caregiver', shortLabel: 'Care', section: 'care', visible: false },
+  { path: '/fasting', label: 'Fasting', shortLabel: 'Fast', section: 'care', visible: false },
+  { path: '/emergency', label: 'Emergency Contacts', shortLabel: 'SOS', section: 'care', visible: false },
+  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', section: 'system', visible: false },
+  { path: '/alerts', label: 'Notifications', shortLabel: 'Alerts', section: 'system', badge: '3' },
+  { path: '/patterns', label: 'Patterns', shortLabel: 'Pattern', section: 'system', visible: false },
+  { path: '/kb', label: 'Help Center', shortLabel: 'Help', section: 'system', visible: false },
+  { path: '/settings/profile', label: 'Settings', shortLabel: 'Settings', section: 'system' },
+  { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', section: 'system', visible: false },
   { path: '/admin/configs', label: 'Admin', shortLabel: 'Admin', section: 'system', adminOnly: true }
 ]
 
@@ -459,7 +461,7 @@ function AppRoutes() {
   }
 
   const isAdmin = !!user.email && ['admin@homesungai.com'].includes(user.email)
-  const visibleNav = NAV.filter(link => !link.adminOnly || isAdmin)
+  const visibleNav = NAV.filter(link => (!link.adminOnly || isAdmin) && link.visible !== false)
   const currentLink = visibleNav.find(link => link.path === appPath)
   const navSections = Object.entries(SECTION_LABELS).map(([section, title]) => ({
     section,
@@ -471,17 +473,21 @@ function AppRoutes() {
     <main className="app-page">
       <aside className="app-sidebar" aria-label="Navigasi aplikasi">
         <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">HL</span>
+          <span className="brand-mark" aria-hidden="true">+</span>
           <div>
-            <strong>HL Health</strong>
-            <span>Clinical Precision</span>
+            <strong>HealthSync Pro</strong>
+            <span>Enterprise Health</span>
           </div>
         </div>
 
+        <button className="emergency-support-btn" onClick={() => navigate('/emergency')} type="button">
+          <span aria-hidden="true">✱</span>
+          Emergency Support
+        </button>
+
         <nav className="app-nav" aria-label="Navigasi utama">
-          {navSections.map(({ section, title, links }) => links.length > 0 ? (
+          {navSections.map(({ section, links }) => links.length > 0 ? (
             <div className="nav-section" key={section}>
-              <p>{title}</p>
               {links.map((link) => (
                 <button
                   aria-current={appPath === link.path ? 'page' : undefined}
@@ -491,27 +497,49 @@ function AppRoutes() {
                   type="button"
                 >
                   <span className="nav-dot" aria-hidden="true" />
-                  {link.label}
+                  <span>{link.label}</span>
+                  {link.badge ? <span className="nav-badge">{link.badge}</span> : null}
                 </button>
               ))}
             </div>
           ) : null)}
         </nav>
+
+        <div className="sidebar-footer">
+          <button onClick={() => navigate('/kb')} type="button">
+            <span aria-hidden="true">?</span>
+            Help Center
+          </button>
+          <button onClick={() => navigate('/login')} type="button">
+            <span aria-hidden="true">↳</span>
+            Logout
+          </button>
+        </div>
       </aside>
 
       <div className="app-main">
+        <div className="app-topbar">
+          <label className="topbar-search">
+            <span className="visually-hidden">Search</span>
+            <input placeholder="Search patients, reports, or data..." type="search" />
+          </label>
+          <div className="topbar-actions" aria-label="Workspace actions">
+            <button type="button" aria-label="Notifications">⌁</button>
+            <button type="button" aria-label="Help">?</button>
+            <div className="topbar-user" aria-label={`User aktif ${user.displayName}`}>
+              <div>
+                <strong>{user.displayName}</strong>
+                <small>Cardiology</small>
+              </div>
+              <span>{getInitials(user.displayName)}</span>
+            </div>
+          </div>
+        </div>
+
         <header className="app-header">
           <div>
-            <p className="eyebrow">HealthSync Pro</p>
             <h1>{currentLink?.label ?? 'Dashboard'}</h1>
-            <p>Halo, {user.displayName}. Pantau data kesehatan dengan alur rule-based.</p>
-          </div>
-          <div className="user-chip" aria-label={`User aktif ${user.displayName}`}>
-            <span>{getInitials(user.displayName)}</span>
-            <div>
-              <strong>{user.displayName}</strong>
-              <small>Personal workspace</small>
-            </div>
+            <p>{user.displayName}, here is your clinical overview for today.</p>
           </div>
         </header>
 
