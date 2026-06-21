@@ -1859,3 +1859,41 @@ Final state of audit + fixes:
 - Cloudflare token working: <CLOUDFLARE_TOKEN> (note capital K)
 - Telegram bot token returns 401 from Telegram API — user needs to regenerate via @BotFather
 - Cloudflare cron triggers at 5/5 limit — manual POST /api/internal/cron/reminders works
+
+## 2026-06-21 15:00 UTC — Agent: claude-audit
+
+### Task
+- Task ID: FIX-PAGES-PROXY
+- Sprint: Sprint 1-4 (production fix)
+- Status: Completed
+
+### Files Read
+- web/src/pages/auth/RegisterPage.tsx
+- web/src/pages/kb/KnowledgeBasePage.tsx
+- All 25 frontend page files (credential audit)
+
+### Files Changed
+- web/functions/api/[[path]].ts (NEW) — Cloudflare Pages Function proxy
+- web/src/pages/auth/RegisterPage.tsx — added credentials:'include'
+- web/src/pages/kb/KnowledgeBasePage.tsx — added credentials:'include'
+
+### What Changed
+- CRITICAL FIX: Frontend at pages.dev could not reach API (different origin). All fetch calls to /api/* returned "Tidak bisa terhubung ke server" because pages.dev only serves static files.
+- Created Cloudflare Pages Function that proxies all /api/* requests to the Worker at workers.dev
+- Fixed RegisterPage missing credentials:'include' (session cookie not saved after register)
+- Fixed KnowledgeBasePage missing credentials:'include'
+- Verified all 43 frontend fetch calls now have credentials:'include'
+
+### Validation
+- E2E tests via pages.dev: 52/52 passed
+- Cookie forwarding: confirmed cookie set on pages.dev domain
+- Full cycle: Register → Login → Me → Onboarding → Dashboard → Submit all work through proxy
+
+### Documentation Updated
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- The Pages Function proxy is essential for the pages.dev deployment
+- Worker at workers.dev is the primary API server
+- Pages at pages.dev serves static frontend + proxy function
