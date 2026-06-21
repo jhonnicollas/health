@@ -9,7 +9,7 @@ import {
   createEmergencyAlert,
   sendEmergencyToContacts,
   type ExtraEnv
-} from './routes-extra'
+} from './routes-extra.js'
 
 export interface Env {
   CLOUDFLARE_ACCOUNT_ID?: string
@@ -567,32 +567,44 @@ function jsonResponse(
 }
 
 const SYSTEM_CONFIG_TTL_MS = 60_000
-const systemConfigCache: Map<string, { value: string; expiresAt: number }> = new Map()
+const systemConfigCacheByDb: WeakMap<object, Map<string, { value: string; expiresAt: number }>> = new WeakMap()
 
-function readSystemConfigCache(configKey: string): string | null {
-  const entry = systemConfigCache.get(configKey)
+function getSystemConfigCache(db: object): Map<string, { value: string; expiresAt: number }> {
+  let cache = systemConfigCacheByDb.get(db)
+  if (!cache) {
+    cache = new Map()
+    systemConfigCacheByDb.set(db, cache)
+  }
+  return cache
+}
+
+function readSystemConfigCache(db: object, configKey: string): string | null {
+  const cache = getSystemConfigCache(db)
+  const entry = cache.get(configKey)
   if (!entry) return null
   if (entry.expiresAt < Date.now()) {
-    systemConfigCache.delete(configKey)
+    cache.delete(configKey)
     return null
   }
   return entry.value
 }
 
-function writeSystemConfigCache(configKey: string, value: string) {
-  systemConfigCache.set(configKey, { value, expiresAt: Date.now() + SYSTEM_CONFIG_TTL_MS })
+function writeSystemConfigCache(db: object, configKey: string, value: string) {
+  getSystemConfigCache(db).set(configKey, { value, expiresAt: Date.now() + SYSTEM_CONFIG_TTL_MS })
 }
 
-function invalidateSystemConfigCache(configKey?: string) {
+function invalidateSystemConfigCache(db: object | null, configKey?: string) {
+  if (!db) return
+  const cache = getSystemConfigCache(db)
   if (configKey) {
-    systemConfigCache.delete(configKey)
+    cache.delete(configKey)
     return
   }
-  systemConfigCache.clear()
+  cache.clear()
 }
 
 async function getSystemConfigNumber(c: Context<{ Bindings: Env }>, configKey: string) {
-  const cached = readSystemConfigCache(configKey)
+  const cached = readSystemConfigCache(c.env.DB, configKey)
   if (cached !== null) {
     const value = Number(cached)
     if (Number.isFinite(value) && value > 0) return value
@@ -609,7 +621,7 @@ async function getSystemConfigNumber(c: Context<{ Bindings: Env }>, configKey: s
   }
 
   if (row?.configValue !== undefined) {
-    writeSystemConfigCache(configKey, row.configValue)
+    writeSystemConfigCache(c.env.DB, configKey, row.configValue)
   }
 
   return value
@@ -3527,7 +3539,7 @@ app.put('/api/admin/configs/:configKey', async (c) => {
     const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
     if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
     await c.env.DB.prepare('UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = ?').bind(body.configValue, configKey).run()
-    invalidateSystemConfigCache(configKey)
+    invalidateSystemConfigCache(c.env.DB, configKey)
     await c.env.DB.prepare(
       "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configUpdate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
     ).bind(createId('aud'), user.id, configKey, JSON.stringify({ configKey, newValue: body.configValue })).run()

@@ -1,129 +1,172 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
 type Reminder = {
   id: string
   reminderType: string
+  enabled: boolean
   scheduleTime: string
-  enabled: number
-  payloadJson: string | null
+  timezone: string
+  channel: string
+  message?: string
 }
 
-type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
+type ApiResp<T> = {
+  success: boolean
+  data?: T
+  error?: { message: string; details?: Array<{ field: string; message: string }> }
+}
+
+const REMINDER_TYPES = ['morningMeasurement', 'eveningMeasurement', 'medication'] as const
+const CHANNELS = ['telegram', 'browser'] as const
 
 export function RemindersPage() {
-  const [items, setItems] = useState<Reminder[]>([])
-  const [loading, setLoading] = useState(true)
+  const [reminders, setReminders] = useState<Reminder[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [metricCode, setMetricCode] = useState('general')
-  const [time, setTime] = useState('08:00')
-  const [label, setLabel] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [reminderType, setReminderType] = useState<(typeof REMINDER_TYPES)[number]>('morningMeasurement')
+  const [scheduleTime, setScheduleTime] = useState('07:00')
+  const [timezone, setTimezone] = useState('Asia/Jakarta')
+  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>('telegram')
+  const [message, setMessage] = useState('Waktunya cek kesehatan pagi.')
 
   async function load() {
-    setLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/reminders', { credentials: 'include' })
-      const body = (await res.json()) as ApiResp<{ reminders: Reminder[] }>
-      if (!body.success) { setError(body.error?.message || 'Gagal memuat.'); return }
-      setItems(body.data?.reminders || [])
-    } catch { setError('Tidak bisa terhubung ke server.') }
-    finally { setLoading(false) }
+      const body = (await res.json()) as ApiResp<Reminder[]>
+      if (!body.success) {
+        setError(body.error?.message ?? 'Gagal memuat reminder.')
+        return
+      }
+      setReminders(body.data ?? [])
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [])
 
-  async function handleCreate(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setSaving(true); setMessage(null); setError(null)
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch('/api/reminders', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ metricCode, time, label: label || undefined })
+        body: JSON.stringify({
+          reminderType,
+          enabled: true,
+          scheduleTime,
+          timezone,
+          channel,
+          payload: { message }
+        })
       })
       const body = (await res.json()) as ApiResp<{ reminderId: string }>
-      if (!body.success) { setError(body.error?.message || 'Gagal membuat.'); return }
-      setMessage('Pengingat dibuat.')
-      setLabel('')
+      if (!res.ok || !body.success) {
+        setError(body.error?.message ?? 'Gagal menambah reminder.')
+        return
+      }
       await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
-    finally { setSaving(false) }
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  async function toggle(item: Reminder) {
-    setError(null)
-    try {
-      const res = await fetch(`/api/reminders/${item.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !(item.enabled === 1) })
-      })
-      const body = (await res.json()) as ApiResp<{ updated: boolean }>
-      if (!body.success) { setError(body.error?.message || 'Gagal update.'); return }
-      await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
+  async function toggleEnabled(reminder: Reminder) {
+    const res = await fetch(`/api/reminders/${reminder.id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !reminder.enabled })
+    })
+    if (res.ok) await load()
   }
 
   async function remove(id: string) {
-    if (!confirm('Hapus pengingat ini?')) return
-    try {
-      const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE', credentials: 'include' })
-      const body = (await res.json()) as ApiResp<{ deleted: boolean }>
-      if (!body.success) { setError(body.error?.message || 'Gagal hapus.'); return }
-      await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
+    const res = await fetch(`/api/reminders/${id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    if (res.ok) await load()
   }
 
   return (
     <section className="settings-panel" aria-labelledby="reminders-title">
-      <h2 id="reminders-title">Pengingat</h2>
-      <p>Atur pengingat otomatis untuk pengukuran Anda.</p>
-      <form className="auth-form settings-form" onSubmit={handleCreate}>
-        <label>Tipe metrik
-          <select onChange={(e) => setMetricCode(e.target.value)} value={metricCode}>
-            <option value="general">Umum</option>
-            <option value="bodyWeight">Berat badan</option>
-            <option value="systolic">Tekanan darah</option>
-            <option value="glucoseFasting">Gula darah puasa</option>
+      <div className="auth-copy">
+        <p className="eyebrow">Pengaturan</p>
+        <h2 id="reminders-title">Reminder pengukuran</h2>
+        <p>Atur pengingat harian untuk pengukuran atau minum obat.</p>
+      </div>
+
+      <form className="auth-form" onSubmit={handleCreate}>
+        <label>
+          Jenis
+          <select
+            onChange={(e) => setReminderType(e.target.value as (typeof REMINDER_TYPES)[number])}
+            value={reminderType}
+          >
+            {REMINDER_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
           </select>
         </label>
-        <label>Waktu (HH:MM)
-          <input onChange={(e) => setTime(e.target.value)} required type="time" value={time} />
+        <label>
+          Waktu (HH:MM)
+          <input onChange={(e) => setScheduleTime(e.target.value)} required type="time" value={scheduleTime} />
         </label>
-        <label>Label (opsional)
-          <input onChange={(e) => setLabel(e.target.value)} type="text" value={label} />
+        <label>
+          Timezone
+          <input onChange={(e) => setTimezone(e.target.value)} required type="text" value={timezone} />
         </label>
-        <button disabled={saving} type="submit">{saving ? 'Menyimpan...' : 'Tambah Pengingat'}</button>
+        <label>
+          Channel
+          <select
+            onChange={(e) => setChannel(e.target.value as (typeof CHANNELS)[number])}
+            value={channel}
+          >
+            {CHANNELS.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Pesan
+          <input onChange={(e) => setMessage(e.target.value)} required type="text" value={message} />
+        </label>
+        <button disabled={submitting} type="submit">
+          {submitting ? 'Menyimpan...' : 'Tambah reminder'}
+        </button>
+        {error ? <p className="form-message error" role="status">{error}</p> : null}
       </form>
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
-      {loading ? <p>Memuat...</p> : items.length === 0 ? <p>Belum ada pengingat.</p> : (
-        <table className="report-table">
-          <thead><tr><th>Tipe</th><th>Waktu</th><th>Label</th><th>Status</th><th>Aksi</th></tr></thead>
-          <tbody>
-            {items.map((r) => {
-              let parsed: { label?: string } = {}
-              try { parsed = r.payloadJson ? JSON.parse(r.payloadJson) : {} } catch { /* ignore */ }
-              return (
-                <tr key={r.id}>
-                  <td>{r.reminderType}</td>
-                  <td>{r.scheduleTime}</td>
-                  <td>{parsed.label || '—'}</td>
-                  <td>{r.enabled === 1 ? 'Aktif' : 'Nonaktif'}</td>
-                  <td>
-                    <button onClick={() => toggle(r)} type="button">{r.enabled === 1 ? 'Nonaktifkan' : 'Aktifkan'}</button>
-                    <button onClick={() => remove(r.id)} type="button">Hapus</button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+
+      <h3>Reminder aktif</h3>
+      {reminders.length === 0 ? <p>Belum ada reminder.</p> : (
+        <ul className="reminder-list">
+          {reminders.map((r) => (
+            <li key={r.id} className="reminder-item">
+              <div>
+                <strong>{r.reminderType}</strong> · {r.scheduleTime} ({r.timezone}) · {r.channel}
+                <div className="muted">{r.message}</div>
+              </div>
+              <div>
+                <button onClick={() => toggleEnabled(r)} type="button">
+                  {r.enabled ? 'Nonaktifkan' : 'Aktifkan'}
+                </button>
+                <button className="danger" onClick={() => remove(r.id)} type="button">Hapus</button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )
 }
+
+export default RemindersPage

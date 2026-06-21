@@ -1,95 +1,129 @@
 import { useEffect, useState } from 'react'
 
-type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
+type FastingSession = {
+  id: string
+  fastingType: string
+  targetHours: number
+  startedAt: string
+  targetAt: string
+}
 
-type Current = {
-  active: boolean
-  id?: string
-  fastingType?: string
-  targetHours?: number
-  startedAt?: string
-  elapsedHours?: number
+type ApiResp<T> = {
+  success: boolean
+  data?: T
+  error?: { message: string }
 }
 
 export function FastingPage() {
-  const [current, setCurrent] = useState<Current | null>(null)
-  const [type, setType] = useState('glucoseFasting')
-  const [hours, setHours] = useState(8)
+  const [active, setActive] = useState(false)
+  const [session, setSession] = useState<FastingSession | null>(null)
+  const [targetHours, setTargetHours] = useState(8)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
 
   async function load() {
     setError(null)
     try {
       const res = await fetch('/api/fasting/current', { credentials: 'include' })
-      const body = (await res.json()) as ApiResp<Current>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setCurrent(body.data || null)
-    } catch { setError('Tidak bisa terhubung ke server.') }
+      const body = (await res.json()) as ApiResp<{ active: boolean; session: FastingSession | null }>
+      if (!body.success) {
+        setError(body.error?.message ?? 'Gagal memuat status puasa.')
+        return
+      }
+      setActive(Boolean(body.data?.active))
+      setSession(body.data?.session ?? null)
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [])
 
   async function start() {
-    setError(null); setMessage(null)
+    setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch('/api/fasting/start', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fastingType: type, targetHours: hours })
+        body: JSON.stringify({ fastingType: 'glucoseFasting', targetHours })
       })
-      const body = (await res.json()) as ApiResp<{ fastingId: string }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setMessage('Sesi puasa dimulai.')
+      const body = (await res.json()) as ApiResp<{ fastingSessionId: string }>
+      if (!res.ok || !body.success) {
+        setError(body.error?.message ?? 'Gagal memulai puasa.')
+        return
+      }
       await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  async function stop(status: 'completed' | 'cancelled') {
-    setError(null); setMessage(null)
+  async function stop() {
+    if (!session) return
+    setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch('/api/fasting/stop', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ fastingSessionId: session.id, status: 'completed' })
       })
       const body = (await res.json()) as ApiResp<{ status: string }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setMessage(`Sesi ${status}.`)
+      if (!res.ok || !body.success) {
+        setError(body.error?.message ?? 'Gagal mengakhiri puasa.')
+        return
+      }
       await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <section className="settings-panel" aria-labelledby="fasting-title">
-      <h2 id="fasting-title">Sesi Puasa</h2>
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
-      {current?.active ? (
-        <div>
-          <p>Sedang berpuasa: <strong>{current.fastingType}</strong></p>
-          <p>Target: {current.targetHours} jam | Sudah: {current.elapsedHours?.toFixed(2)} jam</p>
-          <p>Mulai: {current.startedAt}</p>
-          <button onClick={() => stop('completed')} type="button">Selesaikan</button>
-          <button onClick={() => stop('cancelled')} type="button">Batalkan</button>
+      <div className="auth-copy">
+        <p className="eyebrow">Pengukuran</p>
+        <h2 id="fasting-title">Fasting timer</h2>
+        <p>Catat puasa untuk pengukuran glukosa darah puasa.</p>
+      </div>
+
+      {active && session ? (
+        <div className="fasting-active">
+          <p>Puasa aktif sejak {new Date(session.startedAt).toLocaleString()}.</p>
+          <p>Target selesai: {new Date(session.targetAt).toLocaleString()}.</p>
+          <button disabled={submitting} onClick={stop} type="button">
+            {submitting ? 'Mengakhiri...' : 'Akhiri puasa'}
+          </button>
         </div>
       ) : (
-        <div>
-          <p>Tidak ada sesi aktif.</p>
-          <label>Tipe puasa
-            <select onChange={(e) => setType(e.target.value)} value={type}>
-              <option value="glucoseFasting">Gula darah puasa</option>
-              <option value="cholesterolTotal">Kolesterol total</option>
-              <option value="uricAcid">Asam urat</option>
-              <option value="general">Umum</option>
-            </select>
+        <div className="fasting-start">
+          <label>
+            Target jam
+            <input
+              max={24}
+              min={4}
+              onChange={(e) => setTargetHours(Number(e.target.value))}
+              type="number"
+              value={targetHours}
+            />
           </label>
-          <label>Target jam <input max={48} min={1} onChange={(e) => setHours(Number(e.target.value))} type="number" value={hours} /></label>
-          <button onClick={start} type="button">Mulai Puasa</button>
+          <button disabled={submitting} onClick={start} type="button">
+            {submitting ? 'Memulai...' : 'Mulai puasa'}
+          </button>
         </div>
       )}
+
+      {error ? <p className="form-message error" role="status">{error}</p> : null}
     </section>
   )
 }
+
+export default FastingPage

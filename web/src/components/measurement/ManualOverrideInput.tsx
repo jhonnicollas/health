@@ -1,129 +1,72 @@
-import { useState, useEffect } from 'react'
-import "./ManualOverrideInput.css"
+import { useState } from 'react'
 
-export type MetricValue = {
+type Metric = {
   metricCode: string
-  rawAiValue?: number
-  finalValue?: number
+  metricName: string
   unit: string
-  confidence?: number
-  manualOverride: boolean
+  physicalMin?: number | null
+  physicalMax?: number | null
 }
 
 type ManualOverrideInputProps = {
-  metrics: MetricValue[]
-  onMetricsChange: (metrics: MetricValue[]) => void
-  disabled?: boolean
+  metric: Metric
+  raw: string
+  final: string
+  manual: boolean
+  onChange: (partial: { raw?: string; final?: string; manual?: boolean }) => void
 }
 
-export function ManualOverrideInput({
-  metrics,
-  onMetricsChange,
-  disabled = false
-}: ManualOverrideInputProps) {
-  const [localMetrics, setLocalMetrics] = useState<MetricValue[]>(metrics)
+export function ManualOverrideInput({ metric, raw, final, manual, onChange }: ManualOverrideInputProps) {
+  const [editing, setEditing] = useState(false)
 
-  useEffect(() => {
-    setLocalMetrics(metrics)
-  }, [metrics])
-
-  const handleValueChange = (metricCode: string, newValue: string) => {
-    const numValue = parseFloat(newValue)
-    const updatedMetrics = localMetrics.map(metric => {
-      if (metric.metricCode === metricCode) {
-        const hasChanged = metric.rawAiValue !== undefined && 
-                          numValue !== metric.rawAiValue
-        return {
-          ...metric,
-          finalValue: isNaN(numValue) ? undefined : numValue,
-          manualOverride: hasChanged
-        }
-      }
-      return metric
-    })
-    setLocalMetrics(updatedMetrics)
-    onMetricsChange(updatedMetrics)
+  function setRaw(value: string) {
+    onChange({ raw: value, final: editing ? final : value, manual: editing ? true : false })
   }
 
-  const handleReset = (metricCode: string) => {
-    const updatedMetrics = localMetrics.map(metric => {
-      if (metric.metricCode === metricCode) {
-        return {
-          ...metric,
-          finalValue: metric.rawAiValue,
-          manualOverride: false
-        }
-      }
-      return metric
-    })
-    setLocalMetrics(updatedMetrics)
-    onMetricsChange(updatedMetrics)
+  function startOverride() {
+    setEditing(true)
+    onChange({ manual: true })
   }
 
-  const getMetricLabel = (metricCode: string): string => {
-    const labels: Record<string, string> = {
-      spo2: 'SpO2',
-      heartRate: 'Heart Rate',
-      systolic: 'Systolic',
-      diastolic: 'Diastolic',
-      bloodPressurePulse: 'Pulse',
-      glucoseFasting: 'Glucose Fasting',
-      glucosePostMeal: 'Glucose Post Meal',
-      cholesterolTotal: 'Total Cholesterol',
-      uricAcid: 'Uric Acid',
-      bodyWeight: 'Body Weight',
-      bmi: 'BMI',
-      waistCircumference: 'Waist Circumference',
-      bodyTemperature: 'Body Temperature',
-      sleepDuration: 'Sleep Duration'
-    }
-    return labels[metricCode] || metricCode
+  function commitOverride(value: string) {
+    onChange({ final: value, manual: value !== raw })
   }
+
+  const min = metric.physicalMin ?? undefined
+  const max = metric.physicalMax ?? undefined
 
   return (
     <div className="manual-override-input">
-      {localMetrics.map(metric => (
-        <div key={metric.metricCode} className="metric-row">
-          <label className="metric-label">
-            {getMetricLabel(metric.metricCode)} ({metric.unit})
-          </label>
-          
-          <div className="metric-input-group">
-            <input
-              type="number"
-              value={metric.finalValue !== undefined ? metric.finalValue : ''}
-              onChange={(e) => handleValueChange(metric.metricCode, e.target.value)}
-              disabled={disabled}
-              className={`metric-input ${metric.manualOverride ? 'manual-override' : ''}`}
-              placeholder={metric.rawAiValue !== undefined ? `AI: ${metric.rawAiValue}` : 'Enter value'}
-            />
-            
-            {metric.manualOverride && (
-              <button
-                type="button"
-                onClick={() => handleReset(metric.metricCode)}
-                disabled={disabled}
-                className="reset-button"
-                title="Reset to AI value"
-              >
-                ↺
-              </button>
-            )}
-          </div>
-
-          {metric.confidence !== undefined && (
-            <div className="confidence-indicator">
-              Confidence: {Math.round(metric.confidence * 100)}%
-            </div>
-          )}
-
-          {metric.manualOverride && (
-            <div className="override-badge">
-              Manual Override
-            </div>
-          )}
-        </div>
-      ))}
+      <label>
+        Nilai AI (raw)
+        <input
+          onChange={(e) => setRaw(e.target.value)}
+          readOnly={!editing}
+          type="number"
+          value={raw}
+        />
+      </label>
+      <label>
+        Nilai final (dapat diedit)
+        <input
+          inputMode="decimal"
+          max={max}
+          min={min}
+          onChange={(e) => commitOverride(e.target.value)}
+          type="number"
+          value={final}
+        />
+      </label>
+      <label className="checkbox-row">
+        <input
+          checked={manual || final !== raw}
+          onChange={(e) => (e.target.checked ? startOverride() : commitOverride(raw))}
+          type="checkbox"
+        />
+        Override manual (nilai diubah dari AI)
+      </label>
     </div>
   )
 }
+
+export default ManualOverrideInput

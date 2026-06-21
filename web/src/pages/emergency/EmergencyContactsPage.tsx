@@ -1,72 +1,149 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
-type Contact = {
+type EmergencyContact = {
   id: string
-  name: string
-  phone: string
-  relationship: string | null
-  createdAt: string
+  contactName: string
+  contactRelation: string
+  contactPhone: string
+  contactEmail?: string
+  telegramChatId?: string
+  consentGiven: boolean
+  enabled: boolean
 }
 
-type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
+type ApiResp<T> = {
+  success: boolean
+  data?: T
+  error?: { message: string }
+}
 
 export function EmergencyContactsPage() {
-  const [items, setItems] = useState<Contact[]>([])
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [relationship, setRelationship] = useState('')
+  const [contacts, setContacts] = useState<EmergencyContact[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [contactName, setContactName] = useState('')
+  const [contactRelation, setContactRelation] = useState('Pasangan')
+  const [contactPhone, setContactPhone] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [telegramChatId, setTelegramChatId] = useState('')
+  const [consent, setConsent] = useState(false)
 
   async function load() {
     setError(null)
     try {
       const res = await fetch('/api/emergency/contacts', { credentials: 'include' })
-      const body = (await res.json()) as ApiResp<{ contacts: Contact[] }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setItems(body.data?.contacts || [])
-    } catch { setError('Tidak bisa terhubung ke server.') }
+      const body = (await res.json()) as ApiResp<EmergencyContact[]>
+      if (!body.success) {
+        setError(body.error?.message ?? 'Gagal memuat kontak darurat.')
+        return
+      }
+      setContacts(body.data ?? [])
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [])
 
-  async function handleCreate(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setError(null); setMessage(null)
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch('/api/emergency/contacts', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, relationship: relationship || undefined })
+        body: JSON.stringify({
+          contactName,
+          contactRelation,
+          contactPhone,
+          contactEmail,
+          telegramChatId,
+          consentGiven: consent,
+          enabled: true
+        })
       })
       const body = (await res.json()) as ApiResp<{ contactId: string }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setName(''); setPhone(''); setRelationship('')
-      setMessage('Kontak darurat ditambahkan.')
+      if (!res.ok || !body.success) {
+        setError(body.error?.message ?? 'Gagal menambah kontak.')
+        return
+      }
+      setContactName('')
+      setContactPhone('')
       await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function remove(id: string) {
+    const res = await fetch(`/api/emergency/contacts/${id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    if (res.ok) await load()
   }
 
   return (
-    <section className="settings-panel" aria-labelledby="emc-title">
-      <h2 id="emc-title">Kontak Darurat</h2>
-      <p>Kontak ini akan dinotifikasi saat terdeteksi nilai darurat (jika Anda memberikan persetujuan).</p>
-      <form className="auth-form settings-form" onSubmit={handleCreate}>
-        <label>Nama<input onChange={(e) => setName(e.target.value)} required value={name} /></label>
-        <label>Telepon (mis. +6281234567890)<input onChange={(e) => setPhone(e.target.value)} required value={phone} /></label>
-        <label>Hubungan (opsional)<input onChange={(e) => setRelationship(e.target.value)} value={relationship} /></label>
-        <button type="submit">Tambah Kontak</button>
+    <section className="settings-panel" aria-labelledby="emergency-title">
+      <div className="auth-copy">
+        <p className="eyebrow">Darurat</p>
+        <h2 id="emergency-title">Kontak darurat</h2>
+        <p>Daftarkan kontak yang akan menerima notifikasi saat kondisi darurat.</p>
+      </div>
+
+      <form className="auth-form" onSubmit={handleCreate}>
+        <label>
+          Nama
+          <input onChange={(e) => setContactName(e.target.value)} required type="text" value={contactName} />
+        </label>
+        <label>
+          Hubungan
+          <input onChange={(e) => setContactRelation(e.target.value)} required type="text" value={contactRelation} />
+        </label>
+        <label>
+          Nomor telepon
+          <input onChange={(e) => setContactPhone(e.target.value)} required type="tel" value={contactPhone} />
+        </label>
+        <label>
+          Email (opsional)
+          <input onChange={(e) => setContactEmail(e.target.value)} type="email" value={contactEmail} />
+        </label>
+        <label>
+          Telegram chat ID (opsional)
+          <input onChange={(e) => setTelegramChatId(e.target.value)} type="text" value={telegramChatId} />
+        </label>
+        <label className="checkbox-row">
+          <input checked={consent} onChange={(e) => setConsent(e.target.checked)} type="checkbox" />
+          Saya telah mendapat persetujuan kontak untuk menerima notifikasi darurat.
+        </label>
+        <button disabled={submitting || !consent} type="submit">
+          {submitting ? 'Menyimpan...' : 'Tambah kontak'}
+        </button>
+        {error ? <p className="form-message error" role="status">{error}</p> : null}
       </form>
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
-      {items.length === 0 ? <p>Belum ada kontak.</p> : (
-        <table className="report-table">
-          <thead><tr><th>Nama</th><th>Telepon</th><th>Hubungan</th><th>Dibuat</th></tr></thead>
-          <tbody>{items.map(c => (
-            <tr key={c.id}><td>{c.name}</td><td>{c.phone}</td><td>{c.relationship || '—'}</td><td>{c.createdAt}</td></tr>
-          ))}</tbody>
-        </table>
+
+      <h3>Kontak terdaftar</h3>
+      {contacts.length === 0 ? <p>Belum ada kontak darurat.</p> : (
+        <ul className="emergency-list">
+          {contacts.map((c) => (
+            <li key={c.id} className="emergency-item">
+              <div>
+                <strong>{c.contactName}</strong> · {c.contactRelation} · {c.contactPhone}
+                {c.telegramChatId ? <div className="muted">Telegram: {c.telegramChatId}</div> : null}
+              </div>
+              <button className="danger" onClick={() => remove(c.id)} type="button">Hapus</button>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )
 }
+
+export default EmergencyContactsPage

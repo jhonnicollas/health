@@ -1,137 +1,142 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
-type Link = {
+type FamilyLink = {
   id: string
-  linkedUserId?: string
-  linkedDisplayName?: string
-  ownerUserId?: string
-  ownerDisplayName?: string
-  role: string
+  ownerUserId: string
+  linkedUserId: string
+  role: 'viewer' | 'caregiver'
   status: string
-  canViewDashboard: number
-  canInputMeasurement: number
-  canReceiveAlert: number
+  canViewDashboard: boolean
+  canInputMeasurement: boolean
+  canReceiveAlert: boolean
+  createdAt: string
 }
 
-type Invite = { inviteId: string; inviteUrl: string; shareToken: string; expiresAt: string }
-
-type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
+type ApiResp<T> = {
+  success: boolean
+  data?: T
+  error?: { message: string }
+}
 
 export function FamilyPage() {
-  const [ownedLinks, setOwnedLinks] = useState<Link[]>([])
-  const [linkedToMe, setLinkedToMe] = useState<Link[]>([])
+  const [owned, setOwned] = useState<FamilyLink[]>([])
+  const [linkedToMe, setLinkedToMe] = useState<FamilyLink[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState('caregiver')
-  const [lastInvite, setLastInvite] = useState<Invite | null>(null)
-  const [acceptToken, setAcceptToken] = useState('')
+  const [role, setRole] = useState<'viewer' | 'caregiver'>('viewer')
 
   async function load() {
     setError(null)
     try {
       const res = await fetch('/api/family/links', { credentials: 'include' })
-      const body = (await res.json()) as ApiResp<{ ownedLinks: Link[]; linkedToMe: Link[] }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setOwnedLinks(body.data?.ownedLinks || [])
-      setLinkedToMe(body.data?.linkedToMe || [])
-    } catch { setError('Tidak bisa terhubung ke server.') }
+      const body = (await res.json()) as ApiResp<{ ownedLinks: FamilyLink[]; linkedToMe: FamilyLink[] }>
+      if (!body.success) {
+        setError(body.error?.message ?? 'Gagal memuat daftar keluarga.')
+        return
+      }
+      setOwned(body.data?.ownedLinks ?? [])
+      setLinkedToMe(body.data?.linkedToMe ?? [])
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load() }, [])
 
-  async function handleInvite(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setError(null); setMessage(null)
+  async function handleInvite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch('/api/family/invite', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email || 'unknown@example.com', role })
+        body: JSON.stringify({
+          inviteEmail: email,
+          role,
+          permissions: {
+            canViewDashboard: true,
+            canInputMeasurement: role === 'caregiver',
+            canReceiveAlert: role === 'caregiver'
+          },
+          expiresInDays: 7
+        })
       })
-      const body = (await res.json()) as ApiResp<Invite>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setLastInvite(body.data || null)
-      setMessage('Invite dibuat. Bagikan tautan ke anggota keluarga.')
-    } catch { setError('Tidak bisa terhubung ke server.') }
+      const body = (await res.json()) as ApiResp<{ inviteId: string }>
+      if (!res.ok || !body.success) {
+        setError(body.error?.message ?? 'Gagal mengirim undangan.')
+        return
+      }
+      setEmail('')
+      await load()
+    } catch {
+      setError('Tidak bisa terhubung ke server.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  async function handleAccept(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setError(null); setMessage(null)
-    try {
-      const res = await fetch('/api/family/accept', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shareToken: acceptToken })
-      })
-      const body = (await res.json()) as ApiResp<{ linkId: string }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      setMessage('Anda sudah terhubung ke anggota keluarga.')
-      setAcceptToken('')
-      await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
-  }
-
-  async function updatePerms(id: string, canViewDashboard: number, canInputMeasurement: number, canReceiveAlert: number) {
-    try {
-      const res = await fetch(`/api/family/members/${id}/permissions`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ canRead: canViewDashboard, canWrite: canInputMeasurement, canEmergency: canReceiveAlert })
-      })
-      const body = (await res.json()) as ApiResp<{ updated: boolean }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
-      await load()
-    } catch { setError('Tidak bisa terhubung ke server.') }
+  async function remove(id: string) {
+    const res = await fetch(`/api/family/${id}`, { method: 'DELETE', credentials: 'include' })
+    if (res.ok) await load()
   }
 
   return (
     <section className="settings-panel" aria-labelledby="family-title">
-      <h2 id="family-title">Keluarga &amp; Caregiver</h2>
-      <form className="auth-form settings-form" onSubmit={handleInvite}>
-        <h3>Undang Anggota Keluarga</h3>
-        <label>Email<input onChange={(e) => setEmail(e.target.value)} placeholder="opsional" value={email} /></label>
-        <label>Peran
-          <select onChange={(e) => setRole(e.target.value)} value={role}>
+      <div className="auth-copy">
+        <p className="eyebrow">Pengaturan</p>
+        <h2 id="family-title">Keluarga & caregiver</h2>
+        <p>Undang anggota keluarga atau caregiver untuk memantau kesehatan Anda.</p>
+      </div>
+
+      <form className="auth-form" onSubmit={handleInvite}>
+        <label>
+          Email undangan
+          <input onChange={(e) => setEmail(e.target.value)} required type="email" value={email} />
+        </label>
+        <label>
+          Role
+          <select onChange={(e) => setRole(e.target.value as 'viewer' | 'caregiver')} value={role}>
+            <option value="viewer">Viewer (keluarga)</option>
             <option value="caregiver">Caregiver</option>
-            <option value="viewer">Keluarga (Viewer)</option>
           </select>
         </label>
-        <button type="submit">Buat Invite</button>
+        <button disabled={submitting} type="submit">
+          {submitting ? 'Mengirim...' : 'Undang'}
+        </button>
+        {error ? <p className="form-message error" role="status">{error}</p> : null}
       </form>
-      {lastInvite ? (
-        <p>Tautan invite (beri ke anggota keluarga): <code>{lastInvite.inviteUrl}</code><br />Token: <code>{lastInvite.shareToken}</code> (berlaku sampai {lastInvite.expiresAt})</p>
-      ) : null}
-      <form className="auth-form settings-form" onSubmit={handleAccept}>
-        <h3>Terima Invite</h3>
-        <label>Token<input onChange={(e) => setAcceptToken(e.target.value)} required value={acceptToken} /></label>
-        <button type="submit">Terima</button>
-      </form>
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
-      <h3>Anggota yang terhubung ke saya</h3>
-      {ownedLinks.length === 0 ? <p>Belum ada anggota.</p> : (
-        <table className="report-table">
-          <thead><tr><th>Nama</th><th>Peran</th><th>View</th><th>Input</th><th>Alert</th></tr></thead>
-          <tbody>
-            {ownedLinks.map((l) => (
-              <tr key={l.id}>
-                <td>{l.linkedDisplayName || l.linkedUserId || '—'}</td>
-                <td>{l.role}</td>
-                <td><input checked={l.canViewDashboard === 1} onChange={(e) => updatePerms(l.id, e.target.checked ? 1 : 0, l.canInputMeasurement, l.canReceiveAlert)} type="checkbox" /></td>
-                <td><input checked={l.canInputMeasurement === 1} onChange={(e) => updatePerms(l.id, l.canViewDashboard, e.target.checked ? 1 : 0, l.canReceiveAlert)} type="checkbox" /></td>
-                <td><input checked={l.canReceiveAlert === 1} onChange={(e) => updatePerms(l.id, l.canViewDashboard, l.canInputMeasurement, e.target.checked ? 1 : 0)} type="checkbox" /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <h3>Daftar yang Anda undang</h3>
+      {owned.length === 0 ? <p>Belum ada undangan terkirim.</p> : (
+        <ul className="family-list">
+          {owned.map((l) => (
+            <li key={l.id} className="family-item">
+              <div>
+                <strong>{l.linkedUserId}</strong> · {l.role} · {l.status}
+              </div>
+              <button className="danger" onClick={() => remove(l.id)} type="button">Cabut</button>
+            </li>
+          ))}
+        </ul>
       )}
-      <h3>Saya terhubung sebagai caregiver ke</h3>
-      {linkedToMe.length === 0 ? <p>Belum ada.</p> : (
-        <ul>{linkedToMe.map((l) => <li key={l.id}>{l.ownerDisplayName || l.ownerUserId} ({l.role})</li>)}</ul>
+
+      <h3>Yang merawat Anda</h3>
+      {linkedToMe.length === 0 ? <p>Belum ada caregiver terhubung.</p> : (
+        <ul className="family-list">
+          {linkedToMe.map((l) => (
+            <li key={l.id} className="family-item">
+              <strong>{l.ownerUserId}</strong> · {l.role}
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )
 }
+
+export default FamilyPage
