@@ -24,21 +24,21 @@ export function WeeklyReportPage() {
       .then((d) => { if (d.success && d.data) setData(d.data) })
   }, [])
 
-  if (!data) return <div className="clinical-empty">Memuat...</div>
+  if (!data) return <div className="clinical-empty">Loading...</div>
 
   return (
     <div className="report-page">
       <div className="page-heading">
         <div>
           <p className="eyebrow">Reports</p>
-          <h2>Laporan Mingguan</h2>
+          <h2>Weekly Report</h2>
           <p>Adherence: {data.adherence}%</p>
         </div>
-        <span className="status-chip">{data.metrics.length} metrik</span>
+        <span className="status-chip">{data.metrics.length} metrics</span>
       </div>
       <table className="report-table">
         <thead>
-          <tr><th>Metrik</th><th>Avg</th><th>Min</th><th>Max</th><th>N</th></tr>
+          <tr><th>Metric</th><th>Avg</th><th>Min</th><th>Max</th><th>N</th></tr>
         </thead>
         <tbody>
           {data.metrics.map((m, i) => (

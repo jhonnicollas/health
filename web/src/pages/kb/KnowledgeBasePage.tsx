@@ -23,11 +23,11 @@ export function KnowledgeBasePage() {
         <div>
           <p className="eyebrow">Knowledge</p>
           <h2>Knowledge Base</h2>
-          <p>Panduan alat ukur dan edukasi penggunaan.</p>
+          <p>Measurement device guides and usage education.</p>
         </div>
-        <span className="status-chip">{articles.length} artikel</span>
+        <span className="status-chip">{articles.length} articles</span>
       </div>
-      {articles.length === 0 ? <p>Belum ada artikel.</p> : null}
+      {articles.length === 0 ? <p>No articles yet.</p> : null}
       {articles.map((a) => (
         <article key={a.id} className="kb-article">
           <h3>{a.title}</h3>

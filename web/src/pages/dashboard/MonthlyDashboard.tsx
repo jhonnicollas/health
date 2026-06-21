@@ -2,6 +2,24 @@ import { useEffect, useState } from 'react'
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
 
+const METRIC_LABELS: Record<string, string> = {
+  spo2: 'SpO2',
+  heartRate: 'Heart Rate',
+  systolic: 'Systolic',
+  diastolic: 'Diastolic',
+  bloodPressurePulse: 'Pulse',
+  glucoseFasting: 'Fasting Glucose',
+  glucosePostMeal: 'Post-Meal Glucose',
+  cholesterolTotal: 'Total Cholesterol',
+  uricAcid: 'Uric Acid',
+  bodyWeight: 'Body Weight',
+  bmi: 'BMI',
+  waistCircumference: 'Waist',
+  bodyTemperature: 'Body Temp',
+  sleepDuration: 'Sleep',
+  height: 'Height'
+}
+
 export function MonthlyDashboard() {
   const [metrics, setMetrics] = useState<MetricSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -15,29 +33,49 @@ export function MonthlyDashboard() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="clinical-empty">Memuat dashboard bulanan...</div>
+  if (loading) return <div className="clinical-empty">Loading monthly dashboard...</div>
   if (error) return <div className="clinical-empty dashboard-error">Error: {error}</div>
-  if (metrics.length === 0) return <div className="clinical-empty">Belum ada data 30 hari terakhir.</div>
+  if (metrics.length === 0) return <div className="clinical-empty">No data for the past 30 days.</div>
 
   return (
     <div className="monthly-dashboard">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Analytics</p>
-          <h2>Dashboard 30 Hari</h2>
-          <p>Ringkasan rata-rata, batas, dan jumlah data dalam satu bulan.</p>
-        </div>
-        <span className="status-chip">{metrics.length} metrik</span>
+      <div className="dashboard-tabs">
+        <button className="tab-btn" type="button">Today</button>
+        <button className="tab-btn" type="button">Weekly View</button>
+        <button className="tab-btn active" type="button">Monthly Summary</button>
       </div>
-      <div className="summary-cards">
-        {metrics.map(m => (
-          <div key={m.metricCode} className="summary-card">
-            <span className="stat-kicker">Metric</span>
-            <h3>{m.metricCode}</h3>
-            <div className="big-value">{m.avgValue?.toFixed(1)}</div>
-            <div className="meta">Avg | Min: {m.minValue} | Max: {m.maxValue} | N: {m.cnt}</div>
-          </div>
-        ))}
+
+      <div className="vitals-grid">
+        {metrics.map(m => {
+          const label = METRIC_LABELS[m.metricCode] || m.metricCode
+          return (
+            <div key={m.metricCode} className="vital-card">
+              <div className="vital-card-header">
+                <div className="vital-card-label">
+                  <span className="vital-label-text">{label}</span>
+                </div>
+              </div>
+              <div className="vital-reading-row">
+                <span className="vital-reading">{m.avgValue?.toFixed(1)}</span>
+                <span className="vital-unit">avg</span>
+              </div>
+              <div className="vital-comparison-rows">
+                <div className="vital-comparison-row">
+                  <span>Min</span>
+                  <span>{m.minValue}</span>
+                </div>
+                <div className="vital-comparison-row">
+                  <span>Max</span>
+                  <span>{m.maxValue}</span>
+                </div>
+                <div className="vital-comparison-row">
+                  <span>Readings</span>
+                  <span>{m.cnt}</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -47,25 +47,25 @@ function metricSelectionId(deviceCode: string, metricCode: string) {
 }
 
 function metricBadges(metric: Metric) {
-  const badges = [metric.isCalculated ? 'otomatis' : metric.unit]
+  const badges = [metric.isCalculated ? 'auto' : metric.unit]
 
   if (metric.requiresAttachment) {
-    badges.push('foto')
+    badges.push('photo')
   }
 
   if (metric.requiresFasting) {
-    badges.push('puasa')
+    badges.push('fasting')
   }
 
   if (metric.requiresSex) {
-    badges.push('profil sex')
+    badges.push('sex req')
   }
 
   if (!metric.requiredMetric) {
-    badges.push('opsional')
+    badges.push('optional')
   }
 
-  return badges.join(' | ')
+  return badges.join(' · ')
 }
 
 export function SelectMetricPage() {
@@ -95,14 +95,14 @@ export function SelectMetricPage() {
         }
 
         if (!response.ok || !body.success || !body.data) {
-          setMessage(body.error?.message ?? 'Katalog pengukuran gagal dimuat.')
+          setMessage(body.error?.message ?? 'Failed to load catalog.')
           return
         }
 
         setDevices(body.data.devices)
       } catch {
         if (!cancelled) {
-          setMessage('Tidak bisa memuat katalog pengukuran.')
+          setMessage('Failed to load measurement catalog.')
         }
       } finally {
         if (!cancelled) {
@@ -142,16 +142,12 @@ export function SelectMetricPage() {
 
   return (
     <section className="measurement-panel" aria-labelledby="metric-select-title">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Tambah pengukuran</p>
-          <h2 id="metric-select-title">Pilih jenis pengukuran</h2>
-          <p>Checklist dimuat dari katalog metrik aktif.</p>
-        </div>
-        <span className="status-chip">{selectedMetrics.length} dipilih</span>
+      <div className="measurement-step-header">
+        <span className="step-number">1</span>
+        <h2 id="metric-select-title">Select Metrics</h2>
       </div>
 
-      {loading ? <p className="loading-text">Memuat katalog...</p> : null}
+      {loading ? <p className="loading-text">Loading catalog...</p> : null}
 
       {message ? (
         <p className="form-message error" role="status">
@@ -160,62 +156,63 @@ export function SelectMetricPage() {
       ) : null}
 
       {!loading && !message ? (
-        <div className="metric-device-list">
-          {devices.map((device) => (
-            <fieldset className="metric-device" key={device.deviceCode}>
-              <legend>
-                {device.deviceName}
-                <span>
-                  {device.brand} {device.model}
-                </span>
-              </legend>
-
-              <div className="metric-checklist">
-                {device.metrics.map((metric) => {
-                  const selectionId = metricSelectionId(device.deviceCode, metric.metricCode)
-
-                  return (
-                    <label className="metric-option" key={selectionId}>
-                      <input
-                        checked={selectedMetricIds.includes(selectionId)}
-                        onChange={() => toggleMetric(selectionId)}
-                        type="checkbox"
-                      />
-                      <span>
-                        <strong>{metric.metricName}</strong>
-                        <small>{metricBadges(metric)}</small>
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
-            </fieldset>
-          ))}
+        <div className="metric-checkbox-grid">
+          {devices.flatMap((device) =>
+            device.metrics.map((metric) => {
+              const selectionId = metricSelectionId(device.deviceCode, metric.metricCode)
+              const isSelected = selectedMetricIds.includes(selectionId)
+              return (
+                <label
+                  className={`metric-checkbox-card ${isSelected ? 'selected' : ''}`}
+                  key={selectionId}
+                >
+                  <input
+                    checked={isSelected}
+                    onChange={() => toggleMetric(selectionId)}
+                    type="checkbox"
+                    className="sr-only"
+                  />
+                  <span className={`checkbox-indicator ${isSelected ? 'checked' : ''}`}>
+                    {isSelected ? '✓' : ''}
+                  </span>
+                  <span className="checkbox-card-content">
+                    <strong>{metric.metricName}</strong>
+                    <small>{device.deviceName}</small>
+                  </span>
+                </label>
+              )
+            })
+          )}
         </div>
       ) : null}
 
-      <div className="selection-summary" aria-live="polite">
-        <div className="selection-summary-header">
-          <strong>{selectedMetrics.length} metrik dipilih</strong>
-          <span>{devices.length} alat/input</span>
-        </div>
-        {selectedMetrics.length > 0 ? (
-          <div className="selected-field-list">
-            {selectedMetrics.map(({ id, device, metric }: SelectedMetric) => (
-              <section key={id}>
-                <h3>{metric.metricName}</h3>
-                <p>
-                  {device.deviceName} | {metricBadges(metric)}
-                </p>
-              </section>
-            ))}
+      {selectedMetrics.length > 0 && (
+        <>
+          <div className="measurement-step-header">
+            <span className="step-number">2</span>
+            <h2>Record Data</h2>
           </div>
-        ) : (
-          <p>Belum ada metrik dipilih.</p>
-        )}
-      </div>
 
-      <DynamicMetricForm selectedMetrics={selectedMetrics} />
+          <div className="selection-summary" aria-live="polite">
+            <div className="selection-summary-header">
+              <strong>{selectedMetrics.length} metrics selected</strong>
+              <span>{devices.length} device(s)</span>
+            </div>
+            <div className="selected-field-list">
+              {selectedMetrics.map(({ id, device, metric }: SelectedMetric) => (
+                <section key={id}>
+                  <h3>{metric.metricName}</h3>
+                  <p>
+                    {device.deviceName} · {metricBadges(metric)}
+                  </p>
+                </section>
+              ))}
+            </div>
+          </div>
+
+          <DynamicMetricForm selectedMetrics={selectedMetrics} />
+        </>
+      )}
     </section>
   )
 }

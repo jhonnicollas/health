@@ -38,13 +38,13 @@ export function FamilyPage() {
       const res = await fetch('/api/family/links', { credentials: 'include' })
       const body = (await res.json()) as ApiResp<{ ownedLinks: FamilyLink[]; linkedToMe: FamilyLink[] }>
       if (!body.success) {
-        setError(body.error?.message ?? 'Gagal memuat daftar keluarga.')
+        setError(body.error?.message ?? 'Failed to load family links.')
         return
       }
       setOwned(body.data?.ownedLinks ?? [])
       setLinkedToMe(body.data?.linkedToMe ?? [])
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     }
   }
 
@@ -77,13 +77,13 @@ export function FamilyPage() {
       })
       const body = (await res.json()) as ApiResp<{ inviteId: string }>
       if (!res.ok || !body.success) {
-        setError(body.error?.message ?? 'Gagal mengirim undangan.')
+        setError(body.error?.message ?? 'Failed to send invitation.')
         return
       }
       setEmail('')
       await load()
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     } finally {
       setSubmitting(false)
     }
@@ -99,19 +99,19 @@ export function FamilyPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Care Network</p>
-          <h2 id="family-title">Keluarga & caregiver</h2>
-          <p>Atur izin granular untuk lihat dashboard, input data, dan menerima alert.</p>
+          <h2 id="family-title">Family & Caregivers</h2>
+          <p>Manage granular permissions for dashboard access, data input, and alert delivery.</p>
         </div>
-        <span className="status-chip">{owned.length + linkedToMe.length} link</span>
+        <span className="status-chip">{owned.length + linkedToMe.length} links</span>
       </div>
 
       <form className="auth-form" onSubmit={handleInvite}>
         <div className="form-heading">
-          <h3>Invitation suite</h3>
-          <p>Kirim undangan dengan izin yang sudah ditentukan sebelum diterima.</p>
+          <h3>Send Invitation</h3>
+          <p>Send an invite with predefined permissions before it is accepted.</p>
         </div>
         <label>
-          Email undangan
+          Invite email
           <input onChange={(e) => setEmail(e.target.value)} required type="email" value={email} />
         </label>
         <label>
@@ -130,30 +130,30 @@ export function FamilyPage() {
         </label>
         <label className="checkbox-row">
           <input checked={canViewDashboard} onChange={(e) => setCanViewDashboard(e.target.checked)} type="checkbox" />
-          Izinkan melihat dashboard
+          Allow dashboard access
         </label>
         <label className="checkbox-row">
           <input checked={canInputMeasurement} onChange={(e) => setCanInputMeasurement(e.target.checked)} type="checkbox" />
-          Izinkan input pengukuran
+          Allow measurement input
         </label>
         <label className="checkbox-row">
           <input checked={canReceiveAlert} onChange={(e) => setCanReceiveAlert(e.target.checked)} type="checkbox" />
-          Izinkan menerima alert
+          Allow alert delivery
         </label>
         <button disabled={submitting} type="submit">
-          {submitting ? 'Mengirim...' : 'Send Invitation Link'}
+          {submitting ? 'Sending...' : 'Send Invitation Link'}
         </button>
         {error ? <p className="form-message error" role="status">{error}</p> : null}
       </form>
 
       <div className="settings-card">
-        <h3>Pending invitations</h3>
-        {pendingInvites.length === 0 ? <p>Belum ada invitation pending.</p> : (
+        <h3>Pending Invitations</h3>
+        {pendingInvites.length === 0 ? <p>No pending invitations.</p> : (
           <ul className="family-list">
             {pendingInvites.map((invite) => (
               <li key={invite.id} className="family-item">
                 <div>
-                  <strong>{invite.inviteEmail || invite.linkedDisplayName || 'Undangan pending'}</strong>
+                  <strong>{invite.inviteEmail || invite.linkedDisplayName || 'Pending invite'}</strong>
                   <div className="muted">{invite.role} · view {String(invite.canViewDashboard)} · input {String(invite.canInputMeasurement)}</div>
                 </div>
                 <div className="button-stack">
@@ -167,8 +167,8 @@ export function FamilyPage() {
       </div>
 
       <div className="settings-card">
-        <h3>Link aktif</h3>
-        {activeLinks.length === 0 ? <p>Belum ada caregiver aktif.</p> : (
+        <h3>Active Links</h3>
+        {activeLinks.length === 0 ? <p>No active caregiver links.</p> : (
           <ul className="family-list">
             {activeLinks.map((link) => (
               <li key={link.id} className="family-item">
@@ -176,7 +176,7 @@ export function FamilyPage() {
                   <strong>{link.linkedDisplayName || link.linkedUserId || 'User'}</strong>
                   <div className="muted">{link.role} · {link.status}</div>
                 </div>
-                <button className="danger" onClick={() => void revoke(link.id)} type="button">Cabut</button>
+                <button className="danger" onClick={() => void revoke(link.id)} type="button">Revoke</button>
               </li>
             ))}
           </ul>
@@ -184,12 +184,12 @@ export function FamilyPage() {
       </div>
 
       <div className="settings-card">
-        <h3>Yang merawat Anda</h3>
-        {linkedToMe.length === 0 ? <p>Belum ada caregiver terhubung.</p> : (
+        <h3>Who Cares for You</h3>
+        {linkedToMe.length === 0 ? <p>No linked caregivers yet.</p> : (
           <ul className="family-list">
             {linkedToMe.map((link) => (
               <li key={link.id} className="family-item">
-                <strong>{link.ownerDisplayName || link.ownerUserId || 'Pemilik akun'}</strong>
+                <strong>{link.ownerDisplayName || link.ownerUserId || 'Account owner'}</strong>
               </li>
             ))}
           </ul>

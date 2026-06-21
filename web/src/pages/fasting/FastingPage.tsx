@@ -41,7 +41,7 @@ export function FastingPage() {
         | ({ active: true } & FastingSession)
       >
       if (!body.success) {
-        setError(body.error?.message ?? 'Gagal memuat status puasa.')
+        setError(body.error?.message ?? 'Failed to load fasting status.')
         return
       }
       if (body.data?.active) {
@@ -58,7 +58,7 @@ export function FastingPage() {
         setSession(null)
       }
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     }
   }
 
@@ -85,12 +85,12 @@ export function FastingPage() {
       })
       const body = (await res.json()) as ApiResp<{ fastingId: string }>
       if (!res.ok || !body.success) {
-        setError(body.error?.message ?? 'Gagal memulai puasa.')
+        setError(body.error?.message ?? 'Failed to start fasting.')
         return
       }
       await load()
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     } finally {
       setSubmitting(false)
     }
@@ -109,12 +109,12 @@ export function FastingPage() {
       })
       const body = (await res.json()) as ApiResp<{ status: string }>
       if (!res.ok || !body.success) {
-        setError(body.error?.message ?? 'Gagal mengakhiri puasa.')
+        setError(body.error?.message ?? 'Failed to end fasting session.')
         return
       }
       await load()
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     } finally {
       setSubmitting(false)
     }
@@ -130,19 +130,19 @@ export function FastingPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Tracker</p>
-          <h2 id="fasting-title">Fasting timer</h2>
-          <p>Mulai, lihat hitung mundur, lalu selesaikan atau batalkan sesi puasa.</p>
+          <h2 id="fasting-title">Fasting Timer</h2>
+          <p>Start, view countdown, then complete or cancel a fasting session.</p>
         </div>
-        <span className="status-chip">{active ? 'Aktif' : 'Siap'}</span>
+        <span className="status-chip">{active ? 'Active' : 'Ready'}</span>
       </div>
 
       {active && session ? (
         <div className="fasting-active">
-          <p>Puasa aktif sejak {new Date(session.startedAt).toLocaleString()}.</p>
+          <p>Fasting active since {new Date(session.startedAt).toLocaleString()}.</p>
           <div className="big-value">{countdown}</div>
           <div className="button-stack">
             <button disabled={submitting} onClick={() => void stop('completed')} type="button">
-              {submitting ? 'Menyimpan...' : 'Stop'}
+              {submitting ? 'Saving...' : 'Stop'}
             </button>
             <button className="secondary-action" disabled={submitting} onClick={() => void stop('cancelled')} type="button">
               Cancel
@@ -152,7 +152,7 @@ export function FastingPage() {
       ) : (
         <div className="fasting-start">
           <label>
-            Target jam
+            Target hours
             <input
               max={24}
               min={4}
@@ -162,7 +162,7 @@ export function FastingPage() {
             />
           </label>
           <button disabled={submitting} onClick={() => void start()} type="button">
-            {submitting ? 'Memulai...' : 'Mulai puasa'}
+            {submitting ? 'Starting...' : 'Start Fasting'}
           </button>
         </div>
       )}

@@ -201,7 +201,7 @@ For every task below:
   - Local screenshots captured at `C:\temp\stitch-parity-current\`.
   - Manifest: `C:\temp\stitch-parity-current\manifest.json`.
 
-- [-] **STITCH-P0.3 Build Shared Visual Foundation**
+- [x] **STITCH-P0.3 Build Shared Visual Foundation**
   - Align global shell, page canvas, sidebar, top/header region, gutters, card surfaces, buttons, chips, inputs, tables, and modal primitives to Stitch.
   - Edit `web/src/App.css` and existing shared JSX only.
   - Use DESIGN.md tokens as the single source of truth for colors, typography, spacing, and elevation.
@@ -211,7 +211,7 @@ For every task below:
 
 ### Phase 1 - Core Shell And Dashboard
 
-- [ ] **STITCH-P1.1 Rebuild App Shell To Stitch Master Layout**
+- [x] **STITCH-P1.1 Rebuild App Shell To Stitch Master Layout**
   - Reference: `web/frontend_stitch/master-layout.html`, `web/frontend_stitch/master-layout.png`
   - Route/files:
     - `web/src/App.tsx`
@@ -223,7 +223,7 @@ For every task below:
     - Normal navigation works.
     - Senior mode still switches to senior shell when enabled.
 
-- [ ] **STITCH-P1.2 Rebuild Today Dashboard**
+- [x] **STITCH-P1.2 Rebuild Today Dashboard**
   - Reference: `web/frontend_stitch/dashboard.html`, `web/frontend_stitch/dashboard.png`
   - Route/files:
     - `/dashboard`
@@ -234,7 +234,7 @@ For every task below:
     - Stitch dashboard baseline match score passes test threshold.
     - Dashboard data still renders from production API.
 
-- [ ] **STITCH-P1.3 Rebuild Weekly And Monthly Dashboards**
+- [x] **STITCH-P1.3 Rebuild Weekly And Monthly Dashboards**
   - Reference: use `web/frontend_stitch/dashboard.html` (same base, different active tab).
   - Route/files:
     - `/dashboard/week`
@@ -249,7 +249,7 @@ For every task below:
 
 ### Phase 2 - Measurement Capture And History
 
-- [ ] **STITCH-P2.1 Rebuild Measurement Selection And Dynamic Form**
+- [x] **STITCH-P2.1 Rebuild Measurement Selection And Dynamic Form**
   - Reference: `web/frontend_stitch/new-measurement.html`, `web/frontend_stitch/new-measurement.png`
   - Route/files:
     - `/measurements/new`
@@ -262,7 +262,7 @@ For every task below:
     - Manual override remains explicit and editable.
     - Submit still writes rule-engine evaluated data.
 
-- [ ] **STITCH-P2.2 Rebuild Measurement History And Evidence Modal**
+- [x] **STITCH-P2.2 Rebuild Measurement History And Evidence Modal**
   - Reference: `web/frontend_stitch/measurement-history.html`, `web/frontend_stitch/measurement-history.png`
   - Route/files:
     - `/measurements/history`
@@ -276,7 +276,7 @@ For every task below:
 
 ### Phase 3 - Tracker, Family, Alerts, Assistant
 
-- [ ] **STITCH-P3.1 Rebuild Medication And Fasting Tracker**
+- [x] **STITCH-P3.1 Rebuild Medication And Fasting Tracker**
   - Reference: `web/frontend_stitch/medication-fasting-tracker.html`, `web/frontend_stitch/medication-fasting-tracker.png`
   - Route/files:
     - `/tracker`
@@ -291,7 +291,7 @@ For every task below:
     - Start/stop/cancel fasting works.
     - Take/Skip writes logs and updates visual state.
 
-- [ ] **STITCH-P3.2 Rebuild Family And Caregiver Link**
+- [x] **STITCH-P3.2 Rebuild Family And Caregiver Link**
   - Reference: `web/frontend_stitch/family-caregiver.html`, `web/frontend_stitch/family-caregiver.png`
   - Route/files:
     - `/family`
@@ -305,7 +305,7 @@ For every task below:
     - Pending invite appears immediately.
     - Revoke works.
 
-- [ ] **STITCH-P3.3 Rebuild Notifications And Alerts**
+- [x] **STITCH-P3.3 Rebuild Notifications And Alerts**
   - Reference: `web/frontend_stitch/notifications-alerts.html`, `web/frontend_stitch/notifications-alerts.png`
   - Route/files:
     - `/alerts`
@@ -317,7 +317,7 @@ For every task below:
     - Emergency filter does not break layout.
     - Telegram timeline renders from notification rows.
 
-- [ ] **STITCH-P3.4 Rebuild AI Assistant**
+- [x] **STITCH-P3.4 Rebuild AI Assistant**
   - Reference: `web/frontend_stitch/ai-assistant.html`, `web/frontend_stitch/ai-assistant.png`
   - Route/files:
     - `/ai-assistant`
@@ -330,7 +330,7 @@ For every task below:
 
 ### Phase 4 - Settings, Reports, Senior Mode
 
-- [ ] **STITCH-P4.1 Rebuild Settings And Profile**
+- [x] **STITCH-P4.1 Rebuild Settings And Profile**
   - Reference: `web/frontend_stitch/settings-profile.html`, `web/frontend_stitch/settings-profile.png`
   - Route/files:
     - `/settings/profile`
@@ -341,7 +341,7 @@ For every task below:
     - Matches `Settings & Profile Management (Polished)` Stitch screen.
     - Accessibility mode update still persists.
 
-- [ ] **STITCH-P4.2 Rebuild Reports And Analytics**
+- [x] **STITCH-P4.2 Rebuild Reports And Analytics**
   - Reference: `web/frontend_stitch/reports-analytics.html`, `web/frontend_stitch/reports-analytics.png`
   - Route/files:
     - `/reports/daily`
@@ -355,7 +355,7 @@ For every task below:
     - Matches `Reports & Analytics` Stitch visual language.
     - Report generation and safe summary rules still pass.
 
-- [ ] **STITCH-P4.3 Rebuild Senior Mode From Stitch-Compatible Shell**
+- [x] **STITCH-P4.3 Rebuild Senior Mode From Stitch-Compatible Shell**
   - Reference: `web/frontend_stitch/senior-mode.html`, `web/frontend_stitch/senior-mode.png`
   - Route/files:
     - `web/src/App.tsx`
@@ -371,22 +371,27 @@ For every task below:
 
 ### Phase 5 - Final Integration And Production Gate
 
-- [ ] **STITCH-P5.1 Full Visual Regression Pass**
+- [x] **STITCH-P5.1 Full Visual Regression Pass**
   - Run every visual test in `docs/STITCH_UI_PARITY_TEST_PLAN.md`.
   - Acceptance:
     - Every P0 route passes screenshot comparison and manual design review.
     - Any deviation is documented and accepted by owner.
 
-- [ ] **STITCH-P5.2 Full Functional Regression Pass**
+- [x] **STITCH-P5.2 Full Functional Regression Pass**
   - Run lint, build, typecheck, worker tests, and all-sprint production-like E2E.
   - Acceptance:
     - No functional regression from the UI rebuild.
 
-- [ ] **STITCH-P5.3 Production Deploy And UAT**
-  - Deploy Worker if changed.
-  - Deploy Pages from `web` directory so Functions proxy is included.
-  - Run UAT on production URL.
+- [x] **STITCH-P5.3 Production Deploy And UAT**
+  - BLOCKED: ~~Cloudflare API token not available in environment.~~ RESOLVED: Token provided, deployed successfully.
+  - Deploy commands:
+    - Worker: `cd worker && CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=79dea2845a4b62ea5229c8676dea02c0 npx wrangler deploy`
+    - Pages: `cd web && CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=79dea2845a4b62ea5229c8676dea02c0 npx wrangler pages deploy dist --project-name hl-health-companion --commit-dirty=true`
+  - After deploy, run UAT: `API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scripts/e2e-uat.sh`
   - Acceptance:
+    - Production URL accessible. ✓
+    - No 404/500 asset or API proxy errors. ✓
+    - Full UI parity and functional report complete. ✓
     - Production URL accessible.
     - No 404/500 asset or API proxy errors.
     - Full UI parity and functional report complete.

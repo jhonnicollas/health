@@ -13,13 +13,13 @@ export function PatternsPage() {
     try {
       const res = await fetch(`/api/patterns/generate/${kind}`, { method: 'POST', credentials: 'include' })
       const body = (await res.json()) as ApiResp<{ insight?: string; hasEnoughData?: boolean; adherence?: number }>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
+      if (!body.success) { setError(body.error?.message || 'Failed.'); return }
       const msg = body.data?.hasEnoughData === false
-        ? 'Data belum cukup (minimal 14 hari).'
-        : body.data?.insight || 'Selesai.'
+        ? 'Not enough data (minimum 14 days).'
+        : body.data?.insight || 'Done.'
       if (kind === 'weight-bp') setWbResult(msg)
-      else setMedResult(msg + (body.data?.adherence !== undefined ? ` (Kepatuhan: ${body.data.adherence}%)` : ''))
-    } catch { setError('Tidak bisa terhubung ke server.') }
+      else setMedResult(msg + (body.data?.adherence !== undefined ? ` (Adherence: ${body.data.adherence}%)` : ''))
+    } catch { setError('Could not connect to server.') }
     finally { setLoading(null) }
   }
 
@@ -28,20 +28,20 @@ export function PatternsPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Insights</p>
-          <h2 id="patterns-title">Pola Kesehatan</h2>
-          <p>Insight otomatis dari data Anda (bukan diagnosis, hanya ringkasan).</p>
+          <h2 id="patterns-title">Health Patterns</h2>
+          <p>Automated insights from your data (not a diagnosis, only a summary).</p>
         </div>
-        <span className="status-chip">14 hari minimum</span>
+        <span className="status-chip">14 days minimum</span>
       </div>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
       <div className="settings-card">
-        <h3>Pola Berat Badan vs Tekanan Darah (14 hari)</h3>
-        <button disabled={loading !== null} onClick={() => generate('weight-bp')} type="button">{loading === 'weight-bp' ? 'Membuat...' : 'Buat Insight'}</button>
+        <h3>Weight vs Blood Pressure Pattern (14 days)</h3>
+        <button disabled={loading !== null} onClick={() => generate('weight-bp')} type="button">{loading === 'weight-bp' ? 'Generating...' : 'Generate Insight'}</button>
         {wbResult ? <p>{wbResult}</p> : null}
       </div>
       <div className="settings-card">
-        <h3>Pola Kepatuhan Obat (14 hari)</h3>
-        <button disabled={loading !== null} onClick={() => generate('medication')} type="button">{loading === 'medication' ? 'Membuat...' : 'Buat Insight'}</button>
+        <h3>Medication Adherence Pattern (14 days)</h3>
+        <button disabled={loading !== null} onClick={() => generate('medication')} type="button">{loading === 'medication' ? 'Generating...' : 'Generate Insight'}</button>
         {medResult ? <p>{medResult}</p> : null}
       </div>
     </section>

@@ -32,7 +32,7 @@ type NavLink = {
   path: string
   label: string
   shortLabel: string
-  section: 'overview' | 'capture' | 'care' | 'system'
+  icon: string
   adminOnly?: boolean
   visible?: boolean
   badge?: string
@@ -83,41 +83,34 @@ type VitalSnapshot = {
 }
 
 const NAV: NavLink[] = [
-  { path: '/dashboard', label: 'Dashboard', shortLabel: 'Home', section: 'overview' },
-  { path: '/dashboard/week', label: 'Weekly View', shortLabel: 'Week', section: 'overview', visible: false },
-  { path: '/dashboard/month', label: 'Monthly Summary', shortLabel: 'Month', section: 'overview', visible: false },
-  { path: '/measurements/new', label: 'New Measurement', shortLabel: 'Input', section: 'capture' },
-  { path: '/measurements/history', label: 'History', shortLabel: 'History', section: 'capture' },
-  { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', section: 'capture', visible: false },
-  { path: '/tracker', label: 'Tracker', shortLabel: 'Track', section: 'care', visible: false },
-  { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', section: 'overview' },
-  { path: '/reports/daily', label: 'Reports', shortLabel: 'Reports', section: 'overview' },
-  { path: '/reports/weekly', label: 'Weekly Report', shortLabel: 'W Report', section: 'overview', visible: false },
-  { path: '/reports/monthly', label: 'Monthly Report', shortLabel: 'M Report', section: 'overview', visible: false },
-  { path: '/reports/doctor', label: 'Doctor Report', shortLabel: 'Doctor', section: 'overview', visible: false },
-  { path: '/reminders', label: 'Reminders', shortLabel: 'Remind', section: 'care', visible: false },
-  { path: '/medications', label: 'Medication', shortLabel: 'Meds', section: 'care', visible: false },
-  { path: '/family', label: 'Family Link', shortLabel: 'Family', section: 'care' },
-  { path: '/caregiver', label: 'Caregiver', shortLabel: 'Care', section: 'care', visible: false },
-  { path: '/fasting', label: 'Fasting', shortLabel: 'Fast', section: 'care', visible: false },
-  { path: '/emergency', label: 'Emergency Contacts', shortLabel: 'SOS', section: 'care', visible: false },
-  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', section: 'system', visible: false },
-  { path: '/alerts', label: 'Notifications', shortLabel: 'Alerts', section: 'system', badge: '3' },
-  { path: '/patterns', label: 'Patterns', shortLabel: 'Pattern', section: 'system', visible: false },
-  { path: '/kb', label: 'Help Center', shortLabel: 'Help', section: 'system', visible: false },
-  { path: '/settings/profile', label: 'Settings', shortLabel: 'Settings', section: 'system' },
-  { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', section: 'system', visible: false },
-  { path: '/admin/configs', label: 'Admin', shortLabel: 'Admin', section: 'system', adminOnly: true }
+  { path: '/dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: 'dashboard' },
+  { path: '/dashboard/week', label: 'Weekly View', shortLabel: 'Week', icon: 'date_range', visible: false },
+  { path: '/dashboard/month', label: 'Monthly Summary', shortLabel: 'Month', icon: 'calendar_month', visible: false },
+  { path: '/measurements/new', label: 'New Measurement', shortLabel: 'New', icon: 'add_circle' },
+  { path: '/measurements/history', label: 'History', shortLabel: 'History', icon: 'history' },
+  { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', icon: 'elderly', visible: false },
+  { path: '/tracker', label: 'Tracker', shortLabel: 'Track', icon: 'medication', visible: false },
+  { path: '/alerts', label: 'Notifications & Alerts', shortLabel: 'Alerts', icon: 'notifications', badge: '3' },
+  { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', icon: 'smart_toy' },
+  { path: '/family', label: 'Family / Caregiver', shortLabel: 'Family', icon: 'family_restroom' },
+  { path: '/reports/daily', label: 'Reports & Analytics', shortLabel: 'Reports', icon: 'assessment' },
+  { path: '/reports/weekly', label: 'Weekly Report', shortLabel: 'W Report', icon: 'date_range', visible: false },
+  { path: '/reports/monthly', label: 'Monthly Report', shortLabel: 'M Report', icon: 'calendar_month', visible: false },
+  { path: '/reports/doctor', label: 'Doctor Report', shortLabel: 'Doctor', icon: 'description', visible: false },
+  { path: '/reminders', label: 'Reminders', shortLabel: 'Remind', icon: 'alarm', visible: false },
+  { path: '/medications', label: 'Medication', shortLabel: 'Meds', icon: 'medication', visible: false },
+  { path: '/caregiver', label: 'Caregiver', shortLabel: 'Care', icon: 'supervisor_account', visible: false },
+  { path: '/fasting', label: 'Fasting', shortLabel: 'Fast', icon: 'timer', visible: false },
+  { path: '/emergency', label: 'Emergency Contacts', shortLabel: 'SOS', icon: 'emergency', visible: false },
+  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false },
+  { path: '/patterns', label: 'Patterns', shortLabel: 'Pattern', icon: 'insights', visible: false },
+  { path: '/settings/profile', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
+  { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', icon: 'delete', visible: false },
+  { path: '/admin/configs', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true }
 ]
 
-const ALLOWED_PATHS = new Set(NAV.map(n => n.path))
-const MOBILE_NAV_PATHS = new Set(['/dashboard', '/measurements/new', '/tracker', '/alerts', '/settings/profile'])
-const SECTION_LABELS: Record<NavLink['section'], string> = {
-  overview: 'Overview',
-  capture: 'Capture',
-  care: 'Care Network',
-  system: 'System'
-}
+const ALLOWED_PATHS = new Set(NAV.map(n => n.path).concat(['/kb']))
+const MOBILE_NAV_PATHS = new Set(['/dashboard', '/measurements/new', '/measurements/history', '/alerts', '/ai-assistant'])
 
 function normalizePath(path: string) {
   if (path === '/auth/register') return '/register'
@@ -159,12 +152,12 @@ function MeasurementHistoryPage() {
           error?: { message: string }
         }
         if (!body.success) {
-          setError(body.error?.message ?? 'Gagal memuat riwayat.')
+          setError(body.error?.message ?? 'Failed to load history.')
           return
         }
         setSessions(body.data?.sessions ?? [])
       } catch {
-        setError('Tidak bisa terhubung ke server.')
+        setError('Could not connect to server.')
       } finally {
         setLoading(false)
       }
@@ -176,43 +169,58 @@ function MeasurementHistoryPage() {
     <section className="settings-panel history-panel" aria-labelledby="history-title">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Capture</p>
           <h2 id="history-title">Measurement History</h2>
-          <p>Riwayat sesi, nilai final, manual override, dan bukti final.</p>
+          <p>Comprehensive log of all patient vitals and raw data inputs.</p>
         </div>
-        <span className="status-chip">{sessions.length} sesi</span>
+        <span className="status-chip">{sessions.length} sessions</span>
       </div>
 
-      {loading ? <p>Memuat riwayat...</p> : null}
+      {loading ? <p>Loading history...</p> : null}
       {error ? <p className="form-message error" role="status">{error}</p> : null}
-      {!loading && sessions.length === 0 ? <p>Belum ada riwayat pengukuran.</p> : null}
+      {!loading && sessions.length === 0 ? <p>No measurement history yet.</p> : null}
 
       {sessions.length > 0 ? (
         <table className="report-table">
           <thead>
             <tr>
-              <th>Waktu</th>
-              <th>Nilai</th>
+              <th>Date & Time</th>
+              <th>Metric</th>
+              <th>Result Value</th>
               <th>Status</th>
-              <th>Bukti</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {sessions.map((session) => (
               <tr key={session.id}>
-                <td>{new Date(session.measuredAt).toLocaleString()}</td>
+                <td>
+                  <strong>{new Date(session.measuredAt).toLocaleDateString()}</strong>
+                  <br />
+                  <span className="meta">{new Date(session.measuredAt).toLocaleTimeString()}</span>
+                </td>
+                <td>
+                  {session.values.map((value) => (
+                    <span key={value.id}>{value.metricCode}</span>
+                  )).reduce<React.ReactNode[]>((acc, cur, i) => i === 0 ? [cur] : [...acc, ', ', cur], [])}
+                </td>
                 <td>
                   {session.values.map((value) => (
                     <div key={value.id}>
-                      <strong>{value.metricCode}</strong>: {value.finalValue} {value.unit}
-                      {value.manualOverride === 1 ? <span className="badge-override">Manual Override</span> : null}
+                      <strong>{value.finalValue}</strong> <span className="meta">{value.unit}</span>
+                      {value.manualOverride === 1 ? <span className="badge-override">Manual</span> : null}
                     </div>
                   ))}
                 </td>
-                <td>{session.values.map((value) => value.status).join(', ') || '-'}</td>
+                <td>
+                  {session.values.map((value) => (
+                    <span key={value.id} className={`badge-status badge-${value.status}`}>
+                      <span className="status-dot" />{value.status}
+                    </span>
+                  ))}
+                </td>
                 <td>
                   {session.attachments.length > 0 ? (
-                    <button onClick={() => setSelectedAttachment(session.attachments[0])} type="button">
+                    <button className="evidence-btn" onClick={() => setSelectedAttachment(session.attachments[0])} type="button">
                       View Evidence
                     </button>
                   ) : (
@@ -241,7 +249,7 @@ function MeasurementHistoryPage() {
 }
 
 function AiAssistantPage() {
-  const [question, setQuestion] = useState('Saran makan malam untuk hipertensi')
+  const [question, setQuestion] = useState('Diet tips for hypertension')
   const [answer, setAnswer] = useState('')
   const [vitals, setVitals] = useState<VitalSnapshot[]>([])
   const [loading, setLoading] = useState(false)
@@ -260,13 +268,13 @@ function AiAssistantPage() {
       })
       const body = (await res.json()) as AiAssistantResponse
       if (!res.ok || !body.success || !body.data) {
-        setError(body.error?.message ?? 'AI assistant gagal merespons.')
+        setError(body.error?.message ?? 'AI assistant failed to respond.')
         return
       }
       setVitals(body.data.vitals)
       setAnswer(body.data.reply)
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     } finally {
       setLoading(false)
     }
@@ -277,19 +285,19 @@ function AiAssistantPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">AI Assistant</p>
-          <h2 id="ai-title">Chat kesehatan aman</h2>
-          <p>LLM memakai konteks vital terbaru, tapi tidak memberi diagnosis atau dosis obat.</p>
+          <h2 id="ai-title">Safe Health Chat</h2>
+          <p>LLM uses latest vital context, but does not provide diagnosis or medication dosage.</p>
         </div>
         <span className="status-chip">Rule-first</span>
       </div>
 
       <div className="settings-card">
-        <h3>Health context</h3>
-        {vitals.length === 0 ? <p>Vital terbaru akan tampil setelah pertanyaan dikirim.</p> : (
+        <h3>Health Context</h3>
+        {vitals.length === 0 ? <p>Latest vitals will appear after a question is submitted.</p> : (
           <div className="vital-strip">
             {vitals.map((value) => (
               <span key={`${value.metricCode}-${value.finalValue}`}>
-                {value.metricCode}: {value.finalValue} {value.unit} ({value.severity})
+                <span className={`badge-status badge-${value.severity}`}><span className="status-dot" />{value.metricCode}</span>: {value.finalValue} {value.unit}
               </span>
             ))}
           </div>
@@ -298,18 +306,18 @@ function AiAssistantPage() {
 
       <div className="settings-card">
         <label>
-          Pertanyaan
+          Question
           <textarea onChange={(e) => setQuestion(e.target.value)} rows={4} value={question} />
         </label>
         <button disabled={loading || !question.trim()} onClick={() => void ask()} type="button">
-          {loading ? 'Mengirim...' : 'Kirim pertanyaan'}
+          {loading ? 'Sending...' : 'Submit Question'}
         </button>
       </div>
 
       {error ? <p className="form-message error" role="status">{error}</p> : null}
       {answer ? (
         <div className="result-card ai-answer">
-          <h3>Jawaban</h3>
+          <h3>Answer</h3>
           <p>{answer}</p>
         </div>
       ) : null}
@@ -335,15 +343,15 @@ function SeniorAppShell({
 
   return (
     <main className="senior-shell">
-      <nav className="senior-tabs" aria-label="Navigasi senior">
+      <nav className="senior-tabs" aria-label="Senior navigation">
         <button className={seniorPath === '/dashboard' ? 'active' : ''} onClick={() => navigate('/dashboard')} type="button">
-          Beranda
+          Home
         </button>
         <button className={seniorPath === '/measurements/new' ? 'active' : ''} onClick={() => navigate('/measurements/new')} type="button">
-          Tambah Data
+          Add Data
         </button>
         <button className={seniorPath === '/emergency' ? 'active' : ''} onClick={() => navigate('/emergency')} type="button">
-          Darurat
+          Emergency
         </button>
       </nav>
 
@@ -358,9 +366,9 @@ function SeniorAppShell({
               onTouchStart={longPressStart}
               type="button"
             >
-              TOMBOL SOS
+              SOS BUTTON
             </button>
-            {sosPressed ? <p className="form-message success">SOS long-press terdeteksi. Hubungi kontak darurat atau layanan medis setempat.</p> : null}
+            {sosPressed ? <p className="form-message success">SOS long-press detected. Contact emergency services or local medical assistance.</p> : null}
             <EmergencyContactsPage />
           </div>
         ) : null}
@@ -426,7 +434,7 @@ function AppRoutes() {
   if (loading) {
     return (
       <main className="auth-page">
-        <p className="loading-text">Memeriksa sesi...</p>
+        <p className="loading-text">Checking session...</p>
       </main>
     )
   }
@@ -463,47 +471,41 @@ function AppRoutes() {
   const isAdmin = !!user.email && ['admin@homesungai.com'].includes(user.email)
   const visibleNav = NAV.filter(link => (!link.adminOnly || isAdmin) && link.visible !== false)
   const currentLink = visibleNav.find(link => link.path === appPath)
-  const navSections = Object.entries(SECTION_LABELS).map(([section, title]) => ({
-    section,
-    title,
-    links: visibleNav.filter(link => link.section === section)
-  }))
 
   return (
     <main className="app-page">
-      <aside className="app-sidebar" aria-label="Navigasi aplikasi">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">+</span>
-          <div>
-            <strong>HealthSync Pro</strong>
-            <span>Enterprise Health</span>
+      <aside className="app-sidebar" aria-label="App navigation">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-row">
+            <span className="sidebar-brand-icon" aria-hidden="true">+</span>
+            <div>
+              <h1>HealthSync Pro</h1>
+              <p>Enterprise Health</p>
+            </div>
           </div>
+          <button className="emergency-support-btn" onClick={() => navigate('/emergency')} type="button">
+            <span aria-hidden="true">✱</span>
+            Emergency Support
+          </button>
         </div>
 
-        <button className="emergency-support-btn" onClick={() => navigate('/emergency')} type="button">
-          <span aria-hidden="true">✱</span>
-          Emergency Support
-        </button>
-
-        <nav className="app-nav" aria-label="Navigasi utama">
-          {navSections.map(({ section, links }) => links.length > 0 ? (
-            <div className="nav-section" key={section}>
-              {links.map((link) => (
-                <button
-                  aria-current={appPath === link.path ? 'page' : undefined}
-                  className={appPath === link.path ? 'nav-btn active' : 'nav-btn'}
-                  key={link.path}
-                  onClick={() => navigate(link.path)}
-                  type="button"
-                >
-                  <span className="nav-dot" aria-hidden="true" />
-                  <span>{link.label}</span>
-                  {link.badge ? <span className="nav-badge">{link.badge}</span> : null}
-                </button>
-              ))}
-            </div>
-          ) : null)}
-        </nav>
+        <div className="sidebar-nav-scroll">
+          <nav className="sidebar-nav" aria-label="Main navigation">
+            {visibleNav.map((link) => (
+              <button
+                aria-current={appPath === link.path ? 'page' : undefined}
+                className={appPath === link.path ? 'nav-btn active' : 'nav-btn'}
+                key={link.path}
+                onClick={() => navigate(link.path)}
+                type="button"
+              >
+                <span className="nav-icon" aria-hidden="true">{link.icon === 'dashboard' ? '▦' : link.icon === 'add_circle' ? '⊕' : link.icon === 'history' ? '◷' : link.icon === 'notifications' ? '◉' : link.icon === 'smart_toy' ? '⬡' : link.icon === 'family_restroom' ? '⌂' : link.icon === 'assessment' ? '▩' : link.icon === 'settings' ? '⚙' : '•'}</span>
+                <span>{link.label}</span>
+                {link.badge ? <span className="nav-badge">{link.badge}</span> : null}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         <div className="sidebar-footer">
           <button onClick={() => navigate('/kb')} type="button">
@@ -518,35 +520,46 @@ function AppRoutes() {
       </aside>
 
       <div className="app-main">
+        <div className="mobile-topbar">
+          <div className="mobile-topbar-brand">
+            <span className="sidebar-brand-icon" aria-hidden="true" style={{width:32,height:32,fontSize:'0.85rem'}}>+</span>
+            <h1>HealthSync Pro</h1>
+          </div>
+          <div className="mobile-topbar-actions">
+            <button type="button" aria-label="Search">⌕</button>
+            <button type="button" aria-label="Notifications">◉</button>
+            <span className="mobile-topbar-avatar">{getInitials(user.displayName)}</span>
+          </div>
+        </div>
         <div className="app-topbar">
           <label className="topbar-search">
-            <span className="visually-hidden">Search</span>
+            <span className="search-icon" aria-hidden="true">⌕</span>
+            <span className="visually-hidden-file">Search</span>
             <input placeholder="Search patients, reports, or data..." type="search" />
           </label>
           <div className="topbar-actions" aria-label="Workspace actions">
-            <button type="button" aria-label="Notifications">⌁</button>
+            <button type="button" aria-label="Notifications">◉</button>
             <button type="button" aria-label="Help">?</button>
-            <div className="topbar-user" aria-label={`User aktif ${user.displayName}`}>
-              <div>
-                <strong>{user.displayName}</strong>
-                <small>Cardiology</small>
-              </div>
-              <span>{getInitials(user.displayName)}</span>
+            <div className="topbar-user" aria-label={`Active user ${user.displayName}`}>
+              <strong>{user.displayName}</strong>
+              <span className="topbar-user-avatar">{getInitials(user.displayName)}</span>
             </div>
           </div>
         </div>
 
-        <header className="app-header">
-          <div>
-            <h1>{currentLink?.label ?? 'Dashboard'}</h1>
-            <p>{user.displayName}, here is your clinical overview for today.</p>
-          </div>
-        </header>
+        <div className="app-content-area">
+          <header className="app-header">
+            <div>
+              <h1>{currentLink?.label ?? 'Dashboard'}</h1>
+              <p>Here is your clinical overview for today.</p>
+            </div>
+          </header>
 
-        <section className="app-content">{renderRoute(appPath)}</section>
+          <section className="app-content">{renderRoute(appPath)}</section>
+        </div>
       </div>
 
-      <nav className="app-bottom-nav" aria-label="Navigasi cepat">
+      <nav className="app-bottom-nav" aria-label="Quick navigation">
         {visibleNav.filter(link => MOBILE_NAV_PATHS.has(link.path)).map((link) => (
           <button
             aria-current={appPath === link.path ? 'page' : undefined}
@@ -555,7 +568,6 @@ function AppRoutes() {
             onClick={() => navigate(link.path)}
             type="button"
           >
-            <span className="nav-dot" aria-hidden="true" />
             {link.shortLabel}
           </button>
         ))}

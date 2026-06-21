@@ -24,24 +24,24 @@ export function DailyReportPage() {
       .then((d) => { if (d.success && d.data) setData(d.data) })
   }, [])
 
-  if (!data) return <div className="clinical-empty">Memuat...</div>
+  if (!data) return <div className="clinical-empty">Loading...</div>
 
   return (
     <div className="report-page">
       <div className="page-heading">
         <div>
           <p className="eyebrow">Reports</p>
-          <h2>Laporan Harian</h2>
+          <h2>Daily Report</h2>
           <p>{data.date}</p>
         </div>
-        <span className="status-chip">{data.values.length} nilai</span>
+        <span className="status-chip">{data.values.length} values</span>
       </div>
-      {data.values.length === 0 ? <p>Tidak ada data.</p> : (
+      {data.values.length === 0 ? <p>No data.</p> : (
         <table className="report-table">
           <thead>
             <tr>
-              <th>Metrik</th>
-              <th>Nilai</th>
+              <th>Metric</th>
+              <th>Value</th>
               <th>Status</th>
               <th>Severity</th>
             </tr>
@@ -51,8 +51,8 @@ export function DailyReportPage() {
               <tr key={`${v.metricCode}-${i}`}>
                 <td>{v.metricCode}</td>
                 <td>{v.finalValue} {v.unit}</td>
-                <td>{v.status}</td>
-                <td>{v.severity}</td>
+                <td><span className={`badge-status badge-${v.status}`}><span className="status-dot" />{v.status}</span></td>
+                <td><span className={`badge-status badge-${v.severity}`}><span className="status-dot" />{v.severity}</span></td>
               </tr>
             ))}
           </tbody>

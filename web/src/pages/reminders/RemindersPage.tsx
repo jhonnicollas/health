@@ -28,7 +28,7 @@ export function RemindersPage() {
   const [scheduleTime, setScheduleTime] = useState('07:00')
   const [timezone, setTimezone] = useState('Asia/Jakarta')
   const [channel, setChannel] = useState<(typeof CHANNELS)[number]>('telegram')
-  const [message, setMessage] = useState('Waktunya cek kesehatan pagi.')
+  const [message, setMessage] = useState('Time for your morning health check.')
 
   async function load() {
     setError(null)
@@ -36,12 +36,12 @@ export function RemindersPage() {
       const res = await fetch('/api/reminders', { credentials: 'include' })
       const body = (await res.json()) as ApiResp<Reminder[]>
       if (!body.success) {
-        setError(body.error?.message ?? 'Gagal memuat reminder.')
+        setError(body.error?.message ?? 'Failed to load reminders.')
         return
       }
       setReminders(body.data ?? [])
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     }
   }
 
@@ -68,12 +68,12 @@ export function RemindersPage() {
       })
       const body = (await res.json()) as ApiResp<{ reminderId: string }>
       if (!res.ok || !body.success) {
-        setError(body.error?.message ?? 'Gagal menambah reminder.')
+        setError(body.error?.message ?? 'Failed to add reminder.')
         return
       }
       await load()
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     } finally {
       setSubmitting(false)
     }
@@ -101,20 +101,20 @@ export function RemindersPage() {
     <section className="settings-panel" aria-labelledby="reminders-title">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Pengaturan</p>
-          <h2 id="reminders-title">Reminder pengukuran</h2>
-          <p>Atur pengingat harian untuk pengukuran atau minum obat.</p>
+          <p className="eyebrow">Settings</p>
+          <h2 id="reminders-title">Measurement Reminders</h2>
+          <p>Set daily reminders for measurements or medication intake.</p>
         </div>
-        <span className="status-chip">{reminders.length} reminder</span>
+        <span className="status-chip">{reminders.length} reminders</span>
       </div>
 
       <form className="auth-form" onSubmit={handleCreate}>
         <div className="form-heading">
-          <h3>Reminder baru</h3>
-          <p>Pilih jadwal, channel, dan pesan ringkas.</p>
+          <h3>New Reminder</h3>
+          <p>Choose schedule, channel, and a brief message.</p>
         </div>
         <label>
-          Jenis
+          Type
           <select
             onChange={(e) => setReminderType(e.target.value as (typeof REMINDER_TYPES)[number])}
             value={reminderType}
@@ -125,7 +125,7 @@ export function RemindersPage() {
           </select>
         </label>
         <label>
-          Waktu (HH:MM)
+          Time (HH:MM)
           <input onChange={(e) => setScheduleTime(e.target.value)} required type="time" value={scheduleTime} />
         </label>
         <label>
@@ -144,34 +144,36 @@ export function RemindersPage() {
           </select>
         </label>
         <label>
-          Pesan
+          Message
           <input onChange={(e) => setMessage(e.target.value)} required type="text" value={message} />
         </label>
         <button disabled={submitting} type="submit">
-          {submitting ? 'Menyimpan...' : 'Tambah reminder'}
+          {submitting ? 'Saving...' : 'Add Reminder'}
         </button>
         {error ? <p className="form-message error" role="status">{error}</p> : null}
       </form>
 
-      <h3>Reminder aktif</h3>
-      {reminders.length === 0 ? <p>Belum ada reminder.</p> : (
-        <ul className="reminder-list">
-          {reminders.map((r) => (
-            <li key={r.id} className="reminder-item">
-              <div>
-                <strong>{r.reminderType}</strong> · {r.scheduleTime} ({r.timezone}) · {r.channel}
-                <div className="muted">{r.message}</div>
-              </div>
-              <div>
-                <button onClick={() => toggleEnabled(r)} type="button">
-                  {r.enabled ? 'Nonaktifkan' : 'Aktifkan'}
-                </button>
-                <button className="danger" onClick={() => remove(r.id)} type="button">Hapus</button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="settings-card">
+        <h3>Active Reminders</h3>
+        {reminders.length === 0 ? <p>No reminders yet.</p> : (
+          <ul className="reminder-list">
+            {reminders.map((r) => (
+              <li key={r.id} className="reminder-item">
+                <div>
+                  <strong>{r.reminderType}</strong> · {r.scheduleTime} ({r.timezone}) · {r.channel}
+                  <div className="muted">{r.message}</div>
+                </div>
+                <div>
+                  <button onClick={() => toggleEnabled(r)} type="button">
+                    {r.enabled ? 'Disable' : 'Enable'}
+                  </button>
+                  <button className="danger" onClick={() => remove(r.id)} type="button">Remove</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   )
 }

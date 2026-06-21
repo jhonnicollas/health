@@ -31,7 +31,7 @@ export function MedicationsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [name, setName] = useState('')
   const [dosage, setDosage] = useState('')
-  const [schedule, setSchedule] = useState('Pagi setelah makan')
+  const [schedule, setSchedule] = useState('Morning after meal')
 
   async function load() {
     setError(null)
@@ -43,17 +43,17 @@ export function MedicationsPage() {
       const medBody = (await medRes.json()) as ApiResp<{ medications: Medication[] }>
       const logBody = (await logRes.json()) as ApiResp<{ logs: MedicationLog[] }>
       if (!medBody.success) {
-        setError(medBody.error?.message ?? 'Gagal memuat obat.')
+        setError(medBody.error?.message ?? 'Failed to load medications.')
         return
       }
       if (!logBody.success) {
-        setError(logBody.error?.message ?? 'Gagal memuat log obat.')
+        setError(logBody.error?.message ?? 'Failed to load medication logs.')
         return
       }
       setMeds(medBody.data?.medications ?? [])
       setLogs(logBody.data?.logs ?? [])
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     }
   }
 
@@ -88,14 +88,14 @@ export function MedicationsPage() {
       })
       const body = (await res.json()) as ApiResp<{ medicationId: string }>
       if (!res.ok || !body.success) {
-        setError(body.error?.message ?? 'Gagal menambah obat.')
+        setError(body.error?.message ?? 'Failed to add medication.')
         return
       }
       setName('')
       setDosage('')
       await load()
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     } finally {
       setSubmitting(false)
     }
@@ -111,7 +111,7 @@ export function MedicationsPage() {
     })
     const body = (await res.json()) as ApiResp<{ logId: string }>
     if (!res.ok || !body.success) {
-      setError(body.error?.message ?? 'Gagal mencatat status obat.')
+      setError(body.error?.message ?? 'Failed to log medication status.')
       return
     }
     await load()
@@ -130,38 +130,38 @@ export function MedicationsPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Tracker</p>
-          <h2 id="meds-title">Jadwal obat hari ini</h2>
-          <p>Catat status obat tanpa saran dosis atau perubahan terapi.</p>
+          <h2 id="meds-title">Today's Medication Schedule</h2>
+          <p>Log medication status without dosage advice or therapy changes.</p>
         </div>
-        <span className="status-chip">{meds.length} obat</span>
+        <span className="status-chip">{meds.length} meds</span>
       </div>
 
       <form className="auth-form" onSubmit={handleCreate}>
         <div className="form-heading">
-          <h3>Tambah obat</h3>
-          <p>Nama, dosis teks, dan jadwal tampil di checklist harian.</p>
+          <h3>Add Medication</h3>
+          <p>Name, dosage text, and schedule appear in the daily checklist.</p>
         </div>
         <label>
-          Nama obat
+          Medication name
           <input onChange={(e) => setName(e.target.value)} required type="text" value={name} />
         </label>
         <label>
-          Dosis
+          Dosage
           <input onChange={(e) => setDosage(e.target.value)} required type="text" value={dosage} />
         </label>
         <label>
-          Jadwal
+          Schedule
           <input onChange={(e) => setSchedule(e.target.value)} required type="text" value={schedule} />
         </label>
         <button disabled={submitting} type="submit">
-          {submitting ? 'Menyimpan...' : 'Tambah obat'}
+          {submitting ? 'Saving...' : 'Add Medication'}
         </button>
         {error ? <p className="form-message error" role="status">{error}</p> : null}
       </form>
 
       <div className="settings-card">
-        <h3>Checklist hari ini</h3>
-        {meds.length === 0 ? <p>Belum ada obat tercatat.</p> : (
+        <h3>Today's Checklist</h3>
+        {meds.length === 0 ? <p>No medications recorded yet.</p> : (
           <ul className="medication-list">
             {meds.map((med) => {
               const latest = latestStatusByMedication.get(med.id)
@@ -176,12 +176,14 @@ export function MedicationsPage() {
                   <div>
                     <strong>{med.medicationName}</strong> · {med.dosageText}
                     <div className="muted">{med.scheduleText}</div>
-                    <div className={`status-chip ${latest?.status === 'skipped' ? 'warning' : ''}`}>{statusLabel}</div>
+                    <span className={`badge-status ${latest?.status === 'taken' ? 'badge-normal' : latest?.status === 'skipped' ? 'badge-warning' : 'badge-info'}`}>
+                      <span className="status-dot" />{statusLabel}
+                    </span>
                   </div>
                   <div className="button-stack">
                     <button onClick={() => void logStatus(med, 'taken')} type="button">Take</button>
                     <button className="secondary-action" onClick={() => void logStatus(med, 'skipped')} type="button">Skip</button>
-                    <button className="danger" onClick={() => void remove(med.id)} type="button">Hapus</button>
+                    <button className="danger" onClick={() => void remove(med.id)} type="button">Remove</button>
                   </div>
                 </li>
               )

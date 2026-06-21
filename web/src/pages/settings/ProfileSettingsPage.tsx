@@ -57,14 +57,14 @@ export function ProfileSettingsPage() {
           nextErrors[detail.field] = detail.message
         })
         setFieldErrors(nextErrors)
-        setMessage(body.error?.message ?? 'Pengaturan gagal disimpan.')
+        setMessage(body.error?.message ?? 'Settings failed to save.')
         return
       }
 
       await refresh()
-      setMessage('Pengaturan profil tersimpan.')
+      setMessage('Profile settings saved.')
     } catch {
-      setMessage('Tidak bisa terhubung ke server. Coba lagi sebentar.')
+      setMessage('Could not connect to server. Try again shortly.')
     } finally {
       setSubmitting(false)
     }
@@ -74,20 +74,20 @@ export function ProfileSettingsPage() {
     <section className="settings-panel" aria-labelledby="profile-settings-title">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Pengaturan</p>
-          <h2 id="profile-settings-title">Profil dasar</h2>
-          <p>Atur tinggi badan, timezone, tema, dan mode tampilan untuk aplikasi.</p>
+          <p className="eyebrow">Settings</p>
+          <h2 id="profile-settings-title">Basic Profile</h2>
+          <p>Configure height, timezone, theme, and display mode for the app.</p>
         </div>
         <span className="status-chip">{accessibilityMode}</span>
       </div>
 
       <form className="auth-form settings-form" onSubmit={handleSubmit}>
         <div className="form-heading">
-          <h3>Health profile</h3>
-          <p>Perubahan diterapkan setelah profil disimpan.</p>
+          <h3>Health Profile</h3>
+          <p>Changes are applied after the profile is saved.</p>
         </div>
         <label>
-          Tinggi badan (cm)
+          Height (cm)
           <input
             inputMode="decimal"
             max={250}
@@ -112,7 +112,7 @@ export function ProfileSettingsPage() {
         </label>
 
         <label>
-          Tema
+          Theme
           <select onChange={(event) => setTheme(event.target.value)} value={theme}>
             <option value="light">Light</option>
             <option value="warm">Warm</option>
@@ -123,7 +123,7 @@ export function ProfileSettingsPage() {
         </label>
 
         <label>
-          Mode tampilan
+          Display mode
           <select
             onChange={(event) => setAccessibilityMode(event.target.value)}
             value={accessibilityMode}
@@ -138,12 +138,12 @@ export function ProfileSettingsPage() {
         </label>
 
         <button disabled={submitting} type="submit">
-          {submitting ? 'Menyimpan...' : 'Simpan pengaturan'}
+          {submitting ? 'Saving...' : 'Save Settings'}
         </button>
 
         {message ? (
           <p
-            className={`form-message ${message.includes('tersimpan') ? 'success' : 'error'}`}
+            className={`form-message ${message.includes('saved') ? 'success' : 'error'}`}
             role="status"
           >
             {message}

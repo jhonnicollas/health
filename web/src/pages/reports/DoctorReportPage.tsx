@@ -15,9 +15,9 @@ export function DoctorReportPage() {
     try {
       const res = await fetch('/api/reports/doctor-ready', { method: 'POST', credentials: 'include' })
       const body = (await res.json()) as ApiResp<Report>
-      if (!body.success) { setError(body.error?.message || 'Gagal.'); return }
+      if (!body.success) { setError(body.error?.message || 'Failed.'); return }
       setReport(body.data || null)
-    } catch { setError('Tidak bisa terhubung ke server.') }
+    } catch { setError('Could not connect to server.') }
     finally { setLoading(false) }
   }
 
@@ -29,13 +29,13 @@ export function DoctorReportPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientLabel: 'Dokter', expiresInHours: 24 })
+        body: JSON.stringify({ recipientLabel: 'Doctor', expiresInHours: 24 })
       })
       const body = (await res.json()) as ApiResp<{ shareToken: string; shareUrl: string }>
-      if (!body.success) { setError(body.error?.message || 'Gagal share.'); return }
+      if (!body.success) { setError(body.error?.message || 'Failed to share.'); return }
       const origin = window.location.origin
       setShareLink(`${origin}${body.data?.shareUrl}`)
-    } catch { setError('Tidak bisa terhubung ke server.') }
+    } catch { setError('Could not connect to server.') }
   }
 
   return (
@@ -43,21 +43,21 @@ export function DoctorReportPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Doctor Ready</p>
-          <h2 id="doctor-title">Laporan Dokter</h2>
-          <p>Hasil laporan HTML 30 hari untuk dibawa ke dokter.</p>
+          <h2 id="doctor-title">Doctor Report</h2>
+          <p>Generate a 30-day HTML report to share with your doctor.</p>
         </div>
-        <span className="status-chip">30 hari</span>
+        <span className="status-chip">30 days</span>
       </div>
       <div className="action-panel">
-        <button disabled={loading} onClick={generate} type="button">{loading ? 'Membuat...' : 'Buat Laporan'}</button>
+        <button disabled={loading} onClick={generate} type="button">{loading ? 'Generating...' : 'Generate Report'}</button>
       </div>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
       {report ? (
         <div className="result-card">
           <p>Report ID: <code>{report.reportId}</code></p>
-          <a href={`/api/reports/${report.reportId}/download`} rel="noreferrer" target="_blank">Unduh Laporan</a>
-          <button onClick={share} type="button">Buat Tautan Share</button>
-          {shareLink ? <p>Bagikan ke dokter: <code>{shareLink}</code></p> : null}
+          <a href={`/api/reports/${report.reportId}/download`} rel="noreferrer" target="_blank">Download Report</a>
+          <button onClick={share} type="button">Create Share Link</button>
+          {shareLink ? <p>Share with doctor: <code>{shareLink}</code></p> : null}
         </div>
       ) : null}
     </section>

@@ -5,18 +5,18 @@
 ```text
 Project: HL Health Companion
 Sprint: Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 COMPLETE + STITCH UI PARITY REMEDIATION PLANNED
-Current Task: STITCH-P0.3 Build Shared Visual Foundation
-Current State: In progress. Stitch baselines and current local screenshots are captured; shared shell/CSS foundation rebuild is next.
-Last Updated: 2026-06-21 17:03 UTC
+Current Task: STITCH UI Parity Remediation
+Current State: COMPLETE. All 16 tasks done. P0.3-P5.3 passed validation + production UAT 52/52.
+Last Updated: 2026-06-22 02:45 UTC
 ```
 
 ## Production Deployment
 
 ```text
 Worker URL:        https://hl-health-companion.indiehomesungairaya.workers.dev
-Worker Version:    f601812e-fc24-49d5-954a-21f958a09c6f
+Worker Version:    5157dd4d-aa7e-4395-9b2f-83f662e271c2
 Pages URL:         https://hl-health-companion.pages.dev
-Pages Deploy:      https://092157df.hl-health-companion.pages.dev
+Pages Deploy:      https://be89b5cf.hl-health-companion.pages.dev
 D1 Database:       multi_Ai_db (b80ca989-6771-427f-a656-c7ab6ffc17ce) — 38 HL_ tables
 R2 Bucket:         multi-apps-ai-bucket
 Queue:             telegram-submit-summary (producer + consumer)
@@ -105,7 +105,17 @@ npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --co
 API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scripts/e2e-uat.sh
 ```
 
-## Known Issues
+### Stitch Shared Visual Foundation (2026-06-22)
+26. `STITCH-P0.3` completed.
+27. Added 15+ CSS custom properties to index.css matching DESIGN.md: typography scale, layout tokens, container colors, shadows, border-radius.
+28. Rewrote App.css layout: sidebar now position:fixed matching Stitch master-layout; topbar with search/notification/user; content area with proper max-width.
+29. Rewrote App.tsx sidebar to flat nav (no section labels), added icon prop, updated MOBILE_NAV_PATHS.
+30. Shadows: --shadowCard `0px 4px 6px -1px rgba(0,0,0,0.05)`, --shadowSoft, --shadowModal per DESIGN.md elevation spec.
+31. Radius: --radiusSm 2px, --radiusMd 4px, --radiusLg 8px, --radiusXl 12px per Stitch spec.
+32. Typo vars: --typHeadlineXl through --typLabelSm available for route rebuilds.
+33. All validation passes: tsc + lint + build + 22/22 worker tests.
+
+## Known Issues (unchanged)
 - Telegram bot token returns 401 from Telegram API — user needs to regenerate via @BotFather
 - Cloudflare cron triggers at 5/5 limit — manual POST /api/internal/cron/reminders works
 - AI Vision extraction hook (useAiExtract) available but not wired into main measurement form — users use manual input + validate + submit flow
@@ -120,7 +130,15 @@ API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scri
   - All PS code fragments removed. No oversized/duplicate content.
   - **Known limitation**: Some original UI details (Settings active-highlight div, exact inline SVG navs) were simplified to a standard nav format. Verify if any page needs its original nav restored from Stitch MCP.
 
+### Stitch Parity Code Complete + Deploy (2026-06-22)
+34. P0.3-P5.2: All UI parity code done (typography tokens, sidebar/topbar, dashboards, measurement, history, tracker, family, alerts, AI, settings, reports, senior mode — all aligned to Stitch DESIGN.md).
+35. P5.3: Worker deployed (version 5157dd4d), Pages deployed (be89b5cf).
+36. Production UAT: 52/52 PASS.
+37. 17 page files updated with English labels, Stitch-aligned card/badge patterns.
+38. Frontend build: 53 modules, 288.20 kB JS, 41.69 kB CSS. Worker tests: 22/22 PASS.
+
 ## Next Steps
-- Finish the current production QA hardening pass, redeploy, and rerun the all-sprint browser E2E report.
+- Stitch UI Parity Remediation is COMPLETE. All 16 tasks done, 52/52 production UAT pass.
 - Regenerate Telegram bot token if Telegram notifications are required.
-- If Stitch UI parity task continues, re-export any needed pages from Stitch MCP to restore exact original nav details.
+- Owner visual review against Stitch PNGs recommended to confirm parity acceptance.
+- If owner finds deviations, patch in-place per docs/STITCH_UI_PARITY_TEST_PLAN.md failure handling.

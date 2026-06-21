@@ -49,17 +49,17 @@ export function AlertsPage() {
       const alertsBody = (await alertsRes.json()) as ApiResp<{ alerts: AlertItem[] }>
       const notificationsBody = (await notificationsRes.json()) as ApiResp<{ notifications: NotificationItem[] }>
       if (!alertsBody.success) {
-        setError(alertsBody.error?.message ?? 'Gagal memuat alerts.')
+        setError(alertsBody.error?.message ?? 'Failed to load alerts.')
         return
       }
       if (!notificationsBody.success) {
-        setError(notificationsBody.error?.message ?? 'Gagal memuat inbox.')
+        setError(notificationsBody.error?.message ?? 'Failed to load inbox.')
         return
       }
       setAlerts(alertsBody.data?.alerts ?? [])
       setNotifications(notificationsBody.data?.notifications ?? [])
     } catch {
-      setError('Tidak bisa terhubung ke server.')
+      setError('Could not connect to server.')
     }
   }
 
@@ -95,9 +95,9 @@ export function AlertsPage() {
         <div>
           <p className="eyebrow">Notifications</p>
           <h2 id="alerts-title">Inbox & Alerts Center</h2>
-          <p>Alert rule-based dan log pengiriman notifikasi tampil dalam satu pusat kontrol.</p>
+          <p>Rule-based alerts and notification delivery logs in one control center.</p>
         </div>
-        <span className="status-chip">{visibleAlerts.length} alert</span>
+        <span className="status-chip">{visibleAlerts.length} alerts</span>
       </div>
 
       <div className="segmented-control" role="tablist" aria-label="Filter notifications">
@@ -109,21 +109,21 @@ export function AlertsPage() {
       {error ? <p className="form-message error" role="status">{error}</p> : null}
 
       <div className="settings-card">
-        <h3>Rule alerts</h3>
-        {visibleAlerts.length === 0 ? <p>Tidak ada alert untuk filter ini.</p> : (
+        <h3>Rule Alerts</h3>
+        {visibleAlerts.length === 0 ? <p>No alerts for this filter.</p> : (
           <ul className="alerts-list">
             {visibleAlerts.map((alert) => (
               <li key={alert.id} className={`alert-item severity-${alert.severity}`}>
                 <div>
                   <strong>{alert.metricCode}</strong>: {alert.message}
                   <div className="muted">
-                    Nilai {alert.finalValue} {alert.unit} · {new Date(alert.createdAt).toLocaleString()}
+                    Value {alert.finalValue} {alert.unit} · {new Date(alert.createdAt).toLocaleString()}
                   </div>
                 </div>
                 {alert.acknowledged === true || alert.acknowledged === 1 ? (
-                  <span className="badge">Sudah dikonfirmasi</span>
+                  <span className="badge-status badge-normal"><span className="status-dot" />Acknowledged</span>
                 ) : (
-                  <button onClick={() => void acknowledge(alert.id)} type="button">Konfirmasi</button>
+                  <button onClick={() => void acknowledge(alert.id)} type="button">Acknowledge</button>
                 )}
               </li>
             ))}
@@ -132,12 +132,14 @@ export function AlertsPage() {
       </div>
 
       <div className="settings-card">
-        <h3>Telegram delivery timeline</h3>
-        {visibleNotifications.length === 0 ? <p>Belum ada log notifikasi.</p> : (
+        <h3>Telegram Delivery Timeline</h3>
+        {visibleNotifications.length === 0 ? <p>No notification logs yet.</p> : (
           <ol className="timeline-list">
             {visibleNotifications.map((notification) => (
               <li key={notification.id}>
-                <span className={`status-chip ${notification.status === 'failed' ? 'warning' : ''}`}>{notification.status}</span>
+                <span className={`badge-status ${notification.status === 'failed' ? 'badge-critical' : 'badge-normal'}`}>
+                  <span className="status-dot" />{notification.status}
+                </span>
                 <strong>{notification.title}</strong>
                 <p>{notification.message}</p>
                 <small>{notification.channel} · {notification.notificationType} · {new Date(notification.createdAt).toLocaleString()}</small>
