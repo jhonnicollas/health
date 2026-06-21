@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 export function KnowledgeBasePage() {
   const [articles, setArticles] = useState<any[]>([])
-  useEffect(() => { fetch('/api/kb').then(r => r.json()).then(d => d.success && setArticles(d.data.articles)) }, [])
+  useEffect(() => { fetch('/api/kb', { credentials: 'include' }).then(r => r.json()).then(d => d.success && setArticles(d.data.articles)) }, [])
   return (
     <div className="kb-page">
       <h2>Knowledge Base</h2>

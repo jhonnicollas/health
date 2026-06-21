@@ -40,6 +40,7 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json'
