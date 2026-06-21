@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html class="light" lang="id"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Masuk | HL Health Companion</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f7f9fb",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary-fixed": "#001e2f",
+                        "surface-dim": "#d8dadc",
+                        "on-secondary-container": "#54647a",
+                        "outline": "#737687",
+                        "on-tertiary-container": "#eaf4ff",
+                        "secondary-container": "#d0e1fb",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-surface-variant": "#424656",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-primary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#0061ff",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e6e8ea",
+                        "inverse-primary": "#b4c5ff",
+                        "surface-container-low": "#f2f4f6",
+                        "on-secondary-fixed": "#0b1c30",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "surface-container": "#eceef0",
+                        "primary-fixed": "#dbe1ff",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-tertiary-fixed-variant": "#004c6e",
+                        "tertiary": "#005c85",
+                        "surface-bright": "#f7f9fb",
+                        "surface-tint": "#0052dc",
+                        "on-surface": "#191c1e",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2d3133",
+                        "secondary-fixed": "#d3e4fe",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f7f9fb",
+                        "on-primary-fixed": "#00174b",
+                        "on-primary-container": "#f1f2ff",
+                        "tertiary-container": "#0076a9",
+                        "secondary": "#505f76",
+                        "on-background": "#191c1e",
+                        "primary": "#004bca",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e3e5",
+                        "outline-variant": "#c2c6d9",
+                        "tertiary-fixed-dim": "#89ceff",
+                        "tertiary-fixed": "#c9e6ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "margin-desktop": "32px",
+                        "margin-tablet": "24px",
+                        "container-max-width": "1440px",
+                        "sidebar-width": "280px"
+                    },
+                    "fontFamily": {
+                        "sans": ["Inter", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .form-input:focus {
+            box-shadow: 0 0 0 2px rgba(0, 97, 255, 0.1);
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-sans antialiased">
+<div class="flex min-h-screen flex-col lg:flex-row">
+<!-- Left Side: Hero Image & Branding -->
+<div class="relative hidden lg:flex lg:w-1/2 flex-col justify-between p-margin-desktop overflow-hidden">
+<!-- Background Layer -->
+<div class="absolute inset-0 z-0 bg-primary-container">
+<div class="absolute inset-0 bg-gradient-to-br from-primary/80 to-primary-container/40 z-10"></div>
+<div class="h-full w-full bg-cover bg-center" data-alt="A professional medical workspace in a high-end clinic featuring a clean, minimalist desk with a stethoscope and a modern digital tablet. The room is flooded with natural daylight through large windows, creating a bright and airy atmosphere. The color palette consists of soft clinical whites, slate blues, and professional medical blue accents, reflecting a sense of calm authority and clinical precision. High-contrast lighting highlights the sterile yet welcoming environment of a modern healthcare facility." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCkfDW1Ku4MiJTBgktmp1NGdQ7Axgq1IRM8Iz9AQw482HkkpqlPqeb4mqUesGVp6pLaRL7kAwwS8_CfKnqrti33UfKsBiVsGWwv2GLbPnwUPiZv1V_n6DetAnSwzL1RWUYWnzJRedmhMofAPZAJ7NaHjYv5D0kdIqV3e5gZH6qGsZlnN3ta5SA5H4c6eh3R-h6VkD8Ps1uKt_oVgyetGIYnGcHfjsg28pAlOc_nur9sWRfrRR1G2A2e-95kzaGJVk8-Bs47n8ovIS0')">
+</div>
+</div>
+<!-- Logo & Content -->
+<div class="relative z-20 flex items-center gap-3">
+<div class="bg-surface-container-lowest p-2 rounded-lg shadow-sm">
+<svg class="w-8 h-8 text-primary" fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 4H42V17.3333V30.6667H24V44H6V30.6667V17.3333H24V4Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h1 class="text-white text-2xl font-bold tracking-tight">HL Health</h1>
+</div>
+<div class="relative z-20 mb-20 animate-fade-in">
+<h2 class="text-4xl font-bold text-white leading-tight mb-4">Membangun Masa Depan <br/>Kesehatan Digital.</h2>
+<p class="text-on-primary-container/90 text-lg max-w-md">
+                    Pendamping kesehatan profesional untuk mengelola data medis dan jadwal klinis Anda dengan presisi tinggi.
+                </p>
+</div>
+<!-- Footer Badge -->
+<div class="relative z-20 flex items-center gap-2 text-white/70 text-sm">
+<span class="material-symbols-outlined text-sm">verified_user</span>
+                Sistem Terenkripsi &amp; Standar Kepatuhan Medis
+            </div>
+</div>
+<!-- Right Side: Login Form -->
+<div class="flex-1 flex flex-col justify-center items-center p-6 lg:p-margin-desktop bg-surface">
+<!-- Mobile Logo -->
+<div class="lg:hidden mb-12 flex items-center gap-3">
+<svg class="w-8 h-8 text-primary" fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 4H42V17.3333V30.6667H24V44H6V30.6667V17.3333H24V4Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+<h1 class="text-on-surface text-xl font-bold tracking-tight">HL Health</h1>
+</div>
+<div class="w-full max-w-[440px] bg-surface-container-lowest p-8 lg:p-10 rounded-xl border border-outline-variant shadow-sm animate-fade-in">
+<div class="mb-8">
+<h2 class="text-[28px] font-bold text-on-surface leading-tight mb-2">Selamat Datang Kembali</h2>
+<p class="text-on-surface-variant text-sm">Masuk untuk mengelola kesehatan Anda secara profesional.</p>
+</div>
+<form class="space-y-6" id="loginForm">
+<!-- Email Field -->
+<div class="space-y-2">
+<label class="text-sm font-semibold text-on-surface tracking-wide uppercase" for="email">Email</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-[20px]">mail</span>
+</div>
+<input class="form-input block w-full pl-10 pr-3 py-3.5 border-outline-variant rounded bg-surface-container-low text-on-surface placeholder:text-outline focus:border-primary focus:ring-0 transition-all text-base" id="email" name="email" placeholder="nama@domain.com" required="" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<label class="text-sm font-semibold text-on-surface tracking-wide uppercase" for="password">Kata Sandi</label>
+
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-[20px]">lock</span>
+</div>
+<input class="form-input block w-full pl-10 pr-10 py-3.5 border-outline-variant rounded bg-surface-container-low text-on-surface placeholder:text-outline focus:border-primary focus:ring-0 transition-all text-base" id="password" name="password" placeholder="Masukkan kata sandi" required="" type="password"/>
+<button class="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface-variant" onclick="togglePassword()" type="button">
+<span class="material-symbols-outlined text-[20px]" id="eye-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Actions -->
+<div class="pt-2 space-y-4">
+<button class="w-full flex items-center justify-center py-4 px-6 rounded bg-primary text-white text-base font-bold shadow-lg shadow-primary/20 hover:bg-primary-container active:scale-[0.98] transition-all" type="submit">
+                            Masuk
+                        </button>
+<div class="flex items-center gap-2 py-2">
+<div class="flex-1 h-px bg-outline-variant"></div>
+<span class="text-xs text-outline font-medium uppercase tracking-widest">Atau</span>
+<div class="flex-1 h-px bg-outline-variant"></div>
+</div>
+<button class="w-full flex items-center justify-center py-3.5 px-6 rounded border border-outline-variant bg-surface-container-lowest text-on-surface text-sm font-semibold hover:bg-surface-container-low transition-colors" type="button">
+<span class="truncate">Belum punya akun? <span class="text-primary">Daftar Sekarang</span></span>
+</button>
+</div>
+</form>
+<!-- Help Link -->
+<div class="mt-10 text-center">
+<p class="text-on-surface-variant text-sm">
+                        Butuh bantuan? 
+</p>
+</div>
+</div>
+<!-- Bottom Disclaimer (Centered for Mobile/Large) -->
+<div class="mt-8 text-on-surface-variant text-[11px] uppercase tracking-widest text-center">
+                © 2024 HL Health Technologies. Hak Cipta Dilindungi.
+            </div>
+</div>
+</div>
+<script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eye-icon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.textContent = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.textContent = 'visibility';
+            }
+        }
+
+        // Handle form submission (UI only)
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalContent = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Memproses...
+            `;
+
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+                alert('Fungsi login hanya prototipe. Silakan hubungi admin sistem.');
+            }, 1500);
+        });
+    </script>
+</body></html>

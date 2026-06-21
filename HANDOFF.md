@@ -111,7 +111,16 @@ API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scri
 - AI Vision extraction hook (useAiExtract) available but not wired into main measurement form — users use manual input + validate + submit flow
 
 - `attachment` folder is not present in this workspace; frontend UI source is under `web/src`
+- **2026-06-22: Navigation href repair completed on all 17 frontend_stitch HTML files.**
+  - Previous agent's PowerShell scriptblock-injection corruption cleaned.
+  - All `<a>` tags that were accidentally removed have been rebuilt from scratch.
+  - index.html was completely destroyed (14 bytes) — rebuilt with links to all pages.
+  - All nav pages have working sidebar + mobile nav with correct hrefs.
+  - Auth pages (login, register, auth-gateway, senior-mode) correctly have no sidebar nav.
+  - All PS code fragments removed. No oversized/duplicate content.
+  - **Known limitation**: Some original UI details (Settings active-highlight div, exact inline SVG navs) were simplified to a standard nav format. Verify if any page needs its original nav restored from Stitch MCP.
 
 ## Next Steps
 - Finish the current production QA hardening pass, redeploy, and rerun the all-sprint browser E2E report.
 - Regenerate Telegram bot token if Telegram notifications are required.
+- If Stitch UI parity task continues, re-export any needed pages from Stitch MCP to restore exact original nav details.

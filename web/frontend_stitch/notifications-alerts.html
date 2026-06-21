@@ -1,0 +1,430 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>HealthSync Pro - Notifications</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#d8dadc",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-tertiary-fixed-variant": "#004c6e",
+                        "primary-container": "#0061ff",
+                        "outline-variant": "#c2c6d9",
+                        "on-surface-variant": "#424656",
+                        "error-container": "#ffdad6",
+                        "surface-container-low": "#f2f4f6",
+                        "surface-container-high": "#e6e8ea",
+                        "secondary": "#505f76",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#0b1c30",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#d0e1fb",
+                        "on-background": "#191c1e",
+                        "primary-fixed": "#dbe1ff",
+                        "on-tertiary-fixed": "#001e2f",
+                        "on-secondary-container": "#54647a",
+                        "surface-container": "#eceef0",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "inverse-surface": "#2d3133",
+                        "surface-container-highest": "#e0e3e5",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed": "#c9e6ff",
+                        "outline": "#737687",
+                        "surface-tint": "#0052dc",
+                        "on-primary-container": "#f1f2ff",
+                        "tertiary-container": "#0076a9",
+                        "surface-bright": "#f7f9fb",
+                        "background": "#f7f9fb",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "tertiary-fixed-dim": "#89ceff",
+                        "on-surface": "#191c1e",
+                        "inverse-primary": "#b4c5ff",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#005c85",
+                        "on-tertiary-container": "#eaf4ff",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "surface": "#f7f9fb",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "on-primary-fixed": "#00174b",
+                        "primary": "#004bca"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-max-width": "1440px",
+                        "margin-tablet": "24px",
+                        "unit": "4px",
+                        "sidebar-width": "280px",
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-xl": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Hide scrollbar for clean UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-screen flex overflow-hidden">
+<!-- TopNavBar (Mobile Only) -->
+<header class="md:hidden flex justify-between items-center h-16 px-margin-mobile w-full z-40 bg-surface dark:bg-inverse-surface shadow-sm fixed top-0">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined fill text-primary">health_and_safety</span>
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">HealthSync Pro</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-primary font-bold">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Dr. Julianne Smith" class="w-full h-full object-cover" data-alt="A professional headshot of Dr. Julianne Smith, wearing a modern white clinical coat over a light blue shirt, set against a pristine, well-lit hospital corridor background. The lighting is soft and flattering, typical of high-end medical facility photography, with a calm and reassuring expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCS5FxR33vZSbzFvgZXOLTRbcK_WsQdfRv2c2SbBN0pGODrYn79AJCqNKybLpNvtei_kzDRVuLFdwous4ZCriGZuiCYIYk2lQCz62FpPaWHvJchwzF0wMoQkMHJ09A7FxelztsM_tQelOjEbWc4HMV23VUpGRP6SJRe8_CueG-TMcSizCcf7CqYLiDucuq9LPXvHRThk5JwGdgH1-a-Yg53kMMM35K8IUniViyA19AMBB8FR_B4C66EKQe15TQPdXjIIv32LuhDxc">
+</div>
+</div>
+</header>
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-full w-sidebar-width z-50 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined fill">local_hospital</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary leading-tight">HealthSync Pro</h1>
+<p class="font-label-sm text-label-sm text-outline">Enterprise Health</p>
+</div>
+</div>
+<button class="w-full py-2 px-4 bg-error text-on-error rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-error-container hover:text-on-error-container transition-colors shadow-sm">
+<span class="material-symbols-outlined">emergency</span>
+                Emergency Support
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto py-4">
+<a href="dashboard.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a href="new-measurement.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-label-md text-label-md">New Measurement</span>
+</a>
+<a href="measurement-history.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-label-md">History</span>
+</a>
+<a href="notifications-alerts.html" class="flex items-center gap-4 px-6 py-3 bg-primary-container/10 border-l-4 border-primary text-primary font-bold transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-label-md text-label-md">Notifications & Alerts</span>
+</a>
+<a href="ai-assistant.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-md text-label-md">AI Assistant</span>
+</a>
+<a href="family-caregiver.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">family_restroom</span>
+<span class="font-label-md text-label-md">Family / Caregiver</span>
+</a>
+<a href="reports-analytics.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-md text-label-md">Reports & Analytics</span>
+</a>
+<a href="settings-profile.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<span class="bg-error text-on-error text-[10px] font-bold px-2 py-0.5 rounded-full">3</span>
+</div>
+
+
+
+
+</div>
+<div class="p-4 border-t border-outline-variant">
+<a href="knowledge-base.html" class="flex items-center gap-4 px-4 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Help Center</span>
+</a>
+<a href="login.html" class="flex items-center gap-4 px-4 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area (Split Pane) -->
+<main class="flex-1 flex flex-col md:ml-[280px] h-screen pt-16 md:pt-0 bg-surface">
+<!-- Header Section -->
+<div class="px-margin-mobile md:px-margin-desktop py-6 border-b border-outline-variant bg-surface-container-lowest z-10">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h2 class="font-headline-xl text-headline-lg-mobile md:text-headline-xl text-on-surface">Notifications &amp; Alerts</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-1">Inbox and recent activity</p>
+</div>
+<button class="text-primary font-label-md text-label-md hover:bg-primary-container/10 px-4 py-2 rounded-lg transition-colors self-start md:self-auto border border-primary/20">
+                    Mark All as Read
+                </button>
+</div>
+<!-- Filters -->
+<div class="flex gap-2 mt-6 overflow-x-auto no-scrollbar pb-2">
+<button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-primary-container text-on-primary font-label-md text-label-md">
+                    All
+                </button>
+<button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant font-label-md text-label-md flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+                    Emergency Alerts
+                </button>
+<button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant font-label-md text-label-md flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+                    AI Insights
+                </button>
+<button class="whitespace-nowrap px-4 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant font-label-md text-label-md flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+                    Reminders
+                </button>
+</div>
+</div>
+<!-- Split View Layout -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Pane: Notification List -->
+<div class="w-full md:w-[400px] lg:w-[450px] border-r border-outline-variant overflow-y-auto no-scrollbar bg-surface-bright flex flex-col">
+<!-- Card 1: Emergency (Selected) -->
+<div class="p-4 border-b border-error/20 bg-error/5 border-l-4 border-l-error cursor-pointer relative shadow-sm z-10">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-error-container text-on-error-container flex items-center justify-center">
+<span class="material-symbols-outlined fill">notifications_active</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-body-lg font-bold text-on-surface">CRITICAL: SpO2 dropped to 88%</h3>
+<span class="font-label-sm text-label-sm text-error font-bold ml-2">Just now</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-3">Telegram alert sent to Caregiver (Elita).</p>
+<button class="px-4 py-2 bg-error text-on-error rounded-lg font-label-md text-label-md shadow-sm w-full md:w-auto">
+                                Acknowledge Alert
+                            </button>
+</div>
+</div>
+</div>
+<!-- Card 2: AI Insight -->
+<div class="p-4 border-b border-outline-variant bg-surface-container-lowest cursor-pointer hover:bg-surface-container-low transition-colors group">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-tertiary-container/10 text-tertiary flex items-center justify-center">
+<span class="material-symbols-outlined">auto_awesome</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-body-lg font-semibold text-on-surface group-hover:text-primary transition-colors">New Weekly Pattern Detected</h3>
+<span class="font-label-sm text-label-sm text-outline ml-2 flex-shrink-0">2h ago</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">Correlation between sleep duration and morning systolic pressure identified.</p>
+</div>
+</div>
+</div>
+<!-- Card 3: Reminder -->
+<div class="p-4 border-b border-outline-variant bg-surface-container-lowest cursor-pointer hover:bg-surface-container-low transition-colors group">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-container/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined">schedule</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-body-lg font-semibold text-on-surface group-hover:text-primary transition-colors">Fasting Timer Completed</h3>
+<span class="font-label-sm text-label-sm text-outline ml-2 flex-shrink-0">5h ago</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Optimal time to measure Fasting Blood Glucose is now.</p>
+</div>
+</div>
+</div>
+<!-- Card 4: Read State -->
+<div class="p-4 border-b border-outline-variant bg-surface-bright opacity-60 cursor-pointer hover:opacity-100 transition-opacity">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined">medication</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-body-lg font-medium text-on-surface">Evening Medication Log</h3>
+<span class="font-label-sm text-label-sm text-outline ml-2 flex-shrink-0">Yesterday</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Metformin 500mg logged successfully.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Pane: Detail View (Hidden on mobile unless selected, but for this demo shown on desktop) -->
+<div class="hidden md:flex flex-1 flex-col bg-surface-container-lowest overflow-y-auto">
+<div class="p-margin-desktop max-w-3xl mx-auto w-full">
+<!-- Detail Header -->
+<div class="flex items-center gap-3 mb-6">
+<div class="w-12 h-12 rounded-full bg-error-container text-on-error-container flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined fill text-[28px]">notifications_active</span>
+</div>
+<div>
+<h2 class="font-headline-xl text-headline-xl text-error">Emergency Alert Details</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Generated by Continuous Monitor ID: OXY-77B</p>
+</div>
+</div>
+<!-- Detail Card -->
+<div class="bg-surface border border-error/20 rounded-xl p-8 shadow-sm mb-8 relative overflow-hidden">
+<!-- Decorative background element -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-error/5 rounded-bl-full -mr-16 -mt-16 pointer-events-none"></div>
+<div class="mb-8">
+<h3 class="font-headline-lg text-headline-lg text-on-surface mb-2">SpO2 Level Critical: 88%</h3>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                                Patient's blood oxygen saturation has dropped below the critical threshold of 90% for a sustained period exceeding 3 minutes. Immediate attention is recommended to prevent hypoxia.
+                            </p>
+</div>
+<!-- Data Points -->
+<div class="grid grid-cols-2 gap-4 mb-8">
+<div class="p-4 bg-surface-container-low rounded-lg border border-outline-variant">
+<span class="font-label-md text-label-md text-outline block mb-1">Current SpO2</span>
+<span class="font-headline-xl text-headline-xl text-error font-bold block">88%</span>
+</div>
+<div class="p-4 bg-surface-container-low rounded-lg border border-outline-variant">
+<span class="font-label-md text-label-md text-outline block mb-1">Heart Rate</span>
+<span class="font-headline-xl text-headline-xl text-on-surface font-bold block">112 bpm</span>
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full py-4 bg-primary-container text-on-primary rounded-lg font-headline-md text-body-lg font-bold shadow-md hover:bg-primary transition-colors flex items-center justify-center gap-3">
+<span class="material-symbols-outlined">verified</span>
+                            Acknowledge &amp; Mark as Safe
+                        </button>
+</div>
+<!-- Timeline Section -->
+<div class="mb-12">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6 border-b border-outline-variant pb-2">Delivery Log</h3>
+<div class="relative pl-6 border-l-2 border-surface-variant space-y-8">
+<!-- Timeline Item 1 -->
+<div class="relative">
+<div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-error border-4 border-surface-container-lowest"></div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-body-lg font-semibold text-on-surface">Alert Triggered</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Sensor OXY-77B detected sustained low SpO2.</p>
+</div>
+<span class="font-label-sm text-label-sm text-outline">10:42 AM</span>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative">
+<div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-primary-container border-4 border-surface-container-lowest"></div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-body-lg font-semibold text-on-surface">System Processed</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Rules engine evaluated priority as CRITICAL.</p>
+</div>
+<span class="font-label-sm text-label-sm text-outline">10:42 AM</span>
+</div>
+</div>
+<!-- Timeline Item 3 -->
+<div class="relative">
+<div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-primary-container border-4 border-surface-container-lowest"></div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-body-lg font-semibold text-on-surface">Telegram Alert Sent</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Message dispatched to Caregiver (Elita).</p>
+</div>
+<span class="font-label-sm text-label-sm text-outline">10:43 AM</span>
+</div>
+</div>
+<!-- Timeline Item 4 (Pending) -->
+<div class="relative">
+<div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-surface-variant border-4 border-surface-container-lowest"></div>
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-headline-md text-body-lg font-semibold text-outline">Acknowledgement Pending</h4>
+<p class="font-body-md text-body-md text-outline">Awaiting clinical confirmation.</p>
+</div>
+<span class="font-label-sm text-label-sm text-outline">--:--</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="lg:hidden fixed bottom-0 left-0 w-full h-16 z-50 flex justify-around items-center px-margin-mobile bg-surface dark:bg-inverse-surface border-t border-outline-variant shadow-lg rounded-t-xl">
+<a href="dashboard.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">dashboard</span>
+<span class="font-label-sm text-label-sm">Dashboard</span>
+</a>
+<a href="new-measurement.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">add_circle</span>
+<span class="font-label-sm text-label-sm">New</span>
+</a>
+<a href="measurement-history.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">history</span>
+<span class="font-label-sm text-label-sm">History</span>
+</a>
+<a href="notifications-alerts.html" class="flex flex-col items-center gap-0.5 text-primary">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="font-label-sm text-label-sm">Notifications</span>
+</a>
+<a href="ai-assistant.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">smart_toy</span>
+<span class="font-label-sm text-label-sm">AI</span>
+</a>
+</nav>
+
+
+<button class="fixed bottom-20 right-6 md:bottom-8 md:right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center z-50 hover:bg-surface-tint transition-colors group" aria-label="AI Assistant">
+    <span class="material-symbols-outlined text-[28px] group-hover:scale-110 transition-transform">smart_toy</span>
+</button></body></html>

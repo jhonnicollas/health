@@ -1,0 +1,285 @@
+<!DOCTYPE html><html lang="id"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>HL Health Companion - Registrasi</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-fixed": "#00174b",
+                        "background": "#f7f9fb",
+                        "on-primary-container": "#f1f2ff",
+                        "tertiary-container": "#0076a9",
+                        "secondary": "#505f76",
+                        "primary": "#004bca",
+                        "on-background": "#191c1e",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e0e3e5",
+                        "outline-variant": "#c2c6d9",
+                        "tertiary-fixed-dim": "#89ceff",
+                        "tertiary-fixed": "#c9e6ff",
+                        "primary-fixed": "#dbe1ff",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-tertiary-fixed-variant": "#004c6e",
+                        "tertiary": "#005c85",
+                        "surface-bright": "#f7f9fb",
+                        "surface-tint": "#0052dc",
+                        "on-surface": "#191c1e",
+                        "on-tertiary": "#ffffff",
+                        "inverse-surface": "#2d3133",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#e6e8ea",
+                        "primary-container": "#0061ff",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "inverse-primary": "#b4c5ff",
+                        "surface-container-low": "#f2f4f6",
+                        "on-secondary-fixed": "#0b1c30",
+                        "surface-container": "#eceef0",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "surface": "#f7f9fb",
+                        "on-tertiary-fixed": "#001e2f",
+                        "inverse-on-surface": "#eff1f3",
+                        "surface-dim": "#d8dadc",
+                        "on-secondary-container": "#54647a",
+                        "secondary-container": "#d0e1fb",
+                        "outline": "#737687",
+                        "on-tertiary-container": "#eaf4ff",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-surface-variant": "#424656",
+                        "on-secondary-fixed-variant": "#38485d"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "container-max-width": "1440px",
+                        "sidebar-width": "280px",
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "margin-tablet": "24px",
+                        "margin-desktop": "32px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "headline-lg-mobile": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.05em", fontWeight: "600" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "label-sm": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+                        "headline-lg": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "headline-xl": ["36px", { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "32px", fontWeight: "600" }]
+                    }
+                }
+            }
+        };
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .input-focus-ring:focus {
+            outline: none;
+            border-color: #0061ff;
+            box-shadow: 0 0 0 2px rgba(0, 97, 255, 0.1);
+        }
+        
+        .strength-bar {
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-background min-h-screen flex items-center justify-center p-4 antialiased">
+<!-- Decorative Background -->
+<div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+<div class="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] rounded-full bg-primary-fixed-dim/30 blur-3xl mix-blend-multiply"></div>
+<div class="absolute bottom-[-10%] left-[-5%] w-[40vw] h-[40vw] rounded-full bg-secondary-fixed-dim/30 blur-3xl mix-blend-multiply"></div>
+</div>
+<main class="w-full max-w-md bg-surface-container-lowest rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)] border border-outline-variant relative z-10 overflow-hidden">
+<!-- Header -->
+<div class="p-8 pb-6 text-center border-b border-surface-container">
+<div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary-fixed mb-4">
+<span class="material-symbols-outlined text-primary text-[28px]" data-icon="health_and_safety">health_and_safety</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-2">Buat Akun Baru</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Bergabung dengan HL Health Companion untuk manajemen kesehatan yang lebih baik.</p>
+</div>
+<!-- Form -->
+<form class="p-8 pt-6 space-y-5" onsubmit="event.preventDefault();">
+<!-- Full Name -->
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface block" for="fullName">Nama Lengkap</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xl" data-icon="person">person</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-surface rounded-DEFAULT border border-outline-variant text-on-surface font-body-sm text-body-sm input-focus-ring placeholder-outline/60" id="fullName" placeholder="Masukkan nama lengkap Anda" required="" type="text">
+</div>
+</div>
+<!-- Email -->
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface block" for="email">Alamat Email</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xl" data-icon="mail">mail</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-surface rounded-DEFAULT border border-outline-variant text-on-surface font-body-sm text-body-sm input-focus-ring placeholder-outline/60" id="email" placeholder="nama@email.com" required="" type="email">
+</div>
+</div>
+<!-- Phone Number -->
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface block" for="phone">Nomor Telepon</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xl" data-icon="phone">phone</span>
+<div class="absolute left-10 top-1/2 -translate-y-1/2 text-on-surface font-body-sm text-body-sm border-r border-outline-variant pr-2 pointer-events-none">+62</div>
+<input class="w-full pl-24 pr-4 py-2.5 bg-surface rounded-DEFAULT border border-outline-variant text-on-surface font-body-sm text-body-sm input-focus-ring placeholder-outline/60" id="phone" placeholder="812-XXXX-XXXX" required="" type="tel">
+</div>
+</div>
+<!-- Password -->
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface block" for="password">Kata Sandi</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xl" data-icon="lock">lock</span>
+<input class="w-full pl-10 pr-10 py-2.5 bg-surface rounded-DEFAULT border border-outline-variant text-on-surface font-body-sm text-body-sm input-focus-ring placeholder-outline/60" id="password" oninput="updateStrength(this.value)" placeholder="Minimal 8 karakter" required="" type="password">
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors focus:outline-none" onclick="togglePassword('password', 'toggle-pwd-icon')" type="button">
+<span class="material-symbols-outlined text-xl" data-icon="visibility" id="toggle-pwd-icon">visibility</span>
+</button>
+</div>
+<!-- Password Strength Indicator -->
+<div class="mt-2 space-y-1">
+<div class="flex gap-1 h-1">
+<div class="flex-1 bg-surface-container-high rounded-full strength-bar" id="strength-1"></div>
+<div class="flex-1 bg-surface-container-high rounded-full strength-bar" id="strength-2"></div>
+<div class="flex-1 bg-surface-container-high rounded-full strength-bar" id="strength-3"></div>
+<div class="flex-1 bg-surface-container-high rounded-full strength-bar" id="strength-4"></div>
+</div>
+<div class="text-xs font-body-sm text-outline-variant text-right h-4" id="strength-text">Kekuatan Sandi</div>
+</div>
+</div>
+<!-- Confirm Password -->
+<div class="space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface block" for="confirmPassword">Konfirmasi Kata Sandi</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xl" data-icon="lock_reset">lock_reset</span>
+<input class="w-full pl-10 pr-10 py-2.5 bg-surface rounded-DEFAULT border border-outline-variant text-on-surface font-body-sm text-body-sm input-focus-ring placeholder-outline/60" id="confirmPassword" placeholder="Ulangi kata sandi Anda" required="" type="password">
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors focus:outline-none" onclick="togglePassword('confirmPassword', 'toggle-cpwd-icon')" type="button">
+<span class="material-symbols-outlined text-xl" data-icon="visibility" id="toggle-cpwd-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Terms and Conditions -->
+<div class="flex items-start gap-3 pt-2">
+<div class="flex items-center h-5">
+<input class="w-4 h-4 rounded-DEFAULT border-outline-variant text-primary-container focus:ring-primary-container focus:ring-offset-0 bg-surface" id="terms" required="" type="checkbox">
+</div>
+<div class="text-sm">
+<label class="font-body-sm text-body-sm text-on-surface-variant" for="terms">
+                        Saya setuju dengan  serta  yang berlaku.
+                    </label>
+</div>
+</div>
+<!-- Submit Button -->
+<button class="w-full py-3 px-4 bg-primary-container hover:bg-surface-tint text-on-primary font-label-md text-label-md rounded-DEFAULT shadow-sm transition-colors mt-6 flex justify-center items-center gap-2" type="submit">
+                Daftar Sekarang
+                <span class="material-symbols-outlined text-lg" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Login Link -->
+<div class="text-center mt-6">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                    Sudah punya akun? 
+                    
+</p>
+</div>
+</form>
+</main>
+<script>
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+                icon.setAttribute('data-icon', 'visibility_off');
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+                icon.setAttribute('data-icon', 'visibility');
+            }
+        }
+
+        function updateStrength(password) {
+            let strength = 0;
+            if (password.length >= 8) strength += 1;
+            if (password.match(/[A-Z]/)) strength += 1;
+            if (password.match(/[0-9]/)) strength += 1;
+            if (password.match(/[^A-Za-z0-9]/)) strength += 1;
+
+            const bars = [
+                document.getElementById('strength-1'),
+                document.getElementById('strength-2'),
+                document.getElementById('strength-3'),
+                document.getElementById('strength-4')
+            ];
+            const text = document.getElementById('strength-text');
+
+            // Reset bars
+            bars.forEach(bar => bar.className = 'flex-1 bg-surface-container-high rounded-full strength-bar');
+
+            if (password.length === 0) {
+                text.textContent = 'Kekuatan Sandi';
+                text.className = 'text-xs font-body-sm text-outline-variant text-right h-4';
+                return;
+            }
+
+            const colors = ['bg-error', 'bg-tertiary-container', 'bg-primary-container', 'bg-tertiary'];
+            const texts = ['Sangat Lemah', 'Lemah', 'Sedang', 'Kuat'];
+            const textColors = ['text-error', 'text-tertiary-container', 'text-primary-container', 'text-tertiary'];
+
+            const effectiveStrength = Math.max(0, strength - 1);
+
+            for (let i = 0; i < strength; i++) {
+                bars[i].className = `flex-1 ${colors[effectiveStrength]} rounded-full strength-bar`;
+            }
+
+            text.textContent = texts[effectiveStrength];
+            text.className = `text-xs font-body-sm ${textColors[effectiveStrength]} text-right h-4`;
+        }
+    </script>
+</body></html>

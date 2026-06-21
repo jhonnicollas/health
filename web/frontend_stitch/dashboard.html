@@ -1,0 +1,531 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>HealthSync Pro - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "secondary-fixed-dim": "#b7c8e1",
+                "on-surface-variant": "#424656",
+                "surface-dim": "#d8dadc",
+                "on-secondary-container": "#54647a",
+                "on-secondary": "#ffffff",
+                "tertiary-fixed": "#c9e6ff",
+                "surface-container": "#eceef0",
+                "on-tertiary-fixed-variant": "#004c6e",
+                "inverse-primary": "#b4c5ff",
+                "outline-variant": "#c2c6d9",
+                "on-primary": "#ffffff",
+                "surface-container-low": "#f2f4f6",
+                "surface-variant": "#e0e3e5",
+                "on-primary-fixed-variant": "#003ea8",
+                "secondary-container": "#d0e1fb",
+                "tertiary-fixed-dim": "#89ceff",
+                "on-background": "#191c1e",
+                "on-secondary-fixed-variant": "#38485d",
+                "secondary-fixed": "#d3e4fe",
+                "on-error-container": "#93000a",
+                "surface": "#f7f9fb",
+                "on-surface": "#191c1e",
+                "surface-container-lowest": "#ffffff",
+                "surface-container-high": "#e6e8ea",
+                "primary-fixed": "#dbe1ff",
+                "tertiary-container": "#0076a9",
+                "on-error": "#ffffff",
+                "outline": "#737687",
+                "on-tertiary-fixed": "#001e2f",
+                "on-tertiary-container": "#eaf4ff",
+                "error": "#ba1a1a",
+                "error-container": "#ffdad6",
+                "secondary": "#505f76",
+                "on-primary-fixed": "#00174b",
+                "on-primary-container": "#f1f2ff",
+                "surface-tint": "#0052dc",
+                "primary": "#004bca",
+                "on-tertiary": "#ffffff",
+                "primary-fixed-dim": "#b4c5ff",
+                "background": "#f7f9fb",
+                "surface-container-highest": "#e0e3e5",
+                "inverse-surface": "#2d3133",
+                "primary-container": "#0061ff",
+                "tertiary": "#005c85",
+                "on-secondary-fixed": "#0b1c30",
+                "inverse-on-surface": "#eff1f3",
+                "surface-bright": "#f7f9fb"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "sidebar-width": "280px",
+                "unit": "4px",
+                "margin-tablet": "24px",
+                "margin-mobile": "16px",
+                "margin-desktop": "32px",
+                "gutter": "24px",
+                "container-max-width": "1440px"
+        },
+        "fontFamily": {
+                "body-sm": [
+                        "Inter"
+                ],
+                "headline-xl": [
+                        "Inter"
+                ],
+                "body-md": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "label-sm": [
+                        "Inter"
+                ],
+                "label-md": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "headline-md": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "body-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-xl": [
+                        "36px",
+                        {
+                                "lineHeight": "44px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "28px",
+                        {
+                                "lineHeight": "36px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Hide scrollbar for clean UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-screen flex overflow-hidden">
+<!-- Mobile Top App Bar (Hidden on Desktop) -->
+<header class="md:hidden flex justify-between items-center h-16 px-margin-mobile w-full z-40 bg-surface dark:bg-inverse-surface shadow-sm fixed top-0">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined fill text-primary">health_and_safety</span>
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">HealthSync Pro</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="text-primary font-bold">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Dr. Julianne Smith" class="w-full h-full object-cover" data-alt="A small circular profile picture of a doctor in a white coat, looking professional in a well-lit clinic environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkm-bHb5AcDtTt9dBrd7bNKwcL04rS4-rwemtwAOwQkKYjGMV21AsIGZvC0aQrq0t1PbhylX5acK5C_8Uheuksl3B4HM8n-cuYntNO4oGzxS9Ko3JXI5dnnMzz2sDrWgxnzI9h0PDT9EfC-FsNK1dWsX4FZPRvXBU7zEMvvrvKMh0TYfXqbFF0345cwJ3gFA7O4Fla5b1d_-iMJ8ZA21-9ZbgZ9X1lF80Sjdt7GaEmY-ELx5ToUydQ-QlDN8UNZdhqCwryHwj8bnM">
+</div>
+</div>
+</header>
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-full w-sidebar-width z-50 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined fill">local_hospital</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary leading-tight">HealthSync Pro</h1>
+<p class="font-label-sm text-label-sm text-outline">Enterprise Health</p>
+</div>
+</div>
+<button class="w-full py-2 px-4 bg-error text-on-error rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-error-container hover:text-on-error-container transition-colors shadow-sm">
+<span class="material-symbols-outlined">emergency</span>
+                Emergency Support
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto py-4">
+<a href="dashboard.html" class="flex items-center gap-4 px-6 py-3 bg-primary-container/10 border-l-4 border-primary text-primary font-bold transition-colors">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a href="new-measurement.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-label-md text-label-md">New Measurement</span>
+</a>
+<a href="measurement-history.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-label-md">History</span>
+</a>
+<a href="notifications-alerts.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-label-md text-label-md">Notifications & Alerts</span>
+</a>
+<a href="ai-assistant.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-md text-label-md">AI Assistant</span>
+</a>
+<a href="family-caregiver.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">family_restroom</span>
+<span class="font-label-md text-label-md">Family / Caregiver</span>
+</a>
+<a href="reports-analytics.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-md text-label-md">Reports & Analytics</span>
+</a>
+<a href="settings-profile.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+</div>
+
+
+
+
+
+
+
+</div>
+<div class="p-4 border-t border-outline-variant">
+<a href="knowledge-base.html" class="flex items-center gap-4 px-4 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Help Center</span>
+</a>
+<a href="login.html" class="flex items-center gap-4 px-4 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col md:ml-[280px] h-screen pt-16 md:pt-0 bg-surface overflow-y-auto">
+<!-- TopNavBar (Desktop) -->
+<header class="hidden md:flex justify-between items-center h-16 px-margin-desktop w-full z-40 bg-surface border-b border-outline-variant sticky top-0">
+<div class="relative w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" data-icon="search">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-full text-body-sm focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none" placeholder="Search patients, reports..." type="text">
+</div>
+<div class="flex items-center gap-6"><div class="flex items-center gap-6">
+    <div class="hidden xl:flex flex-col items-end border-r border-outline-variant pr-6">
+        <span class="font-label-md text-label-md text-on-surface">Minggu, 21 Juni 2026</span>
+        <span class="font-label-sm text-label-sm text-on-surface-variant">19:28:00</span>
+    </div>
+    <div class="flex items-center gap-2 bg-surface-container-low p-1 rounded-full border border-outline-variant">
+        <button class="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-on-primary shadow-sm">
+            <span class="material-symbols-outlined text-sm">light_mode</span>
+        </button>
+        <button class="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+            <span class="material-symbols-outlined text-sm">wb_sunny</span>
+        </button>
+        <button class="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+            <span class="material-symbols-outlined text-sm">dark_mode</span>
+        </button>
+    </div>
+    <div class="flex items-center gap-4">
+        <button class="relative text-on-surface-variant hover:text-primary transition-colors">
+            <span class="material-symbols-outlined">notifications</span>
+            <span class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full"></span>
+        </button>
+        <button class="text-on-surface-variant hover:text-primary transition-colors">
+            <span class="material-symbols-outlined">menu_book</span>
+        </button>
+        <button class="text-on-surface-variant hover:text-primary transition-colors">
+            <span class="material-symbols-outlined">help</span>
+        </button>
+    </div>
+    <div class="flex items-center gap-3 border-l border-outline-variant pl-6">
+        <img class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A small circular profile picture of Dr. Julianne Smith, a professional woman in a clinic setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBs8_FTcapT89aLRWE5tpkdV8V161QTF_P8eZ-btZ-dOVCC5aDSMYi6nZ4JZeF3YmeNl0tfzgZmGgmbj3kvtqD8vcsmEf2tpLoB-lQKkBjxa1W0VaE7Sqtm8JKT935BAkEtlW-bdB-ceeyDqEzJnAktVdFKFFJtVkSrRIQbqp_EKtcBusLFLJ0Oi8Iyy3770GP45bHxKu6omjO-ULZHWQ23Pz-KfSVqmPU43IoLa-_3oasr6LkZZM2ozpbZbdriF9OWorHspQ4rwy4">
+        <span class="font-label-md text-label-md text-on-surface">Dr. Julian Vance</span>
+    </div>
+</div></div>
+</header>
+<!-- Dashboard Content -->
+<div class="flex-1 p-margin-mobile md:p-margin-desktop max-w-[1440px] mx-auto w-full space-y-8">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h2 class="font-headline-xl text-headline-lg-mobile md:text-headline-xl text-on-surface">Good Morning, Julian</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-1">Here is your daily health summary.</p>
+</div>
+</div>
+<!-- Bento Grid Layout for Top Highlights -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Gamification Banner -->
+<div class="lg:col-span-1 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm flex items-center gap-6 relative overflow-hidden">
+<div class="absolute -right-10 -bottom-10 opacity-5">
+<span class="material-symbols-outlined text-9xl text-primary" data-icon="local_fire_department" data-weight="fill" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+</div>
+<div class="p-4 bg-error-container rounded-lg flex-shrink-0">
+</div>
+<div class="z-10">
+<h3 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Streak: 7 Days!</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Best Streak: 14 Days</p>
+</div>
+</div>
+<!-- AI Health Assistant Insight -->
+<div class="lg:col-span-2 bg-gradient-to-br from-primary-container to-tertiary-container rounded-xl p-6 shadow-md text-on-primary relative overflow-hidden flex flex-col justify-center">
+<div class="absolute top-0 right-0 p-4 opacity-20">
+<span class="material-symbols-outlined text-6xl" data-icon="temp_preferences_custom">temp_preferences_custom</span>
+</div>
+<div class="flex items-center gap-3 mb-3 z-10">
+<span class="material-symbols-outlined text-inverse-primary" data-icon="smart_toy">smart_toy</span>
+<span class="font-label-md text-label-md text-inverse-primary uppercase tracking-wider">AI Clinical Insight</span>
+</div>
+<p class="font-body-lg text-body-lg leading-relaxed z-10">
+                        Your Fasting Glucose is well-maintained today! However, your 3-day average sleep duration is below 6 hours, which might correlate with your slight Systolic bump.
+                    </p>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<div class="border-b border-outline-variant sticky top-16 md:top-0 bg-surface z-30 pt-4">
+<div class="flex gap-8">
+<button class="pb-3 border-b-2 border-primary text-primary font-label-md text-label-md">Today</button>
+<button class="pb-3 border-b-2 border-transparent text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md">Weekly View</button>
+<button class="pb-3 border-b-2 border-transparent text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md">Monthly Summary</button>
+</div>
+</div>
+<!-- Today View: Quick Vitals Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+<!-- Blood Pressure Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="favorite">favorite</span>
+<span class="font-label-md text-label-md">Blood Pressure</span>
+</div>
+<span class="px-2 py-1 bg-error-container text-on-error-container text-xs font-bold rounded-md">Warning</span>
+</div>
+<div class="flex items-baseline gap-1 mb-4">
+<span class="font-headline-xl text-headline-xl text-on-surface">132/85</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">mmHg</span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 3-day avg</span>
+<div class="flex items-center gap-1 text-error">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span class="">+4%</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 7-day avg</span>
+<div class="flex items-center gap-1 text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_flat">trending_flat</span>
+<span class="">0%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- SpO2 Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="air">air</span>
+<span class="font-label-md text-label-md">SpO2</span>
+</div>
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-md">Normal</span>
+</div>
+<div class="flex items-baseline gap-1 mb-4">
+<span class="font-headline-xl text-headline-xl text-on-surface">98</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">%</span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 3-day avg</span>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span class="">+1%</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 7-day avg</span>
+<div class="flex items-center gap-1 text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_flat">trending_flat</span>
+<span class="">0%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Glucose Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="water_drop">water_drop</span>
+<span class="font-label-md text-label-md">Fasting Glucose</span>
+</div>
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container text-xs font-bold rounded-md">Normal</span>
+</div>
+<div class="flex items-baseline gap-1 mb-4">
+<span class="font-headline-xl text-headline-xl text-on-surface">92</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">mg/dL</span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 3-day avg</span>
+<div class="flex items-center gap-1 text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_flat">trending_flat</span>
+<span class="">0%</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 7-day avg</span>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_down">trending_down</span>
+<span class="">-2%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Sleep Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="bedtime">bedtime</span>
+<span class="font-label-md text-label-md">Sleep</span>
+</div>
+<span class="px-2 py-1 bg-error-container text-on-error-container text-xs font-bold rounded-md">Warning</span>
+</div>
+<div class="flex items-baseline gap-1 mb-4">
+<span class="font-headline-xl text-headline-xl text-on-surface">5<span class="text-xl">h</span> 45<span class="text-xl">m</span></span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 3-day avg</span>
+<div class="flex items-center gap-1 text-error">
+<span class="material-symbols-outlined text-sm" data-icon="trending_down">trending_down</span>
+<span class="">-12%</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-sm bg-surface-container-low px-3 py-1.5 rounded-lg">
+<span class="text-on-surface-variant">vs 7-day avg</span>
+<div class="flex items-center gap-1 text-error">
+<span class="material-symbols-outlined text-sm" data-icon="trending_down">trending_down</span>
+<span class="">-8%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom spacing for mobile nav -->
+<div class="h-8 md:hidden"></div>
+</div>
+</main>
+<!-- FAB (Mobile Only) -->
+<button class="md:hidden fixed bottom-20 right-4 w-14 h-14 bg-primary text-on-primary rounded-xl shadow-lg flex items-center justify-center z-50 hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+</button>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="lg:hidden fixed bottom-0 left-0 w-full h-16 z-50 flex justify-around items-center px-margin-mobile bg-surface dark:bg-inverse-surface border-t border-outline-variant shadow-lg rounded-t-xl pb-safe">
+<a href="dashboard.html" class="flex flex-col items-center gap-0.5 text-primary">
+<span class="material-symbols-outlined text-[22px]">dashboard</span>
+<span class="font-label-sm text-label-sm">Dashboard</span>
+</a>
+<a href="new-measurement.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">add_circle</span>
+<span class="font-label-sm text-label-sm">New</span>
+</a>
+<a href="measurement-history.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">history</span>
+<span class="font-label-sm text-label-sm">History</span>
+</a>
+<a href="notifications-alerts.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="font-label-sm text-label-sm">Notifications</span>
+</a>
+<a href="ai-assistant.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">smart_toy</span>
+<span class="font-label-sm text-label-sm">AI</span>
+</a>
+</nav>
+<!-- Floating AI Assistant -->
+<button aria-label="AI Assistant" class="fixed bottom-20 right-6 md:bottom-8 md:right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center z-50 hover:bg-surface-tint transition-colors group">
+<span class="material-symbols-outlined text-[28px] group-hover:scale-110 transition-transform">smart_toy</span>
+</button>
+
+
+</body></html>

@@ -1,9 +1,8 @@
 # Stitch UI Parity Test Plan
 
 Project: HL Health Companion  
-Stitch source: `HL Health Master Layout`  
-Stitch project ID: `projects/5854270015643176038`  
-Goal: verify that the implemented frontend UI matches the Stitch project screen-by-screen, without breaking Sprint 1-4 product functionality.
+Stitch source: `web/frontend_stitch/` (local HTML + PNG export)  
+Goal: verify that the implemented frontend UI matches the Stitch HTML screens pixel-for-pixel, without breaking Sprint 1-4 product functionality.
 
 ---
 
@@ -20,7 +19,7 @@ Actual screenshot comparison + manual design review = required parity evidence
 
 Every P0 route must pass both:
 
-1. Visual parity test against Stitch.
+1. Visual parity test against Stitch reference (`web/frontend_stitch/{name}.html` + `{name}.png`).
 2. Functional regression test against the real app behavior.
 
 ---
@@ -58,66 +57,52 @@ npx wrangler deploy
 
 ---
 
-## 3. Baseline Capture Requirements
+## 3. Stitch Reference Files (Local)
 
-Before implementation, capture a baseline for every P0 Stitch screen.
+All Stitch reference screens are in `web/frontend_stitch/`. Every screen has two files:
 
-| Baseline ID | Stitch Screen Instance | Local Route | Required |
-|---|---|---|---|
-| `baseline-register` | `47a06482d6ff4a269f770a959bf29820` | `/auth/register`, `/register` | Yes |
-| `baseline-login` | `5eec9b4ce4884c8aae16a904b1dac7c3` | `/auth/login`, `/login` | Yes |
-| `baseline-onboarding` | `d2e4aaf355a24e4cb645ba6b960546f2` | `/onboarding` | Yes |
-| `baseline-shell` | `52b3e3e908414767976602862ea334a8` | App shell for authenticated pages | Yes |
-| `baseline-dashboard` | `e28233a723ed48ed948e54172c3f516d` | `/dashboard`, `/dashboard/week`, `/dashboard/month` | Yes |
-| `baseline-measurement` | `531f69e8d8cc4734865fd4f825c828a4` | `/measurements/new` | Yes |
-| `baseline-history` | `591e9897af984758a61f1861daf0a291` | `/measurements/history` | Yes |
-| `baseline-tracker` | `d3570e169aa94805a797f27ecde2d1ba` | `/tracker` | Yes |
-| `baseline-alerts` | `3bba9bf8931a4d02a9e6f159811fe9ed` | `/alerts` | Yes |
-| `baseline-ai-assistant` | `c7a54284936b4292bb256cd2d35c4b56` | `/ai-assistant` | Yes |
-| `baseline-settings` | `2b657fcafc7645cd89b0c8d3e1e514e1` | `/settings/profile` | Yes |
-| `baseline-family` | `b6c1a7b8ca6149b094e1b7a9343bf2b8` | `/family`, `/caregiver` | Yes |
-| `baseline-senior` | `6b745584fb9443a69ac42f2719e9c54b` | senior mode shell | Yes |
-| `baseline-reports` | `d076d5ec0389499ab51b5363c26f1637` | `/reports/*` | P1 |
+- `{name}.html` — full Stitch HTML markup (open in browser for exact layout reference)
+- `{name}.png` — Stitch screenshot (open in image viewer for quick visual compare)
 
-Each baseline capture must record:
+### Reference Screen Inventory
+
+| Baseline ID | HTML File | PNG File | Local Route | Priority |
+|---|---|---|---|---|
+| `baseline-register` | `web/frontend_stitch/register.html` | `web/frontend_stitch/register.png` | `/auth/register`, `/register` | P0 |
+| `baseline-login` | `web/frontend_stitch/login.html` | `web/frontend_stitch/login.png` | `/auth/login`, `/login` | P0 |
+| `baseline-onboarding` | `web/frontend_stitch/onboarding.html` | `web/frontend_stitch/onboarding.png` | `/onboarding` | P0 |
+| `baseline-shell` | `web/frontend_stitch/master-layout.html` | `web/frontend_stitch/master-layout.png` | Authenticated app shell | P0 |
+| `baseline-dashboard` | `web/frontend_stitch/dashboard.html` | `web/frontend_stitch/dashboard.png` | `/dashboard`, `/dashboard/week`, `/dashboard/month` | P0 |
+| `baseline-measurement` | `web/frontend_stitch/new-measurement.html` | `web/frontend_stitch/new-measurement.png` | `/measurements/new` | P0 |
+| `baseline-history` | `web/frontend_stitch/measurement-history.html` | `web/frontend_stitch/measurement-history.png` | `/measurements/history` | P0 |
+| `baseline-tracker` | `web/frontend_stitch/medication-fasting-tracker.html` | `web/frontend_stitch/medication-fasting-tracker.png` | `/tracker`, `/medications`, `/fasting` | P0 |
+| `baseline-alerts` | `web/frontend_stitch/notifications-alerts.html` | `web/frontend_stitch/notifications-alerts.png` | `/alerts` | P0 |
+| `baseline-ai-assistant` | `web/frontend_stitch/ai-assistant.html` | `web/frontend_stitch/ai-assistant.png` | `/ai-assistant` | P0 |
+| `baseline-settings` | `web/frontend_stitch/settings-profile.html` | `web/frontend_stitch/settings-profile.png` | `/settings/profile` | P0 |
+| `baseline-family` | `web/frontend_stitch/family-caregiver.html` | `web/frontend_stitch/family-caregiver.png` | `/family`, `/caregiver` | P0 |
+| `baseline-senior` | `web/frontend_stitch/senior-mode.html` | `web/frontend_stitch/senior-mode.png` | Senior shell, `/measurements/senior` | P0 |
+| `baseline-reports` | `web/frontend_stitch/reports-analytics.html` | `web/frontend_stitch/reports-analytics.png` | `/reports/*` | P1 |
+| `baseline-knowledge` | `web/frontend_stitch/knowledge-base.html` | `web/frontend_stitch/knowledge-base.png` | `/kb` | P1 |
+| `baseline-auth-gateway` | `web/frontend_stitch/auth-gateway.html` | `web/frontend_stitch/auth-gateway.png` | Auth/onboarding composite | P1 |
+
+### Design Token Reference
+
+The single source of truth for all color, typography, spacing, and elevation tokens:
+
+`web/frontend_stitch/DESIGN.md`
+
+Key token values (see DESIGN.md for the full spec):
 
 ```text
-Stitch screen instance ID
-Route target
-Viewport size
-Capture timestamp
-Screenshot path or artifact link
-Key layout notes
-Known hidden/alternate state notes
+Primary:        #004bca (blue-700)
+Primary container: #0061ff (blue-600)
+Surface:        #f7f9fb (slate-50)
+Sidebar bg:     #f2f4f6 (slate-100)
+Sidebar width:  280px
+Font:           Inter
+Container max:  1440px
+Base unit:      4px
 ```
-
-### Captured Baseline Log - 2026-06-21 16:51 UTC
-
-Stitch MCP returned screenshots at 2x source scale. A `2560x2048` screenshot corresponds to the `1280x1024` desktop design board viewport.
-
-| Baseline ID | Stitch Title | Screen Instance | Source Size | Route Target | Screenshot Artifact | HTML Artifact | Notes |
-|---|---|---|---|---|---|---|---|
-| `baseline-register` | Registrasi (Updated Sidebar) - HL Health Companion | `47a06482d6ff4a269f770a959bf29820` | `2560x2048` | `/auth/register`, `/register` | `projects/5854270015643176038/files/81614f2164d74a85a3aed607517023ae` | `projects/5854270015643176038/files/865ae0adbd804c1b87cb15fc67907eef` | Updated auth sidebar reference. |
-| `baseline-login` | Login (Updated Sidebar) - HL Health Companion | `5eec9b4ce4884c8aae16a904b1dac7c3` | `2560x2048` | `/auth/login`, `/login` | `projects/5854270015643176038/files/23b6e4e1e5e54446a2d34eabfbd7c1ae` | `projects/5854270015643176038/files/44a2af11ffe3445591c3579e28ecd0fa` | Updated auth sidebar reference. |
-| `baseline-onboarding` | Onboarding (Updated Sidebar) - HL Health Companion | `d2e4aaf355a24e4cb645ba6b960546f2` | `2560x2048` | `/onboarding` | `projects/5854270015643176038/files/9966768441894a0298cac59e41420e54` | `projects/5854270015643176038/files/fb22caa88a514da99bdcf503ee9f46af` | Use for forced onboarding gateway. |
-| `baseline-shell` | Master Layout Shell | `52b3e3e908414767976602862ea334a8` | `2560x2048` | Authenticated app shell | `projects/5854270015643176038/files/15918716474395741404` | `projects/5854270015643176038/files/17172836468553858985` | Shared shell reference for sidebar/header/content frame. |
-| `baseline-dashboard` | Dashboard - HealthSync Pro | `e28233a723ed48ed948e54172c3f516d` | `2560x2048` | `/dashboard`, `/dashboard/week`, `/dashboard/month` | `projects/5854270015643176038/files/1859121653976559902` | `projects/5854270015643176038/files/10743242630171483590` | True dashboard baseline. |
-| `baseline-measurement` | New Measurement - HealthSync Pro | `531f69e8d8cc4734865fd4f825c828a4` | `2560x3146` | `/measurements/new` | `projects/5854270015643176038/files/7087945639121735332` | `projects/5854270015643176038/files/6249077463238489025` | Long-form measurement capture baseline. |
-| `baseline-history` | Measurement History & Raw Data Log - HL Health Companion | `591e9897af984758a61f1861daf0a291` | `2560x2048` | `/measurements/history` | `projects/5854270015643176038/files/4706698166574770488` | `projects/5854270015643176038/files/4636297191508710036` | Raw data table and evidence reference. |
-| `baseline-tracker` | Medication & Fasting Tracker - HL Health Companion | `d3570e169aa94805a797f27ecde2d1ba` | `2560x2812` | `/tracker`, `/medications`, `/fasting` | `projects/5854270015643176038/files/14420450855771226219` | `projects/5854270015643176038/files/8170367058085117057` | Long tracker baseline. |
-| `baseline-alerts` | Notifications & Alerts - HL Health Companion | `3bba9bf8931a4d02a9e6f159811fe9ed` | `2560x2048` | `/alerts` | `projects/5854270015643176038/files/4486607896322116636` | `projects/5854270015643176038/files/2715543370339877255` | Alerts inbox/timeline baseline. |
-| `baseline-ai-assistant` | AI Assistant (Polished) - HealthSync Pro | `c7a54284936b4292bb256cd2d35c4b56` | `2560x2048` | `/ai-assistant` | `projects/5854270015643176038/files/cc7fa792804f492a87a73c1c2de6f3e6` | `projects/5854270015643176038/files/2300b0ab5861422aaae2e094b6f80121` | Polished AI baseline. Older hidden AI screen `22a886...` was unavailable from MCP. |
-| `baseline-settings` | Settings & Profile Management (Polished) - HealthSync Pro | `2b657fcafc7645cd89b0c8d3e1e514e1` | `2560x2048` | `/settings/profile` | `projects/5854270015643176038/files/6feed2b0033748b6a5cab5ec47de8468` | `projects/5854270015643176038/files/2d21b8dbaca145e1a56519a7d2732360` | Polished settings baseline. |
-| `baseline-family` | Family & Caregiver Link (Polished) - HealthSync Pro | `b6c1a7b8ca6149b094e1b7a9343bf2b8` | `2560x3028` | `/family`, `/caregiver` | `projects/5854270015643176038/files/09ee679dffd14c27a627f98aa3d7bc46` | `projects/5854270015643176038/files/7a093032a2cb4df68a1eb36b043c1797` | Polished family/caregiver baseline. |
-| `baseline-senior` | Senior Mode Interface - HL Health Companion | `6b745584fb9443a69ac42f2719e9c54b` | `2560x6760` | Senior shell and `/measurements/senior` | `projects/5854270015643176038/files/4c5162e1d7a4405ca1645633f66030ca` | `projects/5854270015643176038/files/d8e7748488ea4569afd00db396ff671f` | Full senior mode baseline. |
-| `baseline-reports` | Reports & Analytics - HealthSync Pro | `d076d5ec0389499ab51b5363c26f1637` | `2560x2048` | `/reports/*` | `projects/5854270015643176038/files/bf473f5fd5e94c489ced2f4ad5cd4d21` | `projects/5854270015643176038/files/2944491976850260794` | P1 report baseline captured early. |
-
-Additional inspected reference:
-
-| Stitch Title | Screen Instance | Source Size | Screenshot Artifact | Notes |
-|---|---|---:|---|---|
-| Authentication & Onboarding Gateway - HL Health Companion | `ff3a1fdb50354aec9b3791c598b97aea` | `2560x5936` | `projects/5854270015643176038/files/798dbc0167fc4c87988d0fa0a353b78e` | Composite auth/onboarding reference. |
-| Knowledge Base - HealthSync Pro | `ecc21fbda8294dd5a826bede08e458ae` | `2560x2048` | `projects/5854270015643176038/files/17089408459099981028` | P1 knowledge base reference. |
 
 ---
 
@@ -126,7 +111,7 @@ Additional inspected reference:
 Target score is 100/100. A route cannot be accepted below 95/100 unless the owner explicitly accepts the deviation.
 
 | Category | Points | Failure Examples |
-|---|---:|---|
+|---|---|---:|---|
 | Shell layout | 15 | Sidebar width wrong, header block wrong, content margin wrong |
 | Grid and spacing | 15 | Cards not aligned, gutters wrong, excessive whitespace, density mismatch |
 | Typography | 10 | Wrong sizes, weights, line heights, label treatment |
@@ -151,7 +136,7 @@ Acceptance:
 
 For each route:
 
-1. Open the Stitch baseline at the exact screen state.
+1. Open the Stitch reference HTML in `web/frontend_stitch/{name}.html` in a browser.
 2. Open the local route with matching viewport.
 3. Seed or create app data so the local state resembles the Stitch screen state.
 4. Capture screenshots at:
@@ -177,7 +162,7 @@ artifacts/stitch-parity/{route-name}/notes.md
 
 Do not commit generated screenshot artifacts unless the owner explicitly requests it.
 
-### Current Local Capture Log - 2026-06-21 17:00 UTC
+### Current Local Capture Log — 2026-06-21 17:00 UTC
 
 Local capture source:
 
@@ -189,25 +174,25 @@ Artifact directory: C:\temp\stitch-parity-current
 Manifest: C:\temp\stitch-parity-current\manifest.json
 ```
 
-These are before-state screenshots for parity remediation. They are not accepted as Stitch-matching UI.
+These are **before-state** screenshots for parity remediation. They are not accepted as Stitch-matching UI.
 
 | Local Screen | Route / Mode | Screenshot Path | Current Mismatch Notes |
 |---|---|---|---|
-| Register | `/auth/register` logged out | `C:\temp\stitch-parity-current\register-desktop.png` | Auth UI functional but simple; must be rebuilt against updated Stitch registration screen and auth gateway composition. |
-| Login | `/auth/login` logged out | `C:\temp\stitch-parity-current\login-desktop.png` | Functional login card; must match updated Stitch login sidebar, spacing, trust indicators, and panel hierarchy. |
-| Onboarding | `/onboarding` onboarding-gated | `C:\temp\stitch-parity-current\onboarding-desktop.png` | Form fields exist, but layout lacks Stitch onboarding gateway structure and polished section rhythm. |
-| Dashboard | `/dashboard` | `C:\temp\stitch-parity-current\dashboard-desktop.png` | Sparse dashboard; shell, KPI hierarchy, card density, and data visualization do not match Stitch dashboard. |
-| Weekly Dashboard | `/dashboard/week` | `C:\temp\stitch-parity-current\dashboard-week-desktop.png` | Minimal metric summaries; lacks Stitch analytics composition and chart/table treatment. |
-| Monthly Dashboard | `/dashboard/month` | `C:\temp\stitch-parity-current\dashboard-month-desktop.png` | Generic summary cards; lacks Stitch report/dashboard visual hierarchy. |
-| Measurement Capture | `/measurements/new` with BP metrics selected | `C:\temp\stitch-parity-current\measurement-new-desktop.png` | Functional checklist/form only; native file inputs and plain metric cards do not match Stitch new measurement screen. |
-| Measurement History | `/measurements/history` | `C:\temp\stitch-parity-current\measurement-history-desktop.png` | Plain table; missing Stitch raw data log density, filters, toolbar, evidence treatment, and table styling. |
-| Tracker | `/tracker` | `C:\temp\stitch-parity-current\tracker-desktop.png` | Basic two-column cards; does not match long Stitch medication/fasting tracker hierarchy. |
-| Alerts | `/alerts` | `C:\temp\stitch-parity-current\alerts-desktop.png` | Functional alert list/timeline; lacks polished Stitch inbox grid and alert center density. |
-| AI Assistant | `/ai-assistant` | `C:\temp\stitch-parity-current\ai-assistant-desktop.png` | Empty/simple chat shell; does not match polished Stitch assistant layout, message rail, and context cards. |
-| Settings | `/settings/profile` | `C:\temp\stitch-parity-current\settings-profile-desktop.png` | Plain profile form; lacks polished Stitch profile management layout and control grouping. |
-| Family | `/family` | `C:\temp\stitch-parity-current\family-desktop.png` | Stacked form/list; does not match polished Stitch caregiver invitation suite and permission layout. |
-| Senior Dashboard | senior mode `/dashboard` | `C:\temp\stitch-parity-current\senior-dashboard-desktop.png` | Three-tab concept exists, but dashboard content is not rebuilt from Stitch senior mode baseline. |
-| Senior Emergency | senior mode Darurat tab | `C:\temp\stitch-parity-current\senior-emergency-desktop.png` | SOS appears, but emergency/contact layout does not match full Stitch senior mode screen. |
+| Register | `/auth/register` logged out | `C:\temp\stitch-parity-current\register-desktop.png` | Auth UI functional but simple; must be rebuilt against Stitch registration screen. Compare with `web/frontend_stitch/register.html`. |
+| Login | `/auth/login` logged out | `C:\temp\stitch-parity-current\login-desktop.png` | Functional login card; must match Stitch login sidebar, spacing, trust indicators. Compare with `web/frontend_stitch/login.html`. |
+| Onboarding | `/onboarding` onboarding-gated | `C:\temp\stitch-parity-current\onboarding-desktop.png` | Form fields exist, but layout lacks Stitch onboarding structure. Compare with `web/frontend_stitch/onboarding.html`. |
+| Dashboard | `/dashboard` | `C:\temp\stitch-parity-current\dashboard-desktop.png` | Sparse dashboard; shell, KPI hierarchy, card density do not match. Compare with `web/frontend_stitch/dashboard.html`. |
+| Weekly Dashboard | `/dashboard/week` | `C:\temp\stitch-parity-current\dashboard-week-desktop.png` | Minimal metric summaries; lacks Stitch analytics composition. |
+| Monthly Dashboard | `/dashboard/month` | `C:\temp\stitch-parity-current\dashboard-month-desktop.png` | Generic summary cards; lacks Stitch visual hierarchy. |
+| Measurement Capture | `/measurements/new` with BP metrics selected | `C:\temp\stitch-parity-current\measurement-new-desktop.png` | Functional checklist/form only; native file inputs do not match Stitch. Compare with `web/frontend_stitch/new-measurement.html`. |
+| Measurement History | `/measurements/history` | `C:\temp\stitch-parity-current\measurement-history-desktop.png` | Plain table; missing Stitch raw data log density, filters, toolbar. Compare with `web/frontend_stitch/measurement-history.html`. |
+| Tracker | `/tracker` | `C:\temp\stitch-parity-current\tracker-desktop.png` | Basic two-column cards; does not match Stitch tracker hierarchy. Compare with `web/frontend_stitch/medication-fasting-tracker.html`. |
+| Alerts | `/alerts` | `C:\temp\stitch-parity-current\alerts-desktop.png` | Functional alert list; lacks Stitch inbox grid and alert center density. Compare with `web/frontend_stitch/notifications-alerts.html`. |
+| AI Assistant | `/ai-assistant` | `C:\temp\stitch-parity-current\ai-assistant-desktop.png` | Empty/simple chat shell; does not match polished Stitch layout. Compare with `web/frontend_stitch/ai-assistant.html`. |
+| Settings | `/settings/profile` | `C:\temp\stitch-parity-current\settings-profile-desktop.png` | Plain profile form; lacks polished Stitch layout. Compare with `web/frontend_stitch/settings-profile.html`. |
+| Family | `/family` | `C:\temp\stitch-parity-current\family-desktop.png` | Stacked form/list; does not match polished Stitch invitation suite. Compare with `web/frontend_stitch/family-caregiver.html`. |
+| Senior Dashboard | senior mode `/dashboard` | `C:\temp\stitch-parity-current\senior-dashboard-desktop.png` | Three-tab concept exists, but content not rebuilt from Stitch senior mode. Compare with `web/frontend_stitch/senior-mode.html`. |
+| Senior Emergency | senior mode Darurat tab | `C:\temp\stitch-parity-current\senior-emergency-desktop.png` | SOS appears, but layout does not match full Stitch senior screen. |
 
 ---
 
@@ -223,7 +208,7 @@ Route:
 
 Required checks:
 
-- Sidebar and active state match Stitch.
+- Sidebar and active state match Stitch (`web/frontend_stitch/dashboard.html`).
 - Header/user context area matches Stitch.
 - KPI/vitals card grid matches Stitch.
 - Empty state and populated state both look intentional.
@@ -271,7 +256,7 @@ Route:
 
 Required checks:
 
-- Device group layout matches Stitch.
+- Device group layout matches Stitch (`web/frontend_stitch/new-measurement.html`).
 - Metric checklist density and active state match Stitch.
 - Selected metric form cards match Stitch.
 - AI extraction button, evidence input, raw AI value, final value, and manual override are visible.
@@ -307,7 +292,7 @@ Route:
 
 Required checks:
 
-- Raw data table matches Stitch.
+- Raw data table matches Stitch (`web/frontend_stitch/measurement-history.html`).
 - Manual Override badge matches Stitch.
 - Status/severity badges match Stitch.
 - Evidence modal/lightbox matches Stitch.
@@ -341,7 +326,7 @@ Routes:
 
 Required checks:
 
-- Timer panel matches Stitch.
+- Timer panel matches Stitch (`web/frontend_stitch/medication-fasting-tracker.html`).
 - Medication schedule cards/table match Stitch.
 - Take/Skip completed states match Stitch.
 - Add medication form matches Stitch.
@@ -378,7 +363,7 @@ Routes:
 
 Required checks:
 
-- Invitation suite matches Stitch.
+- Invitation suite matches Stitch (`web/frontend_stitch/family-caregiver.html`).
 - Permission toggles match Stitch.
 - Pending invitations list matches Stitch.
 - Revoke action state matches Stitch.
@@ -413,7 +398,7 @@ Route:
 
 Required checks:
 
-- Inbox grid matches Stitch.
+- Inbox grid matches Stitch (`web/frontend_stitch/notifications-alerts.html`).
 - Emergency filter segment/tab matches Stitch.
 - Telegram delivery timeline matches Stitch.
 - Empty/loading/error states match Stitch.
@@ -445,7 +430,7 @@ Route:
 
 Required checks:
 
-- Health context banner matches Stitch.
+- Health context banner matches Stitch (`web/frontend_stitch/ai-assistant.html`).
 - Chat panel/messages match Stitch.
 - Prompt input and send button match Stitch.
 - Senior-friendly typography is preserved.
@@ -477,7 +462,7 @@ Route:
 
 Required checks:
 
-- Profile management layout matches Stitch polished screen.
+- Profile management layout matches Stitch (`web/frontend_stitch/settings-profile.html`).
 - Theme/accessibility controls match Stitch.
 - Save state and validation messages match Stitch.
 
@@ -511,7 +496,7 @@ Routes:
 
 Required checks:
 
-- Analytics cards match Stitch report screen.
+- Analytics cards match Stitch report screen (`web/frontend_stitch/reports-analytics.html`).
 - Tables/charts/export actions match Stitch.
 - PDF/report generation state matches Stitch.
 
@@ -626,7 +611,7 @@ All functional E2E flows pass
 Required production report format:
 
 | Flow | Visual | Functional | Status | Notes |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | Dashboard | PASS/FAIL | PASS/FAIL | PASS/FAIL | |
 | Measurement Capture | PASS/FAIL | PASS/FAIL | PASS/FAIL | |
 | Measurement History | PASS/FAIL | PASS/FAIL | PASS/FAIL | |

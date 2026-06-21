@@ -1,0 +1,519 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>HL Health Companion - Measurement History</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#0076a9",
+                        "surface-container": "#eceef0",
+                        "primary-fixed": "#dbe1ff",
+                        "on-secondary-fixed": "#0b1c30",
+                        "on-primary-container": "#f1f2ff",
+                        "error-container": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "secondary-fixed": "#d3e4fe",
+                        "secondary": "#505f76",
+                        "tertiary-fixed-dim": "#89ceff",
+                        "on-tertiary-container": "#eaf4ff",
+                        "on-surface-variant": "#424656",
+                        "background": "#f7f9fb",
+                        "surface-variant": "#e0e3e5",
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#c2c6d9",
+                        "inverse-on-surface": "#eff1f3",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-bright": "#f7f9fb",
+                        "surface": "#f7f9fb",
+                        "on-surface": "#191c1e",
+                        "on-primary-fixed": "#00174b",
+                        "on-tertiary-fixed-variant": "#004c6e",
+                        "surface-container-high": "#e6e8ea",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#d8dadc",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#c9e6ff",
+                        "on-tertiary-fixed": "#001e2f",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "secondary-container": "#d0e1fb",
+                        "outline": "#737687",
+                        "surface-container-low": "#f2f4f6",
+                        "on-background": "#191c1e",
+                        "surface-tint": "#0052dc",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary": "#005c85",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-secondary-container": "#54647a",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#0061ff",
+                        "inverse-surface": "#2d3133",
+                        "surface-container-highest": "#e0e3e5",
+                        "primary": "#004bca"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-width": "280px",
+                        "margin-mobile": "16px",
+                        "margin-tablet": "24px",
+                        "container-max-width": "1440px",
+                        "unit": "4px",
+                        "margin-desktop": "32px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-xl": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(203, 213, 225, 0.5); }
+        .ambient-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        .elevated-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .interactive-row:hover { background-color: #F8FAFC; cursor: pointer; transition: background-color 0.2s ease; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col md:flex-row antialiased">
+<!-- Top Navigation (Mobile) & Top Bar (Desktop) -->
+<header class="docked full-width top-0 sticky z-40 bg-surface-bright/80 backdrop-blur-md border-b border-outline-variant shadow-sm flex justify-between items-center h-16 px-gutter lg:ml-sidebar-width lg:w-[calc(100%-280px)] w-full">
+<div class="flex items-center gap-4">
+<div class="lg:hidden flex items-center gap-2">
+<span class="material-symbols-outlined fill text-primary">health_and_safety</span>
+<span class="font-headline-md text-headline-md font-bold text-primary">HealthSync Pro</span>
+</div>
+<div class="hidden lg:flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<input class="border-none bg-transparent focus:ring-0 text-body-md font-body-md text-on-surface w-64 placeholder:text-on-surface-variant" placeholder="Search records..." type="text">
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button aria-label="Notifications" class="hover:bg-surface-container rounded-full p-2 transition-all group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">notifications</span>
+</button>
+<button aria-label="Help" class="hover:bg-surface-container rounded-full p-2 transition-all group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">help</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border-2 border-outline-variant">
+<img alt="Dr. Julian Vance" class="w-full h-full object-cover" data-alt="A professional headshot of Dr. Julian Vance, a middle-aged male physician with graying hair, wearing a clean white lab coat over a light blue dress shirt and a dark tie. The background is a slightly blurred modern clinical setting with soft, bright, even lighting, conveying trust, expertise, and a calm medical authority within a light-mode UI context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfHituNL5GBzaSgjllet1helcEDEzC0AUz2CP4vjRBYqYBJ6oTu3FxoZdLMW1-skN45CMNcZE2WpJ1xS0QjW985qsXaPPSA2SxrV-hhFW5XRcgZ_CU3UUfF3ZKafnQZZNpuxxvAFkOLhavHMSaiAoFPsp3xJZFTA8gyRWEUYhof0xm2b_L6r_2k7aXjP3OOOcVVepPLRMk8uvTfTWcKOmkcF9pPOD5Lfvnh5cwrs_DmgjZsmip3TEFyJmVhuGSdjGJTQc1ZtjmC8A">
+</div>
+</div>
+</header>
+<!-- Side Navigation (Desktop) -->
+<nav class="w-sidebar-width h-screen fixed left-0 top-0 hidden lg:flex flex-col bg-surface-container-low border-r border-outline-variant z-50">
+<div class="flex flex-col h-full py-8">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined fill">local_hospital</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary leading-tight">HealthSync Pro</h1>
+<p class="font-label-sm text-label-sm text-outline">Enterprise Health</p>
+</div>
+</div>
+<button class="w-full py-2 px-4 bg-error text-on-error rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-error-container hover:text-on-error-container transition-colors shadow-sm">
+<span class="material-symbols-outlined">emergency</span>
+                Emergency Support
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto">
+<ul class="space-y-1">
+<li class="">
+<a href="dashboard.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+</li>
+<li class="">
+<a href="new-measurement.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-label-md text-label-md">New Measurement</span>
+</a>
+</li>
+<li class="bg-primary-container/10 border-l-4 border-primary">
+<a href="measurement-history.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-label-md">History</span>
+</a>
+</li>
+<li class="">
+<a href="notifications-alerts.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-label-md text-label-md">Notifications & Alerts</span>
+</a>
+</li>
+<li class="">
+<a href="ai-assistant.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-md text-label-md">AI Assistant</span>
+</a>
+</li>
+<li class="">
+<a href="family-caregiver.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">family_restroom</span>
+<span class="font-label-md text-label-md">Family / Caregiver</span>
+</a>
+</li>
+<li class="">
+<a href="reports-analytics.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-md text-label-md">Reports & Analytics</span>
+</a>
+</li>
+<li class="">
+<a href="settings-profile.html" class="flex items-center gap-4 px-6 py-3 text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</li>
+</ul>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full lg:ml-sidebar-width p-margin-mobile md:p-margin-tablet lg:p-margin-desktop max-w-container-max-width mx-auto">
+<!-- Header & Filters Area -->
+<div class="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-on-surface">Measurement History</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-2">Comprehensive log of all patient vitals and raw data inputs.</p>
+</div>
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+<!-- Filters -->
+<div class="flex items-center gap-3 bg-surface-container-lowest p-1 rounded-xl border border-outline-variant shadow-sm">
+<div class="relative">
+<select class="appearance-none bg-transparent border-none focus:ring-0 font-body-md text-body-md text-on-surface py-2 pl-4 pr-10 cursor-pointer">
+<option>Last 30 Days</option>
+<option>Last 7 Days</option>
+<option>Last 3 Months</option>
+<option>Custom Range</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">calendar_today</span>
+</div>
+<div class="w-px h-6 bg-outline-variant"></div>
+<div class="relative">
+<select class="appearance-none bg-transparent border-none focus:ring-0 font-body-md text-body-md text-on-surface py-2 pl-4 pr-10 cursor-pointer">
+<option>All Metrics</option>
+<option>Blood Pressure</option>
+<option>SpO2</option>
+<option>Glucose</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">filter_list</span>
+</div>
+</div>
+<!-- Export Action -->
+<button class="flex items-center justify-center gap-2 px-6 py-3 bg-surface-container-high text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-dim transition-colors border border-outline-variant shadow-sm whitespace-nowrap">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                    Export Data (CSV)
+                </button>
+</div>
+</div>
+<!-- Data Table Canvas (Desktop) -->
+<div class="hidden md:block bg-surface-container-lowest rounded-xl border border-outline-variant ambient-shadow overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Date &amp; Time</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Metric Name</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Result Value</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Source</th>
+<th class="px-6 py-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant font-body-sm text-body-sm text-on-surface">
+<!-- Row 1: Blood Pressure -->
+<tr class="interactive-row group">
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="font-medium text-on-surface">Oct 24, 2026</div>
+<div class="text-on-surface-variant">08:15 AM</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap font-medium">Blood Pressure</td>
+<td class="px-6 py-4 whitespace-nowrap font-bold text-on-surface">120/80 <span class="text-on-surface-variant font-normal text-xs ml-1">mmHg</span></td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Normal
+                                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary-fixed text-on-secondary-fixed border border-secondary-fixed-dim font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">visibility</span>
+                                    AI Vision
+                                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-right">
+<button class="text-primary hover:text-primary-container font-label-md text-label-md flex items-center gap-1 ml-auto group-hover:underline" onclick="openLightbox()">
+<span class="material-symbols-outlined text-[18px]">image</span>
+                                    View Evidence
+                                </button>
+</td>
+</tr>
+<!-- Row 2: SpO2 -->
+<tr class="interactive-row group">
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="font-medium text-on-surface">Oct 23, 2026</div>
+<div class="text-on-surface-variant">10:30 PM</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap font-medium">SpO2</td>
+<td class="px-6 py-4 whitespace-nowrap font-bold text-error">88 <span class="text-on-surface-variant font-normal text-xs ml-1">%</span></td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error-container text-on-error-container border border-error/20 font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+                                    Emergency
+                                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-orange-50 text-orange-700 border border-orange-200 font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">edit_note</span>
+                                    Manual Override
+                                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-right">
+<button class="text-primary hover:text-primary-container font-label-md text-label-md flex items-center gap-1 ml-auto group-hover:underline" onclick="openLightbox()">
+<span class="material-symbols-outlined text-[18px]">image</span>
+                                    View Evidence
+                                </button>
+</td>
+</tr>
+<!-- Row 3: Glucose -->
+<tr class="interactive-row group">
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="font-medium text-on-surface">Oct 23, 2026</div>
+<div class="text-on-surface-variant">07:00 AM</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap font-medium">Glucose</td>
+<td class="px-6 py-4 whitespace-nowrap font-bold text-on-surface">105 <span class="text-on-surface-variant font-normal text-xs ml-1">mg/dL</span></td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200 font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                                    Warning
+                                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary-fixed text-on-secondary-fixed border border-secondary-fixed-dim font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">visibility</span>
+                                    AI Vision
+                                </span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-right">
+<button class="text-primary hover:text-primary-container font-label-md text-label-md flex items-center gap-1 ml-auto group-hover:underline" onclick="openLightbox()">
+<span class="material-symbols-outlined text-[18px]">image</span>
+                                    View Evidence
+                                </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="bg-surface-container-low border-t border-outline-variant px-6 py-4 flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Showing 1 to 3 of 45 entries</span>
+<div class="flex gap-2">
+<button class="p-2 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface-variant disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-[20px]">chevron_left</span>
+</button>
+<button class="p-2 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-dim transition-colors">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Log Cards (Mobile Only) -->
+<div class="md:hidden space-y-4 pb-24">
+<!-- Mobile Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 ambient-shadow relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+<div class="flex justify-between items-start mb-4">
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Blood Pressure</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Oct 24 • 08:15 AM</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-label-sm text-label-sm">
+                        Normal
+                    </span>
+</div>
+<div class="flex justify-between items-end mb-4">
+<div class="font-headline-xl text-headline-xl font-bold text-on-surface">120/80 <span class="text-body-sm font-normal text-on-surface-variant">mmHg</span></div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">visibility</span> AI Vision
+                    </div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 py-3 bg-secondary-fixed text-primary font-label-md text-label-md rounded-lg active:bg-secondary-fixed-dim transition-colors" onclick="openLightbox()">
+<span class="material-symbols-outlined">image</span>
+                    View Photo
+                </button>
+</div>
+<!-- Mobile Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 ambient-shadow relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-error"></div>
+<div class="flex justify-between items-start mb-4">
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">SpO2</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Oct 23 • 10:30 PM</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container text-on-error-container border border-error/20 font-label-sm text-label-sm font-bold">
+                        Emergency
+                    </span>
+</div>
+<div class="flex justify-between items-end mb-4">
+<div class="font-headline-xl text-headline-xl font-bold text-error">88 <span class="text-body-sm font-normal text-on-surface-variant">%</span></div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">edit_note</span> Manual
+                    </div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 py-3 bg-secondary-fixed text-primary font-label-md text-label-md rounded-lg active:bg-secondary-fixed-dim transition-colors" onclick="openLightbox()">
+<span class="material-symbols-outlined">image</span>
+                    View Photo
+                </button>
+</div>
+<!-- Mobile Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 ambient-shadow relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
+<div class="flex justify-between items-start mb-4">
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Glucose</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Oct 23 • 07:00 AM</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200 font-label-sm text-label-sm">
+                        Warning
+                    </span>
+</div>
+<div class="flex justify-between items-end mb-4">
+<div class="font-headline-xl text-headline-xl font-bold text-on-surface">105 <span class="text-body-sm font-normal text-on-surface-variant">mg/dL</span></div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">visibility</span> AI Vision
+                    </div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 py-3 bg-secondary-fixed text-primary font-label-md text-label-md rounded-lg active:bg-secondary-fixed-dim transition-colors" onclick="openLightbox()">
+<span class="material-symbols-outlined">image</span>
+                    View Photo
+                </button>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation (Mobile) -->
+<nav class="lg:hidden fixed bottom-0 w-full z-50 h-20 border-t border-outline-variant bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_-4px_10px_0_rgba(0,0,0,0.05)]">
+<a href="dashboard.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">dashboard</span>
+<span class="font-label-sm text-label-sm">Dashboard</span>
+</a>
+<a href="new-measurement.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">add_circle</span>
+<span class="font-label-sm text-label-sm">New</span>
+</a>
+<a href="measurement-history.html" class="flex flex-col items-center gap-0.5 text-primary">
+<span class="material-symbols-outlined text-[22px]">history</span>
+<span class="font-label-sm text-label-sm">History</span>
+</a>
+<a href="notifications-alerts.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="font-label-sm text-label-sm">Notifications</span>
+</a>
+<a href="ai-assistant.html" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px]">smart_toy</span>
+<span class="font-label-sm text-label-sm">AI</span>
+</a>
+</nav>
+<!-- Evidence Lightbox Modal (Hidden by default) -->
+<div class="fixed inset-0 z-[100] hidden items-center justify-center" id="evidence-lightbox">
+<!-- Backdrop -->
+<div class="absolute inset-0 bg-inverse-surface/80 backdrop-blur-sm" onclick="closeLightbox()"></div>
+<!-- Modal Content -->
+<div class="relative z-10 w-[95%] max-w-3xl bg-surface-container-lowest rounded-2xl elevated-shadow overflow-hidden flex flex-col max-h-[90vh]">
+<!-- Modal Header -->
+<div class="flex items-center justify-between p-6 border-b border-outline-variant bg-surface-bright">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Measurement Evidence</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Captured via AI Vision on Oct 23, 2026</p>
+</div>
+<button class="p-2 rounded-full hover:bg-surface-container transition-colors text-on-surface-variant" onclick="closeLightbox()">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Image Container -->
+<div class="relative flex-1 overflow-hidden bg-black p-4 flex items-center justify-center min-h-[300px]">
+<img alt="Measurement Evidence Photo" class="max-w-full max-h-full object-contain rounded shadow-lg" data-alt="A macro photograph of a digital pulse oximeter display illuminated against a dark background. The glowing red LED numbers clearly read '88' for SpO2 and '72' for heart rate. The image is slightly grainy, simulating a photo taken in low light by a smartphone, demonstrating authentic medical data capture within a professional clinical application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8c-AOlTF6mLJZWwOXveKypdmj6ib4X6WlbBFdFTbV7cVS8WbscNYQXxnNYxa6GTdR0I1J0yX_npIsP8-y5m-mK-F589BFRUgdbMPdgRcE5RztcR7-Mm-50GJ7L5rxt0-m8d3cQ1ehzbWE_a07dR8vm4_QK-RJuDhr4WjIVNiZcSp72Eb7uVQDe8L_ZrcWtWl2zjSsnJ3e-1W1Z0NunKzNO0UP0LaqOjwrZkV111aIoGbmth4NxgmjAbBDqe1OMYbmO6Tlruxh_Tk">
+<!-- Watermark Overlay -->
+<div class="absolute bottom-6 left-6 right-6 bg-black/60 backdrop-blur-md border border-white/20 p-3 rounded-lg flex items-center justify-between text-white">
+<div class="font-label-md text-label-md font-medium tracking-wide">HL Health Companion</div>
+<div class="font-body-sm text-body-sm opacity-80 font-mono">2026-10-23 | SpO2 88%</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="p-4 bg-surface-bright border-t border-outline-variant flex justify-end gap-3">
+<button class="px-6 py-2.5 rounded-lg border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-container-low transition-colors" onclick="closeLightbox()">
+                    Close
+                </button>
+<button class="px-6 py-2.5 rounded-lg bg-primary-container text-on-primary-container font-label-md text-label-md hover:bg-primary transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                    Download Image
+                </button>
+</div>
+</div>
+</div>
+<!-- Simple Script for Lightbox Interaction -->
+<script>
+        function openLightbox() {
+            const lightbox = document.getElementById('evidence-lightbox');
+            lightbox.classList.remove('hidden');
+            lightbox.classList.add('flex');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function closeLightbox() {
+            const lightbox = document.getElementById('evidence-lightbox');
+            lightbox.classList.add('hidden');
+            lightbox.classList.remove('flex');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") {
+                closeLightbox();
+            }
+        });
+    </script>
+
+
+<button class="fixed bottom-24 right-6 md:bottom-8 md:right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg elevated-shadow flex items-center justify-center z-[100] hover:scale-110 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-[28px]">smart_toy</span>
+</button></body></html>

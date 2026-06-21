@@ -4,6 +4,73 @@ This log is append-only. Never delete previous entries.
 
 Use this format for every task:
 
+## 2026-06-22 — Agent: opencode
+
+### Task: Update STITCH_UI_PARITY docs to reference local frontend_stitch/ instead of MCP
+
+**Status:** Completed
+
+**Files Read:**
+- docs/STITCH_UI_PARITY_TASK_PLAN.md
+- docs/STITCH_UI_PARITY_TEST_PLAN.md
+- web/frontend_stitch/DESIGN.md
+
+**Files Changed:**
+- docs/STITCH_UI_PARITY_TASK_PLAN.md (full rewrite)
+- docs/STITCH_UI_PARITY_TEST_PLAN.md (full rewrite)
+
+**What Changed (TASK_PLAN.md):**
+- Removed all Stitch MCP references (screen instance IDs, MCP commands)
+- Replaced screen inventory table with local file paths from `web/frontend_stitch/`
+- Added Section 4: "Key Design Tokens" extracted from DESIGN.md (colors, typography, spacing, border-radius, elevation)
+- Updated Execution Protocol to reference opening local HTML/PNG files instead of MCP
+- Added DESIGN.md to the "Required Source Files" list
+- Updated each task to include the Stitch reference file path
+- Changed "Immediate Next Task" from STITCH-P0.1 to STITCH-P0.3 (P0.1/P0.2 already done)
+- Removed MCP-specific notes about screen instances, project IDs
+
+**What Changed (TEST_PLAN.md):**
+- Removed all Stitch MCP references (screen instance IDs, project URLs, artifact file IDs)
+- Replaced baseline table with local file references (`web/frontend_stitch/{name}.html` + `.png`)
+- Added Section 3: "Stitch Reference Files (Local)" documenting all 16 reference screens
+- Added "Design Token Reference" subsection pointing to DESIGN.md
+- Updated "Captured Baseline Log" to reference local files instead of MCP project URLs
+- Updated mismatch notes in "Current Local Capture Log" to include "Compare with web/frontend_stitch/{name}.html"
+- All reference IDs in test cases updated to local file paths
+
+## 2026-06-22 — Agent: opencode
+
+### Task: Fix navigation hrefs in frontend_stitch HTML files after corruption
+
+**Status:** Completed
+
+**Files Changed:**
+- web/frontend_stitch/*.html (all 17 HTML files)
+
+**What Happened:**
+1. An earlier agent tried to fix `href="../folder/file.html"` to `href="file.html"` using PowerShell `-replace` with a scriptblock evaluator. PowerShell 5.1 does NOT support scriptblocks in `-replace` — it stringifies the scriptblock, injecting PowerShell code (`$m = $_.Value`, etc.) into the HTML files.
+2. A second attempt at cleanup accidentally removed ALL `<a>` tags from every file (0 anchor tags remaining).
+3. index.html was completely destroyed (14 bytes, just `</body></html>`).
+
+**Recovery Done:**
+- Extracted first valid HTML document from each corrupted file
+- Removed all PowerShell code injections (`param($m)`, `$file =`, etc.)
+- Rebuilt all navigation links: 8 sidebar nav items + 2 footer items + 5 mobile nav items
+- Rebuilt index.html from scratch with links to all pages
+- Deduplicated reports-analytics.html (305KB -> 30KB) and settings-profile.html (109KB -> 22KB)
+- Used Node.js scripts (PowerShell regex with scriptblock is broken on PS 5.1)
+
+**Validation:**
+- All 17 HTML files: valid DOCTYPE, no PS code, proper hrefs
+- Nav pages (15 files with sidebar): 10-15 working `<a href>` links each
+- Auth pages (login, register, auth-gateway, senior-mode): correctly have 0 nav links
+- No oversized files
+
+**Next Agent Notes:**
+- Navigation links now point to root-level files only (all `.html` in same dir)
+- Auth-gateway, login, register, senior-mode pages naturally have no sidebar nav (auth/senior layout)
+- The fix-nav.js, rebuild-nav.cjs and other temp scripts have been cleaned up
+
 ```markdown
 ## YYYY-MM-DD HH:mm UTC â€” Agent: {agentName}
 
