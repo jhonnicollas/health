@@ -1802,3 +1802,60 @@ Final state of audit + fixes:
 
 ### Next Agent Notes
 - All 85 tasks [x] Done. Project is production-ready.
+
+## 2026-06-21 14:30 UTC — Agent: claude-audit
+
+### Task
+- Task ID: AUDIT-SPRINT-3-4
+- Sprint: Sprint 3 + Sprint 4
+- Status: Completed
+
+### Files Read
+- AGENTS.md, HANDOFF.md, WORK_LOG.md, docs/TASKS.md, docs/schema.sql
+- worker/src/index.ts (3880 lines — full audit)
+- worker/src/routes-extra.ts (493 lines — full audit)
+- worker/wrangler.toml
+- web/src/App.tsx, web/src/App.css, web/src/main.tsx
+- web/src/context/auth.ts, web/src/context/AuthContext.tsx
+- All 25 frontend pages in web/src/pages/*
+- All frontend components in web/src/components/*
+- All hooks and utils in web/src/hooks/*, web/src/utils/*
+
+### Files Changed
+- web/src/components/measurement/DynamicMetricForm.tsx — rewrote with full validate→submit flow, interpretation results display, error handling, field validation
+- web/src/hooks/useAiExtract.ts — added missing credentials:'include' to fetch call
+- web/src/pages/alerts/AlertsPage.tsx — fixed Badge type (removed non-existent id field, used badgeCode as key)
+- web/src/pages/reports/DoctorReportPage.tsx — cleaned up Report type to match API response (removed r2Key)
+- web/src/pages/reports/MonthlyReportPage.tsx — fixed data.narrative → data.aiMonthlySummary (backend field name mismatch)
+- web/src/pages/family/FamilyPage.tsx — fixed role option from 'family' to 'viewer' (DB CHECK constraint)
+- worker/src/routes-extra.ts — added escapeHtml() for XSS prevention in report HTML, removed r2Key exposure from report generation response
+
+### What Changed
+- **Bug fix**: MonthlyReportPage referenced `data.narrative` but backend returns `data.aiMonthlySummary` — fixed
+- **Bug fix**: DynamicMetricForm had no submit mechanism — added full validate→submit flow with results display
+- **Bug fix**: AlertsPage Badge type had `id` field not returned by backend — fixed type and key
+- **Bug fix**: useAiExtract hook missing `credentials: 'include'` — added
+- **Security fix**: Report HTML generation had stored XSS via unescaped displayName — added escapeHtml()
+- **Security fix**: Report generation exposed R2 key in response — removed
+- **Bug fix**: Family invite used role 'family' not matching DB CHECK constraint — changed to 'viewer'
+- **Audit confirmed**: Previous critical fixes (globalThis leak, duplicate alerts, telegram webhook format) verified in place
+
+### Validation
+- worker typecheck: PASS
+- worker build: PASS
+- web typecheck+build: PASS (51 modules, 261.24 kB JS, 10.86 kB CSS)
+- wrangler deploy worker: PASS (version c914486f-d2fd-4725-831e-5d491f2b7e1d)
+- wrangler pages deploy: PASS
+- E2E e2e-uat.sh: 52/52 passed, 0 failed
+- Frontend UAT: 71/71 passed (all API endpoints tested from frontend perspective: CRUD reminders, medications, family, fasting, emergency contacts, telegram; reports; patterns; KB; admin; AI recommendation; profile settings persistence)
+
+### Documentation Updated
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- All 87 tasks [x] Done + 3 audit cycles completed
+- Production deployed and fully tested
+- Cloudflare token working: <CLOUDFLARE_TOKEN> (note capital K)
+- Telegram bot token returns 401 from Telegram API — user needs to regenerate via @BotFather
+- Cloudflare cron triggers at 5/5 limit — manual POST /api/internal/cron/reminders works
