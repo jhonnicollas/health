@@ -18,6 +18,10 @@ type ApiResp<T> = {
   error?: { message: string }
 }
 
+type RawEmergencyContact = EmergencyContact & { name?: string; relationship?: string; phone?: string }
+
+type EmergencyContactsPayload = RawEmergencyContact[] | { contacts?: RawEmergencyContact[] }
+
 export function EmergencyContactsPage() {
   const [contacts, setContacts] = useState<EmergencyContact[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -33,12 +37,20 @@ export function EmergencyContactsPage() {
     setError(null)
     try {
       const res = await fetch('/api/emergency/contacts', { credentials: 'include' })
-      const body = (await res.json()) as ApiResp<EmergencyContact[]>
+      const body = (await res.json()) as ApiResp<EmergencyContactsPayload>
       if (!body.success) {
         setError(body.error?.message ?? 'Gagal memuat kontak darurat.')
         return
       }
-      setContacts(body.data ?? [])
+      const rows: RawEmergencyContact[] = Array.isArray(body.data) ? body.data : body.data?.contacts ?? []
+      setContacts(rows.map((contact) => ({
+        ...contact,
+        contactName: contact.contactName ?? contact.name ?? '',
+        contactRelation: contact.contactRelation ?? contact.relationship ?? '',
+        contactPhone: contact.contactPhone ?? contact.phone ?? '',
+        consentGiven: Boolean(contact.consentGiven),
+        enabled: contact.enabled ?? true
+      })))
     } catch {
       setError('Tidak bisa terhubung ke server.')
     }

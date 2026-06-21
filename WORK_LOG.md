@@ -2126,3 +2126,135 @@ Final state of audit + fixes:
 ### Next Agent Notes
 - UI alignment complete for local source. Production redeploy was not requested in this task.
 - Existing known issue remains: Telegram bot token returns 401 from Telegram API.
+
+## 2026-06-21 22:14 UTC - Agent: Codex
+
+### Task
+- Task ID: PROD-UAT-ALL-SPRINT
+- Sprint: Sprint 1-4 production QA
+- Status: Started
+
+### Files Read
+- AGENTS.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/design-system.md
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src/App.tsx
+- web/src/pages/auth/RegisterPage.tsx
+- web/src/pages/onboarding/OnboardingPage.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+- web/src/components/measurement/DynamicMetricForm.tsx
+- web/src/pages/dashboard/TodayDashboard.tsx
+- web/src/pages/dashboard/WeeklyDashboard.tsx
+- web/src/pages/dashboard/MonthlyDashboard.tsx
+- web/src/pages/fasting/FastingPage.tsx
+- web/src/pages/medications/MedicationsPage.tsx
+- web/src/pages/family/FamilyPage.tsx
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/settings/ProfileSettingsPage.tsx
+- web/src/pages/reminders/RemindersPage.tsx
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+
+### Files Changed
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Started production deployment and all-sprint E2E/UAT pass against the refactored Stitch UI.
+- Confirmed worker and Pages redeploy commands/builds, then audited live UI/routes against the requested production flows.
+- Identified concrete blockers before code edits: missing `/auth/*` aliases, missing measurement history and AI assistant UI, tracker flow gaps, senior mode shell mismatch, and several frontend/API response-shape mismatches that break Sprint 3/4 CRUD pages.
+
+### Validation
+- `npm --prefix worker test` - passed (22/22)
+- `npm --prefix worker run build` - passed
+- `npm --prefix web run lint` - passed
+- `npm --prefix web run build` - passed
+- `npx wrangler deploy` with `NODE_OPTIONS=--dns-result-order=ipv4first` - passed
+- `npx wrangler pages deploy dist --project-name=hl-health-companion` with `NODE_OPTIONS=--dns-result-order=ipv4first` - passed
+- `Invoke-WebRequest https://hl-health-companion.pages.dev` - 200
+- `Invoke-WebRequest https://a73849d3.hl-health-companion.pages.dev` - 200
+
+### Documentation Updated
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue PROD-UAT-ALL-SPRINT only.
+- Next edits must close the audited production gaps, then redeploy and rerun browser E2E against live Pages.
+
+## 2026-06-21 16:35 UTC - Agent: Codex
+
+### Task
+- Task ID: PROD-UAT-ALL-SPRINT
+- Sprint: Sprint 1-4 production QA
+- Status: Completed
+
+### Files Read
+- AGENTS.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/design-system.md
+- docs/TASKS.md
+- docs/TEST_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- web/src/App.tsx
+- web/src/components/measurement/DynamicMetricForm.tsx
+- web/src/pages/fasting/FastingPage.tsx
+- web/src/pages/medications/MedicationsPage.tsx
+- web/src/pages/family/FamilyPage.tsx
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+
+### Files Changed
+- worker/src/index.ts
+- web/src/App.tsx
+- web/src/App.css
+- web/src/components/measurement/DynamicMetricForm.tsx
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/family/FamilyPage.tsx
+- web/src/pages/fasting/FastingPage.tsx
+- web/src/pages/medications/MedicationsPage.tsx
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Deployed Worker and Pages production; redeployed Pages from `web` with Functions proxy included.
+- Added/refined production UI flows for auth aliases, onboarding redirect, measurement history and evidence modal, tracker fasting/medication CRUD, caregiver invite revoke, notifications filters, AI assistant, senior shell, and SOS long-press.
+- Added API support for measurement history/evidence streaming, AI assistant, family revoke, medication delete, emergency contact delete, and notification filters.
+- Fixed emergency contacts response normalization so the senior Darurat tab renders instead of crashing.
+
+### Validation
+- `npm --prefix worker test` - passed, 22/22
+- `npm --prefix worker run build` - passed
+- `npm --prefix web run lint` - passed
+- `npm --prefix web run build` - passed
+- `npx wrangler deploy` - passed, Worker version `f601812e-fc24-49d5-954a-21f958a09c6f`
+- `npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true` - passed, deploy `https://092157df.hl-health-companion.pages.dev`
+- Production Playwright E2E against `https://hl-health-companion.pages.dev` - passed, 7/7 requested flows
+
+### Documentation Updated
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Production UAT is green.
+- Use `npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true` for future Pages deploys so `web/functions` proxy is included.
+- Existing known issue remains: Telegram bot token returns 401 from Telegram API if Telegram delivery is required.

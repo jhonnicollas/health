@@ -1626,3 +1626,17 @@ Avoid queue for every tiny UI action
 16. Family/emergency system
 17. PDF and PWA advanced features
 ```
+
+---
+
+## 43. Production UI Integration Notes - 2026-06-21
+
+The production frontend is deployed as Cloudflare Pages with Pages Functions under `web/functions/api/[[path]].ts`. Production deploys must run from the `web` directory so the Functions proxy is bundled:
+
+```bash
+npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true
+```
+
+The proxy forwards `/api/*` from Pages to the Worker origin and rewrites cookies for the Pages domain. Deploying only `web/dist` from the repo root uploads static assets but omits the Functions proxy, which causes live `/api/*` calls to fail.
+
+The refactored Sprint 1-4 UI keeps business logic in existing pages and adds shell-level routes for measurement history, tracker, AI assistant, and senior mode. Medical safety remains rule-first: measurements submit final values to the rule engine, and AI assistant text only explains or suggests general safe lifestyle guidance using current vitals context.

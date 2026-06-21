@@ -2295,6 +2295,142 @@ app.post('/api/measurements/attachments/upload', async (c) => {
   }
 })
 
+app.get('/api/measurements/history', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) {
+      return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    }
+
+    const from = c.req.query('from')
+    const to = c.req.query('to')
+    const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100)
+    let sql = `SELECT id, measuredAt, source, hasAttachment, hasEmergency
+      FROM HL_measurementSessions
+      WHERE userId = ?`
+    const params: unknown[] = [userId]
+    if (from) {
+      sql += ' AND measuredAt >= ?'
+      params.push(from)
+    }
+    if (to) {
+      sql += ' AND measuredAt <= ?'
+      params.push(to)
+    }
+    sql += ' ORDER BY measuredAt DESC LIMIT ?'
+    params.push(limit)
+
+    const sessions = await c.env.DB.prepare(sql).bind(...params).all<{
+      id: string
+      measuredAt: string
+      source: string
+      hasAttachment: number
+      hasEmergency: number
+    }>()
+    const sessionRows = sessions.results || []
+    if (sessionRows.length === 0) {
+      return jsonResponse(c, success({ sessions: [] }, 200, startedAt))
+    }
+
+    const placeholders = sessionRows.map(() => '?').join(',')
+    const sessionIds = sessionRows.map((row) => row.id)
+    const values = await c.env.DB.prepare(
+      `SELECT id, sessionId, metricCode, finalValue, unit, status, severity, manualOverride
+       FROM HL_measurementValues
+       WHERE userId = ? AND sessionId IN (${placeholders})
+       ORDER BY createdAt DESC`
+    ).bind(userId, ...sessionIds).all<{
+      id: string
+      sessionId: string
+      metricCode: string
+      finalValue: number
+      unit: string
+      status: string
+      severity: string
+      manualOverride: number
+    }>()
+    const attachments = await c.env.DB.prepare(
+      `SELECT id, sessionId, metricCode, fileName, fileType, fileSize, createdAt
+       FROM HL_measurementAttachments
+       WHERE userId = ? AND sessionId IN (${placeholders})
+       ORDER BY createdAt DESC`
+    ).bind(userId, ...sessionIds).all<{
+      id: string
+      sessionId: string
+      metricCode: string
+      fileName: string
+      fileType: string
+      fileSize: number
+      createdAt: string
+    }>()
+
+    const valuesBySession = new Map<string, Array<Record<string, unknown>>>()
+    for (const value of values.results || []) {
+      if (!valuesBySession.has(value.sessionId)) valuesBySession.set(value.sessionId, [])
+      valuesBySession.get(value.sessionId)!.push(value as unknown as Record<string, unknown>)
+    }
+
+    const attachmentsBySession = new Map<string, Array<Record<string, unknown>>>()
+    for (const attachment of attachments.results || []) {
+      if (!attachmentsBySession.has(attachment.sessionId)) attachmentsBySession.set(attachment.sessionId, [])
+      attachmentsBySession.get(attachment.sessionId)!.push(attachment as unknown as Record<string, unknown>)
+    }
+
+    return jsonResponse(
+      c,
+      success(
+        {
+          sessions: sessionRows.map((session) => ({
+            ...session,
+            values: valuesBySession.get(session.id) || [],
+            attachments: attachmentsBySession.get(session.id) || []
+          }))
+        },
+        200,
+        startedAt
+      )
+    )
+  } catch (error) {
+    console.error('measurement history error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat riwayat pengukuran.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/measurements/attachments/:id', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) {
+      return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    }
+
+    const attachment = await c.env.DB.prepare(
+      'SELECT id, userId, r2Key, fileType, fileName FROM HL_measurementAttachments WHERE id = ?'
+    ).bind(c.req.param('id')).first<{ id: string; userId: string; r2Key: string; fileType: string; fileName: string }>()
+
+    if (!attachment || attachment.userId !== userId) {
+      return jsonResponse(c, failure('NOT_FOUND', 'Lampiran tidak ditemukan.', 404, [], startedAt))
+    }
+
+    const object = await c.env.LOGS.get(attachment.r2Key)
+    if (!object) {
+      return jsonResponse(c, failure('NOT_FOUND', 'Bukti pengukuran tidak ditemukan.', 404, [], startedAt))
+    }
+
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': attachment.fileType || 'image/webp',
+        'Content-Disposition': `inline; filename="${attachment.fileName}"`,
+        'Cache-Control': 'no-store'
+      }
+    })
+  } catch (error) {
+    console.error('measurement attachment read error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat bukti pengukuran.', 500, [], startedAt))
+  }
+})
+
 
 // Dashboard Today Endpoint
 app.get('/api/dashboard/today', async (c) => {
@@ -2507,6 +2643,127 @@ Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
   } catch (error) {
     console.error('AI recommendation endpoint error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Rekomendasi AI gagal.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/ai/assistant', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+
+    const body = await c.req.json().catch(() => ({})) as { question?: string }
+    const question = (body.question || '').trim()
+    if (!question) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'question wajib.', 400, [], startedAt))
+    }
+
+    const profile = await c.env.DB.prepare(
+      `SELECT u.displayName, p.heightCm, p.sex, p.birthDate
+       FROM HL_users u
+       LEFT JOIN HL_userProfiles p ON p.userId = u.id
+       WHERE u.id = ?`
+    ).bind(userId).first<{ displayName: string; heightCm: number | null; sex: string | null; birthDate: string | null }>()
+
+    const latestValues = await c.env.DB.prepare(
+      `SELECT metricCode, finalValue, unit, status, severity, measuredAt
+       FROM HL_measurementValues
+       WHERE userId = ?
+       ORDER BY measuredAt DESC
+       LIMIT 8`
+    ).bind(userId).all<{
+      metricCode: string
+      finalValue: number
+      unit: string
+      status: string
+      severity: string
+      measuredAt: string
+    }>()
+
+    const vitals = (latestValues.results || []).map((value) => ({
+      metricCode: value.metricCode,
+      finalValue: value.finalValue,
+      unit: value.unit,
+      status: value.status,
+      severity: value.severity,
+      measuredAt: value.measuredAt
+    }))
+
+    const contextSummary = vitals.length > 0
+      ? vitals
+          .map((value) => `${value.metricCode}: ${value.finalValue} ${value.unit} (${value.status}, ${value.severity})`)
+          .join('; ')
+      : 'Belum ada data vital terbaru.'
+
+    let reply = [
+      `Pertanyaan Anda: ${question}.`,
+      `Konteks pengukuran saat ini: ${contextSummary}`,
+      'Saran umum: pilih makanan rendah garam, cukup minum air, istirahat cukup, dan tetap konsultasikan keputusan medis ke dokter.'
+    ].join(' ')
+    let model = 'deterministic-fallback'
+    let usedFallback = true
+
+    if (c.env.CLOUDFLARE_ACCOUNT_ID && c.env.CLOUDFLARE_API_TOKEN) {
+      try {
+        const aiRes = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: '@cf/meta/llama-3.1-8b-instruct',
+              messages: [
+                {
+                  role: 'system',
+                  content:
+                    'Anda adalah asisten kesehatan yang aman. Dilarang mendiagnosis, mengubah dosis obat, atau menyatakan keparahan medis final. Gunakan bahasa Indonesia yang ramah, singkat, dan senior-friendly. Selalu sebutkan bahwa keputusan medis final mengikuti rule engine dan dokter.'
+                },
+                {
+                  role: 'user',
+                  content: `Profil: ${JSON.stringify(profile || {})}\nVitals terbaru: ${JSON.stringify(vitals)}\nPertanyaan: ${question}`
+                }
+              ],
+              max_completion_tokens: 220
+            })
+          }
+        )
+        if (aiRes.ok) {
+          const aiJson = await aiRes.json() as {
+            choices?: Array<{ message?: { content?: string } }>
+          }
+          const raw = aiJson.choices?.[0]?.message?.content?.trim()
+          if (raw) {
+            const filtered = filterUnsafeContent(raw)
+            reply = filtered.filtered
+            model = '@cf/meta/llama-3.1-8b-instruct'
+            usedFallback = false
+          }
+        }
+      } catch (error) {
+        console.error('ai assistant error:', error)
+      }
+    }
+
+    return jsonResponse(
+      c,
+      success(
+        {
+          reply,
+          model,
+          usedFallback,
+          vitals,
+          profile: profile || null
+        },
+        200,
+        startedAt
+      )
+    )
+  } catch (error) {
+    console.error('ai assistant endpoint error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Asisten AI gagal merespons.', 500, [], startedAt))
   }
 })
 
@@ -2794,16 +3051,61 @@ app.post('/api/family/invite', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const body = await c.req.json().catch(() => ({})) as { email?: string; role?: string }
+    const body = await c.req.json().catch(() => ({})) as {
+      email?: string
+      inviteEmail?: string
+      role?: string
+      permissions?: {
+        canViewDashboard?: boolean
+        canInputMeasurement?: boolean
+        canReceiveAlert?: boolean
+      }
+    }
+    const inviteEmail = (body.inviteEmail || body.email || '').trim().toLowerCase()
+    if (!inviteEmail) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'inviteEmail wajib.', 400, [], startedAt))
+    }
     const inviteId = createId('fmi')
     const shareToken = crypto.randomUUID().replace(/-/g, '')
     const shareTokenHash = await sha256Token(shareToken)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    await c.env.DB.prepare(
-      `INSERT INTO HL_familyInvites (id, ownerUserId, inviteEmail, role, inviteTokenHash, status, expiresAt, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).bind(inviteId, userId, body.email || 'unknown@example.com', body.role || 'caregiver', shareTokenHash, expiresAt).run()
-    return jsonResponse(c, success({ inviteId, shareToken, expiresAt, inviteUrl: `/family/accept?token=${shareToken}` }, 200, startedAt))
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const role = body.role || 'caregiver'
+    const permissions = {
+      canViewDashboard: body.permissions?.canViewDashboard !== false,
+      canInputMeasurement: Boolean(body.permissions?.canInputMeasurement),
+      canReceiveAlert: body.permissions?.canReceiveAlert !== false
+    }
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO HL_familyInvites (id, ownerUserId, inviteEmail, role, inviteTokenHash, status, expiresAt, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(inviteId, userId, inviteEmail, role, shareTokenHash, expiresAt),
+      c.env.DB.prepare(
+        `INSERT INTO HL_familyLinks (id, ownerUserId, linkedUserId, role, status, canViewDashboard, canInputMeasurement, canReceiveAlert, createdAt, updatedAt)
+         VALUES (?, ?, NULL, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(
+        inviteId,
+        userId,
+        role,
+        permissions.canViewDashboard ? 1 : 0,
+        permissions.canInputMeasurement ? 1 : 0,
+        permissions.canReceiveAlert ? 1 : 0
+      )
+    ])
+    return jsonResponse(
+      c,
+      success(
+        {
+          inviteId,
+          status: 'pending',
+          shareToken,
+          expiresAt,
+          inviteUrl: `/family/accept?token=${shareToken}`
+        },
+        201,
+        startedAt
+      )
+    )
   } catch (error) {
     console.error('family invite error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal membuat invite.', 500, [], startedAt))
@@ -2825,15 +3127,15 @@ app.post('/api/family/accept', async (c) => {
     if (invite.status !== 'pending') return jsonResponse(c, failure('VALIDATION_ERROR', 'Invite sudah digunakan.', 400, [], startedAt))
     if (new Date(invite.expiresAt) < new Date()) return jsonResponse(c, failure('VALIDATION_ERROR', 'Invite kadaluarsa.', 400, [], startedAt))
 
-    const linkId = createId('fml')
     await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE HL_familyInvites SET status = 'accepted', updatedAt = CURRENT_TIMESTAMP WHERE id = ?`).bind(invite.id),
       c.env.DB.prepare(
-        `INSERT INTO HL_familyLinks (id, ownerUserId, linkedUserId, role, status, canViewDashboard, canInputMeasurement, canReceiveAlert, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 'active', 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(linkId, invite.ownerUserId, userId, invite.role),
-      c.env.DB.prepare(`UPDATE HL_familyInvites SET status = 'accepted', updatedAt = CURRENT_TIMESTAMP WHERE id = ?`).bind(invite.id)
+        `UPDATE HL_familyLinks
+         SET linkedUserId = ?, role = ?, status = 'active', updatedAt = CURRENT_TIMESTAMP
+         WHERE id = ? AND ownerUserId = ?`
+      ).bind(userId, invite.role, invite.id, invite.ownerUserId)
     ])
-    return jsonResponse(c, success({ linkId, role: invite.role }, 200, startedAt))
+    return jsonResponse(c, success({ linkId: invite.id, role: invite.role }, 200, startedAt))
   } catch (error) {
     console.error('family accept error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menerima invite.', 500, [], startedAt))
@@ -2855,6 +3157,31 @@ app.put('/api/family/members/:id/permissions', async (c) => {
   } catch (error) {
     console.error('family permissions error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update.', 500, [], startedAt))
+  }
+})
+
+app.delete('/api/family/:id', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const linkId = c.req.param('id')
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE HL_familyLinks
+         SET status = 'revoked', updatedAt = CURRENT_TIMESTAMP
+         WHERE id = ? AND (ownerUserId = ? OR linkedUserId = ?)`
+      ).bind(linkId, userId, userId),
+      c.env.DB.prepare(
+        `UPDATE HL_familyInvites
+         SET status = 'revoked', updatedAt = CURRENT_TIMESTAMP
+         WHERE id = ? AND ownerUserId = ? AND status = 'pending'`
+      ).bind(linkId, userId)
+    ])
+    return jsonResponse(c, success({ revoked: true }, 200, startedAt))
+  } catch (error) {
+    console.error('family revoke error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal mencabut akses keluarga.', 500, [], startedAt))
   }
 })
 
@@ -2921,6 +3248,19 @@ app.get('/api/emergency/contacts', async (c) => {
   } catch (error) {
     console.error('emergency contacts list error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal list.', 500, [], startedAt))
+  }
+})
+
+app.delete('/api/emergency/contacts/:id', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    await c.env.DB.prepare('DELETE FROM HL_emergencyContacts WHERE id = ? AND userId = ?').bind(c.req.param('id'), userId).run()
+    return jsonResponse(c, success({ deleted: true }, 200, startedAt))
+  } catch (error) {
+    console.error('emergency contact delete error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menghapus kontak darurat.', 500, [], startedAt))
   }
 })
 
@@ -3599,7 +3939,7 @@ app.get('/api/family/links', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const owned = await c.env.DB.prepare(
-      "SELECT fl.id, fl.linkedUserId, u.displayName as linkedDisplayName, fl.role, fl.status, fl.canViewDashboard, fl.canInputMeasurement, fl.canReceiveAlert FROM HL_familyLinks fl LEFT JOIN HL_users u ON u.id = fl.linkedUserId WHERE fl.ownerUserId = ? ORDER BY fl.createdAt DESC"
+      "SELECT fl.id, fl.linkedUserId, COALESCE(u.displayName, fi.inviteEmail) as linkedDisplayName, fi.inviteEmail as inviteEmail, fl.role, fl.status, fl.canViewDashboard, fl.canInputMeasurement, fl.canReceiveAlert FROM HL_familyLinks fl LEFT JOIN HL_users u ON u.id = fl.linkedUserId LEFT JOIN HL_familyInvites fi ON fi.id = fl.id WHERE fl.ownerUserId = ? ORDER BY fl.createdAt DESC"
     ).bind(userId).all()
     const linked = await c.env.DB.prepare(
       "SELECT fl.id, fl.ownerUserId, u.displayName as ownerDisplayName, fl.role, fl.status, fl.canViewDashboard, fl.canInputMeasurement, fl.canReceiveAlert FROM HL_familyLinks fl LEFT JOIN HL_users u ON u.id = fl.ownerUserId WHERE fl.linkedUserId = ? ORDER BY fl.createdAt DESC"
@@ -3687,10 +4027,14 @@ app.get('/api/notifications', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const status = c.req.query('status')
+    const channel = c.req.query('channel')
+    const notificationType = c.req.query('notificationType')
     const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100)
-    let sql = 'SELECT id, channel, notificationType, title, message, status, createdAt FROM HL_notifications WHERE userId = ?'
+    let sql = 'SELECT id, channel, notificationType, title, message, status, payloadJson, errorMessage, sentAt, createdAt FROM HL_notifications WHERE userId = ?'
     const params: unknown[] = [userId]
     if (status) { sql += ' AND status = ?'; params.push(status) }
+    if (channel) { sql += ' AND channel = ?'; params.push(channel) }
+    if (notificationType) { sql += ' AND notificationType = ?'; params.push(notificationType) }
     sql += ' ORDER BY createdAt DESC LIMIT ?'
     params.push(limit)
     const rows = await c.env.DB.prepare(sql).bind(...params).all()
@@ -3809,6 +4153,19 @@ app.put('/api/medications/:id', async (c) => {
   } catch (error) {
     console.error('medication update error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update obat.', 500, [], startedAt))
+  }
+})
+
+app.delete('/api/medications/:id', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    await c.env.DB.prepare('DELETE FROM HL_medications WHERE id = ? AND userId = ?').bind(c.req.param('id'), userId).run()
+    return jsonResponse(c, success({ deleted: true }, 200, startedAt))
+  } catch (error) {
+    console.error('medication delete error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menghapus obat.', 500, [], startedAt))
   }
 })
 

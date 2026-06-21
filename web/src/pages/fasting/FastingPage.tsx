@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type FastingSession = {
   id: string
   fastingType: string
   targetHours: number
   startedAt: string
-  targetAt: string
+  elapsedHours?: number
 }
 
 type ApiResp<T> = {
@@ -14,31 +14,64 @@ type ApiResp<T> = {
   error?: { message: string }
 }
 
+function formatCountdown(targetHours: number, startedAt: string, nowTick: number) {
+  const targetMs = new Date(startedAt).getTime() + targetHours * 60 * 60 * 1000
+  const remainingMs = Math.max(targetMs - nowTick, 0)
+  const totalSeconds = Math.floor(remainingMs / 1000)
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0')
+  const seconds = String(totalSeconds % 60).padStart(2, '0')
+  return `${hours}:${minutes}:${seconds}`
+}
+
 export function FastingPage() {
   const [active, setActive] = useState(false)
   const [session, setSession] = useState<FastingSession | null>(null)
   const [targetHours, setTargetHours] = useState(8)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nowTick, setNowTick] = useState(() => Date.now())
 
   async function load() {
     setError(null)
     try {
       const res = await fetch('/api/fasting/current', { credentials: 'include' })
-      const body = (await res.json()) as ApiResp<{ active: boolean; session: FastingSession | null }>
+      const body = (await res.json()) as ApiResp<
+        | { active: false }
+        | ({ active: true } & FastingSession)
+      >
       if (!body.success) {
         setError(body.error?.message ?? 'Gagal memuat status puasa.')
         return
       }
-      setActive(Boolean(body.data?.active))
-      setSession(body.data?.session ?? null)
+      if (body.data?.active) {
+        setActive(true)
+        setSession({
+          id: body.data.id,
+          fastingType: body.data.fastingType,
+          targetHours: body.data.targetHours,
+          startedAt: body.data.startedAt,
+          elapsedHours: body.data.elapsedHours
+        })
+      } else {
+        setActive(false)
+        setSession(null)
+      }
     } catch {
       setError('Tidak bisa terhubung ke server.')
     }
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
+  }, [])
+
+  useEffect(() => {
+    if (!active) return
+    const timer = window.setInterval(() => setNowTick(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [active])
 
   async function start() {
     setSubmitting(true)
@@ -50,7 +83,7 @@ export function FastingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fastingType: 'glucoseFasting', targetHours })
       })
-      const body = (await res.json()) as ApiResp<{ fastingSessionId: string }>
+      const body = (await res.json()) as ApiResp<{ fastingId: string }>
       if (!res.ok || !body.success) {
         setError(body.error?.message ?? 'Gagal memulai puasa.')
         return
@@ -63,7 +96,7 @@ export function FastingPage() {
     }
   }
 
-  async function stop() {
+  async function stop(status: 'completed' | 'cancelled') {
     if (!session) return
     setSubmitting(true)
     setError(null)
@@ -72,7 +105,7 @@ export function FastingPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fastingSessionId: session.id, status: 'completed' })
+        body: JSON.stringify({ fastingSessionId: session.id, status })
       })
       const body = (await res.json()) as ApiResp<{ status: string }>
       if (!res.ok || !body.success) {
@@ -87,13 +120,18 @@ export function FastingPage() {
     }
   }
 
+  const countdown = useMemo(() => {
+    if (!session) return '00:00:00'
+    return formatCountdown(session.targetHours, session.startedAt, nowTick)
+  }, [nowTick, session])
+
   return (
     <section className="settings-panel" aria-labelledby="fasting-title">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Pengukuran</p>
+          <p className="eyebrow">Tracker</p>
           <h2 id="fasting-title">Fasting timer</h2>
-          <p>Catat puasa untuk pengukuran glukosa darah puasa.</p>
+          <p>Mulai, lihat hitung mundur, lalu selesaikan atau batalkan sesi puasa.</p>
         </div>
         <span className="status-chip">{active ? 'Aktif' : 'Siap'}</span>
       </div>
@@ -101,10 +139,15 @@ export function FastingPage() {
       {active && session ? (
         <div className="fasting-active">
           <p>Puasa aktif sejak {new Date(session.startedAt).toLocaleString()}.</p>
-          <p>Target selesai: {new Date(session.targetAt).toLocaleString()}.</p>
-          <button disabled={submitting} onClick={stop} type="button">
-            {submitting ? 'Mengakhiri...' : 'Akhiri puasa'}
-          </button>
+          <div className="big-value">{countdown}</div>
+          <div className="button-stack">
+            <button disabled={submitting} onClick={() => void stop('completed')} type="button">
+              {submitting ? 'Menyimpan...' : 'Stop'}
+            </button>
+            <button className="secondary-action" disabled={submitting} onClick={() => void stop('cancelled')} type="button">
+              Cancel
+            </button>
+          </div>
         </div>
       ) : (
         <div className="fasting-start">
@@ -118,7 +161,7 @@ export function FastingPage() {
               value={targetHours}
             />
           </label>
-          <button disabled={submitting} onClick={start} type="button">
+          <button disabled={submitting} onClick={() => void start()} type="button">
             {submitting ? 'Memulai...' : 'Mulai puasa'}
           </button>
         </div>

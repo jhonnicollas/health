@@ -3094,3 +3094,98 @@ PUT /api/admin/configs/:configKey
 13. GET /api/dashboard/monthly
 14. POST /api/reports/doctorReady30d
 ```
+
+---
+
+## 36. Production UAT Endpoint Delta - 2026-06-21
+
+These endpoints are required by the refactored Sprint 1-4 frontend UAT flow.
+
+### Measurement History
+
+```text
+GET /api/measurements/history
+```
+
+Returns authenticated measurement sessions with values and attachment references.
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessions": [
+      {
+        "id": "ses_x",
+        "measuredAt": "2026-06-21T00:00:00.000Z",
+        "source": "manual",
+        "hasAttachment": 1,
+        "hasEmergency": 0,
+        "values": [
+          {
+            "id": "val_x",
+            "metricCode": "blood_pressure_systolic",
+            "finalValue": 145,
+            "unit": "mmHg",
+            "status": "warning",
+            "severity": "medium",
+            "manualOverride": 1,
+            "attachments": []
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {}
+}
+```
+
+### Measurement Evidence Stream
+
+```text
+GET /api/measurements/attachments/:id
+```
+
+Streams a compressed, watermarked evidence object after authenticated ownership verification.
+
+### AI Assistant
+
+```text
+POST /api/ai/assistant
+```
+
+Request:
+
+```json
+{
+  "question": "Saran makan malam untuk hipertensi"
+}
+```
+
+Response includes a safe text reply plus current user vitals context. AI text must not diagnose, prescribe dose changes, or decide medical severity.
+
+### Family Invite
+
+```text
+POST /api/family/invite
+DELETE /api/family/:id
+GET /api/family/links
+```
+
+`POST /api/family/invite` accepts `inviteEmail`, `role`, and granular `permissions`. It creates both a pending invite and a pending family link so the UI can render and revoke pending invitations immediately.
+
+### Medication And Emergency Deletes
+
+```text
+DELETE /api/medications/:id
+DELETE /api/emergency/contacts/:id
+```
+
+Deletes are scoped to the authenticated user.
+
+### Notifications Filter
+
+```text
+GET /api/notifications?notificationType=emergency_alert&channel=telegram
+```
+
+Filters are optional. Response rows include `payloadJson`, `errorMessage`, and `sentAt` for the Telegram delivery timeline.

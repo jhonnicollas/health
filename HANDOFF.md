@@ -4,24 +4,24 @@
 
 ```text
 Project: HL Health Companion
-Sprint: Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 COMPLETE + 4 AUDIT CYCLES + LIVE E2E PASS
-Current Task: UI-STITCH-CLINICAL-PRECISION
-Current State: Completed locally; all 25 files under web/src/pages refactored in place with Stitch Clinical Precision wrappers/tokens; web lint/build passed
-Last Updated: 2026-06-21 13:56 UTC
+Sprint: Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 COMPLETE + LIVE PRODUCTION UAT PASS
+Current Task: PROD-UAT-ALL-SPRINT
+Current State: Completed. Worker + Pages deployed, Pages Functions proxy bundled, and all 7 requested Sprint 1-4 production browser E2E flows passed against the live refactored UI.
+Last Updated: 2026-06-21 16:35 UTC
 ```
 
 ## Production Deployment
 
 ```text
 Worker URL:        https://hl-health-companion.indiehomesungairaya.workers.dev
-Worker Version:    e742e3d6-b11a-46ca-be88-3366b2957ec1  (just redeployed)
+Worker Version:    f601812e-fc24-49d5-954a-21f958a09c6f
 Pages URL:         https://hl-health-companion.pages.dev
-Pages Deploy:      https://3cb154c1.hl-health-companion.pages.dev
+Pages Deploy:      https://092157df.hl-health-companion.pages.dev
 D1 Database:       multi_Ai_db (b80ca989-6771-427f-a656-c7ab6ffc17ce) — 38 HL_ tables
 R2 Bucket:         multi-apps-ai-bucket
 Queue:             telegram-submit-summary (producer + consumer)
-E2E Tests:         52/52 PASSED against production (this audit)
-Frontend UAT:      build clean (50 modules, 251.74 kB JS, 10.86 kB CSS)
+E2E Tests:         7/7 requested all-sprint browser flows PASSED against production
+Frontend UAT:      build clean (53 modules, 281.69 kB JS, 29.17 kB CSS)
 Local Unit Tests:  22/22 PASSED
 ```
 
@@ -52,6 +52,12 @@ Local Unit Tests:  22/22 PASSED
 16. DynamicMetricForm signature aligned with SelectMetricPage call site
 17. Production redeploy + E2E UAT re-verified: 52/52 PASS live
 
+### Production UAT Refit (2026-06-21)
+18. Added production UI/API support for auth aliases, onboarding redirect, measurement history/evidence, tracker CRUD, caregiver pending revoke, notifications filters, AI assistant, and senior SOS shell.
+19. Fixed Pages deploy process to include `web/functions` proxy via `npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true`.
+20. Fixed emergency contacts response normalization so senior Darurat tab no longer crashes.
+21. Final Playwright production E2E: 7/7 requested flows PASS live at `https://hl-health-companion.pages.dev`.
+
 ## Cloudflare Credentials
 
 ```text
@@ -79,7 +85,7 @@ npx wrangler deploy
 
 CLOUDFLARE_API_TOKEN="<CLOUDFLARE_TOKEN>" \
 CLOUDFLARE_ACCOUNT_ID="79dea2845a4b62ea5229c8676dea02c0" \
-npx wrangler pages deploy dist --project-name=hl-health-companion
+npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true
 
 # E2E UAT (live, 52/52 PASS as of this audit)
 API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scripts/e2e-uat.sh
@@ -93,5 +99,5 @@ API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scri
 - `attachment` folder is not present in this workspace; frontend UI source is under `web/src`
 
 ## Next Steps
-- Optional: deploy updated frontend if production refresh is desired.
+- Finish the current production QA hardening pass, redeploy, and rerun the all-sprint browser E2E report.
 - Regenerate Telegram bot token if Telegram notifications are required.

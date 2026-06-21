@@ -1106,6 +1106,188 @@ button.danger {
   box-shadow: var(--shadowSoft);
 }
 
+.tracker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.history-panel,
+.ai-assistant-panel,
+.alerts-center {
+  max-width: 1040px;
+}
+
+.button-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.segmented-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--colorBorderSoft);
+  border-radius: var(--radiusMd);
+  background: var(--colorSurfaceElevated);
+  box-shadow: var(--shadowSoft);
+}
+
+.segmented-control button {
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: var(--radiusMd);
+  padding: 8px 12px;
+  color: var(--colorTextSecondary);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  color: var(--colorPrimaryStrong);
+  border-color: color-mix(in srgb, var(--colorPrimary) 26%, var(--colorBorder));
+  background: color-mix(in srgb, var(--colorPrimary) 9%, var(--colorSurfaceElevated));
+}
+
+.timeline-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.timeline-list li {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--colorBorderSoft);
+  border-radius: var(--radiusMd);
+  background: var(--colorSurface);
+}
+
+.vital-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vital-strip span {
+  border: 1px solid var(--colorBorderSoft);
+  border-radius: var(--radiusFull);
+  padding: 6px 10px;
+  background: var(--colorSurface);
+  color: var(--colorTextPrimary);
+  font-weight: 800;
+}
+
+.ai-answer {
+  font-size: 1.08rem;
+  line-height: 1.65;
+}
+
+.evidence-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--colorOverlay);
+}
+
+.evidence-lightbox {
+  width: min(760px, 100%);
+  max-height: calc(100svh - 40px);
+  display: grid;
+  gap: 14px;
+  overflow: auto;
+  padding: 18px;
+  border-radius: var(--radiusLg);
+  background: var(--colorSurfaceElevated);
+  box-shadow: var(--shadowCard);
+}
+
+.evidence-lightbox img {
+  width: 100%;
+  border: 1px solid var(--colorBorder);
+  border-radius: var(--radiusMd);
+  object-fit: contain;
+  background: var(--colorSurface);
+}
+
+.senior-shell {
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 20px;
+  padding: 20px;
+  background: var(--colorBackground);
+}
+
+.senior-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.senior-tabs button {
+  min-height: 86px;
+  border: 2px solid var(--colorBorder);
+  border-radius: var(--radiusMd);
+  padding: 12px;
+  background: var(--colorSurfaceElevated);
+  color: var(--colorTextPrimary);
+  font-size: 1.25rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.senior-tabs button.active {
+  color: var(--colorPrimaryText);
+  border-color: var(--colorPrimary);
+  background: var(--colorPrimary);
+}
+
+.senior-content {
+  width: min(900px, 100%);
+  margin: 0 auto;
+}
+
+.senior-emergency {
+  display: grid;
+  gap: 18px;
+}
+
+.sos-button {
+  min-height: 140px;
+  border: 0;
+  border-radius: var(--radiusLg);
+  color: #ffffff;
+  background: var(--colorStatusEmergency);
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 950;
+  cursor: pointer;
+  animation: sosPulse 1.35s infinite;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--colorStatusEmergency) 40%, transparent);
+}
+
+.sos-button.confirmed {
+  background: var(--colorStatusCritical);
+  animation: none;
+}
+
+@keyframes sosPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--colorStatusEmergency) 38%, transparent); }
+  70% { box-shadow: 0 0 0 18px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
 .danger-zone {
   border-color: color-mix(in srgb, var(--colorStatusCritical) 36%, var(--colorBorder));
   background: color-mix(in srgb, var(--colorStatusCritical) 6%, var(--colorSurfaceElevated));

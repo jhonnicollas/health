@@ -1200,3 +1200,20 @@ Routes/pages in web/src/pages keep existing React state, hooks, handlers, and AP
 Stitch layout is applied through existing page JSX wrappers plus shared CSS tokens.
 Desktop uses persistent sidebar shell; mobile uses bottom navigation.
 ```
+
+---
+
+## 25. Senior Mode Production Shell
+
+When `accessibilityMode = senior`, the app switches to a simplified shell:
+
+```text
+Primary tabs only: Beranda, Tambah Data, Darurat
+Desktop sidebar hidden
+Mobile bottom nav hidden
+Large tab buttons with high contrast state
+Darurat tab renders pulsing TOMBOL SOS
+SOS long-press state must be reachable by pointer/touch events
+```
+
+Production UAT on 2026-06-21 verified that the senior shell replaces the normal navigation and that the SOS long-press indicator renders after a sustained press.
