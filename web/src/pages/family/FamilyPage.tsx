@@ -96,7 +96,7 @@ export function FamilyPage() {
         <label>Peran
           <select onChange={(e) => setRole(e.target.value)} value={role}>
             <option value="caregiver">Caregiver</option>
-            <option value="family">Keluarga</option>
+            <option value="viewer">Keluarga (Viewer)</option>
           </select>
         </label>
         <button type="submit">Buat Invite</button>
