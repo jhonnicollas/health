@@ -66,8 +66,11 @@ export function SeniorMeasurementFlow() {
   if (done) {
     return (
       <section className="settings-panel" aria-labelledby="senior-done-title">
-        <h2 id="senior-done-title">Selesai</h2>
-        <p>Pengukuran Anda sudah tersimpan. Terima kasih.</p>
+        <div className="clinical-empty">
+          <p className="eyebrow">Mode Lansia</p>
+          <h2 id="senior-done-title">Selesai</h2>
+          <p>Pengukuran Anda sudah tersimpan. Terima kasih.</p>
+        </div>
       </section>
     )
   }
@@ -76,22 +79,30 @@ export function SeniorMeasurementFlow() {
 
   return (
     <section className="settings-panel" aria-labelledby="senior-flow-title">
-      <h2 id="senior-flow-title">Pengukuran ({step + 1} dari {FLOW.length})</h2>
-      <p style={{ fontSize: '1.4rem', fontWeight: 600 }}>{current.label}</p>
-      <label>
-        Nilai ({current.unit})
-        <input
-          autoFocus
-          inputMode="decimal"
-          max={current.max}
-          min={current.min}
-          onChange={(e) => setValues((p) => ({ ...p, [current.code]: e.target.value }))}
-          type="number"
-          value={values[current.code] || ''}
-        />
-      </label>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Mode Lansia</p>
+          <h2 id="senior-flow-title">Pengukuran ({step + 1} dari {FLOW.length})</h2>
+          <p>{current.label}</p>
+        </div>
+        <span className="status-chip">{current.unit}</span>
+      </div>
+      <div className="senior-card">
+        <label>
+          Nilai ({current.unit})
+          <input
+            autoFocus
+            inputMode="decimal"
+            max={current.max}
+            min={current.min}
+            onChange={(e) => setValues((p) => ({ ...p, [current.code]: e.target.value }))}
+            type="number"
+            value={values[current.code] || ''}
+          />
+        </label>
+      </div>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="action-row">
         <button disabled={step === 0 || submitting} onClick={prev} type="button">Kembali</button>
         <button disabled={submitting} onClick={next} type="button">
           {submitting ? 'Menyimpan...' : lastStep ? 'Simpan' : 'Lanjut'}

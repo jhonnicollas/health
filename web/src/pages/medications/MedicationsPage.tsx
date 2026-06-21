@@ -91,13 +91,20 @@ export function MedicationsPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="meds-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Pengaturan</p>
-        <h2 id="meds-title">Obat & kepatuhan</h2>
-        <p>Catat obat yang diminum rutin untuk melihat pola kepatuhan di dashboard.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Pengaturan</p>
+          <h2 id="meds-title">Obat & kepatuhan</h2>
+          <p>Catat obat yang diminum rutin untuk melihat pola kepatuhan di dashboard.</p>
+        </div>
+        <span className="status-chip">{meds.length} obat</span>
       </div>
 
       <form className="auth-form" onSubmit={handleCreate}>
+        <div className="form-heading">
+          <h3>Tambah obat</h3>
+          <p>Informasional saja; tidak ada saran dosis dari aplikasi.</p>
+        </div>
         <label>
           Nama obat
           <input onChange={(e) => setName(e.target.value)} required type="text" value={name} />

@@ -24,11 +24,18 @@ export function DailyReportPage() {
       .then((d) => { if (d.success && d.data) setData(d.data) })
   }, [])
 
-  if (!data) return <div>Memuat...</div>
+  if (!data) return <div className="clinical-empty">Memuat...</div>
 
   return (
     <div className="report-page">
-      <h2>Laporan Harian ({data.date})</h2>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Reports</p>
+          <h2>Laporan Harian</h2>
+          <p>{data.date}</p>
+        </div>
+        <span className="status-chip">{data.values.length} nilai</span>
+      </div>
       {data.values.length === 0 ? <p>Tidak ada data.</p> : (
         <table className="report-table">
           <thead>

@@ -86,9 +86,18 @@ export function OnboardingPage() {
           <p>
             Data ini dipakai untuk BMI dan aturan kesehatan berbasis umur atau jenis kelamin.
           </p>
+          <div className="onboarding-steps" aria-label="Tahap onboarding">
+            <span>1 Profil</span>
+            <span>2 Antropometri</span>
+            <span>3 Preferensi</span>
+          </div>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="form-heading">
+            <h2>Clinical profile</h2>
+            <p>Dipakai untuk evaluasi rule engine.</p>
+          </div>
           <label>
             Nama tampilan
             <input

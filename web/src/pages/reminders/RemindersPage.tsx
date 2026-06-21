@@ -99,13 +99,20 @@ export function RemindersPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="reminders-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Pengaturan</p>
-        <h2 id="reminders-title">Reminder pengukuran</h2>
-        <p>Atur pengingat harian untuk pengukuran atau minum obat.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Pengaturan</p>
+          <h2 id="reminders-title">Reminder pengukuran</h2>
+          <p>Atur pengingat harian untuk pengukuran atau minum obat.</p>
+        </div>
+        <span className="status-chip">{reminders.length} reminder</span>
       </div>
 
       <form className="auth-form" onSubmit={handleCreate}>
+        <div className="form-heading">
+          <h3>Reminder baru</h3>
+          <p>Pilih jadwal, channel, dan pesan ringkas.</p>
+        </div>
         <label>
           Jenis
           <select

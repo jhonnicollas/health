@@ -1170,3 +1170,33 @@ Manual override terlihat
 Emergency modal tidak bisa terlewat
 Submit tidak menyimpan original image
 ```
+
+---
+
+## 24. Stitch Clinical Precision Alignment
+
+Frontend Sprint 1-4 sekarang disejajarkan dengan Stitch project `HL Health Master Layout`
+(`Clinical Precision`):
+
+```text
+Font: Inter
+Canvas: #f7f9fb
+Surface/card: #ffffff
+Primary CTA: #0061ff
+Primary strong: #004bca
+Text primary: #191c1e
+Text secondary: #424656
+Outline: #c2c6d9
+Sidebar width: 280px
+Card radius: 8px
+Modal radius: 12px
+Status chip: pill only for semantic state
+```
+
+Implementation note:
+
+```text
+Routes/pages in web/src/pages keep existing React state, hooks, handlers, and API calls.
+Stitch layout is applied through existing page JSX wrappers plus shared CSS tokens.
+Desktop uses persistent sidebar shell; mobile uses bottom navigation.
+```

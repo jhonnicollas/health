@@ -18,9 +18,9 @@ export function WeeklyDashboard() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div>Memuat dashboard mingguan...</div>
-  if (error) return <div>Error: {error}</div>
-  if (metrics.length === 0) return <div>Belum ada data 7 hari terakhir.</div>
+  if (loading) return <div className="clinical-empty">Memuat dashboard mingguan...</div>
+  if (error) return <div className="clinical-empty dashboard-error">Error: {error}</div>
+  if (metrics.length === 0) return <div className="clinical-empty">Belum ada data 7 hari terakhir.</div>
 
   const grouped = new Map<string, DailyPoint[]>()
   for (const p of daily) {
@@ -30,7 +30,14 @@ export function WeeklyDashboard() {
 
   return (
     <div className="weekly-dashboard">
-      <h2>Dashboard 7 Hari</h2>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Analytics</p>
+          <h2>Dashboard 7 Hari</h2>
+          <p>Tren ringkas berdasarkan rata-rata harian per metrik.</p>
+        </div>
+        <span className="status-chip">{metrics.length} metrik</span>
+      </div>
       {metrics.map(m => {
         const points = grouped.get(m.metricCode) || []
         const first = points[0]?.avgValue || 0
@@ -49,10 +56,10 @@ export function WeeklyDashboard() {
               <TrendBadge direction={direction} percent={percent} />
             </div>
             <div className="metric-stats">
-              <span>Avg: {m.avgValue?.toFixed(1)}</span>
-              <span>Min: {m.minValue}</span>
-              <span>Max: {m.maxValue}</span>
-              <span>Count: {m.cnt}</span>
+              <span><small>Avg</small>{m.avgValue?.toFixed(1)}</span>
+              <span><small>Min</small>{m.minValue}</span>
+              <span><small>Max</small>{m.maxValue}</span>
+              <span><small>N</small>{m.cnt}</span>
             </div>
           </div>
         )

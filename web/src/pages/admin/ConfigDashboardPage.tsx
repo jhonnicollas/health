@@ -92,18 +92,24 @@ export function ConfigDashboardPage() {
   if (!user) {
     return (
       <section className="settings-panel" aria-labelledby="admin-config-title">
-        <h2 id="admin-config-title">Konfigurasi Sistem</h2>
-        <p>Silakan login terlebih dahulu.</p>
+        <div className="clinical-empty">
+          <p className="eyebrow">Admin</p>
+          <h2 id="admin-config-title">Konfigurasi Sistem</h2>
+          <p>Silakan login terlebih dahulu.</p>
+        </div>
       </section>
     )
   }
 
   return (
     <section className="settings-panel" aria-labelledby="admin-config-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Admin</p>
-        <h2 id="admin-config-title">Konfigurasi Sistem</h2>
-        <p>Ubah nilai konfigurasi global (misal timeout AI Vision) tanpa deploy ulang.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Admin</p>
+          <h2 id="admin-config-title">Konfigurasi Sistem</h2>
+          <p>Ubah nilai konfigurasi global (misal timeout AI Vision) tanpa deploy ulang.</p>
+        </div>
+        <span className="status-chip">{configs.length} config</span>
       </div>
 
       {loading ? <p>Memuat konfigurasi...</p> : null}

@@ -142,10 +142,13 @@ export function SelectMetricPage() {
 
   return (
     <section className="measurement-panel" aria-labelledby="metric-select-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Tambah pengukuran</p>
-        <h2 id="metric-select-title">Pilih jenis pengukuran</h2>
-        <p>Checklist dimuat dari katalog metrik aktif.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Tambah pengukuran</p>
+          <h2 id="metric-select-title">Pilih jenis pengukuran</h2>
+          <p>Checklist dimuat dari katalog metrik aktif.</p>
+        </div>
+        <span className="status-chip">{selectedMetrics.length} dipilih</span>
       </div>
 
       {loading ? <p className="loading-text">Memuat katalog...</p> : null}
@@ -192,9 +195,10 @@ export function SelectMetricPage() {
       ) : null}
 
       <div className="selection-summary" aria-live="polite">
-        <strong>
-          {selectedMetrics.length} metrik dipilih dari {devices.length} alat/input
-        </strong>
+        <div className="selection-summary-header">
+          <strong>{selectedMetrics.length} metrik dipilih</strong>
+          <span>{devices.length} alat/input</span>
+        </div>
         {selectedMetrics.length > 0 ? (
           <div className="selected-field-list">
             {selectedMetrics.map(({ id, device, metric }: SelectedMetric) => (

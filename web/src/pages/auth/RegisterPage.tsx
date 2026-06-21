@@ -95,9 +95,18 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
             Simpan catatan pengukuran dengan akun terpisah dan lanjutkan ke profil kesehatan
             untuk mengaktifkan interpretasi berbasis aturan.
           </p>
+          <div className="auth-feature-grid" aria-label="Ringkasan onboarding">
+            <span>Secure profile</span>
+            <span>D1 private data</span>
+            <span>Clinical rules</span>
+          </div>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="form-heading">
+            <h2>Create account</h2>
+            <p>Start personal workspace</p>
+          </div>
           <label>
             Nama tampilan
             <input

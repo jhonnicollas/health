@@ -28,14 +28,23 @@ export function MonthlyReportPage() {
       .then((d) => { if (d.success && d.data) setData(d.data) })
   }, [])
 
-  if (!data) return <div>Memuat...</div>
+  if (!data) return <div className="clinical-empty">Memuat...</div>
 
   return (
     <div className="report-page">
-      <h2>Laporan Bulanan</h2>
-      <p>Total sesi: {data.sessionCount}</p>
-      <p>Hari dengan data: {data.daysWithData}</p>
-      <p>Peringatan: {data.alertCount}</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Reports</p>
+          <h2>Laporan Bulanan</h2>
+          <p>Ringkasan periode untuk evaluasi rutin.</p>
+        </div>
+        <span className="status-chip">{data.metrics.length} metrik</span>
+      </div>
+      <div className="summary-cards">
+        <div className="summary-card"><span className="stat-kicker">Sesi</span><div className="big-value">{data.sessionCount}</div><p>Total sesi</p></div>
+        <div className="summary-card"><span className="stat-kicker">Hari</span><div className="big-value">{data.daysWithData}</div><p>Hari dengan data</p></div>
+        <div className="summary-card"><span className="stat-kicker">Alert</span><div className="big-value">{data.alertCount}</div><p>Peringatan</p></div>
+      </div>
       {data.aiMonthlySummary ? (
         <div className="ai-summary">
           <h3>Ringkasan AI</h3>

@@ -65,26 +65,41 @@ export function TelegramSettingsPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="tg-title">
-      <h2 id="tg-title">Telegram</h2>
-      <h3>1. Buat Koneksi</h3>
-      <button onClick={connect} type="button">Buat Kode Verifikasi</button>
-      {verification ? (
+      <div className="page-heading">
         <div>
+          <p className="eyebrow">Integrasi</p>
+          <h2 id="tg-title">Telegram</h2>
+          <p>Kelola koneksi dan preferensi notifikasi Telegram.</p>
+        </div>
+        <span className="status-chip">{verification ? 'Kode aktif' : 'Belum verifikasi'}</span>
+      </div>
+      <div className="settings-card">
+        <h3>1. Buat Koneksi</h3>
+        <button onClick={connect} type="button">Buat Kode Verifikasi</button>
+      </div>
+      {verification ? (
+        <div className="result-card">
           <p>Kode verifikasi Anda (berlaku {verification.expiresInMinutes} menit): <code>{verification.verificationCode}</code></p>
           <p>Cara 1: Buka bot Telegram kami dan kirim kode ini.</p>
           <p>Cara 2 (jika tidak bisa akses bot): Masukkan chat ID Telegram Anda di bawah.</p>
         </div>
       ) : null}
-      <h3>2. Verifikasi Manual (Chat ID)</h3>
-      <label>Chat ID Telegram Anda<input onChange={(e) => setChatId(e.target.value)} placeholder="contoh: 8727919072" value={chatId} /></label>
-      <button disabled={!verification || !chatId} onClick={verify} type="button">Verifikasi</button>
-      <h3>3. Test Notifikasi</h3>
-      <button onClick={test} type="button">Kirim Test</button>
+      <div className="settings-card">
+        <h3>2. Verifikasi Manual (Chat ID)</h3>
+        <label>Chat ID Telegram Anda<input onChange={(e) => setChatId(e.target.value)} placeholder="contoh: 8727919072" value={chatId} /></label>
+        <button disabled={!verification || !chatId} onClick={verify} type="button">Verifikasi</button>
+      </div>
+      <div className="settings-card">
+        <h3>3. Test Notifikasi</h3>
+        <button onClick={test} type="button">Kirim Test</button>
+      </div>
       {testResult ? <p>{testResult}</p> : null}
-      <h3>4. Pengaturan Notifikasi</h3>
-      <label><input checked={submitEnabled} onChange={(e) => setSubmitEnabled(e.target.checked)} type="checkbox" /> Kirim ringkasan pengukuran</label>
-      <label><input checked={emergencyEnabled} onChange={(e) => setEmergencyEnabled(e.target.checked)} type="checkbox" /> Kirim peringatan darurat</label>
-      <button onClick={saveSettings} type="button">Simpan Pengaturan</button>
+      <div className="settings-card">
+        <h3>4. Pengaturan Notifikasi</h3>
+        <label className="checkbox-row"><input checked={submitEnabled} onChange={(e) => setSubmitEnabled(e.target.checked)} type="checkbox" /> Kirim ringkasan pengukuran</label>
+        <label className="checkbox-row"><input checked={emergencyEnabled} onChange={(e) => setEmergencyEnabled(e.target.checked)} type="checkbox" /> Kirim peringatan darurat</label>
+        <button onClick={saveSettings} type="button">Simpan Pengaturan</button>
+      </div>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
       {message ? <p className="form-message success" role="status">{message}</p> : null}
     </section>

@@ -19,7 +19,14 @@ export function KnowledgeBasePage() {
 
   return (
     <div className="kb-page">
-      <h2>Knowledge Base</h2>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Knowledge</p>
+          <h2>Knowledge Base</h2>
+          <p>Panduan alat ukur dan edukasi penggunaan.</p>
+        </div>
+        <span className="status-chip">{articles.length} artikel</span>
+      </div>
       {articles.length === 0 ? <p>Belum ada artikel.</p> : null}
       {articles.map((a) => (
         <article key={a.id} className="kb-article">

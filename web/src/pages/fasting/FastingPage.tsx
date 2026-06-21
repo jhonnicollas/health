@@ -89,10 +89,13 @@ export function FastingPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="fasting-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Pengukuran</p>
-        <h2 id="fasting-title">Fasting timer</h2>
-        <p>Catat puasa untuk pengukuran glukosa darah puasa.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Pengukuran</p>
+          <h2 id="fasting-title">Fasting timer</h2>
+          <p>Catat puasa untuk pengukuran glukosa darah puasa.</p>
+        </div>
+        <span className="status-chip">{active ? 'Aktif' : 'Siap'}</span>
       </div>
 
       {active && session ? (

@@ -40,12 +40,20 @@ export function DoctorReportPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="doctor-title">
-      <h2 id="doctor-title">Laporan Dokter</h2>
-      <p>Hasil laporan HTML 30 hari untuk dibawa ke dokter.</p>
-      <button disabled={loading} onClick={generate} type="button">{loading ? 'Membuat...' : 'Buat Laporan'}</button>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Doctor Ready</p>
+          <h2 id="doctor-title">Laporan Dokter</h2>
+          <p>Hasil laporan HTML 30 hari untuk dibawa ke dokter.</p>
+        </div>
+        <span className="status-chip">30 hari</span>
+      </div>
+      <div className="action-panel">
+        <button disabled={loading} onClick={generate} type="button">{loading ? 'Membuat...' : 'Buat Laporan'}</button>
+      </div>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
       {report ? (
-        <div>
+        <div className="result-card">
           <p>Report ID: <code>{report.reportId}</code></p>
           <a href={`/api/reports/${report.reportId}/download`} rel="noreferrer" target="_blank">Unduh Laporan</a>
           <button onClick={share} type="button">Buat Tautan Share</button>

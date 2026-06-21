@@ -75,16 +75,17 @@ export function TodayDashboard() {
   }, [])
 
   if (loading) {
-    return <div className="dashboard-loading">Memuat dashboard...</div>
+    return <div className="dashboard-loading clinical-empty">Memuat dashboard...</div>
   }
 
   if (error) {
-    return <div className="dashboard-error">Error: {error}</div>
+    return <div className="dashboard-error clinical-empty">Error: {error}</div>
   }
 
   if (!data || !data.hasData) {
     return (
-      <div className="dashboard-empty">
+      <div className="dashboard-empty clinical-empty">
+        <p className="eyebrow">Dashboard</p>
         <h2>Hari Ini</h2>
         <p>Belum ada pengukuran hari ini.</p>
         <p>Mulai catat pengukuran kesehatan Anda.</p>
@@ -94,20 +95,29 @@ export function TodayDashboard() {
 
   return (
     <div className="today-dashboard">
-      <h2>Dashboard Hari Ini</h2>
-      <p className="dashboard-date">{data.date}</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Dashboard</p>
+          <h2>Dashboard Hari Ini</h2>
+          <p className="dashboard-date">{data.date}</p>
+        </div>
+        <span className="status-chip">Rule Engine Active</span>
+      </div>
       
       <div className="dashboard-stats">
         <div className="stat-card">
+          <span className="stat-kicker">Terukur</span>
           <div className="stat-value">{data.metricCount}</div>
           <div className="stat-label">Metrik Tercatat</div>
         </div>
         <div className="stat-card">
+          <span className="stat-kicker">Sesi</span>
           <div className="stat-value">{data.sessionCount}</div>
           <div className="stat-label">Sesi</div>
         </div>
         {data.emergencyCount > 0 && (
           <div className="stat-card emergency">
+            <span className="stat-kicker">Darurat</span>
             <div className="stat-value">{data.emergencyCount}</div>
             <div className="stat-label">Peringatan</div>
           </div>

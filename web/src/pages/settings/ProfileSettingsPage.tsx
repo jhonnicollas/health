@@ -72,13 +72,20 @@ export function ProfileSettingsPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="profile-settings-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Pengaturan</p>
-        <h2 id="profile-settings-title">Profil dasar</h2>
-        <p>Atur tinggi badan, timezone, tema, dan mode tampilan untuk aplikasi.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Pengaturan</p>
+          <h2 id="profile-settings-title">Profil dasar</h2>
+          <p>Atur tinggi badan, timezone, tema, dan mode tampilan untuk aplikasi.</p>
+        </div>
+        <span className="status-chip">{accessibilityMode}</span>
       </div>
 
       <form className="auth-form settings-form" onSubmit={handleSubmit}>
+        <div className="form-heading">
+          <h3>Health profile</h3>
+          <p>Perubahan diterapkan setelah profil disimpan.</p>
+        </div>
         <label>
           Tinggi badan (cm)
           <input

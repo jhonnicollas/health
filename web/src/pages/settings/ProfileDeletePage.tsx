@@ -25,14 +25,22 @@ export function ProfileDeletePage() {
 
   return (
     <section className="settings-panel" aria-labelledby="delete-title">
-      <h2 id="delete-title">Hapus Akun</h2>
-      <p>Tindakan ini permanen. Semua data pribadi akan dihapus (data klinis yang sudah di-share ke dokter tetap ada untuk audit).</p>
-      <label>Ketik "HAPUS AKUN" untuk konfirmasi
-        <input onChange={(e) => setConfirm(e.target.value)} value={confirm} />
-      </label>
-      <button disabled={loading || confirm !== 'HAPUS AKUN'} onClick={handleDelete} type="button">
-        {loading ? 'Menghapus...' : 'Hapus Akun Saya'}
-      </button>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Privasi</p>
+          <h2 id="delete-title">Hapus Akun</h2>
+          <p>Tindakan ini permanen. Semua data pribadi akan dihapus (data klinis yang sudah di-share ke dokter tetap ada untuk audit).</p>
+        </div>
+        <span className="status-chip danger-chip">Permanen</span>
+      </div>
+      <div className="danger-zone">
+        <label>Ketik "HAPUS AKUN" untuk konfirmasi
+          <input onChange={(e) => setConfirm(e.target.value)} value={confirm} />
+        </label>
+        <button disabled={loading || confirm !== 'HAPUS AKUN'} onClick={handleDelete} type="button">
+          {loading ? 'Menghapus...' : 'Hapus Akun Saya'}
+        </button>
+      </div>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
       {message ? <p className="form-message success" role="status">{message}</p> : null}
     </section>

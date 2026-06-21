@@ -53,10 +53,13 @@ export function AlertsPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="alerts-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Notifikasi</p>
-        <h2 id="alerts-title">Alerts</h2>
-        <p>Daftar alert yang dihasilkan oleh rule engine.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Notifikasi</p>
+          <h2 id="alerts-title">Alerts</h2>
+          <p>Daftar alert yang dihasilkan oleh rule engine.</p>
+        </div>
+        <span className="status-chip">{alerts.length} alert</span>
       </div>
 
       {error ? <p className="form-message error" role="status">{error}</p> : null}

@@ -25,15 +25,21 @@ export function PatternsPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="patterns-title">
-      <h2 id="patterns-title">Pola Kesehatan</h2>
-      <p>Insight otomatis dari data Anda (bukan diagnosis, hanya ringkasan).</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Insights</p>
+          <h2 id="patterns-title">Pola Kesehatan</h2>
+          <p>Insight otomatis dari data Anda (bukan diagnosis, hanya ringkasan).</p>
+        </div>
+        <span className="status-chip">14 hari minimum</span>
+      </div>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      <div>
+      <div className="settings-card">
         <h3>Pola Berat Badan vs Tekanan Darah (14 hari)</h3>
         <button disabled={loading !== null} onClick={() => generate('weight-bp')} type="button">{loading === 'weight-bp' ? 'Membuat...' : 'Buat Insight'}</button>
         {wbResult ? <p>{wbResult}</p> : null}
       </div>
-      <div>
+      <div className="settings-card">
         <h3>Pola Kepatuhan Obat (14 hari)</h3>
         <button disabled={loading !== null} onClick={() => generate('medication')} type="button">{loading === 'medication' ? 'Membuat...' : 'Buat Insight'}</button>
         {medResult ? <p>{medResult}</p> : null}

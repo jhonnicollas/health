@@ -88,9 +88,18 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
             Gunakan email dan password untuk membuka dashboard pribadi Anda. Sesi
             disimpan lewat cookie aman, bukan token yang bisa dibaca halaman.
           </p>
+          <div className="auth-feature-grid" aria-label="Ringkasan keamanan">
+            <span>Rule-first</span>
+            <span>Manual override</span>
+            <span>Private session</span>
+          </div>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="form-heading">
+            <h2>Sign in</h2>
+            <p>Clinical workspace</p>
+          </div>
           <label>
             Email
             <input

@@ -87,13 +87,20 @@ export function FamilyPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="family-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Pengaturan</p>
-        <h2 id="family-title">Keluarga & caregiver</h2>
-        <p>Undang anggota keluarga atau caregiver untuk memantau kesehatan Anda.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Pengaturan</p>
+          <h2 id="family-title">Keluarga & caregiver</h2>
+          <p>Undang anggota keluarga atau caregiver untuk memantau kesehatan Anda.</p>
+        </div>
+        <span className="status-chip">{owned.length + linkedToMe.length} link</span>
       </div>
 
       <form className="auth-form" onSubmit={handleInvite}>
+        <div className="form-heading">
+          <h3>Undangan baru</h3>
+          <p>Role menentukan izin lihat, input, dan alert.</p>
+        </div>
         <label>
           Email undangan
           <input onChange={(e) => setEmail(e.target.value)} required type="email" value={email} />

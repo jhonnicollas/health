@@ -85,10 +85,13 @@ export function CaregiverDashboardPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="caregiver-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Caregiver</p>
-        <h2 id="caregiver-title">Caregiver dashboard</h2>
-        <p>Pantau individu yang memberikan Anda akses.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Caregiver</p>
+          <h2 id="caregiver-title">Caregiver dashboard</h2>
+          <p>Pantau individu yang memberikan Anda akses.</p>
+        </div>
+        <span className="status-chip">{profiles.length} profil</span>
       </div>
 
       {error ? <p className="form-message error" role="status">{error}</p> : null}
@@ -112,12 +115,19 @@ export function CaregiverDashboardPage() {
 
       {monitor ? (
         <section className="monitor-detail">
-          <h3>Detail {monitor.date}</h3>
+          <div className="page-heading compact">
+            <div>
+              <p className="eyebrow">Monitor</p>
+              <h3>Detail {monitor.date}</h3>
+            </div>
+            <span className="status-chip">{monitor.values.length} nilai</span>
+          </div>
           {monitor.values.length === 0 ? <p>Tidak ada nilai.</p> : (
-            <ul>
+            <ul className="value-list">
               {monitor.values.map((v, idx) => (
-                <li key={`${v.metricCode}-${idx}`}>
-                  {v.metricCode}: {v.finalValue} {v.unit} ({v.severity})
+                <li key={`${v.metricCode}-${idx}`} className={`value-card severity-${v.severity}`}>
+                  <strong>{v.metricCode}</strong>
+                  <span>{v.finalValue} {v.unit} ({v.severity})</span>
                 </li>
               ))}
             </ul>
@@ -125,9 +135,9 @@ export function CaregiverDashboardPage() {
           {monitor.alerts.length > 0 ? (
             <>
               <h4>Alerts</h4>
-              <ul>
+              <ul className="alerts-list">
                 {monitor.alerts.map((a) => (
-                  <li key={a.id}>{a.metricCode}: {a.message}</li>
+                  <li key={a.id} className={`alert-item severity-${a.severity}`}>{a.metricCode}: {a.message}</li>
                 ))}
               </ul>
             </>

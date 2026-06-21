@@ -91,13 +91,20 @@ export function EmergencyContactsPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="emergency-title">
-      <div className="auth-copy">
-        <p className="eyebrow">Darurat</p>
-        <h2 id="emergency-title">Kontak darurat</h2>
-        <p>Daftarkan kontak yang akan menerima notifikasi saat kondisi darurat.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Darurat</p>
+          <h2 id="emergency-title">Kontak darurat</h2>
+          <p>Daftarkan kontak yang akan menerima notifikasi saat kondisi darurat.</p>
+        </div>
+        <span className="status-chip">{contacts.length} kontak</span>
       </div>
 
       <form className="auth-form" onSubmit={handleCreate}>
+        <div className="form-heading">
+          <h3>Kontak baru</h3>
+          <p>Notifikasi darurat hanya dikirim jika consent aktif.</p>
+        </div>
         <label>
           Nama
           <input onChange={(e) => setContactName(e.target.value)} required type="text" value={contactName} />

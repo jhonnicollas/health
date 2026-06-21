@@ -5,9 +5,9 @@
 ```text
 Project: HL Health Companion
 Sprint: Sprint 1 + Sprint 2 + Sprint 3 + Sprint 4 COMPLETE + 4 AUDIT CYCLES + LIVE E2E PASS
-Current Task: Test-driven validation + production redeploy
-Current State: All 87 checklist tasks [x] Done; production redeployed; E2E UAT 52/52 PASS live
-Last Updated: 2026-06-21 18:35 UTC
+Current Task: UI-STITCH-CLINICAL-PRECISION
+Current State: Completed locally; all 25 files under web/src/pages refactored in place with Stitch Clinical Precision wrappers/tokens; web lint/build passed
+Last Updated: 2026-06-21 13:56 UTC
 ```
 
 ## Production Deployment
@@ -90,7 +90,8 @@ API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scri
 - Cloudflare cron triggers at 5/5 limit — manual POST /api/internal/cron/reminders works
 - AI Vision extraction hook (useAiExtract) available but not wired into main measurement form — users use manual input + validate + submit flow
 
+- `attachment` folder is not present in this workspace; frontend UI source is under `web/src`
+
 ## Next Steps
-- Project is production-ready, redeployed, and end-to-end verified (52/52 E2E live).
-- No remaining P0/P1 blockers.
+- Optional: deploy updated frontend if production refresh is desired.
 - Regenerate Telegram bot token if Telegram notifications are required.
