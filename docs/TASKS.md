@@ -734,3 +734,212 @@ Rules:
 - [x] DOC-5 Keep `seed.sql` updated for every seed data change
 - [x] DOC-6 Keep `WORK_LOG.md` append-only and current
 - [x] DOC-7 Keep `HANDOFF.md` accurate after every task
+
+---
+
+## Gap Remediation — PRD vs Source Code Quality & Feature Gaps
+
+Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat ini. Semua item adalah [ ] Not Started, prioritas descending.
+
+### GAP-1 UI/UX Visual Quality — Owner Score 5/1000
+- **Deskripsi**: Owner menilai aplikasi 5/1000. UI tidak sesuai ekspektasi enterprise SaaS. Stitch UI Parity sudah dikerjakan tapi ditolak owner.
+- **Akar Masalah**: Stitch CSS tokens sudah di-applied tapi routing, layout, card, badge, dan responsivitas masih kaku. Sidebar, topbar, mobile bottom nav tidak presisi. Warna, spacing, typography tidak konsisten dengan DESIGN.md.
+- **Frontend**: `web/src/App.tsx`, `web/src/App.css`, `web/src/index.css`, semua page files
+- **Acceptance Criteria**:
+  - Sidebar, topbar, content area cocok pixel-for-pixel dengan `web/frontend_stitch/master-layout.html`
+  - Setiap route (dashboard, measurement, history, dsb) cocok dengan referensi Stitch PNG
+  - Warna, font, spacing, shadow, border-radius sesuai DESIGN.md
+  - Owner menyetujui dengan score >= 800/1000
+
+### GAP-2 Mobile Responsive Layout Rusak
+- **Deskripsi**: Layout mobile breakpoints tidak proper. Bottom nav, mobile topbar, card grid tidak responsif.
+- **Frontend**: `web/src/App.css` (media queries), `web/src/App.tsx` (mobile nav), `web/src/index.css`
+- **Acceptance Criteria**:
+  - Mobile (320-767px): sidebar hidden, mobile topbar visible, bottom nav 5 item, card 1 kolom, font size readable
+  - Tablet (768-1023px): sidebar collapsed atau hamburger, grid 2 kolom
+  - Desktop (1024px+): sidebar fixed 280px, grid 3+ kolom
+  - Form input dan tombol touch-friendly (min 44px)
+  - Kamera mobile active untuk capture photo
+
+### GAP-3 AI Vision "Baca Otomatis" Tidak Terhubung
+- **Deskripsi**: `useAiExtract` hook sudah ada dan di-import di `DynamicMetricForm.tsx` tapi tombol "Baca Otomatis" tidak muncul/tidak terhubung ke flow input. User tidak bisa menggunakan AI Vision extraction.
+- **Frontend**: `web/src/components/measurement/DynamicMetricForm.tsx`, `web/src/hooks/useAiExtract.ts`
+- **Worker**: `POST /api/measurements/extract` endpoint
+- **Acceptance Criteria**:
+  - Tiap card metric dengan `requiresAttachment=true` menampilkan tombol "Baca Otomatis"
+  - Klik tombol → kirim attachment ke `/api/measurements/extract`
+  - Loading state selama AI Vision running
+  - Success → value terisi di text box
+  - Timeout > 5000ms → tampilkan manual input + pesan "AI terlalu lama membaca foto"
+  - Failed → manual input
+  - `rawAiValue` dan `confidence` tersimpan
+  - `manualOverride` flag berubah jika user edit hasil AI
+
+### GAP-4 Theme Selector Tidak Berfungsi
+- **Deskripsi**: Theme (light/warm/dark/highContrast) tersimpan di DB tapi tidak langsung diterapkan ke UI setelah user ganti di Settings. Tidak ada visual feedback.
+- **Frontend**: `web/src/pages/settings/ProfileSettingsPage.tsx`, `web/src/context/AuthContext.tsx`
+- **Acceptance Criteria**:
+  - Setelah ganti theme dan save, theme langsung berubah tanpa reload
+  - `document.documentElement.dataset.theme` terupdate
+  - CSS variables berubah sesuai theme
+  - Settings mencerminkan theme saat ini
+
+### GAP-5 Knowledge Base Hanya Teks Polos
+- **Deskripsi**: Halaman Knowledge Base menampilkan artikel sebagai `<pre>` text biasa. PRD requires images, videos, use-case cards, structured device guides.
+- **Frontend**: `web/src/pages/kb/KnowledgeBasePage.tsx`
+- **Worker**: `GET /api/kb` endpoint
+- **Acceptance Criteria**:
+  - Tiap artikel memiliki: title, image/icon, structured sections, use-case card
+  - Device guides: cara pakai, tips foto, kesalahan umum, arti metric, kapan harus cek ulang
+  - Support multimedia (images, embedded videos jika memungkinkan)
+  - Responsive card layout
+
+### GAP-6 Dashboard Kosong / Tidak Menampilkan Data Real
+- **Deskripsi**: Dashboard hari ini, mingguan, bulanan tidak menampilkan data real. Bento grid streak, AI insight, charts kosong/null.
+- **Frontend**: `web/src/pages/dashboard/TodayDashboard.tsx`, `web/src/pages/dashboard/WeeklyDashboard.tsx`, `web/src/pages/dashboard/MonthlyDashboard.tsx`
+- **Worker**: `GET /api/dashboard/today`, `GET /api/dashboard/weekly`, `GET /api/dashboard/monthly`
+- **Acceptance Criteria**:
+  - Today dashboard: latest value per metric, streak counter, AI insight banner, alert status
+  - Weekly dashboard: 7-day trends (text-based minimal), adherence, best/worst day
+  - Monthly dashboard: rata-rata, min, max, alert count, measurement days
+  - Empty state jika tidak ada data
+  - Charts/lazy-load jika memungkinkan
+
+### GAP-7 Reports Minimal — Missing Popup & Recommendation
+- **Deskripsi**: Daily/Weekly/Monthly report hanya menampilkan tabel metric value. Tidak menampilkan popupMessage, recommendation, bestDay/worstDay dari rules engine.
+- **Frontend**: `web/src/pages/reports/DailyReportPage.tsx`, `web/src/pages/reports/WeeklyReportPage.tsx`, `web/src/pages/reports/MonthlyReportPage.tsx`
+- **Acceptance Criteria**:
+  - Daily: tampilkan popupMessage, recommendation, sourceLabel per metric
+  - Weekly: bestDay, worstDay, alertCount, adherence
+  - Monthly: aiMonthlySummary, alertCount, daysWithData, latest metrics
+  - Jika tidak ada data: prompt "Belum ada data pengukuran"
+
+### GAP-8 Telegram Bot Token Tidak Valid
+- **Deskripsi**: Bot token `24032453:AAEStQgN1Djc5bWsIsah8qC47wXTrH2Ev5A` return 401 dari Telegram API. User harus regenerate via @BotFather.
+- **Worker**: Environment secret `TELEGRAM_BOT_TOKEN`
+- **Acceptance Criteria**:
+  - Token valid dan `getMe` return 200
+  - `POST /api/telegram/test` return `sent: true`
+  - Submit measurement mengirim notifikasi Telegram
+
+### GAP-9 System Config Editor Tidak Ada di Settings (Hanya di Admin)
+- **Deskripsi**: Halaman Admin Config terpisah di `/admin/configs`. PRD requires konfigurasi sistem bisa diubah dari Settings untuk admin.
+- **Frontend**: `web/src/pages/settings/ProfileSettingsPage.tsx`, `web/src/pages/admin/ConfigDashboardPage.tsx`
+- **Acceptance Criteria**:
+  - Admin user melihat tab/panel "System Config" di Settings
+  - Bisa edit: aiExtractTimeoutMs, maxUploadSizeBytes, telegramBotToken display, dsb
+  - Non-admin tidak melihat panel ini
+
+### GAP-10 AI Assistant Chatbot Minimal
+- **Deskripsi**: Halaman AI Assistant hanya textarea + submit button. Tidak ada conversational UI, tidak ada context history, tidak ada streaming.
+- **Frontend**: `web/src/App.tsx` (`AiAssistantPage` component inline)
+- **Acceptance Criteria**:
+  - Chat bubble UI (user question + AI answer)
+  - Tampilkan vitals context sebagai card
+  - Loading/typing indicator
+  - Safety disclaimer prominent
+  - No diagnosis/prescription language
+
+### GAP-11 Encrypted Sensitive Data
+- **Deskripsi**: PRD requires encryption untuk: telegramChatId, emergency contact data, medication notes, personal notes. Tidak diimplementasikan.
+- **Worker**: `worker/src/index.ts`, `worker/src/routes-extra.ts`
+- **Acceptance Criteria**:
+  - `telegramChatId` di-encrypt sebelum disimpan ke `HL_telegramLinks`
+  - Emergency contact data di-encrypt
+  - Encryption key dari environment secret (bukan hardcoded)
+  - Decrypt hanya saat digunakan (read)
+
+### GAP-12 Emergency Consent Flow Tidak Lengkap
+- **Deskripsi**: PRD requires consent sebelum emergency contact menerima alert. Flow consent belum diverifikasi end-to-end.
+- **Worker**: `POST /api/emergency/contacts`, alert flow
+- **Acceptance Criteria**:
+  - Emergency contact hanya menerima alert jika `canReceiveAlert=true`
+  - Consent checkbox di UI emergency contacts
+  - Audit log saat consent diberikan/dicabut
+
+### GAP-13 Pattern Detection Missing Sleep vs Blood Pressure
+- **Deskripsi**: PRD US-4.4.1 requires sleep vs blood pressure pattern detection. Hanya weight-bp dan medication yang diimplementasi.
+- **Worker**: `POST /api/patterns/generate` endpoint
+- **Acceptance Criteria**:
+  - Sleep vs BP pattern: rata-rata systolic pada hari <6h sleep vs >=7h sleep
+  - Minimum 14 days data guard
+  - Safe language: "berhubungan", "cenderung", bukan "menyebabkan"
+
+### GAP-14 PDF Doctor Report Not True PDF
+- **Deskripsi**: Laporan dokter adalah HTML (Cloudflare Workers tidak bisa run Puppeteer). PRD requires PDF. Browser print workaround tidak cukup.
+- **Worker**: `POST /api/reports/doctor-ready`, `GET /api/reports/:id/download`
+- **Acceptance Criteria**:
+  - Alternatif: generate PDF via browser-side print atau library jsPDF/PDF-lib
+  - HTML report tetap disimpan di R2 sebagai fallback
+  - Share link dengan expiry berfungsi
+
+### GAP-15 Browser Push Notification Not Fully Wired
+- **Deskripsi**: Endpoint `/api/notifications/browser/subscribe` ada, tapi flow end-to-end (permission → subscribe → send → receive) belum diverifikasi.
+- **Frontend**: `web/src/pages/reminders/RemindersPage.tsx`
+- **Worker**: `POST /api/notifications/browser/subscribe`
+- **Acceptance Criteria**:
+  - User bisa enable/disable browser push di settings
+  - Permission request muncul
+  - Subscribe ke push service berhasil
+  - Notifikasi dikirim saat reminder due
+
+### GAP-16 Measurement Flow Tidak Ada Inline Explanations
+- **Deskripsi**: PRD requires measurement cards memiliki inline explanations: cara pengukuran, tips, apa arti angka. Tidak ada di form saat ini.
+- **Frontend**: `web/src/pages/measurement/SelectMetricPage.tsx`, `web/src/components/measurement/DynamicMetricForm.tsx`
+- **Acceptance Criteria**:
+  - Tiap metric card menampilkan penjelasan singkat inline
+  - Tooltip atau accordion untuk detail
+  - Penjelasan: apa yang diukur, satuan, range normal
+
+### GAP-17 Cron Triggers at 5/5 Limit
+- **Deskripsi**: Cloudflare account mencapai 5/5 cron trigger limit. Cron handler sudah di-export tapi tidak bisa dijadwalkan. Workaround: manual POST `/api/internal/cron/reminders`.
+- **Worker**: Cron handler di `worker/src/routes-extra.ts`
+- **Acceptance Criteria**:
+  - Cron trigger bisa aktif (mungkin perlu upgrade Cloudflare plan)
+  - Atau merge beberapa cron menjadi 1 handler
+  - Reminder notification jalan otomatis
+
+### GAP-18 PWA Offline & Installability Not Verified
+- **Deskripsi**: Manifest dan SW ada tapi install prompt, offline shell, dan sync draft belum diverifikasi end-to-end.
+- **Frontend**: `web/public/manifest.json`, `web/public/sw.js`
+- **Acceptance Criteria**:
+  - Install prompt muncul di browser mobile
+  - App bisa diakses offline (cached shell)
+  - Draft sync via IndexedDB + POST /api/measurements/sync
+
+### GAP-19 Family Role-Based Access Control Belum Lengkap
+- **Deskripsi**: 5 roles (owner, caregiver, viewer, emergencyContact, doctorViewer) dengan permissions berbeda. Implementasi perlu diverifikasi tiap role.
+- **Worker**: Family endpoints, caregiver dashboard
+- **Acceptance Criteria**:
+  - Tiap role memiliki akses sesuai tabel permissions PRD
+  - caregiver: lihat dashboard, input data optional, edit terbatas
+  - viewer: hanya lihat dashboard
+  - emergencyContact: limited dashboard + terima emergency alert
+  - doctorViewer: report only
+
+### GAP-20 Senior Mode One-Metric-Per-Screen Not Verified
+- **Deskripsi**: SeniorMeasurementFlow ada dengan hardcoded 5 metrics. Perlu diverifikasi one-metric-per-screen flow dan dibandingkan dengan PRD spec.
+- **Frontend**: `web/src/pages/measurement/SeniorMeasurementFlow.tsx`
+- **Acceptance Criteria**:
+  - Large font (min 18px), large buttons (min 48px)
+  - One metric per screen (wizard)
+  - Simplified navigation (3 menus: Home, Add Data, Emergency)
+  - SOS long-press emergency button
+  - High contrast mode toggle
+
+### GAP-21 Rate Limiting OCR & Telegram Not Verified
+- **Deskripsi**: PRD requires rate limiting untuk OCR dan Telegram endpoints. Login rate limiting sudah ada, yang lain belum diverifikasi.
+- **Worker**: `worker/src/index.ts`
+- **Acceptance Criteria**:
+  - `POST /api/measurements/extract` memiliki rate limit
+  - `POST /api/telegram/*` endpoints memiliki rate limit
+  - Rate limit configurable dari `HL_systemConfigs`
+
+### GAP-22 Charts & Visualizations Missing
+- **Deskripsi**: Dashboards should have charts/visualizations (trend lines, bar charts) untuk weekly/monthly views. Saat ini hanya text.
+- **Frontend**: `web/src/pages/dashboard/WeeklyDashboard.tsx`, `web/src/pages/dashboard/MonthlyDashboard.tsx`
+- **Acceptance Criteria**:
+  - Weekly dashboard: simple text-based trend (naik/turun/stabil)
+  - Monthly: mini bar chart atau sparkline
+  - Lazy load chart library
+  - Accessible fallback text

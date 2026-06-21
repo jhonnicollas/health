@@ -138,7 +138,9 @@ API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scri
 38. Frontend build: 53 modules, 288.20 kB JS, 41.69 kB CSS. Worker tests: 22/22 PASS.
 
 ## Next Steps
-- Stitch UI Parity Remediation is COMPLETE. All 16 tasks done, 52/52 production UAT pass.
-- Regenerate Telegram bot token if Telegram notifications are required.
-- Owner visual review against Stitch PNGs recommended to confirm parity acceptance.
-- If owner finds deviations, patch in-place per docs/STITCH_UI_PARITY_TEST_PLAN.md failure handling.
+- Stitch UI Parity Remediation is COMPLETE but owner rejected quality (score 5/1000).
+- **GAP-1 through GAP-22** added to `docs/TASKS.md` — 22 critical gaps between PRD and source code.
+- Recommended first task: **GAP-1 UI/UX Visual Quality** — most impactful fix (owner score).
+- Or **GAP-3 AI Vision "Baca Otomatis"** — core feature not wired (useAiExtract hook imported but no button).
+- Regenerate Telegram bot token (currently 401 from Telegram API).
+- See `docs/TASKS.md` "Gap Remediation" section for complete list with acceptance criteria.

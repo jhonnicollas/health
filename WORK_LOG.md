@@ -2689,3 +2689,84 @@ Final state of audit + fixes:
 ### Next Agent Notes
 - P5.3 requires Cloudflare API token to deploy. Run: CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=79dea2845a4b62ea5229c8676dea02c0 npx wrangler deploy (worker) and npx wrangler pages deploy dist --project-name hl-health-companion --commit-dirty=true (web)
 - After deploy, run UAT: API=https://hl-health-companion.indiehomesungairaya.workers.dev bash worker/scripts/e2e-uat.sh
+
+## 2026-06-22 — Agent: opencode
+
+### Task: GAP-ANALYSIS — PRD vs Source Code Gap Audit
+
+**Status:** Completed
+
+**Files Read:**
+- docs/PRD.docx.md (full, 2219 lines)
+- docs/PRD_UserStory.docx.md (full, 1596 lines)
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+- docs/schema.sql
+- worker/src/index.ts (4249 lines, 77 endpoints)
+- worker/src/routes-extra.ts (497 lines, 16 endpoints)
+- web/src/App.tsx (587 lines)
+- web/src/App.css (2083 lines)
+- web/src/index.css (258 lines)
+- web/src/pages/ (25 page files, 4487 total lines)
+- web/src/components/ (6 component files)
+- web/src/hooks/useAiExtract.ts
+- web/src/utils/
+- web/functions/api/[[path]].ts
+
+**Files Changed:**
+- docs/TASKS.md (added Gap Remediation section with 22 tasks)
+- WORK_LOG.md (this entry)
+- HANDOFF.md (updated)
+
+**What Changed:**
+- Conducted comprehensive gap analysis between PRD requirements and current source code
+- Identified 22 critical gaps organized by priority
+- Each gap has description, affected files, and acceptance criteria
+
+**Key Findings:**
+- All 87 sprint tasks [x] Done but many features are skeleton/minimal
+- AI Vision extraction hook imported but NOT wired to any button
+- Theme selector saves to DB but doesn't apply UI changes immediately
+- No Tailwind CSS (PRD requires it)
+- Knowledge Base renders `<pre>` text — no images, videos, cards
+- Reports are plain tables — missing popupMessage, recommendation, bestDay/worstDay
+- Dashboard bento grid exists but empty/null data
+- Telegram bot token returns 401
+- No encryption for sensitive data
+- Charts/visualizations completely missing
+
+**Gaps Identified (22 total):**
+1. GAP-1 UI/UX Visual Quality — Owner score 5/1000
+2. GAP-2 Mobile Responsive Layout rusak
+3. GAP-3 AI Vision "Baca Otomatis" tidak terhubung
+4. GAP-4 Theme Selector tidak berfungsi
+5. GAP-5 Knowledge Base hanya teks polos
+6. GAP-6 Dashboard kosong/tidak menampilkan data real
+7. GAP-7 Reports minimal — missing popup & recommendation
+8. GAP-8 Telegram bot token tidak valid (401)
+9. GAP-9 System Config editor hanya di Admin
+10. GAP-10 AI Assistant chatbot minimal
+11. GAP-11 Encrypted sensitive data tidak ada
+12. GAP-12 Emergency consent flow tidak lengkap
+13. GAP-13 Pattern detection missing Sleep vs BP
+14. GAP-14 PDF Doctor Report not true PDF
+15. GAP-15 Browser push notification not fully wired
+16. GAP-16 Measurement flow tidak ada inline explanations
+17. GAP-17 Cron triggers at 5/5 limit
+18. GAP-18 PWA offline & installability not verified
+19. GAP-19 Family role-based access control belum lengkap
+20. GAP-20 Senior Mode one-metric-per-screen not verified
+21. GAP-21 Rate limiting OCR & Telegram not verified
+22. GAP-22 Charts & visualizations missing
+
+**Documentation Updated:**
+- docs/TASKS.md (added Gap Remediation section)
+- WORK_LOG.md (this entry)
+- HANDOFF.md (updated)
+
+### Next Agent Notes
+- Recommended first task: GAP-1 (UI/UX Visual Quality)
+- Or GAP-3 (AI Vision "Baca Otomatis") — core feature missing
+- Each gap task is independent and can be worked in any order
+- Verify each task against its acceptance criteria before marking [x]
