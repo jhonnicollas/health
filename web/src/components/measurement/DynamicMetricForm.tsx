@@ -56,6 +56,11 @@ type SubmitResponse = {
   }
 }
 
+type AiMetricStatus = {
+  kind: 'success' | 'warning' | 'error'
+  message: string
+}
+
 function deriveMetricGroup(selection: DynamicMetricSelection) {
   const deviceType = selection.device?.deviceType || ''
   if (deviceType === 'bloodPressure') return 'bloodPressure'
@@ -69,6 +74,8 @@ export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFo
   const { extract, loading: aiLoading, error: aiError } = useAiExtract()
   const [values, setValues] = useState<Record<string, ValueState>>({})
   const [files, setFiles] = useState<Record<string, File | null>>({})
+  const [extractingMetricCode, setExtractingMetricCode] = useState<string | null>(null)
+  const [aiMetricStatus, setAiMetricStatus] = useState<Record<string, AiMetricStatus>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -130,29 +137,58 @@ export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFo
 
     setError(null)
     setSuccessMessage(null)
+    setExtractingMetricCode(selection.metric.metricCode)
+    setAiMetricStatus((prev) => ({
+      ...prev,
+      [selection.metric.metricCode]: {
+        kind: 'warning',
+        message: 'AI sedang membaca foto. Input manual tetap bisa digunakan.'
+      }
+    }))
     const siblings = metricsByDevice.get(deviceCode) || [selection]
     const selectedMetricCodes = siblings.map((item) => item.metric.metricCode)
-    const { result, error: resultError } = await extract(
-      file,
-      deviceCode,
-      deriveMetricGroup(selection),
-      selectedMetricCodes
-    )
+    try {
+      const { result, error: resultError } = await extract(
+        file,
+        deviceCode,
+        deriveMetricGroup(selection),
+        selectedMetricCodes
+      )
 
-    if (result?.metrics?.length) {
-      for (const metric of result.metrics) {
-        setField(metric.metricCode, {
-          raw: String(metric.rawAiValue),
-          final: String(metric.rawAiValue),
-          manual: false,
-          confidence: metric.confidence
-        })
+      if (result?.metrics?.length) {
+        for (const metric of result.metrics) {
+          setField(metric.metricCode, {
+            raw: String(metric.rawAiValue),
+            final: String(metric.rawAiValue),
+            manual: false,
+            confidence: metric.confidence
+          })
+          setAiMetricStatus((prev) => ({
+            ...prev,
+            [metric.metricCode]: {
+              kind: result.needsManualReview ? 'warning' : 'success',
+              message: `AI terbaca. Confidence ${Math.round(metric.confidence * 100)}%. Verifikasi sebelum simpan.`
+            }
+          }))
+        }
+        setSuccessMessage('AI berhasil mengisi angka awal. Silakan verifikasi dan ubah jika perlu.')
+        return
       }
-      setSuccessMessage('AI berhasil mengisi angka awal. Silakan verifikasi dan ubah jika perlu.')
-      return
-    }
 
-    setError(resultError?.error.message ?? 'AI belum bisa membaca bukti ini. Silakan input manual.')
+      const fallbackMessage = resultError?.error.code === 'AI_TIMEOUT'
+        ? 'AI terlalu lama membaca foto. Silakan input manual.'
+        : resultError?.error.message ?? 'AI belum bisa membaca bukti ini. Silakan input manual.'
+      setAiMetricStatus((prev) => ({
+        ...prev,
+        [selection.metric.metricCode]: {
+          kind: resultError?.error.code === 'AI_TIMEOUT' ? 'warning' : 'error',
+          message: fallbackMessage
+        }
+      }))
+      setError(fallbackMessage)
+    } finally {
+      setExtractingMetricCode(null)
+    }
   }
 
   async function uploadAttachment(sessionId: string, selection: DynamicMetricSelection, measuredAt: string) {
@@ -299,12 +335,16 @@ export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFo
             {selection.device?.deviceCode && metric.requiresAttachment ? (
               <button
                 className="secondary-action"
-                disabled={aiLoading || !files[metric.metricCode]}
+                disabled={aiLoading || extractingMetricCode === metric.metricCode || !files[metric.metricCode]}
                 onClick={() => void handleAiFill(selection)}
                 type="button"
               >
-                {aiLoading ? 'AI membaca...' : 'Baca otomatis'}
+                {extractingMetricCode === metric.metricCode ? 'AI membaca...' : 'Baca Otomatis'}
               </button>
+            ) : null}
+
+            {metric.requiresAttachment && !files[metric.metricCode] ? (
+              <p className="muted">Pilih foto lebih dulu untuk memakai Baca Otomatis.</p>
             ) : null}
 
             <ManualOverrideInput
@@ -314,6 +354,18 @@ export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFo
               manual={entry.manual}
               onChange={(partial) => setField(metric.metricCode, partial)}
             />
+
+            {entry.confidence !== null && entry.confidence !== undefined ? (
+              <p className="ai-confidence">
+                rawAiValue tersimpan: {entry.raw || '-'} / confidence {Math.round(entry.confidence * 100)}%
+              </p>
+            ) : null}
+
+            {aiMetricStatus[metric.metricCode] ? (
+              <p className={`form-message ${aiMetricStatus[metric.metricCode].kind}`} role="status">
+                {aiMetricStatus[metric.metricCode].message}
+              </p>
+            ) : null}
 
             {files[metric.metricCode] ? (
               <p className="muted">File dipilih: {files[metric.metricCode]?.name}</p>

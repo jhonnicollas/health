@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
 :root {
   --colorBackground: #f7f9fb;
   --colorSurface: #f2f4f6;
@@ -255,4 +257,27 @@ a {
 *:focus-visible {
   outline: 3px solid var(--colorFocus);
   outline-offset: 3px;
+}
+
+.material-symbols-outlined {
+  direction: ltr;
+  display: inline-block;
+  flex-shrink: 0;
+  font-family: 'Material Symbols Outlined';
+  font-feature-settings: 'liga';
+  font-size: 24px;
+  font-style: normal;
+  font-weight: normal;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.material-symbols-outlined.fill {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
 }

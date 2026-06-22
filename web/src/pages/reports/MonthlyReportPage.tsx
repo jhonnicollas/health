@@ -51,23 +51,25 @@ export function MonthlyReportPage() {
           <p>{data.aiMonthlySummary}</p>
         </div>
       ) : null}
-      <table className="report-table">
-        <thead>
-          <tr><th>Metric</th><th>Avg</th><th>Min</th><th>Max</th><th>Latest</th><th>N</th></tr>
-        </thead>
-        <tbody>
-          {data.metrics.map((m, i) => (
-            <tr key={`${m.metricCode}-${i}`}>
-              <td>{m.metricCode}</td>
-              <td>{m.avg?.toFixed(1) ?? '—'}</td>
-              <td>{m.min ?? '—'}</td>
-              <td>{m.max ?? '—'}</td>
-              <td>{m.latest ?? '—'}</td>
-              <td>{m.cnt}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {data.metrics.length === 0 ? <p className="clinical-empty">Belum ada data pengukuran untuk laporan bulanan.</p> : (
+        <table className="report-table">
+          <thead>
+            <tr><th>Metric</th><th>Avg</th><th>Min</th><th>Max</th><th>Latest</th><th>N</th></tr>
+          </thead>
+          <tbody>
+            {data.metrics.map((m, i) => (
+              <tr key={`${m.metricCode}-${i}`}>
+                <td>{m.metricCode}</td>
+                <td>{m.avg?.toFixed(1) ?? '-'}</td>
+                <td>{m.min ?? '-'}</td>
+                <td>{m.max ?? '-'}</td>
+                <td>{m.latest ?? '-'}</td>
+                <td>{m.cnt}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

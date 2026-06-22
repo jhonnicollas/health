@@ -1175,6 +1175,104 @@ Submit tidak menyimpan original image
 
 ## 24. Stitch Clinical Precision Alignment
 
+### 24.1 GAP-1 Local Stitch Shell Refresh — 2026-06-21
+
+Source of truth for the refreshed production shell is `web/frontend_stitch/`.
+
+Applied UI rules:
+
+- App shell uses Material Symbols names, not ad-hoc glyphs or mojibake characters.
+- Sidebar brand, active nav rail, emergency support button, desktop topbar search, segmented density control, notification dot, user avatar, mobile topbar, bottom nav, mobile add FAB, and AI assistant FAB must visually follow `web/frontend_stitch/master-layout.html`.
+- Dashboard bento cards, AI insight banner, tab underline, and vital cards must use local Stitch tokens: `surface-container-lowest`, `outline-variant`, `primary`, `primary-container`, `tertiary-container`, `error-container`, `rounded-xl`, and Level 1 shadow.
+- New Measurement workflow must remain step-based: metric checkbox cards, full-width record cards, dashed image capture area, secondary AI auto-read button, and large submit action.
+- Medical business logic remains unchanged: UI wraps existing React state, hooks, and API calls; status/severity still comes from the rule engine.
+
+Validation required for this refresh:
+
+- `cd web && npx tsc -b`
+- `cd web && npm run lint`
+- `cd web && npm run build`
+- Owner visual review for GAP-1 score target `>=800/1000`.
+
+### 24.2 GAP-2 Responsive Layout Rules — 2026-06-21
+
+Breakpoints now match local Stitch behavior:
+
+- Mobile `<768px`: sidebar hidden, mobile topbar visible, bottom nav fixed with 5 icon+label items, content bottom padding protects against nav overlap, cards/forms collapse to one column.
+- Tablet `768px-1023px`: sidebar becomes an 88px icon rail, main content uses tablet margin, dense grids use two columns.
+- Desktop `>=1024px`: sidebar returns to fixed 280px width, main content margin follows `--sidebarWidth`, large grids can expand to 3+ columns based on component rules.
+- Touch targets stay at minimum 44px via global button sizing and explicit rail/FAB/button sizes.
+- Measurement file input keeps `capture="environment"` in `DynamicMetricForm.tsx` for mobile camera capture.
+
+### 24.3 GAP-3 AI Vision Form States — 2026-06-21
+
+Measurement cards with `requiresAttachment=true` must show:
+
+- A dashed photo capture/upload area.
+- `Baca Otomatis` action after a file is selected.
+- Per-card loading copy: `AI membaca...`.
+- Timeout fallback copy exactly: `AI terlalu lama membaca foto. Silakan input manual.`
+- Visible `rawAiValue` and confidence after AI success.
+- Manual override input remains editable before submit; changed final value sets `manualOverride`.
+
+### 24.4 GAP-4 Immediate Theme Application — 2026-06-21
+
+Settings theme controls must:
+
+- Update `document.documentElement.dataset.theme` as soon as user changes theme.
+- Update `document.documentElement.dataset.accessibility` as soon as user changes display mode.
+- After successful save, update auth context immediately so app shell and Settings reflect current DB-backed values without page reload.
+- Continue persisting source of truth in `HL_userProfiles.theme` and `HL_userProfiles.accessibilityMode`.
+
+### 24.5 GAP-5 Knowledge Base Guide Layout — 2026-06-21
+
+Knowledge Base must render structured guide UI:
+
+- Left directory with category chips and article cards.
+- Right reader with hero, icon, summary, media-ready panel, specs/use-case cards, and parsed sections.
+- No raw `<pre>` article body rendering.
+- Markdown body from `HL_knowledgeArticles.contentMarkdown` may be parsed into headings, paragraphs, and bullet lists client-side.
+- Layout must collapse to one-column on mobile and two-panel reader on tablet/desktop.
+
+### 24.6 GAP-6 Dashboard Real Data Widgets — 2026-06-21
+
+Dashboard pages must render DB-backed values:
+
+- Today: latest values, session/metric counts, emergency count, rule status badges, manual override badge, and alert list.
+- Weekly: metric averages/min/max/readings, trend badges, measurementDays, bestDay, worstDay, alertCount, and medication adherence percent when medication logs exist.
+- Monthly: metric averages/min/max/readings, measurementDays, alertCount, latest metric count, and accessible mini bar chart from daily session counts.
+- Empty states must remain explicit when period has no data.
+
+### 24.7 GAP-7 Rich Report Content — 2026-06-21
+
+Reports must expose rule-engine interpretation:
+
+- Daily report renders per-metric cards with value, severity, popup title/message, recommendation, and source label.
+- Weekly report renders adherence, bestDay, worstDay, alertCount, daysWithData, and metric table.
+- Monthly report renders sessions, daysWithData, alertCount, AI monthly summary, and metric table.
+- Empty reports show explicit no-data prompts.
+
+### 24.8 GAP-9 Settings System Config Panel — 2026-06-22
+
+Admin Settings must expose DB-backed system configuration without leaving the Settings route:
+
+- Non-admin users must not see the System Config panel; frontend discovers permission by calling `/api/admin/configs` and hiding the panel on 401/403.
+- Admin users see a `System Config` section below profile settings.
+- Config rows reuse the admin config table/form pattern: key, description, editable value, and data type.
+- Sensitive config keys such as `telegramBotToken` render as password inputs with clear placeholder text.
+- Settings panel width may expand to support config tables; the profile form remains capped for readability.
+
+### 24.9 GAP-10 AI Assistant Chat UI — 2026-06-22
+
+AI Assistant must behave like a conversational clinical support surface:
+
+- Top context banner shows latest vitals injected into the request.
+- Safety note is always visible and states that AI does not diagnose, assign medical severity, or change medication dosage.
+- Conversation renders user and assistant chat bubbles with model/fallback metadata.
+- Loading state renders an assistant typing bubble.
+- Compose card supports multiline questions and send action.
+- Senior-friendly typography uses `--typBodyLg` inside response bubbles.
+
 Frontend Sprint 1-4 sekarang disejajarkan dengan Stitch project `HL Health Master Layout`
 (`Clinical Precision`):
 

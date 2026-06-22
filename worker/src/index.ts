@@ -15,6 +15,7 @@ export interface Env {
   CLOUDFLARE_ACCOUNT_ID?: string
   CLOUDFLARE_API_TOKEN?: string
   TELEGRAM_BOT_TOKEN?: string
+  ENCRYPTION_KEY?: string
   ADMIN_EMAILS?: string
   DB: D1Database
   LOGS: R2Bucket
@@ -139,6 +140,7 @@ const PASSWORD_HASH_ITERATIONS = 100000
 const MIN_ONBOARDING_AGE_YEARS = 13
 
 const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
 
 function jsonMeta(startedAt: number) {
   return {
@@ -534,6 +536,42 @@ function base64UrlDecode(value: string) {
   return bytes
 }
 
+async function getSensitiveDataKey(c: Context<{ Bindings: Env }>) {
+  const secret = c.env.ENCRYPTION_KEY
+  if (!secret || secret.trim().length < 16) {
+    throw new Error('ENCRYPTION_KEY is required for sensitive data encryption')
+  }
+  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret))
+  return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
+}
+
+function isEncryptedSensitiveValue(value: string | null | undefined): value is string {
+  return typeof value === 'string' && value.startsWith('enc:v1:')
+}
+
+async function encryptSensitive(c: Context<{ Bindings: Env }>, value: string | null | undefined): Promise<string | null> {
+  if (!value) return null
+  if (isEncryptedSensitiveValue(value)) return value
+  const key = await getSensitiveDataKey(c)
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(value))
+  return `enc:v1:${base64Url(iv)}:${base64Url(encrypted)}`
+}
+
+async function decryptSensitive(c: Context<{ Bindings: Env }>, value: string | null | undefined): Promise<string | null> {
+  if (!value) return null
+  if (!isEncryptedSensitiveValue(value)) return value
+  const [, , ivText, cipherText] = value.split(':')
+  if (!ivText || !cipherText) return null
+  const key = await getSensitiveDataKey(c)
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64UrlDecode(ivText) },
+    key,
+    base64UrlDecode(cipherText)
+  )
+  return textDecoder.decode(decrypted)
+}
+
 function timingSafeEqual(left: string, right: string) {
   if (left.length !== right.length) {
     return false
@@ -625,6 +663,56 @@ async function getSystemConfigNumber(c: Context<{ Bindings: Env }>, configKey: s
   }
 
   return value
+}
+
+async function getSystemConfigString(c: Context<{ Bindings: Env }>, configKey: string): Promise<string | null> {
+  const cached = readSystemConfigCache(c.env.DB, configKey)
+  if (cached !== null) return cached.trim() || null
+
+  const row = await c.env.DB.prepare(
+    'SELECT configValue FROM HL_systemConfigs WHERE configKey = ? LIMIT 1'
+  )
+    .bind(configKey)
+    .first<{ configValue: string }>()
+
+  if (row?.configValue !== undefined) {
+    writeSystemConfigCache(c.env.DB, configKey, row.configValue)
+  }
+
+  return row?.configValue?.trim() || null
+}
+
+async function getSystemConfigBoolean(c: Context<{ Bindings: Env }>, configKey: string, fallback = false): Promise<boolean> {
+  const value = await getSystemConfigString(c, configKey)
+  if (value === null) return fallback
+  return ['1', 'true', 'yes', 'on', 'enabled'].includes(value.toLowerCase())
+}
+
+async function resolveTelegramBotToken(c: Context<{ Bindings: Env }>): Promise<{ token?: string; error?: string }> {
+  const botActive = await getSystemConfigBoolean(c, 'telegramBotActive', true)
+  if (!botActive) return { error: 'telegram_bot_disabled' }
+
+  const token = await getSystemConfigString(c, 'telegramBotToken') || c.env.TELEGRAM_BOT_TOKEN
+  if (!token) return { error: 'bot_token_not_configured' }
+
+  return { token }
+}
+
+async function validateTelegramBotToken(c: Context<{ Bindings: Env }>): Promise<{ valid: boolean; bot?: unknown; error?: string }> {
+  const resolved = await resolveTelegramBotToken(c)
+  if (!resolved.token) return { valid: false, error: resolved.error }
+
+  const response = await fetch(`https://api.telegram.org/bot${resolved.token}/getMe`, {
+    method: 'GET'
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    return { valid: false, error: errorText.slice(0, 200) }
+  }
+
+  const body = await response.json().catch(() => ({}))
+  return { valid: true, bot: body }
 }
 
 async function getLoginRateLimitConfig(c: Context<{ Bindings: Env }>): Promise<RateLimitConfig> {
@@ -1894,7 +1982,8 @@ async function sendTelegramNotification(
       'SELECT telegramChatId, verified, enabled FROM HL_telegramLinks WHERE userId = ? AND verified = 1 AND enabled = 1'
     ).bind(userId).first<{ telegramChatId: string; verified: number; enabled: number }>()
 
-    if (!link?.telegramChatId) {
+    const telegramChatId = await decryptSensitive(c, link?.telegramChatId)
+    if (!telegramChatId) {
       return { sent: false, error: 'telegram_not_linked' }
     }
 
@@ -1909,17 +1998,17 @@ async function sendTelegramNotification(
       return { sent: false, error: 'disabled_by_user' }
     }
 
-    const botToken = c.env.TELEGRAM_BOT_TOKEN
-    if (!botToken) {
-      return { sent: false, error: 'bot_token_not_configured' }
+    const resolved = await resolveTelegramBotToken(c)
+    if (!resolved.token) {
+      return { sent: false, error: resolved.error || 'bot_token_not_configured' }
     }
 
     const text = `${title}\n\n${message}`
-    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const response = await fetch(`https://api.telegram.org/bot${resolved.token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: link.telegramChatId,
+        chat_id: telegramChatId,
         text,
         parse_mode: 'HTML'
       })
@@ -2020,6 +2109,7 @@ app.post('/api/measurements/submit', async (c) => {
     const sessionId = crypto.randomUUID()
     const hasAi = body.values.some(v => v.rawAiValue !== null && v.rawAiValue !== undefined) ? 1 : 0
     const hasAttachment = body.attachments && body.attachments.length > 0 ? 1 : 0
+    const encryptedNotes = await encryptSensitive(c, body.notes)
 
     await c.env.DB.prepare(
       `INSERT INTO HL_measurementSessions
@@ -2031,7 +2121,7 @@ app.post('/api/measurements/submit', async (c) => {
       profileId,
       measuredAt,
       body.source || 'manual',
-      body.notes || null,
+      encryptedNotes,
       hasAi,
       hasAttachment
     ).run()
@@ -2522,6 +2612,77 @@ function filterUnsafeContent(text: string): { safe: boolean; filtered: string } 
   return { safe: true, filtered: text }
 }
 
+type AiChatMessage = {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+type AiTextResult = {
+  text: string
+  model: string
+}
+
+async function getAiTextModels(c: Context<{ Bindings: Env }>): Promise<string[]> {
+  const defaultModel = await getSystemConfigString(c, 'aiTextDefaultModel')
+  const modelListRaw = await getSystemConfigString(c, 'aiTextModels')
+  const parsedModels = (() => {
+    if (!modelListRaw) return []
+    try {
+      const parsed = JSON.parse(modelListRaw)
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : []
+    } catch {
+      return modelListRaw.split(',').map((item) => item.trim()).filter(Boolean)
+    }
+  })()
+  return Array.from(new Set([defaultModel, ...parsedModels].filter((item): item is string => Boolean(item))))
+}
+
+async function callConfiguredTextAi(
+  c: Context<{ Bindings: Env }>,
+  messages: AiChatMessage[],
+  maxTokens: number
+): Promise<AiTextResult | null> {
+  const endpoint = await getSystemConfigString(c, 'aiTextEndpoint')
+  const models = await getAiTextModels(c)
+  if (!endpoint || models.length === 0) return null
+
+  const apiKey = await getSystemConfigString(c, 'aiTextApiKey')
+  const url = `${endpoint.replace(/\/+$/, '')}/chat/completions`
+
+  for (const model of models) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.3,
+          max_tokens: maxTokens,
+          stream: false
+        })
+      })
+
+      if (!response.ok) continue
+      const payload = await response.json() as {
+        choices?: Array<{ message?: { content?: string }; text?: string }>
+        result?: { response?: string }
+      }
+      const text = payload.choices?.[0]?.message?.content?.trim()
+        || payload.choices?.[0]?.text?.trim()
+        || payload.result?.response?.trim()
+      if (text) return { text, model }
+    } catch (error) {
+      console.error('configured AI text call failed:', error)
+    }
+  }
+
+  return null
+}
+
 async function getRecentValues(c: Context<{ Bindings: Env }>, userId: string, days: number) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   const rows = await c.env.DB.prepare(
@@ -2574,35 +2735,20 @@ Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
 
     let recommendationText = 'Rekomendasi tidak tersedia saat ini. Jaga pola makan seimbang, istirahat cukup, dan hidrasi yang baik.'
     let safetyStatus: 'safe' | 'filtered' | 'fallback' = 'fallback'
+    let modelName = 'deterministic-fallback'
 
-    if (c.env.CLOUDFLARE_ACCOUNT_ID && c.env.CLOUDFLARE_API_TOKEN) {
-      try {
-        const aiRes = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-2-7b-chat-int8`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ prompt, max_tokens: 300 })
-          }
-        )
-        if (aiRes.ok) {
-          const aiData = await aiRes.json() as any
-          const raw = aiData?.result?.response || ''
-          const filtered = filterUnsafeContent(raw)
-          if (filtered.safe) {
-            recommendationText = filtered.filtered
-            safetyStatus = 'safe'
-          } else {
-            recommendationText = filtered.filtered
-            safetyStatus = 'filtered'
-          }
-        }
-      } catch (err) {
-        console.error('AI recommendation error:', err)
-      }
+    const aiResult = await callConfiguredTextAi(c, [
+      {
+        role: 'system',
+        content: 'Anda adalah asisten kesehatan yang aman. Dilarang mendiagnosis, meresepkan obat, mengubah dosis, atau menentukan keparahan medis final. Berikan edukasi gaya hidup umum dalam Bahasa Indonesia.'
+      },
+      { role: 'user', content: prompt }
+    ], 300)
+    if (aiResult) {
+      const filtered = filterUnsafeContent(aiResult.text)
+      recommendationText = filtered.filtered
+      safetyStatus = filtered.safe ? 'safe' : 'filtered'
+      modelName = aiResult.model
     }
 
     const recId = crypto.randomUUID()
@@ -2619,7 +2765,7 @@ Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
       JSON.stringify(last3Days),
       JSON.stringify(last7Days),
       JSON.stringify((todayValues.results || []).map(v => ({ metric: v.metricCode, status: v.status, severity: v.severity }))),
-      '@cf/meta/llama-2-7b-chat-int8',
+      modelName,
       Date.now() - startedAt,
       safetyStatus
     ).run()
@@ -2703,48 +2849,22 @@ app.post('/api/ai/assistant', async (c) => {
     let model = 'deterministic-fallback'
     let usedFallback = true
 
-    if (c.env.CLOUDFLARE_ACCOUNT_ID && c.env.CLOUDFLARE_API_TOKEN) {
-      try {
-        const aiRes = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: '@cf/meta/llama-3.1-8b-instruct',
-              messages: [
-                {
-                  role: 'system',
-                  content:
-                    'Anda adalah asisten kesehatan yang aman. Dilarang mendiagnosis, mengubah dosis obat, atau menyatakan keparahan medis final. Gunakan bahasa Indonesia yang ramah, singkat, dan senior-friendly. Selalu sebutkan bahwa keputusan medis final mengikuti rule engine dan dokter.'
-                },
-                {
-                  role: 'user',
-                  content: `Profil: ${JSON.stringify(profile || {})}\nVitals terbaru: ${JSON.stringify(vitals)}\nPertanyaan: ${question}`
-                }
-              ],
-              max_completion_tokens: 220
-            })
-          }
-        )
-        if (aiRes.ok) {
-          const aiJson = await aiRes.json() as {
-            choices?: Array<{ message?: { content?: string } }>
-          }
-          const raw = aiJson.choices?.[0]?.message?.content?.trim()
-          if (raw) {
-            const filtered = filterUnsafeContent(raw)
-            reply = filtered.filtered
-            model = '@cf/meta/llama-3.1-8b-instruct'
-            usedFallback = false
-          }
-        }
-      } catch (error) {
-        console.error('ai assistant error:', error)
+    const aiResult = await callConfiguredTextAi(c, [
+      {
+        role: 'system',
+        content:
+          'Anda adalah asisten kesehatan yang aman. Dilarang mendiagnosis, mengubah dosis obat, meresepkan obat, atau menyatakan keparahan medis final. Gunakan bahasa Indonesia yang ramah, singkat, dan senior-friendly. Selalu sebutkan bahwa keputusan medis final mengikuti rule engine dan dokter.'
+      },
+      {
+        role: 'user',
+        content: `Profil: ${JSON.stringify(profile || {})}\nVitals terbaru: ${JSON.stringify(vitals)}\nPertanyaan: ${question}`
       }
+    ], 220)
+    if (aiResult) {
+      const filtered = filterUnsafeContent(aiResult.text)
+      reply = filtered.filtered
+      model = aiResult.model
+      usedFallback = false
     }
 
     return jsonResponse(
@@ -2789,10 +2909,47 @@ app.get('/api/dashboard/weekly', async (c) => {
        ORDER BY day ASC`
     ).bind(userId, since).all<{ day: string; metricCode: string; avgValue: number }>()
 
+    const dayRows = await c.env.DB.prepare(
+      `SELECT substr(measuredAt, 1, 10) as day, COUNT(DISTINCT sessionId) as sessionCount
+       FROM HL_measurementValues
+       WHERE userId = ? AND measuredAt >= ?
+       GROUP BY day
+       ORDER BY day ASC`
+    ).bind(userId, since).all<{ day: string; sessionCount: number }>()
+
+    const days = dayRows.results || []
+    const bestDay = days.length > 0
+      ? days.reduce((best, day) => day.sessionCount > best.sessionCount ? day : best, days[0])
+      : null
+    const worstDay = days.length > 0
+      ? days.reduce((worst, day) => day.sessionCount < worst.sessionCount ? day : worst, days[0])
+      : null
+
+    const alertRow = await c.env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM HL_alerts WHERE userId = ? AND createdAt >= ?`
+    ).bind(userId, since).first<{ cnt: number }>()
+
+    const adherenceRow = await c.env.DB.prepare(
+      `SELECT
+         SUM(CASE WHEN status = 'taken' THEN 1 ELSE 0 END) as takenCount,
+         COUNT(*) as totalCount
+       FROM HL_medicationLogs
+       WHERE userId = ? AND takenAt >= ?`
+    ).bind(userId, since).first<{ takenCount: number | null; totalCount: number }>()
+
+    const adherence = adherenceRow && adherenceRow.totalCount > 0
+      ? Math.round(((adherenceRow.takenCount || 0) / adherenceRow.totalCount) * 100)
+      : null
+
     return jsonResponse(c, success({
       period: '7d',
       metrics: rows.results || [],
-      daily: dailyRows.results || []
+      daily: dailyRows.results || [],
+      measurementDays: days.length,
+      bestDay,
+      worstDay,
+      alertCount: alertRow?.cnt || 0,
+      adherence
     }, 200, startedAt))
   } catch (error) {
     console.error('weekly dashboard error:', error)
@@ -2814,9 +2971,33 @@ app.get('/api/dashboard/monthly', async (c) => {
        GROUP BY metricCode`
     ).bind(userId, since).all<{ metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }>()
 
+    const dailyRows = await c.env.DB.prepare(
+      `SELECT substr(measuredAt, 1, 10) as day, COUNT(DISTINCT sessionId) as sessionCount
+       FROM HL_measurementValues
+       WHERE userId = ? AND measuredAt >= ?
+       GROUP BY day
+       ORDER BY day ASC`
+    ).bind(userId, since).all<{ day: string; sessionCount: number }>()
+
+    const alertRow = await c.env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM HL_alerts WHERE userId = ? AND createdAt >= ?`
+    ).bind(userId, since).first<{ cnt: number }>()
+
+    const latestRows = await c.env.DB.prepare(
+      `SELECT metricCode, finalValue, unit, status, severity, measuredAt
+       FROM HL_measurementValues
+       WHERE userId = ? AND measuredAt >= ?
+       ORDER BY measuredAt DESC
+       LIMIT 8`
+    ).bind(userId, since).all<{ metricCode: string; finalValue: number; unit: string; status: string; severity: string; measuredAt: string }>()
+
     return jsonResponse(c, success({
       period: '30d',
-      metrics: rows.results || []
+      metrics: rows.results || [],
+      measurementDays: (dailyRows.results || []).length,
+      alertCount: alertRow?.cnt || 0,
+      daily: dailyRows.results || [],
+      latest: latestRows.results || []
     }, 200, startedAt))
   } catch (error) {
     console.error('monthly dashboard error:', error)
@@ -2918,28 +3099,23 @@ app.get('/api/reports/monthly', async (c) => {
       `SELECT COUNT(DISTINCT substr(measuredAt, 1, 10)) as cnt FROM HL_measurementSessions WHERE userId = ? AND measuredAt >= ?`
     ).bind(userId, since).first<{ cnt: number }>()
 
-    // AI monthly summary - use LLM if available, else rule-based
+    // AI monthly summary - use configured LLM if available, else rule-based
     let aiSummary = 'Ringkasan 30 hari belum tersedia.'
-    if (c.env.CLOUDFLARE_ACCOUNT_ID && c.env.CLOUDFLARE_API_TOKEN) {
-      const summary = (values.results || []).map((m: any) =>
-        `${m.metricCode}: avg ${m.avg?.toFixed(1)} (min ${m.min}, max ${m.max}, latest ${m.latest})`
-      ).join('; ')
-      try {
-        const prompt = `Buat ringkasan naratif singkat 30 hari kesehatan user berdasarkan data berikut dalam Bahasa Indonesia. Jangan mendiagnosa. Hanya edukasi umum.\n\nData: ${summary}`
-        const aiRes = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-2-7b-chat-int8`,
-          {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, max_tokens: 400 })
-          }
-        )
-        if (aiRes.ok) {
-          const d = await aiRes.json() as any
-          const txt = d?.result?.response || ''
-          if (txt) aiSummary = txt
-        }
-      } catch (err) { console.error('AI monthly error:', err) }
+    const summary = (values.results || []).map((m: any) =>
+      `${m.metricCode}: avg ${m.avg?.toFixed(1)} (min ${m.min}, max ${m.max}, latest ${m.latest})`
+    ).join('; ')
+    const monthlyAi = await callConfiguredTextAi(c, [
+      {
+        role: 'system',
+        content: 'Buat ringkasan kesehatan aman. Jangan mendiagnosis, jangan menyarankan dosis obat, dan jangan menentukan keparahan medis final.'
+      },
+      {
+        role: 'user',
+        content: `Buat ringkasan naratif singkat 30 hari kesehatan user berdasarkan data berikut dalam Bahasa Indonesia. Hanya edukasi umum.\n\nData: ${summary}`
+      }
+    ], 400)
+    if (monthlyAi) {
+      aiSummary = filterUnsafeContent(monthlyAi.text).filtered
     }
 
     return jsonResponse(c, success({
@@ -3035,10 +3211,16 @@ app.post('/api/telegram/test', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const tokenCheck = await validateTelegramBotToken(c)
+    if (!tokenCheck.valid) {
+      await logNotification(c, userId, 'telegram', 'submit_summary', 'Test Telegram', 'Token Telegram tidak valid.',
+        'failed', { botTokenValid: false }, tokenCheck.error)
+      return jsonResponse(c, success({ sent: false, botTokenValid: false, error: tokenCheck.error }, 200, startedAt))
+    }
     const tg = await sendTelegramNotification(c, userId, 'submit_summary', 'Test Telegram', 'Pesan test dari HL Health Companion.')
     await logNotification(c, userId, 'telegram', 'submit_summary', 'Test Telegram', 'Pesan test dari HL Health Companion.',
-      tg.sent ? 'sent' : 'skipped', {}, tg.error)
-    return jsonResponse(c, success({ sent: tg.sent, error: tg.error }, 200, startedAt))
+      tg.sent ? 'sent' : 'skipped', { botTokenValid: true }, tg.error)
+    return jsonResponse(c, success({ sent: tg.sent, botTokenValid: true, error: tg.error }, 200, startedAt))
   } catch (error) {
     console.error('telegram test error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal kirim test.', 500, [], startedAt))
@@ -3222,13 +3404,30 @@ app.post('/api/emergency/contacts', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const body = await c.req.json() as { name: string; phone: string; relationship?: string }
-    if (!body.name || !body.phone) return jsonResponse(c, failure('VALIDATION_ERROR', 'name dan phone wajib.', 400, [], startedAt))
+    const body = await c.req.json() as {
+      name?: string
+      phone?: string
+      relationship?: string
+      contactName?: string
+      contactPhone?: string
+      contactRelation?: string
+      telegramChatId?: string
+      canReceiveAlert?: boolean
+      consentGiven?: boolean
+    }
+    const contactName = body.contactName || body.name || ''
+    const contactPhone = body.contactPhone || body.phone || ''
+    const contactRelation = body.contactRelation || body.relationship || null
+    if (!contactName || !contactPhone) return jsonResponse(c, failure('VALIDATION_ERROR', 'name dan phone wajib.', 400, [], startedAt))
     const contactId = createId('emc')
+    const encryptedName = await encryptSensitive(c, contactName)
+    const encryptedPhone = await encryptSensitive(c, contactPhone)
+    const encryptedTelegramChatId = await encryptSensitive(c, body.telegramChatId)
+    const consentGiven = body.canReceiveAlert || body.consentGiven ? 1 : 0
     await c.env.DB.prepare(
-      `INSERT INTO HL_emergencyContacts (id, userId, contactName, contactRelation, contactPhone, consentGiven, enabled, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).bind(contactId, userId, body.name, body.relationship || null, body.phone).run()
+      `INSERT INTO HL_emergencyContacts (id, userId, contactName, contactRelation, contactPhone, telegramChatId, consentGiven, enabled, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(contactId, userId, encryptedName, contactRelation, encryptedPhone, encryptedTelegramChatId, consentGiven).run()
     return jsonResponse(c, success({ contactId }, 201, startedAt))
   } catch (error) {
     console.error('emergency contact error:', error)
@@ -3242,9 +3441,35 @@ app.get('/api/emergency/contacts', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const rows = await c.env.DB.prepare(
-      `SELECT id, contactName as name, contactPhone as phone, contactRelation as relationship, createdAt FROM HL_emergencyContacts WHERE userId = ? ORDER BY createdAt DESC`
-    ).bind(userId).all()
-    return jsonResponse(c, success({ contacts: rows.results || [] }, 200, startedAt))
+      `SELECT id, contactName, contactPhone, contactRelation, telegramChatId, consentGiven, enabled, createdAt FROM HL_emergencyContacts WHERE userId = ? ORDER BY createdAt DESC`
+    ).bind(userId).all<{
+      id: string
+      contactName: string
+      contactPhone: string | null
+      contactRelation: string | null
+      telegramChatId: string | null
+      consentGiven: number
+      enabled: number
+      createdAt: string
+    }>()
+    const contacts = await Promise.all((rows.results || []).map(async (row) => {
+      const name = await decryptSensitive(c, row.contactName)
+      const phone = await decryptSensitive(c, row.contactPhone)
+      const telegramChatId = await decryptSensitive(c, row.telegramChatId)
+      return {
+        ...row,
+        contactName: name || '',
+        name: name || '',
+        contactPhone: phone || '',
+        phone: phone || '',
+        contactRelation: row.contactRelation,
+        relationship: row.contactRelation,
+        telegramChatId: telegramChatId || '',
+        consentGiven: Boolean(row.consentGiven),
+        enabled: Boolean(row.enabled)
+      }
+    }))
+    return jsonResponse(c, success({ contacts }, 200, startedAt))
   } catch (error) {
     console.error('emergency contacts list error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal list.', 500, [], startedAt))
@@ -3903,13 +4128,14 @@ app.post('/api/telegram/verify', async (c) => {
     const link = await c.env.DB.prepare('SELECT id, verificationCodeHash FROM HL_telegramLinks WHERE userId = ? AND verified = 0').bind(userId).first<{ id: string; verificationCodeHash: string }>()
     if (!link) return jsonResponse(c, failure('NOT_FOUND', 'Tidak ada kode verifikasi aktif.', 404, [], startedAt))
     if (link.verificationCodeHash !== codeHash) return jsonResponse(c, failure('VALIDATION_ERROR', 'Kode verifikasi salah.', 400, [], startedAt))
+    const encryptedChatId = await encryptSensitive(c, body.telegramChatId)
     await c.env.DB.batch([
-      c.env.DB.prepare('UPDATE HL_telegramLinks SET telegramChatId = ?, telegramUsername = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(body.telegramChatId, body.telegramUsername || null, link.id),
+      c.env.DB.prepare('UPDATE HL_telegramLinks SET telegramChatId = ?, telegramUsername = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(encryptedChatId, body.telegramUsername || null, link.id),
       c.env.DB.prepare('UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId)
     ])
     await c.env.DB.prepare(
       "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), userId, link.id, JSON.stringify({ telegramChatId: body.telegramChatId })).run()
+    ).bind(createId('aud'), userId, link.id, JSON.stringify({ telegramChatLinked: true })).run()
     return jsonResponse(c, success({ verified: true, enabled: true }, 200, startedAt))
   } catch (error) {
     console.error('telegram verify error:', error)
@@ -4182,7 +4408,8 @@ app.post('/api/medications/:id/log', async (c) => {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'Status harus taken, skipped, missed, atau unknown.', 400, [], startedAt))
     }
     const logId = createId('mlog')
-    await c.env.DB.prepare('INSERT INTO HL_medicationLogs (id, userId, medicationId, takenAt, status, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(logId, userId, medId, body.takenAt || new Date().toISOString(), body.status, body.note || null).run()
+    const encryptedNote = await encryptSensitive(c, body.note)
+    await c.env.DB.prepare('INSERT INTO HL_medicationLogs (id, userId, medicationId, takenAt, status, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(logId, userId, medId, body.takenAt || new Date().toISOString(), body.status, encryptedNote).run()
     return jsonResponse(c, success({ logId }, 201, startedAt))
   } catch (error) {
     console.error('medication log error:', error)
@@ -4199,8 +4426,19 @@ app.get('/api/medications/logs', async (c) => {
     const to = c.req.query('to') || new Date().toISOString()
     const rows = await c.env.DB.prepare(
       'SELECT ml.id, ml.medicationId, m.medicationName, ml.takenAt, ml.status, ml.note FROM HL_medicationLogs ml JOIN HL_medications m ON m.id = ml.medicationId WHERE ml.userId = ? AND ml.takenAt >= ? AND ml.takenAt <= ? ORDER BY ml.takenAt DESC LIMIT 100'
-    ).bind(userId, from, to).all()
-    return jsonResponse(c, success({ logs: rows.results || [] }, 200, startedAt))
+    ).bind(userId, from, to).all<{
+      id: string
+      medicationId: string
+      medicationName: string
+      takenAt: string
+      status: string
+      note: string | null
+    }>()
+    const logs = await Promise.all((rows.results || []).map(async (row) => ({
+      ...row,
+      note: await decryptSensitive(c, row.note)
+    })))
+    return jsonResponse(c, success({ logs }, 200, startedAt))
   } catch (error) {
     console.error('medication logs error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat log obat.', 500, [], startedAt))
@@ -4219,13 +4457,14 @@ app.post('/api/telegram/webhook', async (c) => {
       const codeHash = await sha256Token(stripped)
       const link = await c.env.DB.prepare('SELECT id, userId FROM HL_telegramLinks WHERE verificationCodeHash = ? AND verified = 0').bind(codeHash).first<{ id: string; userId: string }>()
       if (link) {
+        const encryptedChatId = await encryptSensitive(c, String(message.chat.id))
         await c.env.DB.batch([
-          c.env.DB.prepare('UPDATE HL_telegramLinks SET telegramChatId = ?, telegramUsername = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(String(message.chat.id), message.chat.username || null, link.id),
+          c.env.DB.prepare('UPDATE HL_telegramLinks SET telegramChatId = ?, telegramUsername = ?, verified = 1, enabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(encryptedChatId, message.chat.username || null, link.id),
           c.env.DB.prepare('UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(link.userId)
         ])
         await c.env.DB.prepare(
           "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
-        ).bind(createId('aud'), link.userId, link.id, JSON.stringify({ telegramChatId: String(message.chat.id) })).run()
+        ).bind(createId('aud'), link.userId, link.id, JSON.stringify({ telegramChatLinked: true })).run()
       }
     }
     return c.json({ ok: true })

@@ -16,9 +16,14 @@ BEGIN TRANSACTION;
 INSERT OR IGNORE INTO HL_systemConfigs (configKey, configValue, dataType, description)
 VALUES 
 ('aiExtractTimeoutMs', '5000', 'number', 'Timeout in milliseconds for AI Vision extraction'),
+('aiTextEndpoint', 'https://9router.krpmerch.biz.id/v1', 'string', 'OpenAI-compatible text AI base URL'),
+('aiTextModels', '["cmc/deepseek/deepseek-v4-pro","nvidia/z-ai/glm-5.1","ollama/glm-4.7"]', 'json', 'Ordered text AI model fallback list'),
+('aiTextDefaultModel', 'cmc/deepseek/deepseek-v4-pro', 'string', 'Default text AI model for assistant and recommendations'),
+('aiTextApiKey', '', 'string', 'Optional API key for OpenAI-compatible text AI endpoint'),
 ('maxUploadSizeBytes', '2097152', 'number', 'Maximum file size for uploads in bytes (default 2MB)'),
 ('loginRateLimitMaxReq', '10', 'number', 'Max login requests per window'),
 ('loginRateLimitWindowMin', '10', 'number', 'Login rate limit window in minutes'),
+('telegramBotToken', '', 'string', 'Telegram bot token managed from system config; leave empty until regenerated in BotFather'),
 ('telegramBotActive', 'true', 'boolean', 'Global toggle to enable/disable Telegram bot notifications');
 
 -- Devices

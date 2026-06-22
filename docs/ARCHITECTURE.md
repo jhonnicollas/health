@@ -63,6 +63,10 @@ height
 Semua konfigurasi sistem yang bisa berubah (seperti batas memori 2MB, timeout AI 5000ms, limit API) **TIDAK BOLEH** di-hardcode di dalam kode.
 Semuanya harus dibaca dari tabel `HL_systemConfigs` di D1. Untuk menghindari pengurasan kuota baca D1 (Cloudflare free tier), Worker harus melakukan *caching* (in-memory KV / Cache API) terhadap konfigurasi ini dengan masa berlaku tertentu (misalnya 5 menit).
 
+### 2.7 Sensitive Data Encryption
+
+Sensitive user data is encrypted at rest with AES-GCM using the Worker secret `ENCRYPTION_KEY`. Encrypted values keep the existing schema columns and use the `enc:v1:` prefix. Read paths decrypt automatically, while legacy plaintext remains readable until migrated. Covered fields include Telegram chat IDs, emergency contact names/phones/Telegram IDs, medication log notes, and measurement session notes.
+
 ---
 
 ## 3. Required Cloudflare Stack
@@ -75,7 +79,7 @@ Runtime: Cloudflare Workers TypeScript
 Database: Cloudflare D1 binding DB
 Object Storage: Cloudflare R2 binding LOGS
 AI Vision: Cloudflare Workers AI Vision model
-AI Text: Cloudflare Workers AI LLM
+AI Text: OpenAI-compatible provider configured in `HL_systemConfigs` (`aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, optional `aiTextApiKey`)
 Async: Cloudflare Queues
 Scheduler: Cloudflare Cron Triggers
 Deployment: Wrangler
@@ -793,6 +797,8 @@ Submit success
 ```
 
 ### 18.1 Summary Input
+
+Text AI provider configuration is DB-backed. Worker resolves `aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, and optional `aiTextApiKey` from `HL_systemConfigs`. The current seed points to the 9router OpenAI-compatible endpoint and tries the configured model list in order before falling back to deterministic safe text.
 
 The LLM should receive only compact, relevant data:
 

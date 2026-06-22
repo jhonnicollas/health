@@ -65,7 +65,7 @@ function metricBadges(metric: Metric) {
     badges.push('optional')
   }
 
-  return badges.join(' · ')
+  return badges.join(' / ')
 }
 
 export function SelectMetricPage() {
@@ -173,7 +173,7 @@ export function SelectMetricPage() {
                     className="sr-only"
                   />
                   <span className={`checkbox-indicator ${isSelected ? 'checked' : ''}`}>
-                    {isSelected ? '✓' : ''}
+                    {isSelected ? <span className="material-symbols-outlined">check</span> : ''}
                   </span>
                   <span className="checkbox-card-content">
                     <strong>{metric.metricName}</strong>
@@ -203,7 +203,7 @@ export function SelectMetricPage() {
                 <section key={id}>
                   <h3>{metric.metricName}</h3>
                   <p>
-                    {device.deviceName} · {metricBadges(metric)}
+                    {device.deviceName} / {metricBadges(metric)}
                   </p>
                 </section>
               ))}

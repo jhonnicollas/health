@@ -5,6 +5,7 @@ import type { Context } from 'hono'
 
 export interface ExtraEnv {
   TELEGRAM_BOT_TOKEN?: string
+  ENCRYPTION_KEY?: string
   CRON_SECRET?: string
   DB: D1Database
   LOGS: R2Bucket
@@ -12,6 +13,8 @@ export interface ExtraEnv {
 }
 
 type ApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 429 | 500
+const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
 
 function nowIso() { return new Date().toISOString() }
 function dateInTz(tz: string): string {
@@ -63,12 +66,64 @@ function jsonResponse(c: Context, body: unknown, status: ApiStatus = 200) {
   return c.json(body as any, status as any)
 }
 
+function base64Url(bytes: ArrayBuffer | Uint8Array) {
+  const array = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  let bin = ''
+  for (const byte of array) bin += String.fromCharCode(byte)
+  return btoa(bin).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
+
+function base64UrlDecode(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+async function getSensitiveDataKey(c: Context<{ Bindings: ExtraEnv }>) {
+  const secret = c.env.ENCRYPTION_KEY
+  if (!secret || secret.trim().length < 16) {
+    throw new Error('ENCRYPTION_KEY is required for sensitive data encryption')
+  }
+  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret))
+  return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['decrypt'])
+}
+
+async function decryptSensitive(c: Context<{ Bindings: ExtraEnv }>, value: string | null | undefined): Promise<string | null> {
+  if (!value) return null
+  if (!value.startsWith('enc:v1:')) return value
+  const [, , ivText, cipherText] = value.split(':')
+  if (!ivText || !cipherText) return null
+  const key = await getSensitiveDataKey(c)
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64UrlDecode(ivText) },
+    key,
+    base64UrlDecode(cipherText)
+  )
+  return textDecoder.decode(decrypted)
+}
+
 function failure(code: string, message: string, status: ApiStatus, details: unknown[] = [], startedAt = Date.now()) {
   return { success: false, error: { code, message, details }, meta: { requestId: createId('req'), durationMs: Date.now() - startedAt } }
 }
 
 function success(data: unknown, status: ApiStatus = 200, startedAt = Date.now()) {
   return { success: true, data, meta: { requestId: createId('req'), durationMs: Date.now() - startedAt } }
+}
+
+async function getSystemConfigValue(c: Context<{ Bindings: ExtraEnv }>, configKey: string): Promise<string | null> {
+  const row = await c.env.DB.prepare(
+    'SELECT configValue FROM HL_systemConfigs WHERE configKey = ? LIMIT 1'
+  ).bind(configKey).first<{ configValue: string }>()
+  return row?.configValue?.trim() || null
+}
+
+async function resolveTelegramBotToken(c: Context<{ Bindings: ExtraEnv }>): Promise<string | null> {
+  const active = await getSystemConfigValue(c, 'telegramBotActive')
+  if (active && !['1', 'true', 'yes', 'on', 'enabled'].includes(active.toLowerCase())) return null
+  return await getSystemConfigValue(c, 'telegramBotToken') || c.env.TELEGRAM_BOT_TOKEN || null
 }
 
 // US-3.3.2 Send emergency Telegram to emergency contacts
@@ -81,18 +136,22 @@ export async function sendEmergencyToContacts(c: Context<{ Bindings: ExtraEnv }>
     "SELECT id, contactName, contactPhone, telegramChatId, consentGiven, enabled FROM HL_emergencyContacts WHERE userId = ? AND enabled = 1"
   ).bind(userId).all<{ id: string; contactName: string; contactPhone: string | null; telegramChatId: string | null; consentGiven: number; enabled: number }>()
   let sent = 0
+  const botToken = await resolveTelegramBotToken(c)
   for (const contact of (contacts.results || [])) {
     if (contact.consentGiven !== 1) continue
+    const contactName = await decryptSensitive(c, contact.contactName) || 'Kontak darurat'
+    const contactPhone = await decryptSensitive(c, contact.contactPhone) || '-'
+    const telegramChatId = await decryptSensitive(c, contact.telegramChatId)
     const notifId = createId('ntf')
     await c.env.DB.prepare(
       "INSERT INTO HL_notifications (id, userId, channel, notificationType, title, message, status, createdAt) VALUES (?, ?, 'telegram', 'emergency_alert', ?, ?, 'pending', CURRENT_TIMESTAMP)"
-    ).bind(notifId, userId, `DARURAT ${metricCode}`, `${message}\n\nKontak: ${contact.contactName} (${contact.contactPhone || '-'})`).run()
-    if (contact.telegramChatId && c.env.TELEGRAM_BOT_TOKEN) {
+    ).bind(notifId, userId, `DARURAT ${metricCode}`, `${message}\n\nKontak: ${contactName} (${contactPhone})`).run()
+    if (telegramChatId && botToken) {
       try {
-        const resp = await fetch(`https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: contact.telegramChatId, text: `DARURAT ${metricCode}: ${finalValue} ${unit}\n${message}` })
+          body: JSON.stringify({ chat_id: telegramChatId, text: `DARURAT ${metricCode}: ${finalValue} ${unit}\n${message}` })
         })
         const status = resp.ok ? 'sent' : 'failed'
         await c.env.DB.prepare('UPDATE HL_notifications SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(status, notifId).run()

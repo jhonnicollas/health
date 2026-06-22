@@ -80,6 +80,15 @@ type VitalSnapshot = {
   unit: string
   status: string
   severity: string
+  measuredAt?: string
+}
+
+type ChatMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  model?: string
+  usedFallback?: boolean
 }
 
 const NAV: NavLink[] = [
@@ -125,6 +134,14 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map(part => part[0]?.toUpperCase())
     .join('') || 'HL'
+}
+
+function Icon({ name, className = '' }: { name: string; className?: string }) {
+  return (
+    <span className={`material-symbols-outlined ${className}`.trim()} aria-hidden="true">
+      {name}
+    </span>
+  )
 }
 
 function TrackerPage() {
@@ -249,22 +266,37 @@ function MeasurementHistoryPage() {
 }
 
 function AiAssistantPage() {
-  const [question, setQuestion] = useState('Diet tips for hypertension')
-  const [answer, setAnswer] = useState('')
+  const [question, setQuestion] = useState('Saran makan malam untuk hipertensi')
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: 'Halo. Saya bisa membantu merangkum data vital terbaru dan memberi edukasi gaya hidup umum yang aman.'
+    }
+  ])
   const [vitals, setVitals] = useState<VitalSnapshot[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function ask() {
+    const trimmedQuestion = question.trim()
+    if (!trimmedQuestion) return
+
     setLoading(true)
     setError(null)
-    setAnswer('')
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: trimmedQuestion
+    }
+    setMessages((prev) => [...prev, userMessage])
+    setQuestion('')
     try {
       const res = await fetch('/api/ai/assistant', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question })
+        body: JSON.stringify({ question: trimmedQuestion })
       })
       const body = (await res.json()) as AiAssistantResponse
       if (!res.ok || !body.success || !body.data) {
@@ -272,7 +304,16 @@ function AiAssistantPage() {
         return
       }
       setVitals(body.data.vitals)
-      setAnswer(body.data.reply)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: body.data?.reply ?? '',
+          model: body.data?.model,
+          usedFallback: body.data?.usedFallback
+        }
+      ])
     } catch {
       setError('Could not connect to server.')
     } finally {
@@ -291,10 +332,14 @@ function AiAssistantPage() {
         <span className="status-chip">Rule-first</span>
       </div>
 
-      <div className="settings-card">
-        <h3>Health Context</h3>
-        {vitals.length === 0 ? <p>Latest vitals will appear after a question is submitted.</p> : (
-          <div className="vital-strip">
+      <div className="ai-context-banner">
+        <div>
+          <p className="eyebrow">Current Health Context</p>
+          <h3>{vitals.length > 0 ? `${vitals.length} latest vitals injected` : 'Vitals context ready'}</h3>
+          <p>Responses use this context only for education. Medical status still follows the rule engine.</p>
+        </div>
+        {vitals.length === 0 ? <span className="status-chip">No vitals yet</span> : (
+          <div className="vital-strip" aria-label="Latest vitals">
             {vitals.map((value) => (
               <span key={`${value.metricCode}-${value.finalValue}`}>
                 <span className={`badge-status badge-${value.severity}`}><span className="status-dot" />{value.metricCode}</span>: {value.finalValue} {value.unit}
@@ -304,23 +349,49 @@ function AiAssistantPage() {
         )}
       </div>
 
-      <div className="settings-card">
+      <div className="ai-safety-note" role="note">
+        AI hanya memberi edukasi umum. AI tidak membuat diagnosis, tidak menentukan tingkat keparahan, dan tidak mengubah dosis obat.
+      </div>
+
+      <div className="ai-chat-window" aria-live="polite">
+        {messages.map((message) => (
+          <article className={`chat-bubble ${message.role}`} key={message.id}>
+            <div className="chat-meta">
+              <span>{message.role === 'user' ? 'You' : 'HL AI'}</span>
+              {message.model ? <span>{message.usedFallback ? 'fallback' : message.model}</span> : null}
+            </div>
+            <p>{message.content}</p>
+          </article>
+        ))}
+        {loading ? (
+          <article className="chat-bubble assistant typing">
+            <div className="chat-meta"><span>HL AI</span><span>typing</span></div>
+            <p>Menyiapkan jawaban aman...</p>
+          </article>
+        ) : null}
+      </div>
+
+      <div className="settings-card ai-compose-card">
         <label>
           Question
-          <textarea onChange={(e) => setQuestion(e.target.value)} rows={4} value={question} />
+          <textarea
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault()
+                void ask()
+              }
+            }}
+            rows={4}
+            value={question}
+          />
         </label>
         <button disabled={loading || !question.trim()} onClick={() => void ask()} type="button">
-          {loading ? 'Sending...' : 'Submit Question'}
+          {loading ? 'Sending...' : 'Send'}
         </button>
       </div>
 
       {error ? <p className="form-message error" role="status">{error}</p> : null}
-      {answer ? (
-        <div className="result-card ai-answer">
-          <h3>Answer</h3>
-          <p>{answer}</p>
-        </div>
-      ) : null}
     </section>
   )
 }
@@ -471,20 +542,27 @@ function AppRoutes() {
   const isAdmin = !!user.email && ['admin@homesungai.com'].includes(user.email)
   const visibleNav = NAV.filter(link => (!link.adminOnly || isAdmin) && link.visible !== false)
   const currentLink = visibleNav.find(link => link.path === appPath)
+  const firstName = user.displayName.split(' ').filter(Boolean)[0] ?? 'there'
+  const headerTitle = appPath === '/dashboard' ? `Good Morning, ${firstName}` : currentLink?.label ?? 'Dashboard'
+  const headerSubtitle = appPath === '/dashboard'
+    ? 'Here is your daily health summary.'
+    : 'Here is your clinical overview for today.'
 
   return (
     <main className="app-page">
       <aside className="app-sidebar" aria-label="App navigation">
         <div className="sidebar-brand">
           <div className="sidebar-brand-row">
-            <span className="sidebar-brand-icon" aria-hidden="true">+</span>
+            <span className="sidebar-brand-icon" aria-hidden="true">
+              <Icon name="local_hospital" className="fill" />
+            </span>
             <div>
               <h1>HealthSync Pro</h1>
               <p>Enterprise Health</p>
             </div>
           </div>
           <button className="emergency-support-btn" onClick={() => navigate('/emergency')} type="button">
-            <span aria-hidden="true">✱</span>
+            <Icon name="emergency" />
             Emergency Support
           </button>
         </div>
@@ -499,7 +577,7 @@ function AppRoutes() {
                 onClick={() => navigate(link.path)}
                 type="button"
               >
-                <span className="nav-icon" aria-hidden="true">{link.icon === 'dashboard' ? '▦' : link.icon === 'add_circle' ? '⊕' : link.icon === 'history' ? '◷' : link.icon === 'notifications' ? '◉' : link.icon === 'smart_toy' ? '⬡' : link.icon === 'family_restroom' ? '⌂' : link.icon === 'assessment' ? '▩' : link.icon === 'settings' ? '⚙' : '•'}</span>
+                <Icon name={link.icon} className="nav-icon" />
                 <span>{link.label}</span>
                 {link.badge ? <span className="nav-badge">{link.badge}</span> : null}
               </button>
@@ -509,11 +587,11 @@ function AppRoutes() {
 
         <div className="sidebar-footer">
           <button onClick={() => navigate('/kb')} type="button">
-            <span aria-hidden="true">?</span>
+            <Icon name="help" />
             Help Center
           </button>
           <button onClick={() => navigate('/login')} type="button">
-            <span aria-hidden="true">↳</span>
+            <Icon name="logout" />
             Logout
           </button>
         </div>
@@ -522,24 +600,30 @@ function AppRoutes() {
       <div className="app-main">
         <div className="mobile-topbar">
           <div className="mobile-topbar-brand">
-            <span className="sidebar-brand-icon" aria-hidden="true" style={{width:32,height:32,fontSize:'0.85rem'}}>+</span>
+            <span className="sidebar-brand-icon mobile-brand-icon" aria-hidden="true">
+              <Icon name="health_and_safety" className="fill" />
+            </span>
             <h1>HealthSync Pro</h1>
           </div>
           <div className="mobile-topbar-actions">
-            <button type="button" aria-label="Search">⌕</button>
-            <button type="button" aria-label="Notifications">◉</button>
+            <button type="button" aria-label="Search"><Icon name="search" /></button>
+            <button type="button" aria-label="Notifications"><Icon name="notifications" /></button>
             <span className="mobile-topbar-avatar">{getInitials(user.displayName)}</span>
           </div>
         </div>
         <div className="app-topbar">
           <label className="topbar-search">
-            <span className="search-icon" aria-hidden="true">⌕</span>
+            <Icon name="search" className="search-icon" />
             <span className="visually-hidden-file">Search</span>
             <input placeholder="Search patients, reports, or data..." type="search" />
           </label>
           <div className="topbar-actions" aria-label="Workspace actions">
-            <button type="button" aria-label="Notifications">◉</button>
-            <button type="button" aria-label="Help">?</button>
+            <div className="topbar-view-toggle" aria-label="Preview density">
+              <button className="active" type="button" aria-label="Desktop density"><Icon name="desktop_windows" /></button>
+              <button type="button" aria-label="Tablet density"><Icon name="tablet_mac" /></button>
+              <button type="button" aria-label="Phone density"><Icon name="smartphone" /></button>
+            </div>
+            <button className="topbar-icon-btn has-alert" type="button" aria-label="Notifications"><Icon name="notifications" /></button>
             <div className="topbar-user" aria-label={`Active user ${user.displayName}`}>
               <strong>{user.displayName}</strong>
               <span className="topbar-user-avatar">{getInitials(user.displayName)}</span>
@@ -550,14 +634,22 @@ function AppRoutes() {
         <div className="app-content-area">
           <header className="app-header">
             <div>
-              <h1>{currentLink?.label ?? 'Dashboard'}</h1>
-              <p>Here is your clinical overview for today.</p>
+              <h1>{headerTitle}</h1>
+              <p>{headerSubtitle}</p>
             </div>
           </header>
 
           <section className="app-content">{renderRoute(appPath)}</section>
         </div>
       </div>
+
+      <button className="mobile-add-fab" onClick={() => navigate('/measurements/new')} type="button" aria-label="Add measurement">
+        <Icon name="add" />
+      </button>
+
+      <button className="ai-fab" onClick={() => navigate('/ai-assistant')} type="button" aria-label="AI Assistant">
+        <Icon name="smart_toy" />
+      </button>
 
       <nav className="app-bottom-nav" aria-label="Quick navigation">
         {visibleNav.filter(link => MOBILE_NAV_PATHS.has(link.path)).map((link) => (
@@ -568,7 +660,8 @@ function AppRoutes() {
             onClick={() => navigate(link.path)}
             type="button"
           >
-            {link.shortLabel}
+            <Icon name={link.icon} />
+            <span>{link.shortLabel}</span>
           </button>
         ))}
       </nav>

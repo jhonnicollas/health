@@ -1441,23 +1441,18 @@ weekStart=2026-06-15
 {
   "success": true,
   "data": {
-    "rangeStart": "2026-06-15",
-    "rangeEnd": "2026-06-21",
-    "series": {
-      "systolic": [
-        { "date": "2026-06-15", "value": 132 }
-      ],
-      "diastolic": [],
-      "spo2": [],
-      "glucoseFasting": [],
-      "bodyWeight": [],
-      "sleepDuration": []
-    },
-    "summary": {
-      "measurementDays": 5,
-      "alertCount": 1,
-      "medicationAdherenceRate": 0.86
-    }
+    "period": "7d",
+    "metrics": [
+      { "metricCode": "systolic", "avgValue": 134.5, "minValue": 120, "maxValue": 152, "cnt": 4 }
+    ],
+    "daily": [
+      { "day": "2026-06-21", "metricCode": "systolic", "avgValue": 132 }
+    ],
+    "measurementDays": 5,
+    "bestDay": { "day": "2026-06-21", "sessionCount": 2 },
+    "worstDay": { "day": "2026-06-17", "sessionCount": 1 },
+    "alertCount": 1,
+    "adherence": 86
   }
 }
 ```
@@ -1482,23 +1477,18 @@ month=2026-06
 {
   "success": true,
   "data": {
-    "month": "2026-06",
+    "period": "30d",
     "metrics": [
-      {
-        "metricCode": "systolic",
-        "average": 134.5,
-        "min": 120,
-        "max": 152,
-        "latest": 142,
-        "measurementCount": 18,
-        "trend": "up"
-      }
+      { "metricCode": "systolic", "avgValue": 134.5, "minValue": 120, "maxValue": 152, "cnt": 18 }
     ],
     "alertCount": 2,
-    "streak": {
-      "currentCount": 12,
-      "bestCount": 12
-    }
+    "measurementDays": 12,
+    "daily": [
+      { "day": "2026-06-21", "sessionCount": 2 }
+    ],
+    "latest": [
+      { "metricCode": "systolic", "finalValue": 142, "unit": "mmHg", "status": "Tinggi", "severity": "warning", "measuredAt": "2026-06-21T07:00:00.000Z" }
+    ]
   }
 }
 ```
@@ -1901,10 +1891,17 @@ POST /api/telegram/test
 {
   "success": true,
   "data": {
-    "queued": true
+    "sent": true,
+    "botTokenValid": true,
+    "error": null
   }
 }
 ```
+
+Notes:
+- Telegram bot token is resolved from `HL_systemConfigs.telegramBotToken`; legacy `TELEGRAM_BOT_TOKEN` env is used only as fallback when the DB value is empty.
+- `POST /api/telegram/test` validates the token with Telegram `getMe` before trying to send a message.
+- If the token is missing or invalid, response stays `200` with `sent: false`, `botTokenValid: false`, and `error` explaining the Telegram/config failure.
 
 ---
 
@@ -3015,6 +3012,17 @@ All major write operations must create HL_auditLogs
 Never expose passwordHash, sessionTokenHash, verificationCodeHash, inviteTokenHash, shareTokenHash
 ```
 
+Sensitive values are encrypted at rest with AES-GCM when `ENCRYPTION_KEY` is configured as a Worker secret:
+
+- `HL_telegramLinks.telegramChatId`
+- `HL_emergencyContacts.contactName`
+- `HL_emergencyContacts.contactPhone`
+- `HL_emergencyContacts.telegramChatId`
+- `HL_medicationLogs.note`
+- `HL_measurementSessions.notes`
+
+Ciphertext uses the `enc:v1:` prefix. Read paths decrypt automatically and legacy plaintext remains readable until migrated.
+
 ---
 
 ## 34. System Config API (Admin Only)
@@ -3040,6 +3048,41 @@ GET /api/admin/configs
       "configValue": "5000",
       "dataType": "number",
       "description": "Timeout in milliseconds for AI Vision extraction",
+      "updatedAt": "2026-06-20T10:00:00Z"
+    },
+    {
+      "configKey": "aiTextEndpoint",
+      "configValue": "https://9router.krpmerch.biz.id/v1",
+      "dataType": "string",
+      "description": "OpenAI-compatible text AI base URL",
+      "updatedAt": "2026-06-20T10:00:00Z"
+    },
+    {
+      "configKey": "aiTextModels",
+      "configValue": "[\"cmc/deepseek/deepseek-v4-pro\",\"nvidia/z-ai/glm-5.1\",\"ollama/glm-4.7\"]",
+      "dataType": "json",
+      "description": "Ordered text AI model fallback list",
+      "updatedAt": "2026-06-20T10:00:00Z"
+    },
+    {
+      "configKey": "aiTextDefaultModel",
+      "configValue": "cmc/deepseek/deepseek-v4-pro",
+      "dataType": "string",
+      "description": "Default text AI model",
+      "updatedAt": "2026-06-20T10:00:00Z"
+    },
+    {
+      "configKey": "aiTextApiKey",
+      "configValue": "",
+      "dataType": "string",
+      "description": "Optional API key for OpenAI-compatible text AI endpoint",
+      "updatedAt": "2026-06-20T10:00:00Z"
+    },
+    {
+      "configKey": "telegramBotToken",
+      "configValue": "",
+      "dataType": "string",
+      "description": "Telegram bot token managed from system config",
       "updatedAt": "2026-06-20T10:00:00Z"
     }
   ]
@@ -3162,6 +3205,37 @@ Request:
 ```
 
 Response includes a safe text reply plus current user vitals context. AI text must not diagnose, prescribe dose changes, or decide medical severity.
+
+Example response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "reply": "Pilih makan malam rendah garam...",
+    "model": "cmc/deepseek/deepseek-v4-pro",
+    "usedFallback": false,
+    "vitals": [
+      {
+        "metricCode": "systolic",
+        "finalValue": 145,
+        "unit": "mmHg",
+        "status": "Tinggi",
+        "severity": "warning",
+        "measuredAt": "2026-06-22T07:00:00.000Z"
+      }
+    ],
+    "profile": {
+      "displayName": "Budi",
+      "heightCm": 170,
+      "sex": "male",
+      "birthDate": "1970-01-01"
+    }
+  }
+}
+```
+
+Text model provider is configured through `HL_systemConfigs.aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, and optional `aiTextApiKey`. The Worker tries configured models in order and falls back to deterministic safe text if the provider is unavailable.
 
 ### Family Invite
 

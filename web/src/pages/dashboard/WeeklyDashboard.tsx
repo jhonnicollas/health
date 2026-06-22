@@ -3,6 +3,16 @@ import { TrendBadge, type TrendDirection } from '../../components/dashboard/Tren
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
 type DailyPoint = { day: string; metricCode: string; avgValue: number }
+type DaySummary = { day: string; sessionCount: number }
+type WeeklyPayload = {
+  metrics: MetricSummary[]
+  daily: DailyPoint[]
+  measurementDays: number
+  bestDay: DaySummary | null
+  worstDay: DaySummary | null
+  alertCount: number
+  adherence: number | null
+}
 
 const METRIC_LABELS: Record<string, string> = {
   spo2: 'SpO2',
@@ -25,13 +35,28 @@ const METRIC_LABELS: Record<string, string> = {
 export function WeeklyDashboard() {
   const [metrics, setMetrics] = useState<MetricSummary[]>([])
   const [daily, setDaily] = useState<DailyPoint[]>([])
+  const [summary, setSummary] = useState<Omit<WeeklyPayload, 'metrics' | 'daily'> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/dashboard/weekly', { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { if (d.success) { setMetrics(d.data.metrics); setDaily(d.data.daily) } else { setError(d.error?.message) } })
+      .then((d: { success: boolean; data?: WeeklyPayload; error?: { message?: string } }) => {
+        if (d.success && d.data) {
+          setMetrics(d.data.metrics)
+          setDaily(d.data.daily)
+          setSummary({
+            measurementDays: d.data.measurementDays,
+            bestDay: d.data.bestDay,
+            worstDay: d.data.worstDay,
+            alertCount: d.data.alertCount,
+            adherence: d.data.adherence
+          })
+        } else {
+          setError(d.error?.message ?? 'Failed to load weekly dashboard.')
+        }
+      })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
   }, [])
@@ -52,6 +77,29 @@ export function WeeklyDashboard() {
         <button className="tab-btn" type="button">Today</button>
         <button className="tab-btn active" type="button">Weekly View</button>
         <button className="tab-btn" type="button">Monthly Summary</button>
+      </div>
+
+      <div className="dashboard-stats">
+        <div className="stat-card">
+          <span className="stat-kicker">Measurement Days</span>
+          <div className="stat-value">{summary?.measurementDays ?? 0}</div>
+          <div className="stat-label">of last 7 days</div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-kicker">Best Day</span>
+          <div className="stat-value compact">{summary?.bestDay?.day ?? '-'}</div>
+          <div className="stat-label">{summary?.bestDay?.sessionCount ?? 0} sessions</div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-kicker">Worst Day</span>
+          <div className="stat-value compact">{summary?.worstDay?.day ?? '-'}</div>
+          <div className="stat-label">{summary?.worstDay?.sessionCount ?? 0} sessions</div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-kicker">Adherence</span>
+          <div className="stat-value">{summary?.adherence ?? '-'}{summary?.adherence !== null && summary?.adherence !== undefined ? '%' : ''}</div>
+          <div className="stat-label">{summary?.alertCount ?? 0} alerts</div>
+        </div>
       </div>
 
       <div className="vitals-grid">

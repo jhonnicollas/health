@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
+type DaySummary = { day: string; sessionCount: number }
+type LatestMetric = { metricCode: string; finalValue: number; unit: string; status: string; severity: string; measuredAt: string }
+type MonthlyPayload = {
+  metrics: MetricSummary[]
+  measurementDays: number
+  alertCount: number
+  daily: DaySummary[]
+  latest: LatestMetric[]
+}
 
 const METRIC_LABELS: Record<string, string> = {
   spo2: 'SpO2',
@@ -22,13 +31,27 @@ const METRIC_LABELS: Record<string, string> = {
 
 export function MonthlyDashboard() {
   const [metrics, setMetrics] = useState<MetricSummary[]>([])
+  const [measurementDays, setMeasurementDays] = useState(0)
+  const [alertCount, setAlertCount] = useState(0)
+  const [daily, setDaily] = useState<DaySummary[]>([])
+  const [latest, setLatest] = useState<LatestMetric[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/dashboard/monthly', { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { if (d.success) setMetrics(d.data.metrics); else setError(d.error?.message) })
+      .then((d: { success: boolean; data?: MonthlyPayload; error?: { message?: string } }) => {
+        if (d.success && d.data) {
+          setMetrics(d.data.metrics)
+          setMeasurementDays(d.data.measurementDays)
+          setAlertCount(d.data.alertCount)
+          setDaily(d.data.daily)
+          setLatest(d.data.latest)
+        } else {
+          setError(d.error?.message ?? 'Failed to load monthly dashboard.')
+        }
+      })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
   }, [])
@@ -44,6 +67,35 @@ export function MonthlyDashboard() {
         <button className="tab-btn" type="button">Weekly View</button>
         <button className="tab-btn active" type="button">Monthly Summary</button>
       </div>
+
+      <div className="dashboard-stats">
+        <div className="stat-card">
+          <span className="stat-kicker">Measurement Days</span>
+          <div className="stat-value">{measurementDays}</div>
+          <div className="stat-label">days with data</div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-kicker">Alert Count</span>
+          <div className="stat-value">{alertCount}</div>
+          <div className="stat-label">last 30 days</div>
+        </div>
+        <div className="stat-card">
+          <span className="stat-kicker">Latest Metrics</span>
+          <div className="stat-value">{latest.length}</div>
+          <div className="stat-label">recent entries</div>
+        </div>
+      </div>
+
+      {daily.length > 0 ? (
+        <div className="monthly-bars" aria-label="Monthly measurement days chart">
+          {daily.map((day) => (
+            <div key={day.day} className="monthly-bar-item">
+              <span className="monthly-bar" style={{ height: `${Math.max(18, Math.min(100, day.sessionCount * 24))}%` }} />
+              <small>{day.day.slice(5)}</small>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="vitals-grid">
         {metrics.map(m => {

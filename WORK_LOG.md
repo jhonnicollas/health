@@ -2,6 +2,964 @@
 
 This log is append-only. Never delete previous entries.
 
+## 2026-06-22 09:46 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-8
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/TASKS.md
+- HANDOFF.md
+- WORK_LOG.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src/pages/telegram/TelegramSettingsPage.tsx
+- web/src/pages/admin/ConfigDashboardPage.tsx
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-8 as In Progress.
+- Confirmed existing Telegram tables/config source: `HL_telegramLinks`, `HL_notificationSettings`, `HL_notifications`, and `HL_systemConfigs`.
+- Found Telegram sender still reads bot token from Worker env only, while product rule requires configurable DB-backed settings.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue GAP-8 only. Add DB-backed Telegram bot token/config lookup, preserve env fallback only if no DB value exists, then validate worker/frontend builds.
+
+## 2026-06-22 10:00 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-8
+- Sprint: Gap Remediation
+- Status: Blocked
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+
+### Files Changed
+- docs/TASKS.md
+- docs/api-contract.md
+- docs/seed.sql
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+
+### What Changed
+- Added DB-backed Telegram config key `HL_systemConfigs.telegramBotToken` to seed data.
+- Added Worker helpers to resolve Telegram token from `HL_systemConfigs.telegramBotToken`, with legacy env fallback only when DB value is empty.
+- Added `telegramBotActive` guard to normal Telegram sends and emergency-contact Telegram sends.
+- Added Telegram `getMe` validation inside `POST /api/telegram/test`; response now reports `botTokenValid`, `sent`, and `error`.
+- Updated API contract for the new `/api/telegram/test` response and config key.
+
+### Validation
+- `cd worker && npm test` — PASS (22/22)
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/api-contract.md
+- docs/seed.sql
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- GAP-8 code remediation is complete, but full acceptance is externally blocked until a regenerated BotFather token is saved into `HL_systemConfigs.telegramBotToken`.
+- Continue GAP-9 next: surface System Config editor inside Settings for admin users so the token and other configs can be managed from frontend.
+
+## 2026-06-22 10:02 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-9
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- docs/TASKS.md
+- web/src/pages/settings/ProfileSettingsPage.tsx
+- web/src/pages/admin/ConfigDashboardPage.tsx
+- web/src/context/AuthContext.tsx
+- worker/src/index.ts
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-9 as In Progress.
+- Confirmed `HL_systemConfigs` and existing admin config API can be reused without schema changes.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Add admin-only System Config panel in Settings while preserving profile/theme save logic.
+
+## 2026-06-22 10:18 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-9
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- web/src/pages/settings/ProfileSettingsPage.tsx
+- web/src/pages/admin/ConfigDashboardPage.tsx
+- web/src/context/AuthContext.tsx
+- web/src/context/auth.ts
+- worker/src/index.ts
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- web/src/App.css
+- web/src/pages/settings/ProfileSettingsPage.tsx
+
+### What Changed
+- Added admin-only System Config panel inside Profile Settings.
+- Panel discovers admin permission through existing `/api/admin/configs`; non-admin 401/403 users do not see it.
+- Reused existing config list/update API and table/form interaction pattern.
+- Added editable rows for all `HL_systemConfigs` keys, including `telegramBotToken` as a password input.
+- Expanded Settings layout to fit config tables while keeping the profile form readable.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 301.75 kB JS, 53.04 kB CSS)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-10 next: upgrade `/ai-assistant` from minimal form into conversational UI with vitals context, loading indicator, and safety disclaimer.
+
+## 2026-06-22 10:20 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-10
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- docs/TASKS.md
+- worker/src/index.ts
+- web/src/App.tsx
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-10 as In Progress.
+- Started AI assistant UI/API audit for chat bubbles, vitals context, loading state, and DB-backed AI configuration.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Preserve AI safety rules: no diagnosis, no medication dosage changes, and no AI severity decisions.
+
+## 2026-06-22 10:45 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-10
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- docs/ARCHITECTURE.md
+- docs/design-system.md
+- worker/src/index.ts
+- web/src/App.tsx
+- web/src/App.css
+
+### Files Changed
+- docs/TASKS.md
+- docs/seed.sql
+- docs/api-contract.md
+- docs/ARCHITECTURE.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- web/src/App.tsx
+- web/src/App.css
+
+### What Changed
+- Added DB-backed text AI config keys: `aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, and `aiTextApiKey`.
+- Seeded 9router endpoint and the three requested models as ordered fallback config values.
+- Replaced hardcoded Cloudflare text LLM calls for AI recommendation, monthly summary, and AI assistant with a shared OpenAI-compatible helper that reads `HL_systemConfigs`.
+- Preserved safety filter and deterministic fallback when provider/config is unavailable.
+- Rebuilt `/ai-assistant` into chat bubbles with vitals context banner, always-visible safety note, loading/typing bubble, and model/fallback metadata.
+
+### Validation
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+- `cd worker && npm test` — PASS (22/22)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 303.21 kB JS, 54.86 kB CSS)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/seed.sql
+- docs/api-contract.md
+- docs/ARCHITECTURE.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-11 next: encrypted sensitive data for Telegram chat IDs, emergency contact data, medication notes, and personal notes.
+
+## 2026-06-22 10:47 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-11
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- docs/TASKS.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+- web/src/pages/medications/MedicationsPage.tsx
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-11 as In Progress.
+- Started audit of sensitive fields and read/write paths.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Add encryption without schema rename; keep legacy plaintext readable until existing data is migrated.
+
+## 2026-06-22 11:15 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-11
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/api-contract.md
+- docs/ARCHITECTURE.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+- web/src/pages/medications/MedicationsPage.tsx
+
+### Files Changed
+- docs/TASKS.md
+- docs/api-contract.md
+- docs/ARCHITECTURE.md
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+
+### What Changed
+- Added AES-GCM sensitive-data encryption helpers using Worker secret `ENCRYPTION_KEY`; no schema rename or new table required.
+- New encrypted values use `enc:v1:` prefix and legacy plaintext remains readable on decrypt paths.
+- Encrypted Telegram link chat IDs before storing and decrypted only when sending Telegram.
+- Encrypted emergency contact name, phone, and Telegram chat ID at rest; decrypted for UI reads and emergency send.
+- Encrypted measurement session notes and medication log notes before insert; decrypted medication log notes on read.
+- Removed raw Telegram chat ID from audit log metadata.
+
+### Validation
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+- `cd worker && npm test` — PASS (22/22)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/api-contract.md
+- docs/ARCHITECTURE.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-12 next: verify and complete emergency consent flow end-to-end.
+- Deployment must set Worker secret `ENCRYPTION_KEY` before sensitive write paths are used in production.
+
+## 2026-06-22 11:17 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-12
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- docs/TASKS.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-12 as In Progress.
+- Started emergency consent verification and completion.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Ensure contact-level consent controls persist and emergency sends are gated by both user profile consent and contact consent.
+
+## 2026-06-21 21:05 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-1
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- AGENTS.md
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/design-system.md
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+- docs/TEST_PLAN.md
+- web/frontend_stitch/DESIGN.md
+- web/frontend_stitch/master-layout.html
+- web/frontend_stitch/dashboard.html
+- web/src/App.tsx
+- web/src/App.css
+- web/src/pages/dashboard/TodayDashboard.tsx
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Marked GAP-1 as In Progress.
+- Started Stitch local frontend parity remediation cycle.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-1 only. Do not jump to GAP-2 until GAP-1 validation and docs are complete.
+
+## 2026-06-21 21:40 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-1
+- Sprint: Gap Remediation
+- Status: Needs Review
+
+### Files Read
+- web/frontend_stitch/DESIGN.md
+- web/frontend_stitch/master-layout.html
+- web/frontend_stitch/dashboard.html
+- web/frontend_stitch/new-measurement.html
+- web/src/App.tsx
+- web/src/App.css
+- web/src/index.css
+- web/src/pages/dashboard/TodayDashboard.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+- web/src/components/measurement/DynamicMetricForm.tsx
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- web/src/App.tsx
+- web/src/App.css
+- web/src/index.css
+- web/src/pages/dashboard/TodayDashboard.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+
+### What Changed
+- Replaced corrupted/ad-hoc shell glyphs with Material Symbols to match local Stitch HTML.
+- Added desktop topbar segmented density control, notification dot, AI floating action button, and mobile add-measurement FAB.
+- Aligned dashboard bento, AI insight, and vital icons with Stitch Material Symbols.
+- Refined New Measurement checklist and record form visual system: card workflow, checked indicator, dashed capture area, and AI auto-read secondary action.
+- Preserved existing React state, hooks, fetch calls, AI extraction hook wiring, manual override flow, and submit logic.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 289.33 kB JS, 45.19 kB CSS)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- GAP-1 measurable implementation and build validation passed.
+- Cannot mark GAP-1 `[x] Done` until owner provides visual approval score >=800/1000.
+- Next strict action: owner visual review of local/prod UI against `web/frontend_stitch/`; then mark GAP-1 `[x]` or reopen specific visual deltas.
+
+## 2026-06-21 21:50 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-1
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Auto-approval accepted by owner instruction.
+- Marked GAP-1 Done after previous frontend validation passed.
+- Marked GAP-2 In Progress.
+
+### Validation
+- Previous GAP-1 validation still applies: `npx tsc -b`, `npm run lint`, `npm run build` all PASS.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-2 only. Responsive layout work must preserve existing hooks and API calls.
+
+## 2026-06-21 21:52 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-2
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- docs/TASKS.md
+- web/src/App.css
+- web/src/pages/measurement/SelectMetricPage.tsx
+
+### Files Changed
+- Pending.
+
+### What Changed
+- Started mobile/tablet/desktop responsive remediation.
+- Confirmed no schema/table changes needed; existing `HL_` tables retained.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- WORK_LOG.md
+
+### Next Agent Notes
+- Add tablet rail at 768-1023, desktop 280px sidebar at 1024+, mobile one-column/touch layout.
+
+## 2026-06-21 22:05 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-2
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/TASKS.md
+- web/src/App.css
+- web/src/pages/measurement/SelectMetricPage.tsx
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- web/src/App.css
+- web/src/pages/measurement/SelectMetricPage.tsx
+
+### What Changed
+- Added mobile layout hardening: one-column grids, bottom nav-safe content padding, smaller headers, touch-friendly card padding.
+- Added tablet 768-1023px collapsed sidebar rail with icon-only navigation and two-column grids.
+- Added desktop >=1024px sidebar restore to 280px.
+- Confirmed measurement file input retains `capture="environment"` for mobile camera.
+- Removed stray mojibake separator from measurement summary.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 289.33 kB JS, 47.09 kB CSS)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-3 only: AI Vision "Baca Otomatis" functional wiring/timeout/manual override verification.
+
+## 2026-06-21 22:10 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-3
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/TASKS.md
+- worker/src/index.ts
+- web/src/hooks/useAiExtract.ts
+- web/src/components/measurement/ManualOverrideInput.tsx
+- web/src/components/measurement/DynamicMetricForm.tsx
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-3 as In Progress.
+- Confirmed existing tables `HL_aiExtractions`, `HL_measurementValues`, and config `aiExtractTimeoutMs`.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Verify and harden AI extraction button text, timeout fallback message, per-metric loading, rawAiValue/confidence display, and manualOverride behavior.
+
+## 2026-06-21 22:25 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-3
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- worker/src/index.ts
+- web/src/hooks/useAiExtract.ts
+- web/src/components/measurement/ManualOverrideInput.tsx
+- web/src/components/measurement/DynamicMetricForm.tsx
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- web/src/App.css
+- web/src/components/measurement/DynamicMetricForm.tsx
+
+### What Changed
+- Added per-card AI extraction status and loading state.
+- Standardized button label to `Baca Otomatis`.
+- Added exact timeout fallback copy: `AI terlalu lama membaca foto. Silakan input manual.`
+- Added visible `rawAiValue` and confidence display after AI success.
+- Preserved manual override logic: final value edit sets `manualOverride` on submit payload.
+- Confirmed extraction endpoint logs `HL_aiExtractions` and timeout config uses `HL_systemConfigs.aiExtractTimeoutMs`.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 290.42 kB JS, 47.43 kB CSS)
+- `cd worker && npm test` — PASS (22/22)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-4 only: theme selector must apply immediately after save.
+
+## 2026-06-21 22:30 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-4
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- web/src/context/AuthContext.tsx
+- web/src/context/auth.ts
+- web/src/pages/settings/ProfileSettingsPage.tsx
+- web/src/index.css
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-4 as In Progress.
+- Confirmed `HL_userProfiles.theme` and `accessibilityMode` existing schema fields.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Patch ProfileSettingsPage to update DOM dataset and auth context immediately after save.
+
+## 2026-06-21 22:45 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-4
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- web/src/context/AuthContext.tsx
+- web/src/context/auth.ts
+- web/src/pages/settings/ProfileSettingsPage.tsx
+- web/src/index.css
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- web/src/pages/settings/ProfileSettingsPage.tsx
+
+### What Changed
+- Theme selector now updates `document.documentElement.dataset.theme` immediately.
+- Accessibility selector now updates `document.documentElement.dataset.accessibility` immediately.
+- Successful save updates auth context optimistically before async refresh completes.
+- Existing DB-backed profile fields remain source of truth.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 290.74 kB JS, 47.43 kB CSS)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-5 only: rebuild Knowledge Base from plain `<pre>` to structured cards/media-ready guide UI.
+
+## 2026-06-21 22:50 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-5
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- worker/src/index.ts
+- web/frontend_stitch/knowledge-base.html
+- web/src/pages/kb/KnowledgeBasePage.tsx
+- web/src/App.css
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-5 as In Progress.
+- Confirmed existing table `HL_knowledgeArticles`; no new table needed.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Replace `<pre>` article rendering with structured directory/detail guide cards.
+
+## 2026-06-21 23:05 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-5
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- worker/src/index.ts
+- web/frontend_stitch/knowledge-base.html
+- web/src/pages/kb/KnowledgeBasePage.tsx
+- web/src/App.css
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- web/src/pages/kb/KnowledgeBasePage.tsx
+- web/src/App.css
+
+### What Changed
+- Replaced plain `<pre>` article rendering with structured Knowledge Base shell.
+- Added category chips, article cards, selected reader, media-ready guide panel, specs/use-case cards, and parsed markdown sections.
+- Added responsive mobile/tablet layout for KB.
+- Preserved existing `GET /api/kb` endpoint and `HL_knowledgeArticles` schema.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 294.55 kB JS, 51.45 kB CSS)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-6 only: dashboards must render real data, empty states, trend/chart-like summaries.
+
+## 2026-06-21 23:10 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-6
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- worker/src/index.ts
+- web/src/pages/dashboard/TodayDashboard.tsx
+- web/src/pages/dashboard/WeeklyDashboard.tsx
+- web/src/pages/dashboard/MonthlyDashboard.tsx
+- web/src/App.css
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-6 as In Progress.
+- Confirmed dashboard data source tables: `HL_measurementValues`, `HL_measurementSessions`, `HL_alerts`, `HL_medicationLogs`.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Add dashboard endpoint summary metadata and frontend summary cards/charts.
+
+## 2026-06-21 23:30 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-6
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- worker/src/index.ts
+- web/src/pages/dashboard/TodayDashboard.tsx
+- web/src/pages/dashboard/WeeklyDashboard.tsx
+- web/src/pages/dashboard/MonthlyDashboard.tsx
+- web/src/App.css
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- docs/api-contract.md
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- web/src/pages/dashboard/WeeklyDashboard.tsx
+- web/src/pages/dashboard/MonthlyDashboard.tsx
+- web/src/App.css
+
+### What Changed
+- Extended weekly dashboard API with measurementDays, bestDay, worstDay, alertCount, and adherence.
+- Extended monthly dashboard API with measurementDays, alertCount, daily session counts, and latest metric rows.
+- Added weekly summary cards and monthly summary cards.
+- Added accessible monthly mini bar chart from real daily session counts.
+- Preserved Today dashboard real values, alert list, manual override/status badges, and empty state.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 297.36 kB JS, 52.13 kB CSS)
+- `cd worker && npm test` — PASS (22/22)
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- docs/api-contract.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-7 only: reports must show popupMessage, recommendations, best/worst day, alert counts, adherence, and rich empty states.
+
+## 2026-06-21 23:35 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-7
+- Sprint: Gap Remediation
+- Status: Started
+
+### Files Read
+- docs/schema.sql
+- worker/src/index.ts
+- web/src/pages/reports/DailyReportPage.tsx
+- web/src/pages/reports/WeeklyReportPage.tsx
+- web/src/pages/reports/MonthlyReportPage.tsx
+- web/src/App.css
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked GAP-7 as In Progress.
+- Confirmed existing daily report endpoint already returns rule popup fields from `HL_metricRules`.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Update report frontend to expose existing API fields and rich empty states.
+
+## 2026-06-21 23:55 UTC — Agent: Codex
+
+### Task
+- Task ID: GAP-7
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- worker/src/index.ts
+- web/src/pages/reports/DailyReportPage.tsx
+- web/src/pages/reports/WeeklyReportPage.tsx
+- web/src/pages/reports/MonthlyReportPage.tsx
+- web/src/App.css
+
+### Files Changed
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- web/src/pages/reports/DailyReportPage.tsx
+- web/src/pages/reports/WeeklyReportPage.tsx
+- web/src/pages/reports/MonthlyReportPage.tsx
+- web/src/App.css
+
+### What Changed
+- Daily report now shows rule popup title/message, recommendation, sourceLabel, value, and severity per metric.
+- Weekly report now shows bestDay, worstDay, alertCount, daysWithData, adherence, and rich empty state.
+- Monthly report now shows rich empty state and cleaned table placeholders.
+- Added report detail card styling.
+
+### Validation
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS (53 modules, 298.76 kB JS, 52.98 kB CSS)
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue GAP-8 only: Telegram token validity is external; verify config path and block if no regenerated token exists.
+
 Use this format for every task:
 
 ## 2026-06-22 — Agent: opencode

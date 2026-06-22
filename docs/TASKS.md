@@ -741,7 +741,7 @@ Rules:
 
 Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat ini. Semua item adalah [ ] Not Started, prioritas descending.
 
-### GAP-1 UI/UX Visual Quality — Owner Score 5/1000
+### [x] GAP-1 UI/UX Visual Quality — Owner Score 5/1000
 - **Deskripsi**: Owner menilai aplikasi 5/1000. UI tidak sesuai ekspektasi enterprise SaaS. Stitch UI Parity sudah dikerjakan tapi ditolak owner.
 - **Akar Masalah**: Stitch CSS tokens sudah di-applied tapi routing, layout, card, badge, dan responsivitas masih kaku. Sidebar, topbar, mobile bottom nav tidak presisi. Warna, spacing, typography tidak konsisten dengan DESIGN.md.
 - **Frontend**: `web/src/App.tsx`, `web/src/App.css`, `web/src/index.css`, semua page files
@@ -751,7 +751,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Warna, font, spacing, shadow, border-radius sesuai DESIGN.md
   - Owner menyetujui dengan score >= 800/1000
 
-### GAP-2 Mobile Responsive Layout Rusak
+### [x] GAP-2 Mobile Responsive Layout Rusak
 - **Deskripsi**: Layout mobile breakpoints tidak proper. Bottom nav, mobile topbar, card grid tidak responsif.
 - **Frontend**: `web/src/App.css` (media queries), `web/src/App.tsx` (mobile nav), `web/src/index.css`
 - **Acceptance Criteria**:
@@ -761,7 +761,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Form input dan tombol touch-friendly (min 44px)
   - Kamera mobile active untuk capture photo
 
-### GAP-3 AI Vision "Baca Otomatis" Tidak Terhubung
+### [x] GAP-3 AI Vision "Baca Otomatis" Tidak Terhubung
 - **Deskripsi**: `useAiExtract` hook sudah ada dan di-import di `DynamicMetricForm.tsx` tapi tombol "Baca Otomatis" tidak muncul/tidak terhubung ke flow input. User tidak bisa menggunakan AI Vision extraction.
 - **Frontend**: `web/src/components/measurement/DynamicMetricForm.tsx`, `web/src/hooks/useAiExtract.ts`
 - **Worker**: `POST /api/measurements/extract` endpoint
@@ -775,7 +775,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - `rawAiValue` dan `confidence` tersimpan
   - `manualOverride` flag berubah jika user edit hasil AI
 
-### GAP-4 Theme Selector Tidak Berfungsi
+### [x] GAP-4 Theme Selector Tidak Berfungsi
 - **Deskripsi**: Theme (light/warm/dark/highContrast) tersimpan di DB tapi tidak langsung diterapkan ke UI setelah user ganti di Settings. Tidak ada visual feedback.
 - **Frontend**: `web/src/pages/settings/ProfileSettingsPage.tsx`, `web/src/context/AuthContext.tsx`
 - **Acceptance Criteria**:
@@ -784,7 +784,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - CSS variables berubah sesuai theme
   - Settings mencerminkan theme saat ini
 
-### GAP-5 Knowledge Base Hanya Teks Polos
+### [x] GAP-5 Knowledge Base Hanya Teks Polos
 - **Deskripsi**: Halaman Knowledge Base menampilkan artikel sebagai `<pre>` text biasa. PRD requires images, videos, use-case cards, structured device guides.
 - **Frontend**: `web/src/pages/kb/KnowledgeBasePage.tsx`
 - **Worker**: `GET /api/kb` endpoint
@@ -794,7 +794,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Support multimedia (images, embedded videos jika memungkinkan)
   - Responsive card layout
 
-### GAP-6 Dashboard Kosong / Tidak Menampilkan Data Real
+### [x] GAP-6 Dashboard Kosong / Tidak Menampilkan Data Real
 - **Deskripsi**: Dashboard hari ini, mingguan, bulanan tidak menampilkan data real. Bento grid streak, AI insight, charts kosong/null.
 - **Frontend**: `web/src/pages/dashboard/TodayDashboard.tsx`, `web/src/pages/dashboard/WeeklyDashboard.tsx`, `web/src/pages/dashboard/MonthlyDashboard.tsx`
 - **Worker**: `GET /api/dashboard/today`, `GET /api/dashboard/weekly`, `GET /api/dashboard/monthly`
@@ -805,7 +805,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Empty state jika tidak ada data
   - Charts/lazy-load jika memungkinkan
 
-### GAP-7 Reports Minimal — Missing Popup & Recommendation
+### [x] GAP-7 Reports Minimal — Missing Popup & Recommendation
 - **Deskripsi**: Daily/Weekly/Monthly report hanya menampilkan tabel metric value. Tidak menampilkan popupMessage, recommendation, bestDay/worstDay dari rules engine.
 - **Frontend**: `web/src/pages/reports/DailyReportPage.tsx`, `web/src/pages/reports/WeeklyReportPage.tsx`, `web/src/pages/reports/MonthlyReportPage.tsx`
 - **Acceptance Criteria**:
@@ -814,15 +814,16 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Monthly: aiMonthlySummary, alertCount, daysWithData, latest metrics
   - Jika tidak ada data: prompt "Belum ada data pengukuran"
 
-### GAP-8 Telegram Bot Token Tidak Valid
+### [!] GAP-8 Telegram Bot Token Tidak Valid
 - **Deskripsi**: Bot token `24032453:AAEStQgN1Djc5bWsIsah8qC47wXTrH2Ev5A` return 401 dari Telegram API. User harus regenerate via @BotFather.
 - **Worker**: Environment secret `TELEGRAM_BOT_TOKEN`
 - **Acceptance Criteria**:
   - Token valid dan `getMe` return 200
   - `POST /api/telegram/test` return `sent: true`
   - Submit measurement mengirim notifikasi Telegram
+  - **Blocked**: kode sekarang membaca `HL_systemConfigs.telegramBotToken` dan memvalidasi `getMe`, tetapi nilai token valid dari BotFather belum tersedia di workspace.
 
-### GAP-9 System Config Editor Tidak Ada di Settings (Hanya di Admin)
+### [x] GAP-9 System Config Editor Tidak Ada di Settings (Hanya di Admin)
 - **Deskripsi**: Halaman Admin Config terpisah di `/admin/configs`. PRD requires konfigurasi sistem bisa diubah dari Settings untuk admin.
 - **Frontend**: `web/src/pages/settings/ProfileSettingsPage.tsx`, `web/src/pages/admin/ConfigDashboardPage.tsx`
 - **Acceptance Criteria**:
@@ -830,7 +831,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Bisa edit: aiExtractTimeoutMs, maxUploadSizeBytes, telegramBotToken display, dsb
   - Non-admin tidak melihat panel ini
 
-### GAP-10 AI Assistant Chatbot Minimal
+### [x] GAP-10 AI Assistant Chatbot Minimal
 - **Deskripsi**: Halaman AI Assistant hanya textarea + submit button. Tidak ada conversational UI, tidak ada context history, tidak ada streaming.
 - **Frontend**: `web/src/App.tsx` (`AiAssistantPage` component inline)
 - **Acceptance Criteria**:
@@ -840,7 +841,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Safety disclaimer prominent
   - No diagnosis/prescription language
 
-### GAP-11 Encrypted Sensitive Data
+### [x] GAP-11 Encrypted Sensitive Data
 - **Deskripsi**: PRD requires encryption untuk: telegramChatId, emergency contact data, medication notes, personal notes. Tidak diimplementasikan.
 - **Worker**: `worker/src/index.ts`, `worker/src/routes-extra.ts`
 - **Acceptance Criteria**:
@@ -849,7 +850,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Encryption key dari environment secret (bukan hardcoded)
   - Decrypt hanya saat digunakan (read)
 
-### GAP-12 Emergency Consent Flow Tidak Lengkap
+### [-] GAP-12 Emergency Consent Flow Tidak Lengkap
 - **Deskripsi**: PRD requires consent sebelum emergency contact menerima alert. Flow consent belum diverifikasi end-to-end.
 - **Worker**: `POST /api/emergency/contacts`, alert flow
 - **Acceptance Criteria**:

@@ -126,7 +126,9 @@ export function TodayDashboard() {
     <div className="today-dashboard">
       <div className="dashboard-bento">
         <div className="bento-streak">
-          <div className="streak-icon" aria-hidden="true">🔥</div>
+          <div className="streak-icon" aria-hidden="true">
+            <span className="material-symbols-outlined fill">local_fire_department</span>
+          </div>
           <div className="streak-info">
             <h3>Streak: {data.streak ?? data.sessionCount} Days!</h3>
             <p>Best Streak: {data.bestStreak ?? data.sessionCount} Days</p>
@@ -134,7 +136,7 @@ export function TodayDashboard() {
         </div>
         <div className="bento-ai-insight">
           <div className="ai-insight-label">
-            <span aria-hidden="true">⬡</span>
+            <span className="material-symbols-outlined" aria-hidden="true">smart_toy</span>
             <span>AI CLINICAL INSIGHT</span>
           </div>
           <p>{data.aiInsight ?? 'Your vitals are being tracked. Continue logging for personalized insights.'}</p>
@@ -186,7 +188,9 @@ export function TodayDashboard() {
             <div key={v.id} className={`vital-card severity-${v.severity}`}>
               <div className="vital-card-header">
                 <div className="vital-card-label">
-                  <span className="vital-icon" aria-hidden="true">{METRIC_ICONS[v.metricCode] ? '●' : '●'}</span>
+                  <span className="material-symbols-outlined vital-icon" aria-hidden="true">
+                    {METRIC_ICONS[v.metricCode] ?? 'monitor_heart'}
+                  </span>
                   <span className="vital-label-text">{METRIC_LABELS[v.metricCode] || v.metricCode}</span>
                 </div>
                 <span className={`vital-badge ${badge.className}`}>{badge.label}</span>
