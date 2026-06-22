@@ -8,3 +8,4 @@ dist/
 brain/
 *.log
 .stitch-assets/
+.opencode/
