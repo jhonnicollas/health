@@ -1927,7 +1927,7 @@ async function evaluateRule(
     sourceLabel: 'Belum ada referensi spesifik',
     ruleId: null
   }
-  let rule: any = null
+  let rule: { id: number; status: string; severity: string; emergencyLevel: string; popupTitle: string; popupMessage: string; recommendation: string; sourceLabel: string } | null = null
   try {
     const result = await c.env.DB.prepare(
     `SELECT id, status, severity, emergencyLevel, popupTitle, popupMessage, recommendation, sourceLabel
@@ -2117,7 +2117,10 @@ app.post('/api/measurements/submit', async (c) => {
     }
 
     const hasAi = body.values.some(v => v.rawAiValue !== null && v.rawAiValue !== undefined) ? 1 : 0
-    const hasAttachment = body.attachments && body.attachments.length > 0 ? 1 : 0
+    // body.attachments is intentionally unused — attachments are uploaded via a separate
+    // POST /api/measurements/attachments/upload after session creation (see DynamicMetricForm).
+    // hasAttachment is set to 0 here and flipped to 1 by the upload endpoint.
+    const hasAttachment = 0
     const encryptedNotes = await encryptSensitive(c, body.notes)
 
     const sessionId = await insertAndGetId(c.env.DB.prepare(
@@ -2196,24 +2199,9 @@ app.post('/api/measurements/submit', async (c) => {
       })
     }
 
-    if (hasAttachment && body.attachments) {
-      for (const att of body.attachments) {
-        const attId = await insertAndGetId(c.env.DB.prepare(
-          `INSERT INTO HL_measurementAttachments
-           (sessionId, userId, metricCode, r2Key, fileName, fileType, fileSize, watermarked, compressed, compressionQuality, imageWidth, imageHeight, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 50, ?, ?, CURRENT_TIMESTAMP)`
-        ).bind(
-          sessionId,
-          userId,
-          att.metricCode,
-          att.r2Key,
-          `${att.metricCode}-att.webp`,
-          att.sizeBytes,
-          att.width,
-          att.height
-        ))
-      }
-    }
+    // Attachments are uploaded separately via POST /api/measurements/attachments/upload
+    // (handled by DynamicMetricForm.tsx after submit). The upload endpoint updates
+    // HL_measurementSessions.hasAttachment = 1 directly.
 
     if (hasEmergency) {
       await c.env.DB.prepare(
@@ -2252,7 +2240,7 @@ app.post('/api/measurements/submit', async (c) => {
     const lines = savedValues.map(v => `• ${v.metricCode}: ${v.finalValue} ${v.unit} (${v.status})`).join('\n')
     const notifMessage = hasEmergency === 1
       ? `Terdeteksi nilai darurat.\n${lines}\nSegera konsultasi ke dokter.`
-      : `${body.values.length} nilai tersimpan.\n${lines}`
+      : `${savedValues.length} nilai tersimpan.\n${lines}`
     // US-3.3.1 + US-4.3.1 + US-4.3.2: create HL_alerts for emergency severity, update daily streak, award badges.
     let streakData: { currentCount: number; bestCount: number; today: string } | null = null
     let badgesData: string[] = []
@@ -2521,7 +2509,7 @@ app.get('/api/measurements/last', async (c) => {
     const rows = await c.env.DB.prepare(
       'SELECT metricCode, deviceCode, finalValue, unit, measuredAt FROM HL_lastMeasurements WHERE userId = ? ORDER BY measuredAt DESC'
     ).bind(userId).all<{ metricCode: string; deviceCode: string | null; finalValue: number; unit: string; measuredAt: string }>()
-    return jsonResponse(c, success({ data: rows.results || [] }, 200, startedAt))
+    return jsonResponse(c, success(rows.results || [], 200, startedAt))
   } catch (error) {
     console.error('last measurements error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat data terakhir.', 500, [], startedAt))
@@ -2566,11 +2554,16 @@ app.get('/api/measurements/today', async (c) => {
       `SELECT s.id AS sessionId, s.measuredAt, s.source, s.hasAttachment,
               (SELECT COUNT(*) FROM HL_measurementValues v WHERE v.sessionId = s.id) AS valueCount
        FROM HL_measurementSessions s
-       WHERE s.userId = ? AND substr(s.measuredAt, 1, 10) = ?
-       ORDER BY s.measuredAt DESC`
-    ).bind(userId, today).all<{ sessionId: number; measuredAt: string; source: string; hasAttachment: number; valueCount: number }>()
+       WHERE s.userId = ?
+       ORDER BY s.measuredAt DESC
+       LIMIT 50`
+    ).bind(userId).all<{ sessionId: number; measuredAt: string; source: string; hasAttachment: number; valueCount: number }>()
 
-    const enriched = await Promise.all((sessions.results || []).map(async (s) => {
+    // Filter to today's sessions in the user's timezone (measuredAt is stored in UTC)
+    const todayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const todaysSessions = (sessions.results || []).filter(s => todayFormatter.format(new Date(s.measuredAt)) === today)
+
+    const enriched = await Promise.all(todaysSessions.map(async (s) => {
       const deviceRows = await c.env.DB.prepare(
         'SELECT DISTINCT deviceCode FROM HL_measurementValues WHERE sessionId = ? AND deviceCode IS NOT NULL'
       ).bind(s.sessionId).all<{ deviceCode: string }>()

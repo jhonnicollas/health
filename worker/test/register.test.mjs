@@ -2010,3 +2010,54 @@ test('admin system config supports create update delete and masks sensitive audi
   assert.equal(db.systemConfigs.featureDoctorExportEnabled, undefined)
   assert.equal(db.auditLogs.at(-1).action, 'configDelete')
 })
+
+test('GET /api/measurements/last returns data as array (no double-wrap)', async () => {
+  const db = new D1Mock()
+  const token = 'session-token'
+  db.users.push({
+    id: 1, email: 'u@e.com', passwordHash: 'x', displayName: 'U',
+    telegramEnabled: 0, browserPushEnabled: 0, active: 1, authProvider: 'local', lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 1, userId: 1, sessionTokenHash: await sha256Token(token),
+    userAgent: null, expiresAt: new Date(Date.now() + 60000).toISOString(), revokedAt: null
+  })
+  const res = await app.request(
+    '/api/measurements/last',
+    { headers: { Cookie: `hlSession=${token}` } },
+    env(db)
+  )
+  const body = await res.json()
+  assert.equal(res.status, 200)
+  assert.ok(Array.isArray(body.data), 'body.data must be an array (not {data: []})')
+  assert.equal(body.data.length, 0)
+})
+
+test('GET /api/measurements/today returns sessions with deviceCodes (Asia/Jakarta timezone)', async () => {
+  const db = new D1Mock()
+  const token = 'session-token'
+  db.users.push({
+    id: 1, email: 'u@e.com', passwordHash: 'x', displayName: 'U',
+    telegramEnabled: 0, browserPushEnabled: 0, active: 1, authProvider: 'local', lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 1, userId: 1, sessionTokenHash: await sha256Token(token),
+    userAgent: null, expiresAt: new Date(Date.now() + 60000).toISOString(), revokedAt: null
+  })
+  db.profiles.push({
+    id: 1, userId: 1, sex: 'male', birthDate: '1990-01-01', heightCm: 170,
+    timezone: 'Asia/Jakarta', accessibilityMode: 'normal', theme: 'light',
+    emergencyConsent: 0, aiConsent: 1, dataShareConsent: 0
+  })
+  // No sessions yet
+  const emptyRes = await app.request(
+    '/api/measurements/today',
+    { headers: { Cookie: `hlSession=${token}` } },
+    env(db)
+  )
+  const emptyBody = await emptyRes.json()
+  assert.equal(emptyRes.status, 200)
+  assert.ok(Array.isArray(emptyBody.data.sessions))
+  assert.equal(emptyBody.data.sessions.length, 0)
+  assert.equal(emptyBody.data.date.length, 10, 'date is YYYY-MM-DD format')
+})

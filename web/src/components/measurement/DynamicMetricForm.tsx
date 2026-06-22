@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
 import { useAiExtract } from '../../hooks/useAiExtract'
@@ -320,9 +320,23 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
   const [interpretation, setInterpretation] = useState<{ interpretations: MetricInterpretation[]; values: Array<{ metricCode: string; finalValue: number; unit: string }> } | null>(null)
   const [removedDevices, setRemovedDevices] = useState<Set<string>>(new Set())
   const [bpTrials, setBpTrials] = useState<Record<string, BpTrial[]>>({})
+  const pendingTimersRef = useRef<Set<number>>(new Set())
 
   useEffect(() => { void getLastMeasurements().then(setLastMeasurements) }, [])
   useEffect(() => { if (profile?.birthDate) setAgeInfo(calculateAge(profile.birthDate)) }, [profile?.birthDate])
+
+  // Cleanup: revoke all Object URLs and clear pending timers on unmount
+  useEffect(() => {
+    return () => {
+      const timers = pendingTimersRef.current
+      for (const t of timers) window.clearTimeout(t)
+      timers.clear()
+      setPreviewUrls(current => {
+        for (const url of Object.values(current)) URL.revokeObjectURL(url)
+        return {}
+      })
+    }
+  }, [])
 
   useEffect(() => {
     setValues(prev => {
@@ -402,7 +416,11 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
       const heightM = profile.heightCm / 100
       if (weight > 0 && heightM > 0) {
         const bmi = Math.round((weight / (heightM * heightM)) * 10) / 10
-        if (!values['bmi'] || values['bmi'].final === '' || values['bmi'].final !== String(bmi)) {
+        const bmiEntry = values['bmi']
+        // Don't overwrite if user already manually set BMI (i.e. it isn't from auto-calc)
+        const isBmiAuto = !bmiEntry?.raw || bmiEntry.raw === bmiEntry.final
+        const differs = !bmiEntry || bmiEntry.final === '' || bmiEntry.final !== String(bmi)
+        if (differs && isBmiAuto) {
           setValues(prev => ({ ...prev, bmi: { ...prev['bmi'], final: String(bmi), raw: String(bmi), confidence: null } }))
         }
       }
@@ -452,10 +470,12 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
     const objectUrl = URL.createObjectURL(file)
     setPreviewUrls(prev => ({ ...prev, [deviceCode]: objectUrl }))
     setDeviceFiles(prev => ({ ...prev, [deviceCode]: file }))
-    setTimeout(() => {
+    const timerId = window.setTimeout(() => {
+      pendingTimersRef.current.delete(timerId)
       const group = deviceGroups.get(deviceCode)
       if (group) void handleAiExtract(deviceCode, group)
     }, 800)
+    pendingTimersRef.current.add(timerId)
   }
 
   async function handleAiExtract(deviceCode: string, group: { device: DynamicMetricDevice; selections: DynamicMetricSelection[] }) {
@@ -561,9 +581,8 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
       }
 
       await uploadAttachments(body.data.sessionId, measuredAt)
-      const metricsToSave = ['bodyWeight', 'waistCircumference', 'bodyTemperature', 'spo2', 'heartRate', 'sleepDuration', 'glucoseFasting', 'glucosePostMeal', 'cholesterolTotal', 'uricAcid', 'systolic', 'diastolic', 'bloodPressurePulse']
       for (const p of payload) {
-        if (metricsToSave.includes(p.metricCode)) {
+        if (ALL_AUTOFILL_METRICS.has(p.metricCode)) {
           await fetch('/api/measurements/last/save', {
             method: 'POST', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -574,6 +593,8 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
       onSubmit?.(payload.map(v => ({ metricCode: v.metricCode, finalValue: v.finalValue, manualOverride: v.manualOverride })))
       onSubmitted?.()
       setValues({}); setDeviceFiles({}); setPreviewUrls({}); setAutoFilled(new Set()); setRemovedDevices(new Set())
+      // Refresh last-measurement cache so the next visit auto-fills with the just-submitted values
+      void getLastMeasurements().then(setLastMeasurements)
       setSuccessMessage('Pengukuran berhasil tersimpan.')
     } catch (e) { setError(e instanceof Error ? e.message : 'Tidak bisa terhubung ke server.') }
     finally { setSubmitting(false) }

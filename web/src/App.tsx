@@ -149,7 +149,7 @@ NAV.push({ path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: '
 NAV.push({ path: '/admin/configs', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true })
 
 const ALLOWED_PATHS = new Set(NAV.map(n => n.path).concat(['/kb']))
-const MOBILE_NAV_PATHS = new Set(['/dashboard', '/measurements/new', '/measurements/history', '/alerts', '/ai-assistant'])
+const MOBILE_NAV_PATHS = new Set(['/dashboard', '/measurements/new', '/measurements/history', '/alerts', '/ai-assistant', '/emergency'])
 
 function normalizePath(path: string) {
   if (path === '/auth/register') return '/register'
@@ -434,10 +434,28 @@ function SeniorAppShell({
     ? activePath
     : '/dashboard'
   const [sosPressed, setSosPressed] = useState(false)
+  const sosTimerRef = useRef<number | null>(null)
+
+  function clearSosTimer() {
+    if (sosTimerRef.current !== null) {
+      window.clearTimeout(sosTimerRef.current)
+      sosTimerRef.current = null
+    }
+  }
 
   function longPressStart() {
-    window.setTimeout(() => setSosPressed(true), 900)
+    clearSosTimer()
+    sosTimerRef.current = window.setTimeout(() => {
+      sosTimerRef.current = null
+      setSosPressed(true)
+    }, 900)
   }
+
+  function longPressEnd() {
+    clearSosTimer()
+  }
+
+  useEffect(() => () => clearSosTimer(), [])
 
   return (
     <main className="senior-shell">
@@ -461,7 +479,11 @@ function SeniorAppShell({
             <button
               className={sosPressed ? 'sos-button confirmed' : 'sos-button'}
               onMouseDown={longPressStart}
+              onMouseUp={longPressEnd}
+              onMouseLeave={longPressEnd}
               onTouchStart={longPressStart}
+              onTouchEnd={longPressEnd}
+              onTouchCancel={longPressEnd}
               type="button"
             >
               SOS BUTTON
@@ -519,6 +541,8 @@ function AppRoutes() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<NavLink[]>([])
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
+  const notifRef = useRef<HTMLDivElement | null>(null)
+  const userMenuRef = useRef<HTMLDivElement | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'Reports']))
 
   function toggleSidebar() {
@@ -542,8 +566,16 @@ function AppRoutes() {
     window.addEventListener('popstate', handlePopState)
     const timer = setInterval(() => setLiveTime(new Date()), 1000)
     function handleDocClick(event: MouseEvent) {
-      if (searchWrapRef.current && !searchWrapRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (searchWrapRef.current && !searchWrapRef.current.contains(target)) {
         setSearchResults([])
+        setSearchQuery('')
+      }
+      if (notifRef.current && !notifRef.current.contains(target)) {
+        setNotifOpen(false)
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setUserMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleDocClick)
@@ -563,6 +595,8 @@ function AppRoutes() {
 
   function navigate(path: string) {
     setNotifOpen(false)
+    setUserMenuOpen(false)
+    setSearchQuery('')
     window.history.pushState(null, '', path)
     setCurrentPath(normalizePath(path))
   }
@@ -649,8 +683,9 @@ function AppRoutes() {
     return (!g.adminOnly || isAdmin) && g.visible !== false
   }) as (NavGroup | NavLink)[]
   const currentLink = visibleNav.find(link => link.path === appPath)
+  const PAGE_LABELS: Record<string, string> = { '/kb': 'Knowledge Base', '/tracker': 'Fasting & Medication', '/caregiver': 'Caregiver Dashboard' }
   const firstName = user.displayName.split(' ').filter(Boolean)[0] ?? 'there'
-  const headerTitle = appPath === '/dashboard' ? `Good Morning, ${firstName}` : currentLink?.label ?? 'Dashboard'
+  const headerTitle = appPath === '/dashboard' ? `Good Morning, ${firstName}` : PAGE_LABELS[appPath] ?? currentLink?.label ?? 'Dashboard'
   const headerSubtitle = appPath === '/dashboard'
     ? 'Here is your daily health summary.'
     : 'Here is your clinical overview for today.'
@@ -771,9 +806,12 @@ function AppRoutes() {
             <h1>HealthSync Pro</h1>
           </div>
           <div className="mobile-topbar-actions">
-            <button type="button" aria-label="Search"><Icon name="search" /></button>
-            <button type="button" aria-label="Notifications"><Icon name="notifications" /></button>
-            <span className="mobile-topbar-avatar">{getInitials(user.displayName)}</span>
+            <button type="button" aria-label="Buka notifikasi" onClick={() => setNotifOpen(o => !o)}>
+              <Icon name="notifications" />
+            </button>
+            <button type="button" aria-label="Buka menu pengguna" className="mobile-topbar-avatar" onClick={() => setUserMenuOpen(o => !o)}>
+              {getInitials(user.displayName)}
+            </button>
           </div>
         </div>
         <div className="app-topbar">
@@ -829,8 +867,7 @@ function AppRoutes() {
               <button className={currentTheme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')} type="button" aria-label="Dark mode"><Icon name="dark_mode" /></button>
             </div>
             <button className="topbar-icon-btn" onClick={() => navigate('/kb')} type="button" aria-label="Knowledge Base"><Icon name="menu_book" /></button>
-            <button className="topbar-icon-btn" onClick={() => navigate('/kb')} type="button" aria-label="Help"><Icon name="help" /></button>
-            <div className="topbar-notif-wrap">
+            <div className="topbar-notif-wrap" ref={notifRef}>
               <button className="topbar-icon-btn has-alert" onClick={() => setNotifOpen(o => !o)} type="button" aria-label="Notifications"><Icon name="notifications" /></button>
               {notifOpen && (
                 <div className="notif-dropdown">
@@ -839,7 +876,7 @@ function AppRoutes() {
                 </div>
               )}
             </div>
-            <div className="topbar-user-wrap">
+            <div className="topbar-user-wrap" ref={userMenuRef}>
               <button className="topbar-user" onClick={() => setUserMenuOpen(o => !o)} type="button" aria-label={`User menu for ${user.displayName}`}>
                 <strong>{user.displayName}</strong>
                 <span className="topbar-user-avatar">{getInitials(user.displayName)}</span>
