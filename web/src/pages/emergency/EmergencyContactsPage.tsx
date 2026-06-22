@@ -93,6 +93,18 @@ export function EmergencyContactsPage() {
     }
   }
 
+  async function toggleConsent(id: string, consentGiven: boolean) {
+    try {
+      await fetch(`/api/emergency/contacts/${id}/consent`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consentGiven })
+      })
+      await load()
+    } catch { /* ignore */ }
+  }
+
   async function remove(id: string) {
     const res = await fetch(`/api/emergency/contacts/${id}`, {
       method: 'DELETE',
@@ -156,6 +168,12 @@ export function EmergencyContactsPage() {
                 <div>
                   <strong>{c.contactName}</strong> · {c.contactRelation} · {c.contactPhone}
                   {c.telegramChatId ? <div className="muted">Telegram: {c.telegramChatId}</div> : null}
+                  <div className="consent-toggle-row">
+                    <label className="checkbox-row compact">
+                      <input checked={c.consentGiven} onChange={(e) => toggleConsent(c.id, e.target.checked)} type="checkbox" />
+                      Alert consent active
+                    </label>
+                  </div>
                 </div>
                 <button className="danger" onClick={() => remove(c.id)} type="button">Remove</button>
               </li>

@@ -102,6 +102,21 @@ export function WeeklyDashboard() {
         </div>
       </div>
 
+      {daily.length > 0 ? (
+        <div className="weekly-bars" aria-label="Weekly daily trend chart">
+          {daily.map((point) => {
+            const maxVal = Math.max(...daily.map(p => p.avgValue), 1)
+            const heightPct = Math.max(8, (point.avgValue / maxVal) * 100)
+            return (
+              <div key={`${point.day}-${point.metricCode}`} className="weekly-bar-item">
+                <span className="weekly-bar" style={{ height: `${heightPct}%` }} title={`${point.metricCode}: ${point.avgValue?.toFixed(1)}`} />
+                <small>{point.day.slice(5)}</small>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+
       <div className="vitals-grid">
         {metrics.map(m => {
           const points = grouped.get(m.metricCode) || []

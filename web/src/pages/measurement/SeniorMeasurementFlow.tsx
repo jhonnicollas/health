@@ -1,26 +1,47 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/auth'
 
-type Field = 'systolic' | 'diastolic' | 'heartRate' | 'spo2' | 'bodyWeight'
-
-const FLOW: Array<{ code: Field; label: string; unit: string; min: number; max: number }> = [
-  { code: 'systolic', label: 'Tekanan darah sistolik', unit: 'mmHg', min: 60, max: 260 },
-  { code: 'diastolic', label: 'Tekanan darah diastolik', unit: 'mmHg', min: 30, max: 180 },
-  { code: 'heartRate', label: 'Detak jantung', unit: 'bpm', min: 30, max: 220 },
-  { code: 'spo2', label: 'Saturasi oksigen (SpO2)', unit: '%', min: 50, max: 100 },
-  { code: 'bodyWeight', label: 'Berat badan', unit: 'kg', min: 20, max: 300 }
-]
+type FlowStep = { code: string; label: string; unit: string; min: number; max: number }
 
 export function SeniorMeasurementFlow() {
   const { profile } = useAuth()
+  const [flow, setFlow] = useState<FlowStep[]>([
+    { code: 'systolic', label: 'Tekanan darah sistolik', unit: 'mmHg', min: 60, max: 260 },
+    { code: 'diastolic', label: 'Tekanan darah diastolik', unit: 'mmHg', min: 30, max: 180 },
+    { code: 'heartRate', label: 'Detak jantung', unit: 'bpm', min: 30, max: 220 },
+    { code: 'spo2', label: 'Saturasi oksigen (SpO2)', unit: '%', min: 50, max: 100 },
+    { code: 'bodyWeight', label: 'Berat badan', unit: 'kg', min: 20, max: 300 }
+  ])
   const [step, setStep] = useState(0)
   const [values, setValues] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const current = FLOW[step]
-  const lastStep = step === FLOW.length - 1
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const res = await fetch('/api/metrics/catalog', { credentials: 'include' })
+        const body = (await res.json()) as {
+          success: boolean
+          data?: { metrics: Array<{ metricCode: string; metricName: string; unit: string; physicalMin: number | null; physicalMax: number | null }> }
+        }
+        if (body.success && body.data?.metrics?.length) {
+          setFlow(body.data.metrics.map(m => ({
+            code: m.metricCode,
+            label: m.metricName,
+            unit: m.unit,
+            min: m.physicalMin ?? 0,
+            max: m.physicalMax ?? 999
+          })))
+        }
+      } catch { /* fallback to default */ }
+    }
+    void loadCatalog()
+  }, [])
+
+  const current = flow[step]
+  const lastStep = step === flow.length - 1
 
   function next() {
     if (!current) return
@@ -44,7 +65,7 @@ export function SeniorMeasurementFlow() {
     try {
       const payloadValues = Object.entries(values)
         .filter(([, v]) => v && !Number.isNaN(Number(v)))
-        .map(([code, v]) => ({ metricCode: code, finalValue: Number(v), unit: FLOW.find(f => f.code === code)?.unit || '' }))
+        .map(([code, v]) => ({ metricCode: code, finalValue: Number(v), unit: flow.find(f => f.code === code)?.unit || '' }))
       const resp = await fetch('/api/measurements/submit', {
         method: 'POST',
         credentials: 'include',
@@ -82,7 +103,7 @@ export function SeniorMeasurementFlow() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Mode Lansia</p>
-          <h2 id="senior-flow-title">Pengukuran ({step + 1} dari {FLOW.length})</h2>
+          <h2 id="senior-flow-title">Pengukuran ({step + 1} dari {flow.length})</h2>
           <p>{current.label}</p>
         </div>
         <span className="status-chip">{current.unit}</span>

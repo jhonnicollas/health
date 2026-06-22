@@ -850,7 +850,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Encryption key dari environment secret (bukan hardcoded)
   - Decrypt hanya saat digunakan (read)
 
-### [-] GAP-12 Emergency Consent Flow Tidak Lengkap
+### [x] GAP-12 Emergency Consent Flow Tidak Lengkap
 - **Deskripsi**: PRD requires consent sebelum emergency contact menerima alert. Flow consent belum diverifikasi end-to-end.
 - **Worker**: `POST /api/emergency/contacts`, alert flow
 - **Acceptance Criteria**:
@@ -858,7 +858,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Consent checkbox di UI emergency contacts
   - Audit log saat consent diberikan/dicabut
 
-### GAP-13 Pattern Detection Missing Sleep vs Blood Pressure
+### [x] GAP-13 Pattern Detection Missing Sleep vs Blood Pressure
 - **Deskripsi**: PRD US-4.4.1 requires sleep vs blood pressure pattern detection. Hanya weight-bp dan medication yang diimplementasi.
 - **Worker**: `POST /api/patterns/generate` endpoint
 - **Acceptance Criteria**:
@@ -866,7 +866,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Minimum 14 days data guard
   - Safe language: "berhubungan", "cenderung", bukan "menyebabkan"
 
-### GAP-14 PDF Doctor Report Not True PDF
+### [x] GAP-14 PDF Doctor Report Not True PDF
 - **Deskripsi**: Laporan dokter adalah HTML (Cloudflare Workers tidak bisa run Puppeteer). PRD requires PDF. Browser print workaround tidak cukup.
 - **Worker**: `POST /api/reports/doctor-ready`, `GET /api/reports/:id/download`
 - **Acceptance Criteria**:
@@ -874,7 +874,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - HTML report tetap disimpan di R2 sebagai fallback
   - Share link dengan expiry berfungsi
 
-### GAP-15 Browser Push Notification Not Fully Wired
+### [x] GAP-15 Browser Push Notification Not Fully Wired
 - **Deskripsi**: Endpoint `/api/notifications/browser/subscribe` ada, tapi flow end-to-end (permission → subscribe → send → receive) belum diverifikasi.
 - **Frontend**: `web/src/pages/reminders/RemindersPage.tsx`
 - **Worker**: `POST /api/notifications/browser/subscribe`
@@ -884,7 +884,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Subscribe ke push service berhasil
   - Notifikasi dikirim saat reminder due
 
-### GAP-16 Measurement Flow Tidak Ada Inline Explanations
+### [x] GAP-16 Measurement Flow Tidak Ada Inline Explanations
 - **Deskripsi**: PRD requires measurement cards memiliki inline explanations: cara pengukuran, tips, apa arti angka. Tidak ada di form saat ini.
 - **Frontend**: `web/src/pages/measurement/SelectMetricPage.tsx`, `web/src/components/measurement/DynamicMetricForm.tsx`
 - **Acceptance Criteria**:
@@ -892,7 +892,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Tooltip atau accordion untuk detail
   - Penjelasan: apa yang diukur, satuan, range normal
 
-### GAP-17 Cron Triggers at 5/5 Limit
+### [x] GAP-17 Cron Triggers at 5/5 Limit
 - **Deskripsi**: Cloudflare account mencapai 5/5 cron trigger limit. Cron handler sudah di-export tapi tidak bisa dijadwalkan. Workaround: manual POST `/api/internal/cron/reminders`.
 - **Worker**: Cron handler di `worker/src/routes-extra.ts`
 - **Acceptance Criteria**:
@@ -900,7 +900,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Atau merge beberapa cron menjadi 1 handler
   - Reminder notification jalan otomatis
 
-### GAP-18 PWA Offline & Installability Not Verified
+### [x] GAP-18 PWA Offline & Installability Not Verified
 - **Deskripsi**: Manifest dan SW ada tapi install prompt, offline shell, dan sync draft belum diverifikasi end-to-end.
 - **Frontend**: `web/public/manifest.json`, `web/public/sw.js`
 - **Acceptance Criteria**:
@@ -908,7 +908,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - App bisa diakses offline (cached shell)
   - Draft sync via IndexedDB + POST /api/measurements/sync
 
-### GAP-19 Family Role-Based Access Control Belum Lengkap
+### [x] GAP-19 Family Role-Based Access Control Belum Lengkap
 - **Deskripsi**: 5 roles (owner, caregiver, viewer, emergencyContact, doctorViewer) dengan permissions berbeda. Implementasi perlu diverifikasi tiap role.
 - **Worker**: Family endpoints, caregiver dashboard
 - **Acceptance Criteria**:
@@ -918,7 +918,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - emergencyContact: limited dashboard + terima emergency alert
   - doctorViewer: report only
 
-### GAP-20 Senior Mode One-Metric-Per-Screen Not Verified
+### [x] GAP-20 Senior Mode One-Metric-Per-Screen Not Verified
 - **Deskripsi**: SeniorMeasurementFlow ada dengan hardcoded 5 metrics. Perlu diverifikasi one-metric-per-screen flow dan dibandingkan dengan PRD spec.
 - **Frontend**: `web/src/pages/measurement/SeniorMeasurementFlow.tsx`
 - **Acceptance Criteria**:
@@ -928,7 +928,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - SOS long-press emergency button
   - High contrast mode toggle
 
-### GAP-21 Rate Limiting OCR & Telegram Not Verified
+### [x] GAP-21 Rate Limiting OCR & Telegram Not Verified
 - **Deskripsi**: PRD requires rate limiting untuk OCR dan Telegram endpoints. Login rate limiting sudah ada, yang lain belum diverifikasi.
 - **Worker**: `worker/src/index.ts`
 - **Acceptance Criteria**:
@@ -936,7 +936,7 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - `POST /api/telegram/*` endpoints memiliki rate limit
   - Rate limit configurable dari `HL_systemConfigs`
 
-### GAP-22 Charts & Visualizations Missing
+### [x] GAP-22 Charts & Visualizations Missing
 - **Deskripsi**: Dashboards should have charts/visualizations (trend lines, bar charts) untuk weekly/monthly views. Saat ini hanya text.
 - **Frontend**: `web/src/pages/dashboard/WeeklyDashboard.tsx`, `web/src/pages/dashboard/MonthlyDashboard.tsx`
 - **Acceptance Criteria**:

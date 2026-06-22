@@ -68,6 +68,24 @@ function metricBadges(metric: Metric) {
   return badges.join(' / ')
 }
 
+const METRIC_EXPLANATIONS: Record<string, { what: string; normalRange: string; tip: string }> = {
+  systolic: { what: 'Tekanan darah saat jantung berkontraksi', normalRange: '<120 mmHg (normal)', tip: 'Duduk tenang 5 menit sebelum mengukur. Lengan setinggi jantung.' },
+  diastolic: { what: 'Tekanan darah saat jantung beristirahat', normalRange: '<80 mmHg (normal)', tip: 'Jangan bicara saat pengukuran berlangsung.' },
+  heartRate: { what: 'Jumlah detak jantung per menit', normalRange: '60-100 bpm (istirahat)', tip: 'Ukur saat bangun pagi untuk baseline akurat.' },
+  spo2: { what: 'Persentase oksigen dalam darah', normalRange: '95-100% (normal)', tip: 'Pastikan tangan hangar dan jari bersih sebelum konsumsi.' },
+  bloodPressurePulse: { what: 'Denut nadi saat pengukuran tekanan darah', normalRange: '60-100 bpm', tip: 'Sama dengan detak jantung, diukur via tensimeter.' },
+  glucoseFasting: { what: 'Gula darah setelah puasa 8+ jam', normalRange: '70-100 mg/dL (normal)', tip: 'Puasa minimal 8 jam. Hanya minum air putih.' },
+  glucosePostMeal: { what: 'Gula darah 2 jam setelah makan', normalRange: '<140 mg/dL (normal)', tip: 'Ukur tepat 2 jam setelah mulai makan.' },
+  cholesterolTotal: { what: 'Total kolesterol dalam darah', normalRange: '<200 mg/dL (normal)', tip: 'Puasa 9-12 jam sebelum tes. Hindari olahraga berat.' },
+  uricAcid: { what: 'Asam urat dalam darah', normalRange: '3.5-7.2 mg/dL', tip: 'Hindari makanan tinggi purin 24 jam sebelum tes.' },
+  bodyWeight: { what: 'Berat badan total', normalRange: 'Sesuai BMI 18.5-24.9', tip: 'Ukur saat bangun pagi, sebelum makan, tanpa sepatu.' },
+  bmi: { what: 'Indeks massa tubuh (otomatis dihitung)', normalRange: '18.5-24.9 (normal)', tip: 'Dihitung dari berat dan tinggi badan.' },
+  waistCircumference: { what: 'Lingkar pinggang', normalRange: '<90 cm pria, <80 cm wanita', tip: 'Ukur di titik tersebar perut saat napas normal.' },
+  bodyTemperature: { what: 'Suhu tubuh inti', normalRange: '36.1-37.2 C', tip: 'Ukur di pagi hari untuk baseline suhu normal.' },
+  sleepDuration: { what: 'Durasi tidur dalam jam', normalRange: '7-9 jam (normal)', tip: 'Catat jam tidur dan bangun untuk akurasi.' },
+  height: { what: 'Tinggi badan', normalRange: 'Tetap setelah dewasa', tip: 'Ukur tanpa sepatu, punggung menempel dinding.' }
+}
+
 export function SelectMetricPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedMetricIds, setSelectedMetricIds] = useState<string[]>([])
@@ -178,6 +196,14 @@ export function SelectMetricPage() {
                   <span className="checkbox-card-content">
                     <strong>{metric.metricName}</strong>
                     <small>{device.deviceName}</small>
+                    {METRIC_EXPLANATIONS[metric.metricCode] ? (
+                      <details className="metric-explanation">
+                        <summary>What is this?</summary>
+                        <p><strong>What:</strong> {METRIC_EXPLANATIONS[metric.metricCode].what}</p>
+                        <p><strong>Normal:</strong> {METRIC_EXPLANATIONS[metric.metricCode].normalRange}</p>
+                        <p><strong>Tip:</strong> {METRIC_EXPLANATIONS[metric.metricCode].tip}</p>
+                      </details>
+                    ) : null}
                   </span>
                 </label>
               )

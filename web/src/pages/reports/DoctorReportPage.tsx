@@ -21,6 +21,22 @@ export function DoctorReportPage() {
     finally { setLoading(false) }
   }
 
+  async function downloadPdf() {
+    if (!report) return
+    try {
+      const htmlRes = await fetch(`/api/reports/${report.reportId}/download`, { credentials: 'include' })
+      const htmlText = await htmlRes.text()
+      const printWindow = window.open('', '_blank')
+      if (printWindow) {
+        printWindow.document.write(htmlText)
+        printWindow.document.close()
+        printWindow.onload = () => { printWindow.print() }
+      }
+    } catch {
+      setError('Failed to open print view.')
+    }
+  }
+
   async function share() {
     if (!report) return
     setError(null)
@@ -44,7 +60,7 @@ export function DoctorReportPage() {
         <div>
           <p className="eyebrow">Doctor Ready</p>
           <h2 id="doctor-title">Doctor Report</h2>
-          <p>Generate a 30-day HTML report to share with your doctor.</p>
+          <p>Generate a 30-day report. Use browser print to save as PDF.</p>
         </div>
         <span className="status-chip">30 days</span>
       </div>
@@ -55,7 +71,8 @@ export function DoctorReportPage() {
       {report ? (
         <div className="result-card">
           <p>Report ID: <code>{report.reportId}</code></p>
-          <a href={`/api/reports/${report.reportId}/download`} rel="noreferrer" target="_blank">Download Report</a>
+          <a href={`/api/reports/${report.reportId}/download`} rel="noreferrer" target="_blank">View HTML Report</a>
+          <button onClick={downloadPdf} type="button">Print / Save as PDF</button>
           <button onClick={share} type="button">Create Share Link</button>
           {shareLink ? <p>Share with doctor: <code>{shareLink}</code></p> : null}
         </div>

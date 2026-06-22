@@ -2874,3 +2874,49 @@ html[data-accessibility="senior"] .auth-form button,
 html[data-accessibility="senior"] .dynamic-metric-form > button {
   min-height: 56px;
 }
+
+/* GAP-12: consent toggle */
+.consent-toggle-row { margin-top: 4px; }
+.checkbox-row.compact { font-size: 0.85rem; }
+
+/* GAP-16: inline metric explanations */
+.metric-explanation { margin-top: 4px; font-size: 0.82rem; color: var(--colorTextSubdued); }
+.metric-explanation summary { cursor: pointer; color: var(--colorTextSecondary); font-size: 0.8rem; }
+.metric-explanation p { margin: 2px 0; }
+
+/* GAP-22: weekly bar chart */
+.weekly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  padding: 12px 8px;
+  background: var(--colorSurfaceElevated);
+  border-radius: var(--radiusMd);
+  border: 1px solid var(--colorBorderSoft);
+}
+.weekly-bar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+.weekly-bar {
+  width: 100%;
+  max-width: 24px;
+  background: var(--colorPrimary);
+  border-radius: 2px 2px 0 0;
+  min-height: 4px;
+  transition: height 0.2s ease;
+}
+.weekly-bar-item small { font-size: 0.65rem; margin-top: 4px; color: var(--colorTextSubdued); }
+
+/* GAP-20: senior mode improved */
+html[data-accessibility="senior"] .senior-shell { font-size: 18px; min-height: 100vh; }
+html[data-accessibility="senior"] .senior-tabs button { min-height: 48px; font-size: 1.1rem; }
+html[data-accessibility="senior"] .senior-card input { min-height: 48px; font-size: 1.2rem; }
+html[data-accessibility="senior"] .senior-card label { font-size: 1rem; }
+html[data-accessibility="senior"] .action-row button { min-height: 48px; font-size: 1.1rem; }
+html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; min-height: 44px; align-items: center; display: flex; gap: 8px; }

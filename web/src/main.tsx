@@ -10,3 +10,14 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault()
+  ;(window as unknown as Record<string, unknown>).__hlInstallPrompt = event
+})

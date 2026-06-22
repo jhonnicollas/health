@@ -221,6 +221,110 @@ export async function awardBadges(c: Context<{ Bindings: ExtraEnv }>, userId: st
 
 export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
 
+  // GAP-12: toggle consent for emergency contact
+  app.patch('/api/emergency/contacts/:id/consent', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const contactId = c.req.param('id')
+      const body = await c.req.json() as { consentGiven: boolean }
+      const contact = await c.env.DB.prepare(
+        'SELECT id, consentGiven FROM HL_emergencyContacts WHERE id = ? AND userId = ?'
+      ).bind(contactId, userId).first<{ id: string; consentGiven: number }>()
+      if (!contact) return jsonResponse(c, failure('NOT_FOUND', 'Kontak tidak ditemukan.', 404, [], startedAt), 404)
+      const newValue = body.consentGiven ? 1 : 0
+      await c.env.DB.prepare(
+        'UPDATE HL_emergencyContacts SET consentGiven = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ? AND userId = ?'
+      ).bind(newValue, contactId, userId).run()
+      await c.env.DB.prepare(
+        "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, ?, 'HL_emergencyContacts', ?, ?, CURRENT_TIMESTAMP)"
+      ).bind(createId('aud'), userId, newValue ? 'emergencyConsentGiven' : 'emergencyConsentRevoked', contactId, JSON.stringify({ consentGiven: Boolean(newValue) })).run()
+      return jsonResponse(c, success({ contactId, consentGiven: Boolean(newValue) }, 200, startedAt), 200)
+    } catch (e) {
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update consent.', 500, [], startedAt), 500)
+    }
+  })
+
+  // GAP-19: role-based access check for family
+  app.get('/api/family/access-check', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const memberRows = await c.env.DB.prepare(
+        "SELECT id, role, canViewDashboard, canInputData, canEditLimited, canReceiveEmergencyAlert, canViewReports FROM HL_familyMembers WHERE userId = ? AND status = 'active'"
+      ).bind(userId).all<{
+        id: string; role: string; canViewDashboard: number; canInputData: number; canEditLimited: number; canReceiveEmergencyAlert: number; canViewReports: number
+      }>()
+      const roles = (memberRows.results || []).map(row => ({
+        memberId: row.id,
+        role: row.role,
+        permissions: {
+          canViewDashboard: Boolean(row.canViewDashboard),
+          canInputData: Boolean(row.canInputData),
+          canEditLimited: Boolean(row.canEditLimited),
+          canReceiveEmergencyAlert: Boolean(row.canReceiveEmergencyAlert),
+          canViewReports: Boolean(row.canViewReports)
+        }
+      }))
+      return jsonResponse(c, success({ roles }, 200, startedAt), 200)
+    } catch (e) {
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal cek akses.', 500, [], startedAt), 500)
+    }
+  })
+
+  // GAP-13: Sleep vs Blood Pressure pattern detection
+  app.post('/api/patterns/generate/sleep-bp', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+      const lowSleepDays = await c.env.DB.prepare(
+        "SELECT substr(measuredAt, 1, 10) as day, AVG(mv.finalValue) as avgSystolic FROM HL_measurementValues mv WHERE mv.userId = ? AND mv.metricCode = 'systolic' AND mv.measuredAt >= ? AND EXISTS (SELECT 1 FROM HL_measurementValues sv WHERE sv.userId = mv.userId AND sv.metricCode = 'sleepDuration' AND substr(sv.measuredAt, 1, 10) = substr(mv.measuredAt, 1, 10) AND sv.finalValue < 6 AND sv.measuredAt >= ?) GROUP BY day"
+      ).bind(userId, since, since).all<{ day: string; avgSystolic: number }>()
+      const normalSleepDays = await c.env.DB.prepare(
+        "SELECT substr(measuredAt, 1, 10) as day, AVG(mv.finalValue) as avgSystolic FROM HL_measurementValues mv WHERE mv.userId = ? AND mv.metricCode = 'systolic' AND mv.measuredAt >= ? AND EXISTS (SELECT 1 FROM HL_measurementValues sv WHERE sv.userId = mv.userId AND sv.metricCode = 'sleepDuration' AND substr(sv.measuredAt, 1, 10) = substr(mv.measuredAt, 1, 10) AND sv.finalValue >= 7 AND sv.measuredAt >= ?) GROUP BY day"
+      ).bind(userId, since, since).all<{ day: string; avgSystolic: number }>()
+      const sleepDays = (lowSleepDays.results || []).length + (normalSleepDays.results || []).length
+      if (sleepDays < 14) {
+        return jsonResponse(c, success({ insight: 'Data belum cukup untuk menampilkan pola tidur vs tekanan darah (minimal 14 hari data).', hasEnoughData: false }, 200, startedAt), 200)
+      }
+      const lowAvg = lowSleepDays.results?.length ? lowSleepDays.results.reduce((s: number, r: { avgSystolic: number }) => s + r.avgSystolic, 0) / lowSleepDays.results.length : 0
+      const normalAvg = normalSleepDays.results?.length ? normalSleepDays.results.reduce((s: number, r: { avgSystolic: number }) => s + r.avgSystolic, 0) / normalSleepDays.results.length : 0
+      const diff = lowAvg - normalAvg
+      const direction = diff > 0 ? 'lebih tinggi' : 'lebih rendah'
+      const insightText = `Pada hari dengan tidur <6 jam, tekanan darah sistolik rata-rata ${lowAvg.toFixed(1)} mmHg, sedangkan pada hari tidur >=7 jam rata-rata ${normalAvg.toFixed(1)} mmHg. Sistolik cenderung ${direction} saat tidur kurang. Ini korelasi, bukan diagnosis. Konsultasikan dengan dokter.`
+      const insightId = createId('pi')
+      await c.env.DB.prepare("INSERT INTO HL_patternInsights (id, userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt) VALUES (?, ?, 'sleep_bp', ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(insightId, userId, since, nowIso(), insightText, JSON.stringify({ lowSleepAvg: lowAvg, normalSleepAvg: normalAvg, diff })).run()
+      return jsonResponse(c, success({ insightId, insight: insightText, hasEnoughData: true, lowSleepAvg: lowAvg, normalSleepAvg: normalAvg }, 200, startedAt), 200)
+    } catch (e) {
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
+    }
+  })
+
+  // GAP-21: rate limit check for OCR
+  app.post('/api/measurements/extract/limit-check', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const maxR = Number(await getSystemConfigValue(c, 'ocrRateLimitMax') || '10')
+      const windowMin = Number(await getSystemConfigValue(c, 'ocrRateLimitWindowMin') || '5')
+      const since = new Date(Date.now() - windowMin * 60 * 1000).toISOString()
+      const count = await c.env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM HL_aiExtractions WHERE userId = ? AND createdAt >= ?"
+      ).bind(userId, since).first<{ cnt: number }>()
+      if ((count?.cnt || 0) >= maxR) {
+        return jsonResponse(c, failure('RATE_LIMITED', `Maksimum ${maxR} ekstraksi per ${windowMin} menit.`, 429, [], startedAt), 429)
+      }
+      return jsonResponse(c, success({ allowed: true, remaining: maxR - (count?.cnt || 0) }, 200, startedAt), 200)
+    } catch (e) {
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
+    }
+  })
+
   // US-3.3.2 manual trigger (for tests; in prod the queue consumer does it)
   app.post('/api/emergency/contacts/notify', async (c) => {
     const startedAt = Date.now()
@@ -517,7 +621,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
   })
 }
 
-// US-3.4.2 daily reminder cron handler (also US-4.2.3 fasting reminder)
+// GAP-17: single merged cron handler for all scheduled tasks
 export async function scheduledHandler(event: ScheduledController, env: ExtraEnv, _ctx: ExecutionContext) {
   const cronName = event.cron || 'hourly'
   // Reminders
@@ -552,5 +656,9 @@ export async function scheduledHandler(event: ScheduledController, env: ExtraEnv
     ).bind(createId('ntf'), f.userId, `Target puasa tercapai`, `Anda sudah berpuasa ${f.fastingType} selama ${f.targetHours} jam.`).run()
     fastingNotified++
   }
-  console.log(`cron ${cronName}: reminders=${fired} fasting=${fastingNotified}`)
+  // GAP-17: stale draft cleanup (runs on every cron tick)
+  const staleDrafts = await env.DB.prepare(
+    "DELETE FROM HL_measurementDrafts WHERE status = 'expired' AND createdAt < datetime('now', '-7 days')"
+  ).run()
+  console.log(`cron ${cronName}: reminders=${fired} fasting=${fastingNotified} staleDraftsCleaned=${staleDrafts.meta?.changes ?? 0}`)
 }

@@ -97,6 +97,47 @@ export function RemindersPage() {
     if (res.ok) await load()
   }
 
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushStatus, setPushStatus] = useState<string | null>(null)
+
+  async function enableBrowserPush() {
+    setPushStatus(null)
+    try {
+      if (!('Notification' in window)) {
+        setPushStatus('Browser does not support notifications.')
+        return
+      }
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setPushStatus('Notification permission denied.')
+        return
+      }
+      if (!('serviceWorker' in navigator)) {
+        setPushStatus('Service Worker not supported.')
+        return
+      }
+      const registration = await navigator.serviceWorker.ready
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: 'BEl62iUYgUivxIkv69yViEiBIa-3N3Mf9iLq2qN0g8Kj5QK9F5E2qD5W4V7Y9P3Q'
+      })
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: subscription.toJSON() })
+      })
+      if (res.ok) {
+        setPushEnabled(true)
+        setPushStatus('Browser push notifications enabled.')
+      } else {
+        setPushStatus('Failed to subscribe. Try again.')
+      }
+    } catch {
+      setPushStatus('Could not enable browser push. Check browser settings.')
+    }
+  }
+
   return (
     <section className="settings-panel" aria-labelledby="reminders-title">
       <div className="page-heading">
@@ -106,6 +147,15 @@ export function RemindersPage() {
           <p>Set daily reminders for measurements or medication intake.</p>
         </div>
         <span className="status-chip">{reminders.length} reminders</span>
+      </div>
+
+      <div className="settings-card">
+        <h3>Browser Push Notifications</h3>
+        <p>Enable browser push to receive reminders even when the app is not open.</p>
+        <button disabled={pushEnabled} onClick={() => void enableBrowserPush()} type="button">
+          {pushEnabled ? 'Push Enabled' : 'Enable Browser Push'}
+        </button>
+        {pushStatus ? <p className={`form-message ${pushEnabled ? 'success' : 'error'}`} role="status">{pushStatus}</p> : null}
       </div>
 
       <form className="auth-form" onSubmit={handleCreate}>

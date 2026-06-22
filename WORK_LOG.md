@@ -3728,3 +3728,69 @@ Final state of audit + fixes:
 - Or GAP-3 (AI Vision "Baca Otomatis") — core feature missing
 - Each gap task is independent and can be worked in any order
 - Verify each task against its acceptance criteria before marking [x]
+
+## 2026-06-22 14:30 UTC — Agent: opencode
+
+### Task
+- Task IDs: GAP-12 through GAP-22
+- Sprint: Gap Remediation
+- Status: Completed
+
+### Files Read
+- docs/TASKS.md, HANDOFF.md, WORK_LOG.md
+- worker/src/index.ts, worker/src/routes-extra.ts
+- web/src/App.tsx, web/src/App.css, web/src/main.tsx
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+- web/src/pages/patterns/PatternsPage.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+- web/src/pages/measurement/SeniorMeasurementFlow.tsx
+- web/src/pages/reminders/RemindersPage.tsx
+- web/src/pages/reports/DoctorReportPage.tsx
+- web/src/pages/dashboard/WeeklyDashboard.tsx
+- web/src/pages/dashboard/MonthlyDashboard.tsx
+- web/public/manifest.json, web/public/sw.js, web/index.html
+
+### Files Changed
+- worker/src/routes-extra.ts
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+- web/src/pages/patterns/PatternsPage.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+- web/src/pages/measurement/SeniorMeasurementFlow.tsx
+- web/src/pages/reminders/RemindersPage.tsx
+- web/src/pages/reports/DoctorReportPage.tsx
+- web/src/main.tsx
+- web/src/App.css
+- docs/TASKS.md
+- HANDOFF.md
+- WORK_LOG.md
+
+### What Changed
+- GAP-12: Added PATCH /api/emergency/contacts/:id/consent endpoint + audit log for consent toggle + per-contact consent checkbox in UI
+- GAP-13: Added POST /api/patterns/generate/sleep-bp endpoint + sleep-bp card in PatternsPage
+- GAP-14: Added browser Print/Save-as-PDF button in DoctorReportPage
+- GAP-15: Added browser push notification enable flow in RemindersPage
+- GAP-16: Added inline metric explanations (what/normal/tip) to SelectMetricPage via details/summary
+- GAP-17: Merged cron handler with stale draft cleanup
+- GAP-18: Registered SW in main.tsx + added beforeinstallprompt capture for PWA install
+- GAP-19: Added GET /api/family/access-check endpoint for role-based access verification
+- GAP-20: SeniorMeasurementFlow loads metrics from catalog API instead of hardcoded list + senior CSS improvements (48px buttons, 18px font)
+- GAP-21: Added rate limit check endpoints for OCR and Telegram + seed config keys for limits
+- GAP-22: Added CSS bar chart visualization to WeeklyDashboard
+
+### Validation
+- worker npx tsc -p tsconfig.json — PASS
+- worker npm test — PASS (22/22)
+- web npx tsc -b — PASS
+- web npx eslint . — PASS
+- web npx vite build — PASS (53 modules, 309.20 kB JS, 56.20 kB CSS)
+
+### Documentation Updated
+- docs/TASKS.md (GAP-12..22 marked [x])
+- HANDOFF.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- All GAPs completed except GAP-8 (blocked: Telegram bot token 401)
+- Deploy to production via wrangler deploy + pages deploy
+- Run UAT against production
+- GAP-8 needs regenerated bot token from @BotFather
