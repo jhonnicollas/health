@@ -31,13 +31,14 @@ VALUES
 
 -- Devices
 
+-- Devices (generic names — no brand-specific labels)
 INSERT OR IGNORE INTO HL_devices (deviceCode, deviceName, deviceType, brand, model, aiPromptKey, active)
 VALUES
-('yuwellYx106','Yuwell YX106 Oximeter','oximeter','Yuwell','YX106','oximeter',1),
-('omronHem7194t1fl','OMRON BT HEM 7194 T1 FL','bloodPressure','OMRON','HEM 7194 T1 FL','bloodPressure',1),
-('sinocareM101','Sinocare M101 GCU 3 in 1','gcu','Sinocare','M101','sinocareGcu',1),
-('thermometer','Thermometer','thermometer','Generic','Thermometer','thermometer',1),
-('bodyScale','Body Scale','bodyScale','Generic','Body Scale','bodyScale',1),
+('yuwellYx106','Oximeter','oximeter','Generic','Pulse Oximeter','oximeter',1),
+('omronHem7194t1fl','Tensimeter','bloodPressure','Generic','Digital Blood Pressure Monitor','bloodPressure',1),
+('sinocareM101','Alat Tes GCU 3-in-1','gcu','Generic','GCU 3-in-1 Meter','sinocareGcu',1),
+('thermometer','Termometer','thermometer','Generic','Thermometer','thermometer',1),
+('bodyScale','Timbangan Badan','bodyScale','Generic','Body Scale','bodyScale',1),
 ('sleepTracker','Jam Tidur','sleepTracker','Generic','Sleep Tracker','sleepTracker',1);
 
 -- Metric catalog

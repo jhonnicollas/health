@@ -1896,6 +1896,7 @@ type RuleEvaluation = {
   popupTitle: string | null
   popupMessage: string | null
   recommendation: string | null
+  sourceLabel: string | null
   ruleId: number | null
 }
 
@@ -1923,12 +1924,13 @@ async function evaluateRule(
     popupTitle: 'Belum Ada Interpretasi',
     popupMessage: 'Belum ada rule yang cocok untuk nilai ini. Nilai tetap tersimpan dan dapat dikonsultasikan dengan dokter.',
     recommendation: 'Pantau nilai dan konsultasikan dengan dokter untuk interpretasi lebih lanjut.',
+    sourceLabel: 'Belum ada referensi spesifik',
     ruleId: null
   }
   let rule: any = null
   try {
     const result = await c.env.DB.prepare(
-    `SELECT id, status, severity, emergencyLevel, popupTitle, popupMessage, recommendation
+    `SELECT id, status, severity, emergencyLevel, popupTitle, popupMessage, recommendation, sourceLabel
      FROM HL_metricRules
      WHERE metricCode = ?
        AND active = 1
@@ -1945,6 +1947,7 @@ async function evaluateRule(
     popupTitle: string
     popupMessage: string
     recommendation: string
+    sourceLabel: string
   }>()
     rule = result
   } catch (error) {
@@ -1960,6 +1963,7 @@ async function evaluateRule(
     popupTitle: rule.popupTitle,
     popupMessage: rule.popupMessage,
     recommendation: rule.recommendation,
+    sourceLabel: rule.sourceLabel,
     ruleId: rule.id
   }
 }
@@ -2130,7 +2134,7 @@ app.post('/api/measurements/submit', async (c) => {
       hasAttachment
     ))
 
-    const savedValues: Array<{ id: number; metricCode: string; status: string; severity: string; ruleId: number | null; finalValue: number; unit: string }> = []
+    const savedValues: Array<{ id: number; metricCode: string; status: string; severity: string; ruleId: number | null; finalValue: number; unit: string; popupTitle: string | null; popupMessage: string | null; recommendation: string | null; sourceLabel: string | null; emergencyLevel: string }> = []
     let hasEmergency = 0
     const missingRules: Array<{ metricCode: string; finalValue: number }> = []
 
@@ -2183,7 +2187,12 @@ app.post('/api/measurements/submit', async (c) => {
         severity: rule.severity,
         ruleId: rule.ruleId,
         finalValue: v.finalValue,
-        unit: v.unit
+        unit: v.unit,
+        popupTitle: rule.popupTitle,
+        popupMessage: rule.popupMessage,
+        recommendation: rule.recommendation,
+        sourceLabel: rule.sourceLabel,
+        emergencyLevel: rule.emergencyLevel
       })
     }
 
@@ -2287,9 +2296,28 @@ app.post('/api/measurements/submit', async (c) => {
         'pending', { sessionId, hasEmergency: hasEmergency === 1, via: 'queue' }, undefined)
     }
 
+    // US-1.4.2 + US-2.2.1 + US-2.2.2: build interpretations array for client-side popup
+    const metricNames = await c.env.DB.prepare('SELECT metricCode, metricName FROM HL_metricCatalog').all<{ metricCode: string; metricName: string }>()
+    const metricNameMap = new Map<string, string>()
+    for (const r of metricNames.results || []) metricNameMap.set(r.metricCode, r.metricName)
+    const interpretations = savedValues.map(v => ({
+      metricCode: v.metricCode,
+      metricName: metricNameMap.get(v.metricCode) || v.metricCode,
+      finalValue: v.finalValue,
+      unit: v.unit,
+      status: v.status,
+      severity: v.severity,
+      popupTitle: v.popupTitle || v.status,
+      popupMessage: v.popupMessage || '',
+      recommendation: v.recommendation || '',
+      sourceLabel: v.sourceLabel || '',
+      emergencyLevel: v.emergencyLevel || 'none'
+    }))
+
     return jsonResponse(c, success({
       sessionId,
       values: savedValues,
+      interpretations,
       hasEmergency: hasEmergency === 1,
       streak: streakData,
       badges: badgesData
@@ -2519,6 +2547,47 @@ app.post('/api/measurements/last/save', async (c) => {
   } catch (error) {
     console.error('save last measurement error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menyimpan data terakhir.', 500, [], startedAt))
+  }
+})
+
+// Get today's measurement sessions — used to mark which devices already recorded today
+app.get('/api/measurements/today', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+
+    const profileInfo = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ? LIMIT 1').bind(userId).first<{ timezone: string }>()
+    const timezone = profileInfo?.timezone || 'UTC'
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const today = formatter.format(new Date())
+
+    const sessions = await c.env.DB.prepare(
+      `SELECT s.id AS sessionId, s.measuredAt, s.source, s.hasAttachment,
+              (SELECT COUNT(*) FROM HL_measurementValues v WHERE v.sessionId = s.id) AS valueCount
+       FROM HL_measurementSessions s
+       WHERE s.userId = ? AND substr(s.measuredAt, 1, 10) = ?
+       ORDER BY s.measuredAt DESC`
+    ).bind(userId, today).all<{ sessionId: number; measuredAt: string; source: string; hasAttachment: number; valueCount: number }>()
+
+    const enriched = await Promise.all((sessions.results || []).map(async (s) => {
+      const deviceRows = await c.env.DB.prepare(
+        'SELECT DISTINCT deviceCode FROM HL_measurementValues WHERE sessionId = ? AND deviceCode IS NOT NULL'
+      ).bind(s.sessionId).all<{ deviceCode: string }>()
+      return {
+        sessionId: s.sessionId,
+        measuredAt: s.measuredAt,
+        source: s.source,
+        hasAttachment: s.hasAttachment,
+        valueCount: s.valueCount,
+        deviceCodes: (deviceRows.results || []).map(r => r.deviceCode).filter(Boolean)
+      }
+    }))
+
+    return jsonResponse(c, success({ sessions: enriched, date: today }, 200, startedAt))
+  } catch (error) {
+    console.error('today measurements error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat data hari ini.', 500, [], startedAt))
   }
 })
 

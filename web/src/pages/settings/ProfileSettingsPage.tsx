@@ -74,17 +74,23 @@ export function ProfileSettingsPage() {
         credentials: 'include',
         headers: { Accept: 'application/json' }
       })
-      const body = (await response.json()) as ConfigListResponse
       if (response.status === 401 || response.status === 403) {
+        setConfigPanelVisible(false)
+        setConfigs([])
+        return
+      }
+      if (!response.ok) {
         setConfigPanelVisible(false)
         return
       }
-      if (!response.ok || !body.success) {
+      const body = (await response.json()) as ConfigListResponse
+      if (!body.success) {
         setConfigPanelVisible(true)
         setConfigError(body.error?.message ?? 'Unable to load system config.')
+        setConfigs([])
         return
       }
-      const list = body.data?.configs || []
+      const list = Array.isArray(body.data?.configs) ? body.data.configs : []
       setConfigPanelVisible(true)
       setConfigs(list)
       const nextEditing: Record<string, string> = {}

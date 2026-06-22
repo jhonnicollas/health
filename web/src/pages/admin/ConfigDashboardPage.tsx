@@ -43,12 +43,23 @@ export function ConfigDashboardPage() {
         credentials: 'include',
         headers: { Accept: 'application/json' }
       })
-      const body = (await res.json()) as ConfigListResponse
-      if (!res.ok || !body.success) {
-        setError(body.error?.message ?? 'Gagal memuat konfigurasi.')
+      if (res.status === 401 || res.status === 403) {
+        setError('Admin access required.')
+        setConfigs([])
         return
       }
-      const list = body.data?.configs || []
+      if (!res.ok) {
+        setError('Gagal memuat konfigurasi.')
+        setConfigs([])
+        return
+      }
+      const body = (await res.json()) as ConfigListResponse
+      if (!body.success) {
+        setError(body.error?.message ?? 'Gagal memuat konfigurasi.')
+        setConfigs([])
+        return
+      }
+      const list = Array.isArray(body.data?.configs) ? body.data.configs : []
       setConfigs(list)
       const init: Record<string, string> = {}
       list.forEach((row) => { init[row.configKey] = row.configValue })

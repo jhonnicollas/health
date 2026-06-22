@@ -17,6 +17,8 @@ type ApiResp<T> = {
   error?: { message: string; details?: Array<{ field: string; message: string }> }
 }
 
+type RemindersListResponse = ApiResp<{ reminders: Reminder[] }>
+
 const REMINDER_TYPES = ['morningMeasurement', 'eveningMeasurement', 'medication'] as const
 const CHANNELS = ['telegram', 'browser'] as const
 
@@ -34,14 +36,33 @@ export function RemindersPage() {
     setError(null)
     try {
       const res = await fetch('/api/reminders', { credentials: 'include' })
-      const body = (await res.json()) as ApiResp<Reminder[]>
-      if (!body.success) {
-        setError(body.error?.message ?? 'Failed to load reminders.')
+      if (res.status === 401 || res.status === 403) {
+        setReminders([])
         return
       }
-      setReminders(body.data ?? [])
+      if (!res.ok) {
+        setReminders([])
+        setError(`Failed to load reminders (${res.status}).`)
+        return
+      }
+      const body = await res.json().catch(() => null) as RemindersListResponse | null
+      if (!body || typeof body !== 'object') {
+        setReminders([])
+        setError('Unexpected response from server.')
+        return
+      }
+      if (!body.success) {
+        setError(body.error?.message ?? 'Failed to load reminders.')
+        setReminders([])
+        return
+      }
+      const data = body.data
+      const raw = data && typeof data === 'object' && 'reminders' in data ? data.reminders : undefined
+      const list = Array.isArray(raw) ? raw : []
+      setReminders(list)
     } catch {
       setError('Could not connect to server.')
+      setReminders([])
     }
   }
 
@@ -86,7 +107,11 @@ export function RemindersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: !reminder.enabled })
     })
-    if (res.ok) await load()
+    if (!res.ok) {
+      setError('Failed to update reminder.')
+      return
+    }
+    await load()
   }
 
   async function remove(id: number) {
@@ -94,7 +119,11 @@ export function RemindersPage() {
       method: 'DELETE',
       credentials: 'include'
     })
-    if (res.ok) await load()
+    if (!res.ok) {
+      setError('Failed to remove reminder.')
+      return
+    }
+    await load()
   }
 
   const [pushEnabled, setPushEnabled] = useState(false)

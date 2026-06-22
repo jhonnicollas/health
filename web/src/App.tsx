@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatIndonesianDate } from './utils/dateFormat'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/auth'
@@ -516,6 +516,9 @@ function AppRoutes() {
     try { return localStorage.getItem('hl-sidebar-collapsed') === 'true' } catch { return false }
   })
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<NavLink[]>([])
+  const searchWrapRef = useRef<HTMLDivElement | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'Reports']))
 
   function toggleSidebar() {
@@ -538,7 +541,17 @@ function AppRoutes() {
     function handlePopState() { setCurrentPath(normalizePath(window.location.pathname)) }
     window.addEventListener('popstate', handlePopState)
     const timer = setInterval(() => setLiveTime(new Date()), 1000)
-    return () => { window.removeEventListener('popstate', handlePopState); clearInterval(timer) }
+    function handleDocClick(event: MouseEvent) {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(event.target as Node)) {
+        setSearchResults([])
+      }
+    }
+    document.addEventListener('mousedown', handleDocClick)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      clearInterval(timer)
+      document.removeEventListener('mousedown', handleDocClick)
+    }
   }, [])
 
   function showAuthView(view: 'login' | 'register') {
@@ -602,6 +615,33 @@ function AppRoutes() {
 
   const isAdmin = !!user.email && ['admin@homesungai.com'].includes(user.email)
   const visibleNav = NAV.filter(link => (!link.adminOnly || isAdmin) && link.visible !== false)
+
+  const SEARCH_EXTRA: NavLink[] = [
+    { path: '/kb', label: 'Knowledge Base', shortLabel: 'KB', icon: 'menu_book' }
+  ]
+
+  function handleSearch(query: string) {
+    setSearchQuery(query)
+    const q = query.trim().toLowerCase()
+    if (q.length < 2) {
+      setSearchResults([])
+      return
+    }
+    const pool: NavLink[] = [...visibleNav]
+    if (!pool.some(n => n.path === '/kb')) pool.push(...SEARCH_EXTRA)
+    const matches = pool.filter(link =>
+      link.label.toLowerCase().includes(q) ||
+      link.shortLabel.toLowerCase().includes(q) ||
+      link.path.toLowerCase().includes(q)
+    )
+    setSearchResults(matches.slice(0, 8))
+  }
+
+  function selectSearchResult(path: string) {
+    setSearchQuery('')
+    setSearchResults([])
+    navigate(path)
+  }
   const visibleNavGroups = NAV_GROUPS.filter(g => {
     if ('children' in g) {
       return g.children.some(c => !c.adminOnly || isAdmin)
@@ -737,11 +777,47 @@ function AppRoutes() {
           </div>
         </div>
         <div className="app-topbar">
-          <label className="topbar-search">
-            <Icon name="search" className="search-icon" />
-            <span className="visually-hidden-file">Search</span>
-            <input placeholder="Search patients, reports, or data..." type="search" />
-          </label>
+          <div className="topbar-search-wrap" ref={searchWrapRef}>
+            <label className="topbar-search">
+              <Icon name="search" className="search-icon" />
+              <span className="visually-hidden-file">Search</span>
+              <input
+                onChange={(e) => handleSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearchQuery('')
+                    setSearchResults([])
+                  } else if (e.key === 'Enter' && searchResults[0]) {
+                    e.preventDefault()
+                    selectSearchResult(searchResults[0].path)
+                  }
+                }}
+                placeholder="Cari pengukuran, laporan, atau KB..."
+                type="search"
+                value={searchQuery}
+              />
+            </label>
+            {searchQuery.trim().length >= 2 ? (
+              <div className="search-dropdown" role="listbox">
+                {searchResults.length === 0 ? (
+                  <div className="search-empty">Tidak ada hasil untuk "{searchQuery}"</div>
+                ) : (
+                  searchResults.map((link) => (
+                    <button
+                      className="search-result-item"
+                      key={link.path}
+                      onClick={() => selectSearchResult(link.path)}
+                      type="button"
+                    >
+                      <Icon name={link.icon} className="nav-icon" />
+                      <span className="search-result-label">{link.label}</span>
+                      <span className="search-result-path">{link.path}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </div>
           <div className="topbar-actions" aria-label="Workspace actions">
             <div className="topbar-clock hidden xl:flex flex-col items-end border-r border-outline-variant pr-6 mr-6">
               <span className="clock-date">{clock.dateStr}</span>

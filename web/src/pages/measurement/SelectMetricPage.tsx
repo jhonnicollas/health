@@ -37,13 +37,33 @@ type CatalogResponse = {
   }
 }
 
+type TodaySession = {
+  sessionId: number
+  measuredAt: string
+  deviceCodes: string[]
+  valueCount: number
+}
+
 const DEVICE_ICONS: Record<string, string> = {
   oximeter: 'oxygen_saturation',
   bloodPressure: 'blood_pressure',
   gcu: 'bloodtype',
   thermometer: 'thermostat',
   bodyScale: 'monitor_weight',
+  sleepTracker: 'bedtime',
   manual: 'edit_note'
+}
+
+async function fetchTodaySessions(): Promise<TodaySession[]> {
+  try {
+    const res = await fetch('/api/measurements/today', { credentials: 'include' })
+    if (!res.ok) return []
+    const body = await res.json() as { success: boolean; data?: { sessions: TodaySession[] } }
+    if (!body.success) return []
+    return Array.isArray(body.data?.sessions) ? body.data.sessions : []
+  } catch {
+    return []
+  }
 }
 
 export function SelectMetricPage() {
@@ -52,28 +72,26 @@ export function SelectMetricPage() {
   const [sinocareMode, setSinocareMode] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
+  const [todaySessions, setTodaySessions] = useState<TodaySession[]>([])
+  const [now] = useState(() => new Date())
+  const isPastNoon = now.getHours() >= 12
 
   useEffect(() => {
     let cancelled = false
-
     async function loadCatalog() {
       setLoading(true)
       setMessage('')
-
       try {
         const response = await fetch('/api/metrics/catalog', {
           credentials: 'include',
           headers: { Accept: 'application/json' }
         })
         const body = (await response.json()) as CatalogResponse
-
         if (cancelled) return
-
         if (!response.ok || !body.success || !body.data) {
           setMessage(body.error?.message ?? 'Failed to load catalog.')
           return
         }
-
         setDevices(body.data.devices)
       } catch {
         if (!cancelled) setMessage('Failed to load measurement catalog.')
@@ -81,8 +99,8 @@ export function SelectMetricPage() {
         if (!cancelled) setLoading(false)
       }
     }
-
     void loadCatalog()
+    void fetchTodaySessions().then(setTodaySessions)
     return () => { cancelled = true }
   }, [])
 
@@ -91,7 +109,6 @@ export function SelectMetricPage() {
     for (const device of devices) {
       if (!selectedDeviceCodes.includes(device.deviceCode)) continue
       for (const metric of device.metrics) {
-        // Sinocare: only include the selected mode metric
         if (device.deviceType === 'gcu' && sinocareMode && metric.metricCode !== sinocareMode) continue
         result.push({
           id: `${device.deviceCode}:${metric.metricCode}`,
@@ -110,6 +127,10 @@ export function SelectMetricPage() {
     return result
   }, [devices, selectedDeviceCodes, sinocareMode])
 
+  function isDeviceRecordedToday(deviceCode: string): boolean {
+    return todaySessions.some(s => s.deviceCodes.includes(deviceCode))
+  }
+
   function toggleDevice(deviceCode: string) {
     setSelectedDeviceCodes((current) =>
       current.includes(deviceCode)
@@ -124,32 +145,48 @@ export function SelectMetricPage() {
     <section className="measurement-panel" aria-labelledby="device-select-title">
       <div className="measurement-step-header">
         <span className="step-number">1</span>
-        <h2 id="device-select-title">Select Device</h2>
+        <h2 id="device-select-title">Pilih Alat Pengukuran</h2>
       </div>
+      <p className="muted" style={{ marginTop: -8, marginBottom: 8 }}>
+        Pilih satu atau lebih alat yang ingin Anda gunakan hari ini. Alat yang sudah pernah digunakan hari ini akan ditandai.
+      </p>
 
-      {loading ? <p className="loading-text">Loading catalog...</p> : null}
-
-      {message ? (
-        <p className="form-message error" role="status">{message}</p>
-      ) : null}
+      {loading ? <p className="loading-text">Memuat katalog alat...</p> : null}
+      {message ? <p className="form-message error" role="status">{message}</p> : null}
 
       {!loading && !message ? (
         <div className="device-selector-grid">
           {devices.map((device) => {
             const isSelected = selectedDeviceCodes.includes(device.deviceCode)
+            const isRecordedToday = isDeviceRecordedToday(device.deviceCode)
+            const isLateWarning = isPastNoon && !isRecordedToday
             const icon = DEVICE_ICONS[device.deviceType] || 'medical_services'
-            const metricCount = device.metrics.length
+            const cardState = isRecordedToday
+              ? 'recorded-today'
+              : isLateWarning
+                ? 'late-warning'
+                : ''
             return (
               <button
                 key={device.deviceCode}
-                className={`device-selector-card ${isSelected ? 'selected' : ''}`}
+                className={`device-selector-card ${isSelected ? 'selected' : ''} ${cardState}`}
                 onClick={() => toggleDevice(device.deviceCode)}
                 type="button"
               >
                 <span className="material-symbols-outlined device-icon">{icon}</span>
                 <div className="device-info">
                   <strong>{device.deviceName}</strong>
-                  <small>{device.brand} {device.model} &middot; {metricCount} values</small>
+                  {isRecordedToday ? (
+                    <small className="device-status-today">
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
+                      Sudah diukur hari ini
+                    </small>
+                  ) : isLateWarning ? (
+                    <small className="device-status-late">
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>schedule</span>
+                      Belum diukur (sudah lewat jam 12)
+                    </small>
+                  ) : null}
                 </div>
                 {isSelected ? (
                   <span className="material-symbols-outlined device-check">check_circle</span>
@@ -162,7 +199,7 @@ export function SelectMetricPage() {
 
       {sinocareDevice ? (
         <div className="sinocare-mode-selector">
-          <p><strong>{sinocareDevice.deviceName}</strong> &mdash; Select test mode:</p>
+          <p><strong>{sinocareDevice.deviceName}</strong> &mdash; Pilih jenis tes:</p>
           <div className="sinocare-mode-buttons">
             {sinocareDevice.metrics.map((metric) => (
               <button
@@ -182,27 +219,22 @@ export function SelectMetricPage() {
         <>
           <div className="measurement-step-header">
             <span className="step-number">2</span>
-            <h2>Record Data</h2>
+            <h2>Catat Hasil Pengukuran</h2>
             <button
               className="btn-secondary"
               onClick={() => { setSelectedDeviceCodes([]); setSinocareMode(null) }}
               type="button"
               style={{ marginLeft: 'auto', padding: '8px 16px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', background: 'var(--colorSurface)', cursor: 'pointer', fontSize: 14 }}
             >
-              Clear Selection
+              <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>close</span>
+              Hapus Pilihan
             </button>
-          </div>
-
-          <div className="selection-summary" aria-live="polite">
-            <div className="selection-summary-header">
-              <strong>{selectedDeviceCodes.length} device(s) selected</strong>
-              <span>{selectedMetrics.length} value(s) to record</span>
-            </div>
           </div>
 
           <DynamicMetricForm
             selectedMetrics={selectedMetrics}
             onClearSelection={() => { setSelectedDeviceCodes([]); setSinocareMode(null) }}
+            onSubmitted={() => { void fetchTodaySessions().then(setTodaySessions) }}
           />
         </>
       )}
