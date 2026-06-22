@@ -198,145 +198,148 @@ export function ProfileSettingsPage() {
 
   return (
     <section className="settings-panel" aria-labelledby="profile-settings-title">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Settings</p>
-          <h2 id="profile-settings-title">Basic Profile</h2>
-          <p>Configure height, timezone, theme, and display mode for the app.</p>
-        </div>
-        <span className="status-chip">{accessibilityMode}</span>
-      </div>
-
-      <form className="auth-form settings-form" onSubmit={handleSubmit}>
-        <div className="form-heading">
-          <h3>Health Profile</h3>
-          <p>Changes are applied after the profile is saved.</p>
-        </div>
-        <label>
-          Height (cm)
-          <input
-            inputMode="decimal"
-            max={250}
-            min={50}
-            onChange={(event) => setHeightCm(event.target.value)}
-            required
-            type="number"
-            value={heightCm}
-          />
-          {fieldErrors.heightCm ? <span className="field-error">{fieldErrors.heightCm}</span> : null}
-        </label>
-
-        <label>
-          Timezone
-          <input
-            onChange={(event) => setTimezone(event.target.value)}
-            required
-            type="text"
-            value={timezone}
-          />
-          {fieldErrors.timezone ? <span className="field-error">{fieldErrors.timezone}</span> : null}
-        </label>
-
-        <label>
-          Theme
-          <select onChange={(event) => handleThemeChange(event.target.value)} value={theme}>
-            <option value="light">Light</option>
-            <option value="warm">Warm</option>
-            <option value="dark">Dark</option>
-            <option value="highContrast">High contrast</option>
-          </select>
-          {fieldErrors.theme ? <span className="field-error">{fieldErrors.theme}</span> : null}
-        </label>
-
-        <label>
-          Display mode
-          <select
-            onChange={(event) => handleAccessibilityChange(event.target.value)}
-            value={accessibilityMode}
-          >
-            <option value="normal">Normal</option>
-            <option value="senior">Senior</option>
-            <option value="highContrast">High contrast</option>
-          </select>
-          {fieldErrors.accessibilityMode ? (
-            <span className="field-error">{fieldErrors.accessibilityMode}</span>
-          ) : null}
-        </label>
-
-        <button disabled={submitting} type="submit">
-          {submitting ? 'Saving...' : 'Save Settings'}
-        </button>
-
-        {message ? (
-          <p
-            className={`form-message ${message.includes('saved') ? 'success' : 'error'}`}
-            role="status"
-          >
-            {message}
-          </p>
-        ) : null}
-      </form>
-
-      {configPanelVisible ? (
-        <section className="settings-config-section" aria-labelledby="system-config-title">
-          <div className="page-heading compact">
-            <div>
-              <p className="eyebrow">Admin</p>
-              <h3 id="system-config-title">System Config</h3>
-              <p>Edit global DB-backed settings without redeploying the app.</p>
+      <div className="settings-grid">
+        <div className="settings-left">
+          <section className="card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div>
+                <h3 style={{ font: 'var(--typHeadlineMd)', color: 'var(--colorTextPrimary)', margin: 0 }}>User Profile</h3>
+                <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)', marginTop: 4 }}>Manage your personal information and clinical identifiers.</p>
+              </div>
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--colorSurfaceContainer)', fontSize: 24, fontWeight: 700, color: 'var(--colorTextPrimary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--colorBorderSoft)' }}>
+                {user?.displayName?.charAt(0)?.toUpperCase() ?? 'U'}
+              </div>
             </div>
-            <span className="status-chip">{configs.length} keys</span>
-          </div>
 
-          {configsLoading ? <p>Loading system config...</p> : null}
-          {configError ? <p className="form-message error" role="alert">{configError}</p> : null}
-          {configMessage ? <p className="form-message success" role="status">{configMessage}</p> : null}
+            <form onSubmit={handleSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+                <div>
+                  <label style={{ font: 'var(--typLabelSm)', color: 'var(--colorTextSecondary)', display: 'block', marginBottom: 4 }}>Height (cm)</label>
+                  <input className="input-field" inputMode="decimal" max={250} min={50} onChange={(event) => setHeightCm(event.target.value)} required type="number" value={heightCm} />
+                  {fieldErrors.heightCm ? <span className="field-error">{fieldErrors.heightCm}</span> : null}
+                </div>
+                <div>
+                  <label style={{ font: 'var(--typLabelSm)', color: 'var(--colorTextSecondary)', display: 'block', marginBottom: 4 }}>Timezone</label>
+                  <input className="input-field" onChange={(event) => setTimezone(event.target.value)} required type="text" value={timezone} />
+                  {fieldErrors.timezone ? <span className="field-error">{fieldErrors.timezone}</span> : null}
+                </div>
+                <div>
+                  <label style={{ font: 'var(--typLabelSm)', color: 'var(--colorTextSecondary)', display: 'block', marginBottom: 4 }}>Theme</label>
+                  <select className="input-field" onChange={(event) => handleThemeChange(event.target.value)} value={theme}>
+                    <option value="light">Light</option>
+                    <option value="warm">Warm</option>
+                    <option value="dark">Dark</option>
+                    <option value="highContrast">High contrast</option>
+                  </select>
+                  {fieldErrors.theme ? <span className="field-error">{fieldErrors.theme}</span> : null}
+                </div>
+                <div>
+                  <label style={{ font: 'var(--typLabelSm)', color: 'var(--colorTextSecondary)', display: 'block', marginBottom: 4 }}>Display mode</label>
+                  <select className="input-field" onChange={(event) => handleAccessibilityChange(event.target.value)} value={accessibilityMode}>
+                    <option value="normal">Normal</option>
+                    <option value="senior">Senior</option>
+                    <option value="highContrast">High contrast</option>
+                  </select>
+                  {fieldErrors.accessibilityMode ? <span className="field-error">{fieldErrors.accessibilityMode}</span> : null}
+                </div>
+              </div>
 
-          {!configsLoading && !configError ? (
-            <table className="admin-config-table" aria-label="System configuration">
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Description</th>
-                  <th>Value</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {configs.map((row) => (
-                  <tr key={row.configKey}>
-                    <td><code>{row.configKey}</code></td>
-                    <td>{row.description || '-'}</td>
-                    <td>
-                      <form
-                        className="admin-config-form"
-                        onSubmit={(event) => handleConfigSave(event, row.configKey)}
-                      >
+              <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--colorBorderSoft)' }}>
+                <button className="btn-primary" disabled={submitting} type="submit">
+                  {submitting ? 'Saving...' : 'Save Settings'}
+                </button>
+              </div>
+
+              {message ? (
+                <p className={`form-message ${message.includes('saved') ? 'success' : 'error'}`} role="status" style={{ marginTop: 12 }}>
+                  {message}
+                </p>
+              ) : null}
+            </form>
+          </section>
+        </div>
+
+        <div className="settings-right">
+          <section className="card">
+            <h3 style={{ font: 'var(--typHeadlineMd)', color: 'var(--colorTextPrimary)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--colorPrimary)' }}>notifications_active</span>
+              Notifications
+            </h3>
+            <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)', marginBottom: 20 }}>Configure delivery channels.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ padding: 16, borderRadius: 'var(--radiusXl)', border: '1px solid var(--colorBorderSoft)', background: 'var(--colorSurfaceElevated)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, #0088cc 10%, transparent)', color: '#0088cc' }}>
+                      <span className="material-symbols-outlined">send</span>
+                    </div>
+                    <div>
+                      <p style={{ font: 'var(--typLabelMd)' }}>Telegram</p>
+                      <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)' }}>Instant medical alerts</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: 16, borderRadius: 'var(--radiusXl)', border: '1px solid var(--colorBorderSoft)', background: 'var(--colorSurfaceElevated)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--colorSurfaceContainer)', color: 'var(--colorTextMuted)' }}>
+                    <span className="material-symbols-outlined">desktop_windows</span>
+                  </div>
+                  <div>
+                    <p style={{ font: 'var(--typLabelMd)' }}>Browser Push</p>
+                    <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)' }}>Desktop notifications</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {configPanelVisible ? (
+            <section className="card" style={{ marginTop: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ font: 'var(--typHeadlineMd)', color: 'var(--colorTextPrimary)', margin: 0 }}>System Config</h3>
+                  <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)', marginTop: 4 }}>{configs.length} keys — edit without redeploy</p>
+                </div>
+                <span className="status-chip">{configs.length} keys</span>
+              </div>
+
+              {configsLoading ? <p>Loading system config...</p> : null}
+              {configError ? <p className="form-message error" role="alert">{configError}</p> : null}
+              {configMessage ? <p className="form-message success" role="status">{configMessage}</p> : null}
+
+              {!configsLoading && !configError ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {configs.map((row) => (
+                    <div key={row.configKey} style={{ padding: 12, borderRadius: 'var(--radiusLg)', border: '1px solid var(--colorBorderSoft)', background: 'var(--colorSurface)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <code style={{ font: 'var(--typBodySm)', fontWeight: 600 }}>{row.configKey}</code>
+                        <span className="meta">{row.dataType || 'string'}</span>
+                      </div>
+                      {row.description ? <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)', marginBottom: 8 }}>{row.description}</p> : null}
+                      <form style={{ display: 'flex', gap: 8 }} onSubmit={(event) => handleConfigSave(event, row.configKey)}>
                         <input
+                          style={{ flex: 1, minHeight: 36, padding: '6px 10px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', font: 'var(--typBodySm)' }}
                           aria-label={`Value for ${row.configKey}`}
                           onChange={(event) =>
-                            setEditingConfigs((prev) => ({
-                              ...prev,
-                              [row.configKey]: event.target.value
-                            }))
+                            setEditingConfigs((prev) => ({ ...prev, [row.configKey]: event.target.value }))
                           }
                           placeholder={row.configKey === 'telegramBotToken' ? 'Paste regenerated BotFather token' : undefined}
                           type={isSensitiveConfig(row.configKey) ? 'password' : 'text'}
                           value={editingConfigs[row.configKey] ?? ''}
                         />
-                        <button disabled={savingConfigKey === row.configKey} type="submit">
+                        <button style={{ minHeight: 36, padding: '6px 14px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', background: 'var(--colorSurface)', cursor: 'pointer', font: 'var(--typLabelSm)' }} disabled={savingConfigKey === row.configKey} type="submit">
                           {savingConfigKey === row.configKey ? 'Saving...' : 'Save'}
                         </button>
                       </form>
-                    </td>
-                    <td className="meta">{row.dataType || 'string'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
           ) : null}
-        </section>
-      ) : null}
+        </div>
+      </div>
     </section>
   )
 }

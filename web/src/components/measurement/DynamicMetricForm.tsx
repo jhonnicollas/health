@@ -79,6 +79,7 @@ export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFo
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   const metricsByDevice = useMemo(() => {
     const grouped = new Map<string, DynamicMetricSelection[]>()
@@ -304,78 +305,98 @@ export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFo
     return <p className="muted">Pilih metrik pada checklist di atas untuk mulai mengisi.</p>
   }
 
+  function toggleCollapse(key: string) {
+    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
   return (
     <form className="dynamic-metric-form" onSubmit={handleSubmit}>
       {selectedMetrics.map((selection) => {
         const metric = selection.metric
         const entry = values[metric.metricCode] ?? { raw: '', final: '', manual: false, confidence: null }
+        const isCollapsed = collapsed[metric.metricCode] ?? false
         return (
           <fieldset key={selection.id ?? metric.metricCode} className="metric-card">
-            <legend>
-              {metric.metricName} <span className="muted">({metric.unit})</span>
-            </legend>
+            <div className="metric-card-header" onClick={() => toggleCollapse(metric.metricCode)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <div className="metric-card-header-left">
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--colorTextMuted)', transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>expand_more</span>
+                <legend style={{ margin: 0, padding: 0, border: 'none' }}>
+                  {metric.metricName} <span className="muted">({metric.unit})</span>
+                </legend>
+              </div>
+              {entry.final ? (
+                <span className="badge-status badge-normal" style={{ fontSize: 12 }}>{entry.final} {metric.unit}</span>
+              ) : null}
+            </div>
 
-            {metric.requiresAttachment ? (
-              <label className="metric-file-field">
-                Bukti pengukuran
-                <input
-                  accept="image/png,image/jpeg,image/webp"
-                  capture="environment"
-                  onChange={(event) =>
-                    setFiles((prev) => ({
-                      ...prev,
-                      [metric.metricCode]: event.target.files?.[0] ?? null
-                    }))
-                  }
-                  type="file"
+            {!isCollapsed && (
+              <div className="metric-card-body">
+                {metric.requiresAttachment ? (
+                  <div className="metric-file-row">
+                    <label className="metric-file-field" style={{ flex: 1 }}>
+                      <input
+                        accept="image/png,image/jpeg,image/webp"
+                        capture="environment"
+                        onChange={(event) =>
+                          setFiles((prev) => ({
+                            ...prev,
+                            [metric.metricCode]: event.target.files?.[0] ?? null
+                          }))
+                        }
+                        type="file"
+                      />
+                    </label>
+                    <div className="metric-ai-col">
+                      {selection.device?.deviceCode && metric.requiresAttachment ? (
+                        <button
+                          className="btn-ai-extract"
+                          disabled={aiLoading || extractingMetricCode === metric.metricCode || !files[metric.metricCode]}
+                          onClick={() => void handleAiFill(selection)}
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>document_scanner</span>
+                          {extractingMetricCode === metric.metricCode ? 'Processing...' : 'Auto-Read with AI'}
+                        </button>
+                      ) : null}
+                      {metric.requiresAttachment && !files[metric.metricCode] ? (
+                        <p className="muted" style={{ textAlign: 'center', fontSize: 12 }}>Select image first</p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                <ManualOverrideInput
+                  metric={metric}
+                  raw={entry.raw}
+                  final={entry.final}
+                  manual={entry.manual}
+                  onChange={(partial) => setField(metric.metricCode, partial)}
                 />
-              </label>
-            ) : null}
 
-            {selection.device?.deviceCode && metric.requiresAttachment ? (
-              <button
-                className="secondary-action"
-                disabled={aiLoading || extractingMetricCode === metric.metricCode || !files[metric.metricCode]}
-                onClick={() => void handleAiFill(selection)}
-                type="button"
-              >
-                {extractingMetricCode === metric.metricCode ? 'AI membaca...' : 'Baca Otomatis'}
-              </button>
-            ) : null}
+                {entry.confidence !== null && entry.confidence !== undefined ? (
+                  <p className="ai-confidence">
+                    rawAiValue: {entry.raw || '-'} / confidence {Math.round(entry.confidence * 100)}%
+                  </p>
+                ) : null}
 
-            {metric.requiresAttachment && !files[metric.metricCode] ? (
-              <p className="muted">Pilih foto lebih dulu untuk memakai Baca Otomatis.</p>
-            ) : null}
+                {aiMetricStatus[metric.metricCode] ? (
+                  <p className={`form-message ${aiMetricStatus[metric.metricCode].kind}`} role="status">
+                    {aiMetricStatus[metric.metricCode].message}
+                  </p>
+                ) : null}
 
-            <ManualOverrideInput
-              metric={metric}
-              raw={entry.raw}
-              final={entry.final}
-              manual={entry.manual}
-              onChange={(partial) => setField(metric.metricCode, partial)}
-            />
-
-            {entry.confidence !== null && entry.confidence !== undefined ? (
-              <p className="ai-confidence">
-                rawAiValue tersimpan: {entry.raw || '-'} / confidence {Math.round(entry.confidence * 100)}%
-              </p>
-            ) : null}
-
-            {aiMetricStatus[metric.metricCode] ? (
-              <p className={`form-message ${aiMetricStatus[metric.metricCode].kind}`} role="status">
-                {aiMetricStatus[metric.metricCode].message}
-              </p>
-            ) : null}
-
-            {files[metric.metricCode] ? (
-              <p className="muted">File dipilih: {files[metric.metricCode]?.name}</p>
-            ) : null}
+                {files[metric.metricCode] ? (
+                  <p className="muted">File: {files[metric.metricCode]?.name}</p>
+                ) : null}
+              </div>
+            )}
           </fieldset>
         )
       })}
 
-      <button disabled={submitting} type="submit">
-        {submitting ? 'Menyimpan...' : 'Submit pengukuran'}
+      <button disabled={submitting} type="submit" className="btn-submit" style={{ minHeight: 56, border: 0, borderRadius: 'var(--radiusXl)', padding: '16px 24px', color: 'var(--colorPrimaryText)', background: 'var(--colorPrimary)', font: 'var(--typHeadlineMd)', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,97,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <span className="material-symbols-outlined">check_circle</span>
+        {submitting ? 'Saving...' : 'Validate & Save Results'}
       </button>
 
       {aiError ? (

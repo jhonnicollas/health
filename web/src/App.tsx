@@ -483,11 +483,14 @@ function AppRoutes() {
   const [authView, setAuthView] = useState<'login' | 'register'>(() =>
     normalizePath(window.location.pathname) === '/register' ? 'register' : 'login'
   )
+  const [liveTime, setLiveTime] = useState(new Date())
+  const [notifOpen, setNotifOpen] = useState(false)
 
   useEffect(() => {
     function handlePopState() { setCurrentPath(normalizePath(window.location.pathname)) }
     window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
+    const timer = setInterval(() => setLiveTime(new Date()), 1000)
+    return () => { window.removeEventListener('popstate', handlePopState); clearInterval(timer) }
   }, [])
 
   function showAuthView(view: 'login' | 'register') {
@@ -498,8 +501,18 @@ function AppRoutes() {
   }
 
   function navigate(path: string) {
+    setNotifOpen(false)
     window.history.pushState(null, '', path)
     setCurrentPath(normalizePath(path))
+  }
+
+  const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+
+  function formatClock(d: Date) {
+    const day = dayNames[d.getDay()]
+    const date = d.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
+    const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return { dateStr: `${day}, ${date}`, timeStr: time }
   }
 
   if (loading) {
@@ -547,6 +560,17 @@ function AppRoutes() {
   const headerSubtitle = appPath === '/dashboard'
     ? 'Here is your daily health summary.'
     : 'Here is your clinical overview for today.'
+  const clock = formatClock(liveTime)
+  const currentTheme = profile?.theme ?? 'light'
+
+  function setTheme(next: string) {
+    document.documentElement.dataset.theme = next
+    fetch('/api/profile', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: next, timezone: profile?.timezone ?? 'Asia/Jakarta', heightCm: profile?.heightCm ?? 170, accessibilityMode: profile?.accessibilityMode ?? 'normal' })
+    }).catch(() => {})
+  }
 
   return (
     <main className="app-page">
@@ -618,12 +642,26 @@ function AppRoutes() {
             <input placeholder="Search patients, reports, or data..." type="search" />
           </label>
           <div className="topbar-actions" aria-label="Workspace actions">
-            <div className="topbar-view-toggle" aria-label="Preview density">
-              <button className="active" type="button" aria-label="Desktop density"><Icon name="desktop_windows" /></button>
-              <button type="button" aria-label="Tablet density"><Icon name="tablet_mac" /></button>
-              <button type="button" aria-label="Phone density"><Icon name="smartphone" /></button>
+            <div className="topbar-clock hidden xl:flex flex-col items-end border-r border-outline-variant pr-6 mr-6">
+              <span className="clock-date">{clock.dateStr}</span>
+              <span className="clock-time">{clock.timeStr}</span>
             </div>
-            <button className="topbar-icon-btn has-alert" type="button" aria-label="Notifications"><Icon name="notifications" /></button>
+            <div className="topbar-theme-switch">
+              <button className={currentTheme === 'light' ? 'active' : ''} onClick={() => setTheme('light')} type="button" aria-label="Light mode"><Icon name="light_mode" /></button>
+              <button className={currentTheme === 'warm' ? 'active' : ''} onClick={() => setTheme('warm')} type="button" aria-label="Warm mode"><Icon name="wb_sunny" /></button>
+              <button className={currentTheme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')} type="button" aria-label="Dark mode"><Icon name="dark_mode" /></button>
+            </div>
+            <button className="topbar-icon-btn" onClick={() => navigate('/kb')} type="button" aria-label="Knowledge Base"><Icon name="menu_book" /></button>
+            <button className="topbar-icon-btn" onClick={() => navigate('/kb')} type="button" aria-label="Help"><Icon name="help" /></button>
+            <div className="topbar-notif-wrap">
+              <button className="topbar-icon-btn has-alert" onClick={() => setNotifOpen(o => !o)} type="button" aria-label="Notifications"><Icon name="notifications" /></button>
+              {notifOpen && (
+                <div className="notif-dropdown">
+                  <div className="notif-header">Notifications</div>
+                  <div className="notif-empty">No new notifications</div>
+                </div>
+              )}
+            </div>
             <div className="topbar-user" aria-label={`Active user ${user.displayName}`}>
               <strong>{user.displayName}</strong>
               <span className="topbar-user-avatar">{getInitials(user.displayName)}</span>

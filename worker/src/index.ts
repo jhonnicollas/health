@@ -2574,14 +2574,50 @@ app.get('/api/dashboard/today', async (c) => {
     const metricCount = new Set(values.map(v => v.metricCode)).size
     const emergencyCount = (sessions.results || []).filter(s => s.hasEmergency === 1).length
 
+    const streakRow = await c.env.DB.prepare(
+      `SELECT currentStreak, bestStreak FROM HL_userStreaks WHERE userId = ? LIMIT 1`
+    ).bind(userId).first<{ currentStreak: number; bestStreak: number }>()
+    const streak = streakRow?.currentStreak ?? 0
+    const bestStreak = streakRow?.bestStreak ?? 0
+
+    const aiInsightRow = await c.env.DB.prepare(
+      `SELECT summary FROM HL_recommendations WHERE userId = ? ORDER BY createdAt DESC LIMIT 1`
+    ).bind(userId).first<{ summary: string }>()
+
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    const threeDaysStr = formatter.format(threeDaysAgo)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const sevenDaysStr = formatter.format(sevenDaysAgo)
+
+    const comparisons: Record<string, { avg3day: number | null; avg7day: number | null }> = {}
+    for (const v of values) {
+      const code = v.metricCode
+      if (comparisons[code]) continue
+      const avg3 = await c.env.DB.prepare(
+        `SELECT AVG(finalValue) as avgVal FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(createdAt,1,10) >= ? AND substr(createdAt,1,10) < ?`
+      ).bind(userId, code, threeDaysStr, today).first<{ avgVal: number | null }>()
+      const avg7 = await c.env.DB.prepare(
+        `SELECT AVG(finalValue) as avgVal FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(createdAt,1,10) >= ? AND substr(createdAt,1,10) < ?`
+      ).bind(userId, code, sevenDaysStr, today).first<{ avgVal: number | null }>()
+      comparisons[code] = { avg3day: avg3?.avgVal ?? null, avg7day: avg7?.avgVal ?? null }
+    }
+
     return jsonResponse(c, success({
       date: today,
       metricCount,
       sessionCount: (sessions.results || []).length,
       emergencyCount,
       hasData: (sessions.results || []).length > 0,
+      streak,
+      bestStreak,
+      aiInsight: aiInsightRow?.summary ?? null,
       sessions: sessions.results || [],
-      values,
+      values: values.map((v: any) => ({
+        ...v,
+        comparisons: comparisons[v.metricCode] ?? { avg3day: null, avg7day: null }
+      })),
       alerts: alerts.results || []
     }, 200, startedAt))
   } catch (error) {

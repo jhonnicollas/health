@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
 
+type Comparison = {
+  avg3day: number | null
+  avg7day: number | null
+}
+
 type MetricValue = {
   id: string
   sessionId: string
@@ -10,6 +15,7 @@ type MetricValue = {
   severity: string
   manualOverride: number
   createdAt: string
+  comparisons?: Comparison
 }
 
 type Alert = {
@@ -122,6 +128,30 @@ export function TodayDashboard() {
     )
   }
 
+  function pctDiff(current: number, avg: number | null): { pct: string; icon: string; cls: string } | null {
+    if (avg === null || avg === 0) return null
+    const diff = ((current - avg) / avg) * 100
+    const abs = Math.abs(diff)
+    const pct = (diff >= 0 ? '+' : '') + diff.toFixed(0) + '%'
+    if (abs < 1) return { pct: '0%', icon: 'trending_flat', cls: 'text-tertiary' }
+    if (diff > 0) return { pct, icon: 'trending_up', cls: 'text-error' }
+    return { pct, icon: 'trending_down', cls: '' }
+  }
+
+  function TrendRow({ label, current, avg }: { label: string; current: number; avg: number | null }) {
+    const trend = pctDiff(current, avg)
+    if (!trend) return null
+    return (
+      <div className="vital-comparison-row">
+        <span>{label}</span>
+        <span className={trend.cls} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{trend.icon}</span>
+          {trend.pct}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className="today-dashboard">
       <div className="dashboard-bento">
@@ -149,26 +179,6 @@ export function TodayDashboard() {
         <button className="tab-btn" type="button">Monthly Summary</button>
       </div>
 
-      <div className="dashboard-stats">
-        <div className="stat-card">
-          <span className="stat-kicker">Measured</span>
-          <div className="stat-value">{data.metricCount}</div>
-          <div className="stat-label">Metrics Recorded</div>
-        </div>
-        <div className="stat-card">
-          <span className="stat-kicker">Sessions</span>
-          <div className="stat-value">{data.sessionCount}</div>
-          <div className="stat-label">Sessions</div>
-        </div>
-        {data.emergencyCount > 0 && (
-          <div className="stat-card emergency">
-            <span className="stat-kicker">Emergency</span>
-            <div className="stat-value">{data.emergencyCount}</div>
-            <div className="stat-label">Alerts</div>
-          </div>
-        )}
-      </div>
-
       {data.alerts.length > 0 && (
         <div className="dashboard-alerts">
           <h3>Alerts Today</h3>
@@ -184,6 +194,7 @@ export function TodayDashboard() {
       <div className="vitals-grid">
         {data.values.map(v => {
           const badge = SEVERITY_BADGE[v.severity] || SEVERITY_BADGE[v.status] || { label: v.status, className: 'badge-info' }
+          const comp = v.comparisons
           return (
             <div key={v.id} className={`vital-card severity-${v.severity}`}>
               <div className="vital-card-header">
@@ -199,6 +210,12 @@ export function TodayDashboard() {
                 <span className="vital-reading">{v.finalValue}</span>
                 <span className="vital-unit">{v.unit}</span>
               </div>
+              {comp && (
+                <div className="vital-comparison-rows">
+                  <TrendRow label="vs 3-day avg" current={v.finalValue} avg={comp.avg3day} />
+                  <TrendRow label="vs 7-day avg" current={v.finalValue} avg={comp.avg7day} />
+                </div>
+              )}
               <div className="vital-meta">
                 {v.manualOverride === 1 && <span className="badge-override">Manual</span>}
                 <span className={`badge-status status-${v.status}`}>{v.status}</span>
