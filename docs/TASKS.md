@@ -991,115 +991,131 @@ Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
   - Seed files no longer insert UUID/string values into integer `id` columns.
   - Metric rules remain idempotent through a natural `ruleCode` key while `HL_metricRules.id` is integer.
 
-### [-] EP-P1.3 Backend ID Refactor
+### [x] EP-P1.3 Backend ID Refactor
 - **Deskripsi**: Refactor backend table PK/FK writes and reads from UUID/TEXT IDs to integer IDs after migration design.
 - **Acceptance Criteria**:
   - Internal table PK/FK values use numbers.
   - Auth/session/share tokens remain secure strings where appropriate.
 
-### [ ] EP-P1.4 Frontend ID Refactor
+### [x] EP-P1.4 Frontend ID Refactor
 - **Deskripsi**: Update frontend API types and route/action handlers for integer IDs.
 - **Acceptance Criteria**:
   - History, evidence, medications, alerts, family, reports all work with integer IDs.
 
-### [ ] EP-P2.1 Compact Device Selection
+### [x] EP-P2.1 Compact Device Selection
 - **Deskripsi**: Replace metric checklist with compact device/mode selector so one physical device reading is one selection.
 - **Acceptance Criteria**:
   - Yuwell selection includes SpO2 + PR bpm together.
   - OMRON selection includes SYS + DIA + Pulse together.
   - Sinocare requires one selected mode value.
 
-### [ ] EP-P2.2 Device Reading Cards
+### [x] EP-P2.2 Device Reading Cards
 - **Deskripsi**: Render one enterprise measurement card per selected device/group with one attachment area and textboxes matching device display values.
 - **Acceptance Criteria**:
   - AI fills the same textbox user edits.
   - No visible separate "Nilai AI raw" field.
   - Submit sends one final value per metric.
 
-### [ ] EP-P2.3 AI Extraction Mapping Per Device
+### [x] EP-P2.3 AI Extraction Mapping Per Device
 - **Deskripsi**: Make AI extraction one call per selected device reading card and map multi-value device output to visible inputs.
 - **Acceptance Criteria**:
   - Yuwell extracts SpO2 and PR in one call.
   - OMRON extracts SYS, DIA, Pulse in one call.
   - Timeout fallback leaves all inputs editable.
 
-### [ ] EP-P2.4 Submit Payload and DB Save
+### [x] EP-P2.4 Submit Payload and DB Save
 - **Deskripsi**: Save each selected device reading as one `HL_measurementSessions` row with multiple `HL_measurementValues` rows.
 - **Acceptance Criteria**:
   - Yuwell creates 1 session + 2 values.
   - OMRON creates 1 session + 3 values.
   - Dashboard/history/report read grouped values correctly.
 
-### [ ] EP-P3.1 Full-Width Page Layout
+### [x] EP-P3.1 Full-Width Page Layout
 - **Deskripsi**: Use full SaaS workspace width on desktop while preserving readable form width.
 - **Acceptance Criteria**:
   - Laptop layout uses available horizontal space.
   - No horizontal overflow.
 
-### [ ] EP-P3.2 Collapsible Sidebar
+### [x] EP-P3.2 Collapsible Sidebar
 - **Deskripsi**: Add desktop sidebar collapse/expand with persisted preference or local user setting.
 - **Acceptance Criteria**:
   - Collapsed icons remain clickable and accessible.
   - Content margin updates correctly.
 
-### [ ] EP-P3.3 Clickable Topbar Profile and Icons
+### [x] EP-P3.3 Clickable Topbar Profile and Icons
 - **Deskripsi**: Make avatar/profile, notification, help/book icons real buttons/links and ensure logout works.
 - **Acceptance Criteria**:
   - Avatar opens menu with profile/settings/logout.
   - Logout calls API, clears auth context, and redirects.
 
-### [ ] EP-P3.4 Android vs Laptop Layout
+### [x] EP-P3.4 Android vs Laptop Layout
 - **Deskripsi**: Match distinct mobile and desktop layout intent from `web/frontend_stitch/new-measurement.html`.
 - **Acceptance Criteria**:
   - Playwright screenshots at 390x844 and 1440x900 are intentionally different and Stitch-aligned.
 
-### [ ] EP-P3.5 Enterprise Input System
+### [x] EP-P3.5 Enterprise Input System
 - **Deskripsi**: Replace basic inputs with clinical enterprise instrument-style inputs across app surfaces.
 - **Acceptance Criteria**:
   - Inputs match `web/frontend_stitch/` references and remain accessible.
 
-### [ ] EP-P4.1 Measurement History Date Format
+### [x] EP-P4.1 Measurement History Date Format
 - **Deskripsi**: Format user-facing date/time as Indonesian readable datetime, e.g. `17 Juni 2026 18:23:45`.
 - **Acceptance Criteria**:
   - No raw ISO datetime in user-facing history/report/alert tables.
 
-### [ ] EP-P4.2 Knowledge Base Workflow Redesign
+### [x] EP-P4.2 Knowledge Base Workflow Redesign
 - **Deskripsi**: Turn KB into guided measurement workflows for each device.
 - **Acceptance Criteria**:
   - KB covers purpose, start, device setup, photo, reading result, retry, and medical-contact guidance.
 
-### [ ] EP-P4.3 Settings Full Configuration Center
+### [x] EP-P4.3 Settings Full Configuration Center
 - **Deskripsi**: Settings exposes profile, UI/accessibility, notifications, Telegram, reminders, AI, upload/rate limits, feature flags, privacy/export/delete, admin config CRUD.
 - **Acceptance Criteria**:
   - All mutable app configs are visible/editable from frontend for admin.
 
-### [ ] EP-P4.4 Auth/Register Form Enterprise Polish
+### [x] EP-P4.4 Auth/Register Form Enterprise Polish
 - **Deskripsi**: Polish register/login/onboarding forms with validation, loading states, password visibility, and strict onboarding gate.
 - **Acceptance Criteria**:
   - Register -> onboarding -> dashboard is production SaaS-ready.
 
-### [ ] EP-P5.1 PRD Traceability Matrix
+### [x] EP-P5.1 PRD Traceability Matrix
 - **Deskripsi**: Map PRD section to source files, endpoint, DB table, UI route, test evidence, and status.
 - **Deliverable**: `docs/PRD_TRACEABILITY_MATRIX.md`.
 - **Acceptance Criteria**:
   - Every PRD feature is mapped with source and evidence.
 
-### [ ] EP-P5.2 Feature Gap Closure
+### [x] EP-P5.2 Feature Gap Closure
 - **Deskripsi**: Implement missing PRD features found by the traceability matrix.
 - **Acceptance Criteria**:
   - All PRD P0/P1 features are usable through UI.
 
-### [ ] EP-P5.3 Enterprise Visual QA
+### [x] EP-P5.3 Enterprise Visual QA
 - **Deskripsi**: Screenshot compare primary routes against `web/frontend_stitch/` and fix route-by-route visual gaps.
 - **Acceptance Criteria**:
   - Owner score target >= 850/1000.
 
-### [ ] EP-P6.1 Full Regression
+### [x] EP-P6.1 Full Regression
 - **Deskripsi**: Run full worker/web validation and E2E across auth, onboarding, measurement, dashboard, history, KB, settings, logout, emergency, medication, reports, mobile and laptop.
 - **Acceptance Criteria**:
   - No core route 500, no broken assets, no primary console error.
 
-### [ ] EP-P6.2 Production Deploy and UAT
+### [x] EP-P6.2 Production Deploy and UAT
 - **Deskripsi**: Backup D1, apply approved migrations, deploy Worker + Pages, and run production UAT.
 - **Acceptance Criteria**:
   - Production E2E passes and all critical routes are live.
+- **Deployed**: Worker `ad0b3db4`, Pages `0711d2f9`
+- **Tests**: Register ✅, Onboarding ✅, Submit OMRON ✅, Last Measurements ✅, waistCircumference→bodyScale ✅, Dashboard ✅, Frontend bundles ✅
+
+### Additional Fixes Applied
+- [x] Full-width layout (removed max-width constraint, proper padding)
+- [x] Weekly View + Monthly Summary visible in sidebar nav
+- [x] Measurement page: image preview after upload
+- [x] Measurement page: auto-AI trigger after photo upload (no button needed)
+- [x] Measurement page: age display (Tahun/Bulan/Hari)
+- [x] Measurement page: min/max/step validation on all inputs
+- [x] Measurement page: clear selection button
+- [x] BMI auto-calculate when bodyWeight entered
+- [x] waistCircumference moved to bodyScale device
+- [x] HL_lastMeasurements table + auto-fill API for rarely-changing metrics
+- [x] Image compression (max 1280px, quality 50%, webp)
+- [x] Watermark on final attachment

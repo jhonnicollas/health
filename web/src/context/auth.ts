@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
 export type User = {
-  id: string
+  id: number
   email: string
   displayName: string
   telegramEnabled: boolean
@@ -9,7 +9,7 @@ export type User = {
 }
 
 export type Profile = {
-  id: string
+  id: number
   sex: string
   birthDate: string
   heightCm: number

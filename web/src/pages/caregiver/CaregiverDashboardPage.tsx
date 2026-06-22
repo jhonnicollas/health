@@ -10,7 +10,7 @@ type MonitorValue = {
 }
 
 type MonitorAlert = {
-  id: string
+  id: number
   metricCode: string
   finalValue: number
   unit: string
@@ -25,7 +25,7 @@ type Profile = {
   role: string
   permissions: { canViewDashboard: boolean; canInputMeasurement: boolean; canReceiveAlert: boolean }
   lastMeasurementAt: string | null
-  latestAlerts: Array<{ id: string; metricCode: string; finalValue: number; unit: string; severity: string; message: string; createdAt: string }>
+  latestAlerts: Array<{ id: number; metricCode: string; finalValue: number; unit: string; severity: string; message: string; createdAt: string }>
 }
 
 type Monitor = {

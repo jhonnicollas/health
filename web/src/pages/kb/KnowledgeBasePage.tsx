@@ -23,6 +23,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   safety: 'Safety'
 }
 
+const WORKFLOW_STEPS = [
+  { icon: 'info', label: 'Purpose', description: 'Understand what this device measures' },
+  { icon: 'settings_input_component', label: 'Device Setup', description: 'Prepare the device for measurement' },
+  { icon: 'photo_camera', label: 'Photo', description: 'Take a clear photo of the reading' },
+  { icon: 'analytics', label: 'Read Result', description: 'Verify the extracted values' },
+  { icon: 'replay', label: 'Retry', description: 'Retake if the reading is unclear' },
+  { icon: 'contact_phone', label: 'Medical Contact', description: 'Consult a doctor for interpretation' }
+]
+
 function articleIcon(article: Article) {
   const haystack = `${article.title} ${article.slug ?? ''}`.toLowerCase()
   if (haystack.includes('omron') || haystack.includes('pressure')) return 'monitor_heart'
@@ -74,6 +83,15 @@ function articleSummary(article: Article) {
   return firstBodyLine ?? 'Panduan ringkas untuk pengukuran, foto alat, dan verifikasi angka.'
 }
 
+function matchWorkflowStep(section: ArticleSection): number {
+  const h = section.heading.toLowerCase()
+  if (h.includes('cara pakai') || h.includes('cara pengukuran')) return 1
+  if (h.includes('tips foto') || h.includes('foto')) return 2
+  if (h.includes('arti') || h.includes('kapan') || h.includes('normal')) return 3
+  if (h.includes('kesalahan') || h.includes('retry') || h.includes('ulang')) return 4
+  return -1
+}
+
 export function KnowledgeBasePage() {
   const [articles, setArticles] = useState<Article[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -107,12 +125,12 @@ export function KnowledgeBasePage() {
         <div>
           <p className="eyebrow">Knowledge</p>
           <h2>Knowledge Base</h2>
-          <p>Measurement device guides and usage education.</p>
+          <p>Guided measurement workflows for each device.</p>
         </div>
-        <span className="status-chip">{articles.length} articles</span>
+        <span className="status-chip">{articles.length} guides</span>
       </div>
 
-      {articles.length === 0 ? <p>No articles yet.</p> : null}
+      {articles.length === 0 ? <p>No guides available yet.</p> : null}
 
       {articles.length > 0 ? (
         <div className="kb-shell">
@@ -157,43 +175,54 @@ export function KnowledgeBasePage() {
                   <h3 id="kb-reader-title">{selectedArticle.title}</h3>
                 </div>
                 <p>{articleSummary(selectedArticle)}</p>
+                <a href="/measurements/new" className="kb-cta-btn">
+                  <span className="material-symbols-outlined">add_circle</span>
+                  Record with this device
+                </a>
               </header>
 
-              <div className="kb-media-panel">
-                <span className="material-symbols-outlined" aria-hidden="true">image</span>
-                <div>
-                  <strong>Visual guide ready</strong>
-                  <p>Image or video walkthrough can be attached to this article without changing layout.</p>
-                </div>
-              </div>
-
-              <div className="kb-spec-grid">
-                <div>
-                  <span>Guide Type</span>
-                  <strong>{CATEGORY_LABELS[selectedArticle.category ?? 'device'] ?? selectedArticle.category}</strong>
-                </div>
-                <div>
-                  <span>Use Case</span>
-                  <strong>Measure / verify / retake photo</strong>
-                </div>
-                <div>
-                  <span>Safety</span>
-                  <strong>Rule-first education</strong>
-                </div>
+              <div className="kb-workflow-stepper">
+                {WORKFLOW_STEPS.map((step, i) => (
+                  <div key={step.label} className={`kb-workflow-step ${sections.some(s => matchWorkflowStep(s) === i) ? 'has-content' : ''}`}>
+                    <div className="kb-workflow-step-icon">
+                      <span className="material-symbols-outlined">{step.icon}</span>
+                    </div>
+                    <div className="kb-workflow-step-text">
+                      <strong>{i + 1}. {step.label}</strong>
+                      <small>{step.description}</small>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="kb-section-list">
-                {sections.map((section) => (
-                  <section key={section.heading} className="kb-guide-section">
-                    <h4>{section.heading}</h4>
-                    {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-                    {section.bullets.length > 0 ? (
-                      <ul>
-                        {section.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
-                      </ul>
-                    ) : null}
-                  </section>
-                ))}
+                {sections.map((section) => {
+                  const stepIdx = matchWorkflowStep(section)
+                  return (
+                    <section key={section.heading} className="kb-guide-section">
+                      <h4>
+                        {stepIdx >= 0 ? (
+                          <span className="kb-step-badge">{stepIdx + 1}</span>
+                        ) : null}
+                        {section.heading}
+                      </h4>
+                      {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                      {section.bullets.length > 0 ? (
+                        <ul>
+                          {section.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}
+                        </ul>
+                      ) : null}
+                    </section>
+                  )
+                })}
+              </div>
+
+              <div className="kb-contact-footer">
+                <span className="material-symbols-outlined">contact_phone</span>
+                <div>
+                  <strong>Need medical interpretation?</strong>
+                  <p>Consult your doctor for clinical decisions. This app provides data, not diagnosis.</p>
+                </div>
               </div>
             </article>
           ) : null}

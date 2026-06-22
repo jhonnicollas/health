@@ -36,13 +36,26 @@ async function sha256Token(value: string): Promise<string> {
   return `sha256:${b64}`
 }
 
-async function getCurrentSession(c: Context<{ Bindings: ExtraEnv }>): Promise<string | null> {
+function getInsertedId(result: D1Result<unknown>): number {
+  const meta = result.meta as Record<string, unknown> | undefined
+  const id = Number(meta?.last_row_id ?? meta?.lastRowId)
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('D1 insert did not return a valid last_row_id')
+  }
+  return id
+}
+
+async function insertAndGetId(statement: D1PreparedStatement): Promise<number> {
+  return getInsertedId(await statement.run())
+}
+
+async function getCurrentSession(c: Context<{ Bindings: ExtraEnv }>): Promise<number | null> {
   const token = getCookie(c, 'hlSession')
   if (!token) return null
   const tokenHash = await sha256Token(token)
   const row = await c.env.DB.prepare(
     'SELECT userId, expiresAt, revokedAt FROM HL_sessions WHERE sessionTokenHash = ? LIMIT 1'
-  ).bind(tokenHash).first<{ userId: string; expiresAt: string; revokedAt: string | null }>()
+  ).bind(tokenHash).first<{ userId: number; expiresAt: string; revokedAt: string | null }>()
 
   if (!row) return null
   if (row.revokedAt) return null
@@ -136,14 +149,14 @@ async function resolveTelegramBotToken(c: Context<{ Bindings: ExtraEnv }>): Prom
 }
 
 // US-3.3.2 Send emergency Telegram to emergency contacts
-export async function sendEmergencyToContacts(c: Context<{ Bindings: ExtraEnv }>, userId: string, severity: string, metricCode: string, finalValue: number, unit: string, message: string) {
+export async function sendEmergencyToContacts(c: Context<{ Bindings: ExtraEnv }>, userId: number, severity: string, metricCode: string, finalValue: number, unit: string, message: string) {
   const profile = await c.env.DB.prepare('SELECT emergencyConsent FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ emergencyConsent: number }>()
   if (!profile || profile.emergencyConsent !== 1) {
     return { sent: 0, skipped: 'no_consent' }
   }
   const contacts = await c.env.DB.prepare(
     "SELECT id, contactName, contactPhone, telegramChatId, consentGiven, enabled FROM HL_emergencyContacts WHERE userId = ? AND enabled = 1"
-  ).bind(userId).all<{ id: string; contactName: string; contactPhone: string | null; telegramChatId: string | null; consentGiven: number; enabled: number }>()
+  ).bind(userId).all<{ id: number; contactName: string; contactPhone: string | null; telegramChatId: string | null; consentGiven: number; enabled: number }>()
   let sent = 0
   const botToken = await resolveTelegramBotToken(c)
   for (const contact of (contacts.results || [])) {
@@ -151,10 +164,9 @@ export async function sendEmergencyToContacts(c: Context<{ Bindings: ExtraEnv }>
     const contactName = await decryptSensitive(c, contact.contactName) || 'Kontak darurat'
     const contactPhone = await decryptSensitive(c, contact.contactPhone) || '-'
     const telegramChatId = await decryptSensitive(c, contact.telegramChatId)
-    const notifId = createId('ntf')
-    await c.env.DB.prepare(
-      "INSERT INTO HL_notifications (id, userId, channel, notificationType, title, message, status, createdAt) VALUES (?, ?, 'telegram', 'emergency_alert', ?, ?, 'pending', CURRENT_TIMESTAMP)"
-    ).bind(notifId, userId, `DARURAT ${metricCode}`, `${message}\n\nKontak: ${contactName} (${contactPhone})`).run()
+    await insertAndGetId(c.env.DB.prepare(
+      "INSERT INTO HL_notifications (userId, channel, notificationType, title, message, status, createdAt) VALUES (?, 'telegram', 'emergency_alert', ?, ?, 'pending', CURRENT_TIMESTAMP)"
+    ).bind(userId, `DARURAT ${metricCode}`, `${message}\n\nKontak: ${contactName} (${contactPhone})`))
     if (telegramChatId && botToken) {
       try {
         const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -162,37 +174,32 @@ export async function sendEmergencyToContacts(c: Context<{ Bindings: ExtraEnv }>
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ chat_id: telegramChatId, text: `DARURAT ${metricCode}: ${finalValue} ${unit}\n${message}` })
         })
-        const status = resp.ok ? 'sent' : 'failed'
-        await c.env.DB.prepare('UPDATE HL_notifications SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(status, notifId).run()
         if (resp.ok) sent++
-      } catch {
-        await c.env.DB.prepare('UPDATE HL_notifications SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind('failed', notifId).run()
-      }
+      } catch { /* ignore */ }
     }
   }
   return { sent, total: (contacts.results || []).length }
 }
 
 // US-3.3.1 helper: write HL_alerts row from emergency severity, and enqueue contact notifications
-export async function createEmergencyAlert(c: Context<{ Bindings: ExtraEnv }>, userId: string, sessionId: string, metricCode: string, finalValue: number, unit: string, severity: string, message: string) {
-  const alertId = createId('alt')
+export async function createEmergencyAlert(c: Context<{ Bindings: ExtraEnv }>, userId: number, sessionId: number, metricCode: string, finalValue: number, unit: string, severity: string, message: string) {
+  const alertId = await insertAndGetId(c.env.DB.prepare(
+    "INSERT INTO HL_alerts (userId, sessionId, metricCode, finalValue, unit, status, severity, alertType, message, acknowledged, createdAt) VALUES (?, ?, ?, ?, ?, 'active', ?, 'emergency', ?, 0, CURRENT_TIMESTAMP)"
+  ).bind(userId, sessionId, metricCode, finalValue, unit, severity, message))
   await c.env.DB.prepare(
-    "INSERT INTO HL_alerts (id, userId, sessionId, metricCode, finalValue, unit, status, severity, alertType, message, acknowledged, createdAt) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, 'emergency', ?, 0, CURRENT_TIMESTAMP)"
-  ).bind(alertId, userId, sessionId, metricCode, finalValue, unit, severity, message).run()
-  await c.env.DB.prepare(
-    "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'alertCreate', 'HL_alerts', ?, ?, CURRENT_TIMESTAMP)"
-  ).bind(createId('aud'), userId, alertId, JSON.stringify({ metricCode, severity, sessionId })).run()
+    "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'alertCreate', 'HL_alerts', ?, ?, CURRENT_TIMESTAMP)"
+  ).bind(userId, alertId, JSON.stringify({ metricCode, severity, sessionId })).run()
   // Send to contacts (fire and forget; never blocks measurement submit)
   sendEmergencyToContacts(c, userId, severity, metricCode, finalValue, unit, message).catch(err => console.error('emergency contacts error:', err))
   return alertId
 }
 
 // US-4.3.1 streak update: idempotent per day
-export async function updateDailyStreak(c: Context<{ Bindings: ExtraEnv }>, userId: string, tz: string) {
+export async function updateDailyStreak(c: Context<{ Bindings: ExtraEnv }>, userId: number, tz: string) {
   const today = dateInTz(tz)
-  const existing = await c.env.DB.prepare('SELECT id, currentCount, bestCount, lastDate FROM HL_streaks WHERE userId = ? AND streakType = ?').bind(userId, 'dailyMeasurement').first<{ id: string; currentCount: number; bestCount: number; lastDate: string | null }>()
+  const existing = await c.env.DB.prepare('SELECT id, currentCount, bestCount, lastDate FROM HL_streaks WHERE userId = ? AND streakType = ?').bind(userId, 'dailyMeasurement').first<{ id: number; currentCount: number; bestCount: number; lastDate: string | null }>()
   if (!existing) {
-    await c.env.DB.prepare("INSERT INTO HL_streaks (id, userId, streakType, currentCount, bestCount, lastDate, updatedAt) VALUES (?, ?, 'dailyMeasurement', 1, 1, ?, CURRENT_TIMESTAMP)").bind(createId('strk'), userId, today).run()
+    await insertAndGetId(c.env.DB.prepare("INSERT INTO HL_streaks (userId, streakType, currentCount, bestCount, lastDate, updatedAt) VALUES (?, 'dailyMeasurement', 1, 1, ?, CURRENT_TIMESTAMP)").bind(userId, today))
     return { currentCount: 1, bestCount: 1, today }
   }
   if (existing.lastDate === today) {
@@ -208,7 +215,7 @@ export async function updateDailyStreak(c: Context<{ Bindings: ExtraEnv }>, user
 }
 
 // US-4.3.2 idempotent badge awarding
-export async function awardBadges(c: Context<{ Bindings: ExtraEnv }>, userId: string, streakCount: number) {
+export async function awardBadges(c: Context<{ Bindings: ExtraEnv }>, userId: number, streakCount: number) {
   const awarded: string[] = []
   const map: Array<{ code: string; when: (s: number) => boolean }> = [
     { code: 'streak3', when: s => s >= 3 },
@@ -217,12 +224,12 @@ export async function awardBadges(c: Context<{ Bindings: ExtraEnv }>, userId: st
   ]
   for (const m of map) {
     if (!m.when(streakCount)) continue
-    const exists = await c.env.DB.prepare('SELECT id FROM HL_userBadges WHERE userId = ? AND badgeCode = ?').bind(userId, m.code).first<{ id: string }>()
+    const exists = await c.env.DB.prepare('SELECT id FROM HL_userBadges WHERE userId = ? AND badgeCode = ?').bind(userId, m.code).first<{ id: number }>()
     if (exists) continue
-    await c.env.DB.prepare("INSERT INTO HL_userBadges (id, userId, badgeCode, earnedAt, createdAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(createId('ubd'), userId, m.code).run()
+    await insertAndGetId(c.env.DB.prepare("INSERT INTO HL_userBadges (userId, badgeCode, earnedAt, createdAt) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(userId, m.code))
     await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'badgeEarned', 'HL_userBadges', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), userId, m.code, JSON.stringify({ badgeCode: m.code })).run()
+      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'badgeEarned', 'HL_userBadges', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(userId, m.code, JSON.stringify({ badgeCode: m.code })).run()
     awarded.push(m.code)
   }
   return awarded
@@ -236,19 +243,19 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     try {
       const userId = await getCurrentSession(c)
       if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const contactId = c.req.param('id')
+      const contactId = Number(c.req.param('id'))
       const body = await c.req.json() as { consentGiven: boolean }
       const contact = await c.env.DB.prepare(
         'SELECT id, consentGiven FROM HL_emergencyContacts WHERE id = ? AND userId = ?'
-      ).bind(contactId, userId).first<{ id: string; consentGiven: number }>()
+      ).bind(contactId, userId).first<{ id: number; consentGiven: number }>()
       if (!contact) return jsonResponse(c, failure('NOT_FOUND', 'Kontak tidak ditemukan.', 404, [], startedAt), 404)
       const newValue = body.consentGiven ? 1 : 0
       await c.env.DB.prepare(
         'UPDATE HL_emergencyContacts SET consentGiven = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ? AND userId = ?'
       ).bind(newValue, contactId, userId).run()
       await c.env.DB.prepare(
-        "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, ?, 'HL_emergencyContacts', ?, ?, CURRENT_TIMESTAMP)"
-      ).bind(createId('aud'), userId, newValue ? 'emergencyConsentGiven' : 'emergencyConsentRevoked', contactId, JSON.stringify({ consentGiven: Boolean(newValue) })).run()
+        "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'HL_emergencyContacts', ?, ?, CURRENT_TIMESTAMP)"
+      ).bind(userId, newValue ? 'emergencyConsentGiven' : 'emergencyConsentRevoked', contactId, JSON.stringify({ consentGiven: Boolean(newValue) })).run()
       return jsonResponse(c, success({ contactId, consentGiven: Boolean(newValue) }, 200, startedAt), 200)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update consent.', 500, [], startedAt), 500)
@@ -262,9 +269,9 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       const userId = await getCurrentSession(c)
       if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
       const memberRows = await c.env.DB.prepare(
-        "SELECT id, role, canViewDashboard, canInputData, canEditLimited, canReceiveEmergencyAlert, canViewReports FROM HL_familyMembers WHERE userId = ? AND status = 'active'"
+        "SELECT id, role, canViewDashboard, canInputData, canEditLimited, canReceiveEmergencyAlert, canViewReports FROM HL_familyLinks WHERE linkedUserId = ? AND status = 'active'"
       ).bind(userId).all<{
-        id: string; role: string; canViewDashboard: number; canInputData: number; canEditLimited: number; canReceiveEmergencyAlert: number; canViewReports: number
+        id: number; role: string; canViewDashboard: number; canInputData: number; canEditLimited: number; canReceiveEmergencyAlert: number; canViewReports: number
       }>()
       const roles = (memberRows.results || []).map(row => ({
         memberId: row.id,
@@ -305,8 +312,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       const diff = lowAvg - normalAvg
       const direction = diff > 0 ? 'lebih tinggi' : 'lebih rendah'
       const insightText = `Pada hari dengan tidur <6 jam, tekanan darah sistolik rata-rata ${lowAvg.toFixed(1)} mmHg, sedangkan pada hari tidur >=7 jam rata-rata ${normalAvg.toFixed(1)} mmHg. Sistolik cenderung ${direction} saat tidur kurang. Ini korelasi, bukan diagnosis. Konsultasikan dengan dokter.`
-      const insightId = createId('pi')
-      await c.env.DB.prepare("INSERT INTO HL_patternInsights (id, userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt) VALUES (?, ?, 'sleep_bp', ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(insightId, userId, since, nowIso(), insightText, JSON.stringify({ lowSleepAvg: lowAvg, normalSleepAvg: normalAvg, diff })).run()
+      const insightId = await insertAndGetId(c.env.DB.prepare("INSERT INTO HL_patternInsights (userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt) VALUES (?, 'sleep_bp', ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(userId, since, nowIso(), insightText, JSON.stringify({ lowSleepAvg: lowAvg, normalSleepAvg: normalAvg, diff })))
       return jsonResponse(c, success({ insightId, insight: insightText, hasEnoughData: true, lowSleepAvg: lowAvg, normalSleepAvg: normalAvg }, 200, startedAt), 200)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
@@ -367,10 +373,9 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       let fired = 0
       for (const r of (reminders.results || [])) {
         if (nowInTz(r.timezone || 'UTC') !== r.scheduleTime) continue
-        const notifId = createId('ntf')
-        await c.env.DB.prepare(
-          "INSERT INTO HL_notifications (id, userId, channel, notificationType, title, message, status, createdAt) VALUES (?, ?, 'inApp', 'reminder', ?, ?, 'sent', CURRENT_TIMESTAMP)"
-        ).bind(notifId, r.userId, `Pengingat: ${r.reminderType}`, 'Waktunya melakukan pengukuran.').run()
+        await insertAndGetId(c.env.DB.prepare(
+          "INSERT INTO HL_notifications (userId, channel, notificationType, title, message, status, createdAt) VALUES (?, 'inApp', 'reminder', ?, ?, 'sent', CURRENT_TIMESTAMP)"
+        ).bind(r.userId, `Pengingat: ${r.reminderType}`, 'Waktunya melakukan pengukuran.'))
         fired++
       }
       return jsonResponse(c, success({ fired, checked: (reminders.results || []).length }, 200, startedAt), 200)
@@ -414,15 +419,17 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       ).bind(userId, rangeStart, rangeEnd).all()
       const profile = await c.env.DB.prepare('SELECT displayName FROM HL_users WHERE id = ?').bind(userId).first<{ displayName: string }>()
       const html = `<!doctype html><html><head><meta charset="utf-8"><title>Laporan 30 Hari</title></head><body><h1>Laporan Kesehatan 30 Hari</h1><p>Nama: ${escapeHtml(profile?.displayName || '-')}</p><p>Rentang: ${rangeStart} s/d ${rangeEnd}</p><table border="1" cellpadding="4"><tr><th>Tanggal</th><th>Metrik</th><th>Nilai</th><th>Unit</th><th>Status</th><th>Severity</th></tr>${(values.results || []).map((v: any) => `<tr><td>${v.measuredAt}</td><td>${v.metricCode}</td><td>${v.finalValue}</td><td>${v.unit}</td><td>${v.status}</td><td>${v.severity}</td></tr>`).join('')}</table><p><em>Laporan ini hanya data, bukan diagnosis. Konsultasikan dengan dokter.</em></p></body></html>`
-      const reportId = createId('rpt')
-      const r2Key = `HL/users/${userId}/reports/${reportId}.html`
-      await c.env.LOGS.put(r2Key, html, { httpMetadata: { contentType: 'text/html; charset=utf-8' } })
+      const reportId = await (async () => {
+        const tempId = Date.now().toString(36)
+        const r2Key = `HL/users/${userId}/reports/${tempId}.html`
+        await c.env.LOGS.put(r2Key, html, { httpMetadata: { contentType: 'text/html; charset=utf-8' } })
+        return insertAndGetId(c.env.DB.prepare(
+          "INSERT INTO HL_reports (userId, reportType, rangeStart, rangeEnd, r2Key, status, summaryJson, createdAt, updatedAt) VALUES (?, 'doctorReady30d', ?, ?, ?, 'ready', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+        ).bind(userId, rangeStart, rangeEnd, r2Key, JSON.stringify({ count: (values.results || []).length })))
+      })()
       await c.env.DB.prepare(
-        "INSERT INTO HL_reports (id, userId, reportType, rangeStart, rangeEnd, r2Key, status, summaryJson, createdAt, updatedAt) VALUES (?, ?, 'doctorReady30d', ?, ?, ?, 'ready', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-      ).bind(reportId, userId, rangeStart, rangeEnd, r2Key, JSON.stringify({ count: (values.results || []).length })).run()
-      await c.env.DB.prepare(
-        "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'reportGenerate', 'HL_reports', ?, ?, CURRENT_TIMESTAMP)"
-      ).bind(createId('aud'), userId, reportId, JSON.stringify({ reportType: 'doctorReady30d' })).run()
+        "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'reportGenerate', 'HL_reports', ?, ?, CURRENT_TIMESTAMP)"
+      ).bind(userId, reportId, JSON.stringify({ reportType: 'doctorReady30d' })).run()
       return jsonResponse(c, success({ reportId, status: 'ready' }, 201, startedAt), 201)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal generate PDF.', 500, [], startedAt), 500)
@@ -436,7 +443,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       const userId = await getCurrentSession(c)
       if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
       const reportId = c.req.param('id')
-      const report = await c.env.DB.prepare('SELECT userId, r2Key FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: string; r2Key: string }>()
+      const report = await c.env.DB.prepare('SELECT userId, r2Key FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: number; r2Key: string }>()
       if (!report) return jsonResponse(c, failure('NOT_FOUND', 'Report tidak ditemukan.', 404, [], startedAt), 404)
       if (report.userId !== userId) {
         const link = await c.env.DB.prepare("SELECT id FROM HL_familyLinks WHERE ownerUserId = ? AND linkedUserId = ? AND status = 'active' AND canViewDashboard = 1").bind(report.userId, userId).first()
@@ -458,16 +465,16 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
       const reportId = c.req.param('id')
       const body = await c.req.json() as { recipientLabel?: string; expiresInHours?: number }
-      const report = await c.env.DB.prepare('SELECT userId FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: string }>()
+      const report = await c.env.DB.prepare('SELECT userId FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: number }>()
       if (!report) return jsonResponse(c, failure('NOT_FOUND', 'Report tidak ditemukan.', 404, [], startedAt), 404)
       if (report.userId !== userId) return jsonResponse(c, failure('FORBIDDEN', 'Tidak memiliki akses.', 403, [], startedAt), 403)
       const shareToken = crypto.randomUUID().replace(/-/g, '')
       const shareTokenHash = await sha256Token(shareToken)
       const expiresInHours = Math.min(Math.max(body.expiresInHours ?? 24, 1), 168)
       const expiresAt = new Date(Date.now() + expiresInHours * 3600 * 1000).toISOString()
-      await c.env.DB.prepare(
-        "INSERT INTO HL_reportShares (id, reportId, userId, shareTokenHash, recipientLabel, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
-      ).bind(createId('rps'), reportId, userId, shareTokenHash, body.recipientLabel || null, expiresAt).run()
+      await insertAndGetId(c.env.DB.prepare(
+        "INSERT INTO HL_reportShares (reportId, userId, shareTokenHash, recipientLabel, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
+      ).bind(reportId, userId, shareTokenHash, body.recipientLabel || null, expiresAt))
       return jsonResponse(c, success({ shareToken, expiresAt, shareUrl: `/api/reports/share/${shareToken}` }, 201, startedAt), 201)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal share.', 500, [], startedAt), 500)
@@ -503,12 +510,11 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       const body = await c.req.json() as { fastingType?: string; targetHours?: number }
       const active = await c.env.DB.prepare("SELECT id FROM HL_fastingSessions WHERE userId = ? AND status = 'active'").bind(userId).first<{ id: string }>()
       if (active) return jsonResponse(c, failure('VALIDATION_ERROR', 'Sesi puasa aktif sudah ada.', 400, [], startedAt), 400)
-      const fastId = createId('fst')
       const fastingType = (['glucoseFasting', 'cholesterolTotal', 'uricAcid', 'general'].includes(body.fastingType || '') ? body.fastingType : 'general') as string
       const targetHours = Number(body.targetHours) || 8
-      await c.env.DB.prepare(
-        "INSERT INTO HL_fastingSessions (id, userId, fastingType, targetHours, startedAt, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-      ).bind(fastId, userId, fastingType, targetHours).run()
+      const fastId = await insertAndGetId(c.env.DB.prepare(
+        "INSERT INTO HL_fastingSessions (userId, fastingType, targetHours, startedAt, status, createdAt, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+      ).bind(userId, fastingType, targetHours))
       return jsonResponse(c, success({ fastingId: fastId, fastingType, targetHours, startedAt: nowIso() }, 201, startedAt), 201)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
@@ -588,8 +594,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
         return jsonResponse(c, success({ insight: 'Data belum cukup untuk menampilkan pola (minimal 14 hari data).', hasEnoughData: false }, 200, startedAt), 200)
       }
       const insightText = `Berat badan rata-rata ${weight?.avg?.toFixed(1)} kg dengan tekanan darah sistolik rata-rata ${bp?.avg?.toFixed(0)} mmHg. Konsultasikan dengan dokter untuk interpretasi lebih lanjut.`
-      const insightId = createId('pi')
-      await c.env.DB.prepare("INSERT INTO HL_patternInsights (id, userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt) VALUES (?, ?, 'weight_bp', ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(insightId, userId, since, nowIso(), insightText, JSON.stringify({ weight, bp })).run()
+      const insightId = await insertAndGetId(c.env.DB.prepare("INSERT INTO HL_patternInsights (userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt) VALUES (?, 'weight_bp', ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(userId, since, nowIso(), insightText, JSON.stringify({ weight, bp })))
       return jsonResponse(c, success({ insightId, insight: insightText, hasEnoughData: true }, 200, startedAt), 200)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
@@ -608,8 +613,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       const taken = (logs.results || []).filter(r => r.status === 'taken').reduce((s, r) => s + r.cnt, 0)
       const adherence = total > 0 ? Math.round((taken / total) * 100) : 0
       const insightText = `Tingkat kepatuhan minum obat Anda ${adherence}% dalam 14 hari terakhir. Ini bukan saran dosis, hanya ringkasan data. Konsultasikan dengan dokter untuk perubahan dosis.`
-      const insightId = createId('pi')
-      await c.env.DB.prepare("INSERT INTO HL_patternInsights (id, userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt) VALUES (?, ?, 'medication', ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(insightId, userId, since, nowIso(), insightText, JSON.stringify({ logs: logs.results, adherence })).run()
+      const insightId = await insertAndGetId(c.env.DB.prepare("INSERT INTO HL_patternInsights (userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt) VALUES (?, 'medication', ?, ?, ?, ?, CURRENT_TIMESTAMP)").bind(userId, since, nowIso(), insightText, JSON.stringify({ logs: logs.results, adherence })))
       return jsonResponse(c, success({ insightId, insight: insightText, adherence, hasEnoughData: total > 0 }, 200, startedAt), 200)
     } catch (e) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
@@ -646,8 +650,8 @@ export async function scheduledHandler(event: ScheduledController, env: ExtraEnv
     })()
     if (nowInTz !== r.scheduleTime) continue
     await env.DB.prepare(
-      "INSERT INTO HL_notifications (id, userId, channel, notificationType, title, message, status, createdAt) VALUES (?, ?, 'inApp', 'reminder', ?, ?, 'sent', CURRENT_TIMESTAMP)"
-    ).bind(createId('ntf'), r.userId, `Pengingat: ${r.reminderType}`, 'Waktunya melakukan pengukuran.').run()
+      "INSERT INTO HL_notifications (userId, channel, notificationType, title, message, status, createdAt) VALUES (?, 'inApp', 'reminder', ?, ?, 'sent', CURRENT_TIMESTAMP)"
+    ).bind(r.userId, `Pengingat: ${r.reminderType}`, 'Waktunya melakukan pengukuran.').run()
     fired++
   }
   // Fasting reminder (US-4.2.3)
@@ -661,8 +665,8 @@ export async function scheduledHandler(event: ScheduledController, env: ExtraEnv
     const exists = await env.DB.prepare("SELECT id FROM HL_notifications WHERE userId = ? AND notificationType = 'fastingTarget' AND createdAt > datetime('now', '-1 hour')").bind(f.userId).first<{ id: string }>()
     if (exists) continue
     await env.DB.prepare(
-      "INSERT INTO HL_notifications (id, userId, channel, notificationType, title, message, status, createdAt) VALUES (?, ?, 'inApp', 'fastingTarget', ?, ?, 'sent', CURRENT_TIMESTAMP)"
-    ).bind(createId('ntf'), f.userId, `Target puasa tercapai`, `Anda sudah berpuasa ${f.fastingType} selama ${f.targetHours} jam.`).run()
+      "INSERT INTO HL_notifications (userId, channel, notificationType, title, message, status, createdAt) VALUES (?, 'inApp', 'fastingTarget', ?, ?, 'sent', CURRENT_TIMESTAMP)"
+    ).bind(f.userId, `Target puasa tercapai`, `Anda sudah berpuasa ${f.fastingType} selama ${f.targetHours} jam.`).run()
     fastingNotified++
   }
   // GAP-17: stale draft cleanup (runs on every cron tick)

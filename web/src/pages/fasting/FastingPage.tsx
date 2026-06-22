@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 type FastingSession = {
-  id: string
+  id: number
   fastingType: string
   targetHours: number
   startedAt: string

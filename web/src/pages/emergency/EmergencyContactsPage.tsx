@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type EmergencyContact = {
-  id: string
+  id: number
   contactName: string
   contactRelation: string
   contactPhone: string
@@ -93,7 +93,7 @@ export function EmergencyContactsPage() {
     }
   }
 
-  async function toggleConsent(id: string, consentGiven: boolean) {
+  async function toggleConsent(id: number, consentGiven: boolean) {
     try {
       await fetch(`/api/emergency/contacts/${id}/consent`, {
         method: 'PATCH',
@@ -105,7 +105,7 @@ export function EmergencyContactsPage() {
     } catch { /* ignore */ }
   }
 
-  async function remove(id: string) {
+  async function remove(id: number) {
     const res = await fetch(`/api/emergency/contacts/${id}`, {
       method: 'DELETE',
       credentials: 'include'

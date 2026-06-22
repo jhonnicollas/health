@@ -8,14 +8,14 @@ type LoginResponse = {
   success: boolean
   data?: {
     user: {
-      id: string
+      id: number
       email: string
       displayName: string
       telegramEnabled: boolean
       browserPushEnabled: boolean
     }
     profile: {
-      id: string
+      id: number
       sex: string
       birthDate: string
       heightCm: number

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatIndonesianDate } from './utils/dateFormat'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/auth'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -39,7 +40,7 @@ type NavLink = {
 }
 
 type HistoryValue = {
-  id: string
+  id: number
   metricCode: string
   finalValue: number
   unit: string
@@ -49,13 +50,13 @@ type HistoryValue = {
 }
 
 type HistoryAttachment = {
-  id: string
+  id: number
   metricCode: string
   fileName: string
 }
 
 type HistorySession = {
-  id: string
+  id: number
   measuredAt: string
   source: string
   hasAttachment: number
@@ -91,32 +92,61 @@ type ChatMessage = {
   usedFallback?: boolean
 }
 
-const NAV: NavLink[] = [
-  { path: '/dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: 'dashboard' },
-  { path: '/dashboard/week', label: 'Weekly View', shortLabel: 'Week', icon: 'date_range', visible: false },
-  { path: '/dashboard/month', label: 'Monthly Summary', shortLabel: 'Month', icon: 'calendar_month', visible: false },
+type NavGroup = {
+  label: string
+  icon: string
+  shortLabel: string
+  children: NavLink[]
+}
+
+const NAV_GROUPS: (NavGroup | NavLink)[] = [
+  {
+    label: 'Dashboard',
+    icon: 'dashboard',
+    shortLabel: 'Dash',
+    children: [
+      { path: '/dashboard', label: 'Today', shortLabel: 'Today', icon: 'dashboard' },
+      { path: '/dashboard/week', label: 'Weekly View', shortLabel: 'Week', icon: 'date_range' },
+      { path: '/dashboard/month', label: 'Monthly Summary', shortLabel: 'Month', icon: 'calendar_month' },
+    ]
+  },
   { path: '/measurements/new', label: 'New Measurement', shortLabel: 'New', icon: 'add_circle' },
   { path: '/measurements/history', label: 'History', shortLabel: 'History', icon: 'history' },
-  { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', icon: 'elderly', visible: false },
-  { path: '/tracker', label: 'Tracker', shortLabel: 'Track', icon: 'medication', visible: false },
-  { path: '/alerts', label: 'Notifications & Alerts', shortLabel: 'Alerts', icon: 'notifications', badge: '3' },
+  {
+    label: 'Reports',
+    icon: 'assessment',
+    shortLabel: 'Rpts',
+    children: [
+      { path: '/reports/daily', label: 'Daily Report', shortLabel: 'Daily', icon: 'today' },
+      { path: '/reports/weekly', label: 'Weekly Report', shortLabel: 'Weekly', icon: 'date_range' },
+      { path: '/reports/monthly', label: 'Monthly Report', shortLabel: 'Monthly', icon: 'calendar_month' },
+      { path: '/reports/doctor', label: 'Doctor Report', shortLabel: 'Doctor', icon: 'description' },
+    ]
+  },
   { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', icon: 'smart_toy' },
+  { path: '/alerts', label: 'Notifications & Alerts', shortLabel: 'Alerts', icon: 'notifications', badge: '3' },
+  {
+    label: 'Health',
+    icon: 'favorite',
+    shortLabel: 'Health',
+    children: [
+      { path: '/tracker', label: 'Fasting & Medication', shortLabel: 'Track', icon: 'timer' },
+      { path: '/fasting', label: 'Fasting Timer', shortLabel: 'Fast', icon: 'timer' },
+      { path: '/medications', label: 'Medication', shortLabel: 'Meds', icon: 'medication' },
+      { path: '/patterns', label: 'Patterns', shortLabel: 'Pattern', icon: 'insights' },
+    ]
+  },
   { path: '/family', label: 'Family / Caregiver', shortLabel: 'Family', icon: 'family_restroom' },
-  { path: '/reports/daily', label: 'Reports & Analytics', shortLabel: 'Reports', icon: 'assessment' },
-  { path: '/reports/weekly', label: 'Weekly Report', shortLabel: 'W Report', icon: 'date_range', visible: false },
-  { path: '/reports/monthly', label: 'Monthly Report', shortLabel: 'M Report', icon: 'calendar_month', visible: false },
-  { path: '/reports/doctor', label: 'Doctor Report', shortLabel: 'Doctor', icon: 'description', visible: false },
-  { path: '/reminders', label: 'Reminders', shortLabel: 'Remind', icon: 'alarm', visible: false },
-  { path: '/medications', label: 'Medication', shortLabel: 'Meds', icon: 'medication', visible: false },
-  { path: '/caregiver', label: 'Caregiver', shortLabel: 'Care', icon: 'supervisor_account', visible: false },
-  { path: '/fasting', label: 'Fasting', shortLabel: 'Fast', icon: 'timer', visible: false },
-  { path: '/emergency', label: 'Emergency Contacts', shortLabel: 'SOS', icon: 'emergency', visible: false },
-  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false },
-  { path: '/patterns', label: 'Patterns', shortLabel: 'Pattern', icon: 'insights', visible: false },
+  { path: '/reminders', label: 'Reminders', shortLabel: 'Remind', icon: 'alarm' },
+  { path: '/emergency', label: 'Emergency Contacts', shortLabel: 'SOS', icon: 'emergency' },
   { path: '/settings/profile', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
-  { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', icon: 'delete', visible: false },
-  { path: '/admin/configs', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true }
 ]
+
+const NAV: NavLink[] = NAV_GROUPS.flatMap(g => 'children' in g ? g.children : [g]).filter(n => !('children' in n)) as NavLink[]
+NAV.push({ path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', icon: 'delete', visible: false })
+NAV.push({ path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', icon: 'elderly', visible: false })
+NAV.push({ path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false })
+NAV.push({ path: '/admin/configs', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true })
 
 const ALLOWED_PATHS = new Set(NAV.map(n => n.path).concat(['/kb']))
 const MOBILE_NAV_PATHS = new Set(['/dashboard', '/measurements/new', '/measurements/history', '/alerts', '/ai-assistant'])
@@ -204,48 +234,45 @@ function MeasurementHistoryPage() {
               <th>Metric</th>
               <th>Result Value</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th>Evidence</th>
             </tr>
           </thead>
           <tbody>
-            {sessions.map((session) => (
-              <tr key={session.id}>
-                <td>
-                  <strong>{new Date(session.measuredAt).toLocaleDateString()}</strong>
-                  <br />
-                  <span className="meta">{new Date(session.measuredAt).toLocaleTimeString()}</span>
-                </td>
-                <td>
-                  {session.values.map((value) => (
-                    <span key={value.id}>{value.metricCode}</span>
-                  )).reduce<React.ReactNode[]>((acc, cur, i) => i === 0 ? [cur] : [...acc, ', ', cur], [])}
-                </td>
-                <td>
-                  {session.values.map((value) => (
-                    <div key={value.id}>
-                      <strong>{value.finalValue}</strong> <span className="meta">{value.unit}</span>
+            {sessions.flatMap((session) =>
+              session.values.map((value, idx) => {
+                const attachment = session.attachments.find(a => a.metricCode === value.metricCode)
+                return (
+                  <tr key={`${session.id}-${value.id}`}>
+                    {idx === 0 ? (
+                      <td rowSpan={session.values.length} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--colorBorder)' }}>
+                        <strong>{formatIndonesianDate(session.measuredAt)}</strong>
+                      </td>
+                    ) : null}
+                    <td>
+                      <span className="metric-code-badge">{value.metricCode}</span>
+                    </td>
+                    <td>
+                      <strong style={{ fontSize: '1.1em' }}>{value.finalValue}</strong> <span className="meta">{value.unit}</span>
                       {value.manualOverride === 1 ? <span className="badge-override">Manual</span> : null}
-                    </div>
-                  ))}
-                </td>
-                <td>
-                  {session.values.map((value) => (
-                    <span key={value.id} className={`badge-status badge-${value.status}`}>
-                      <span className="status-dot" />{value.status}
-                    </span>
-                  ))}
-                </td>
-                <td>
-                  {session.attachments.length > 0 ? (
-                    <button className="evidence-btn" onClick={() => setSelectedAttachment(session.attachments[0])} type="button">
-                      View Evidence
-                    </button>
-                  ) : (
-                    <span className="muted">No evidence</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                    </td>
+                    <td>
+                      <span className={`badge-status badge-${value.status}`}>
+                        <span className="status-dot" />{value.status}
+                      </span>
+                    </td>
+                    <td>
+                      {attachment ? (
+                        <button className="evidence-btn" onClick={() => setSelectedAttachment(attachment)} type="button">
+                          <Icon name="photo_camera" /> View
+                        </button>
+                      ) : (
+                        <span className="muted" style={{ fontSize: '0.85em' }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       ) : null}
@@ -448,8 +475,8 @@ function SeniorAppShell({
   )
 }
 
-function renderRoute(appPath: string) {
-  if (appPath === '/dashboard') return <TodayDashboard />
+function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
+  if (appPath === '/dashboard') return <TodayDashboard onNavigateTab={onNavigate} />
   if (appPath === '/dashboard/week') return <WeeklyDashboard />
   if (appPath === '/dashboard/month') return <MonthlyDashboard />
   if (appPath === '/measurements/new') return <SelectMetricPage />
@@ -485,6 +512,27 @@ function AppRoutes() {
   )
   const [liveTime, setLiveTime] = useState(new Date())
   const [notifOpen, setNotifOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('hl-sidebar-collapsed') === 'true' } catch { return false }
+  })
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'Reports']))
+
+  function toggleSidebar() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      try { localStorage.setItem('hl-sidebar-collapsed', String(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  async function handleLogout() {
+    setUserMenuOpen(false)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch { /* ignore */ }
+    navigate('/login')
+  }
 
   useEffect(() => {
     function handlePopState() { setCurrentPath(normalizePath(window.location.pathname)) }
@@ -554,6 +602,12 @@ function AppRoutes() {
 
   const isAdmin = !!user.email && ['admin@homesungai.com'].includes(user.email)
   const visibleNav = NAV.filter(link => (!link.adminOnly || isAdmin) && link.visible !== false)
+  const visibleNavGroups = NAV_GROUPS.filter(g => {
+    if ('children' in g) {
+      return g.children.some(c => !c.adminOnly || isAdmin)
+    }
+    return (!g.adminOnly || isAdmin) && g.visible !== false
+  }) as (NavGroup | NavLink)[]
   const currentLink = visibleNav.find(link => link.path === appPath)
   const firstName = user.displayName.split(' ').filter(Boolean)[0] ?? 'there'
   const headerTitle = appPath === '/dashboard' ? `Good Morning, ${firstName}` : currentLink?.label ?? 'Dashboard'
@@ -562,6 +616,14 @@ function AppRoutes() {
     : 'Here is your clinical overview for today.'
   const clock = formatClock(liveTime)
   const currentTheme = profile?.theme ?? 'light'
+
+  function toggleGroup(label: string) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      next.has(label) ? next.delete(label) : next.add(label)
+      return next
+    })
+  }
 
   function setTheme(next: string) {
     document.documentElement.dataset.theme = next
@@ -573,50 +635,89 @@ function AppRoutes() {
   }
 
   return (
-    <main className="app-page">
+    <main className={`app-page ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="app-sidebar" aria-label="App navigation">
         <div className="sidebar-brand">
           <div className="sidebar-brand-row">
             <span className="sidebar-brand-icon" aria-hidden="true">
               <Icon name="local_hospital" className="fill" />
             </span>
-            <div>
+            {!sidebarCollapsed && <div>
               <h1>HealthSync Pro</h1>
               <p>Enterprise Health</p>
-            </div>
+            </div>}
           </div>
-          <button className="emergency-support-btn" onClick={() => navigate('/emergency')} type="button">
-            <Icon name="emergency" />
-            Emergency Support
+          <button className="sidebar-collapse-btn" onClick={toggleSidebar} type="button" aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            <Icon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} />
           </button>
+          {!sidebarCollapsed && (
+            <button className="emergency-support-btn" onClick={() => navigate('/emergency')} type="button">
+              <Icon name="emergency" />
+              Emergency Support
+            </button>
+          )}
         </div>
 
         <div className="sidebar-nav-scroll">
           <nav className="sidebar-nav" aria-label="Main navigation">
-            {visibleNav.map((link) => (
-              <button
-                aria-current={appPath === link.path ? 'page' : undefined}
-                className={appPath === link.path ? 'nav-btn active' : 'nav-btn'}
-                key={link.path}
-                onClick={() => navigate(link.path)}
-                type="button"
-              >
-                <Icon name={link.icon} className="nav-icon" />
-                <span>{link.label}</span>
-                {link.badge ? <span className="nav-badge">{link.badge}</span> : null}
-              </button>
-            ))}
+            {visibleNavGroups.map((item) => {
+              if ('children' in item) {
+                const isExpanded = expandedGroups.has(item.label)
+                const hasActiveChild = item.children.some(c => c.path === appPath)
+                return (
+                  <div key={item.label} className={`nav-group ${hasActiveChild ? 'has-active' : ''}`}>
+                    <button
+                      className={`nav-group-toggle ${isExpanded ? 'expanded' : ''}`}
+                      onClick={() => toggleGroup(item.label)}
+                      type="button"
+                    >
+                      <Icon name={item.icon} className="nav-icon" />
+                      {!sidebarCollapsed && <span>{item.label}</span>}
+                      {!sidebarCollapsed && <Icon name="expand_more" className="nav-group-chevron" />}
+                    </button>
+                    {!sidebarCollapsed && isExpanded && (
+                      <div className="nav-group-children">
+                        {item.children.map((child) => (
+                          <button
+                            key={child.path}
+                            className={`nav-btn nav-child ${appPath === child.path ? 'active' : ''}`}
+                            onClick={() => navigate(child.path)}
+                            type="button"
+                          >
+                            <Icon name={child.icon} className="nav-icon" />
+                            <span>{child.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              return (
+                <button
+                  key={item.path}
+                  className={appPath === item.path ? 'nav-btn active' : 'nav-btn'}
+                  onClick={() => navigate(item.path)}
+                  title={sidebarCollapsed ? item.label : undefined}
+                  type="button"
+                >
+                  <Icon name={item.icon} className="nav-icon" />
+                  {!sidebarCollapsed && <span>{item.label}</span>}
+                  {!sidebarCollapsed && item.badge ? <span className="nav-badge">{item.badge}</span> : null}
+                </button>
+              )
+            })}
           </nav>
         </div>
 
         <div className="sidebar-footer">
-          <button onClick={() => navigate('/kb')} type="button">
+          <button onClick={() => navigate('/kb')} type="button" title={sidebarCollapsed ? 'Help Center' : undefined}>
             <Icon name="help" />
-            Help Center
+            {!sidebarCollapsed && <span>Help Center</span>}
           </button>
-          <button onClick={() => navigate('/login')} type="button">
+          <button onClick={handleLogout} type="button" title={sidebarCollapsed ? 'Logout' : undefined}>
             <Icon name="logout" />
-            Logout
+            {!sidebarCollapsed && <span>Logout</span>}
           </button>
         </div>
       </aside>
@@ -662,9 +763,25 @@ function AppRoutes() {
                 </div>
               )}
             </div>
-            <div className="topbar-user" aria-label={`Active user ${user.displayName}`}>
-              <strong>{user.displayName}</strong>
-              <span className="topbar-user-avatar">{getInitials(user.displayName)}</span>
+            <div className="topbar-user-wrap">
+              <button className="topbar-user" onClick={() => setUserMenuOpen(o => !o)} type="button" aria-label={`User menu for ${user.displayName}`}>
+                <strong>{user.displayName}</strong>
+                <span className="topbar-user-avatar">{getInitials(user.displayName)}</span>
+              </button>
+              {userMenuOpen && (
+                <div className="user-dropdown">
+                  <button onClick={() => { setUserMenuOpen(false); navigate('/settings/profile') }} type="button">
+                    <Icon name="person" /> Profile & Settings
+                  </button>
+                  <button onClick={() => { setUserMenuOpen(false); navigate('/reports/daily') }} type="button">
+                    <Icon name="assessment" /> My Reports
+                  </button>
+                  <hr />
+                  <button onClick={handleLogout} type="button" className="user-dropdown-logout">
+                    <Icon name="logout" /> Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -677,7 +794,7 @@ function AppRoutes() {
             </div>
           </header>
 
-          <section className="app-content">{renderRoute(appPath)}</section>
+          <section className="app-content">{renderRoute(appPath, navigate)}</section>
         </div>
       </div>
 

@@ -5,7 +5,7 @@ import { useAuth } from '../../context/auth'
 type OnboardingResponse = {
   success: boolean
   data?: {
-    profileId: string
+    profileId: number
     completed: boolean
   }
   error?: {

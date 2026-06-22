@@ -38,7 +38,7 @@ VALUES
 ('sinocareM101','Sinocare M101 GCU 3 in 1','gcu','Sinocare','M101','sinocareGcu',1),
 ('thermometer','Thermometer','thermometer','Generic','Thermometer','thermometer',1),
 ('bodyScale','Body Scale','bodyScale','Generic','Body Scale','bodyScale',1),
-('manualInput','Manual Input','manual','Manual','Manual','manual',1);
+('sleepTracker','Jam Tidur','sleepTracker','Generic','Sleep Tracker','sleepTracker',1);
 
 -- Metric catalog
 
@@ -77,8 +77,8 @@ VALUES
 ('thermometer','bodyTemperature',1,10,1),
 ('bodyScale','bodyWeight',1,10,1),
 ('bodyScale','bmi',0,20,1),
-('manualInput','waistCircumference',0,10,1),
-('manualInput','sleepDuration',0,20,1);
+('bodyScale','waistCircumference',0,30,1),
+('sleepTracker','sleepDuration',0,10,1);
 
 -- Metric rules
 

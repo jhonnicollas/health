@@ -17,6 +17,10 @@
           navigator.serviceWorker.register('/sw.js').catch(() => {})
         })
       }
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault()
+        window.__hlInstallPrompt = e
+      })
     </script>
   </body>
 </html>

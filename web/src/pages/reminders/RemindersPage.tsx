@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type Reminder = {
-  id: string
+  id: number
   reminderType: string
   enabled: boolean
   scheduleTime: string
@@ -89,7 +89,7 @@ export function RemindersPage() {
     if (res.ok) await load()
   }
 
-  async function remove(id: string) {
+  async function remove(id: number) {
     const res = await fetch(`/api/reminders/${id}`, {
       method: 'DELETE',
       credentials: 'include'

@@ -767,7 +767,7 @@ async function enforceLoginRateLimit(
      LIMIT 1`
   )
     .bind(rateKey, routeKey, windowStart)
-    .first<{ id: string; requestCount: number }>()
+    .first<{ id: number; requestCount: number }>()
 
   if (existing && existing.requestCount >= config.maxRequests) {
     const result = failure(
@@ -1545,7 +1545,6 @@ app.put('/api/profile', async (c) => {
     const nextTheme = validation.data.theme ?? existingProfile.theme
     const nextAccessibilityMode =
       validation.data.accessibilityMode ?? existingProfile.accessibilityMode
-    const auditId = createId('aud')
 
     await c.env.DB.batch([
       c.env.DB.prepare(
@@ -1561,10 +1560,9 @@ app.put('/api/profile', async (c) => {
       ),
       c.env.DB.prepare(
         `INSERT INTO HL_auditLogs
-          (id, userId, action, entityType, entityId, metadataJson, createdAt)
-         VALUES (?, ?, 'profileUpdate', 'HL_userProfiles', ?, ?, CURRENT_TIMESTAMP)`
+          (userId, action, entityType, entityId, metadataJson, createdAt)
+         VALUES (?, 'profileUpdate', 'HL_userProfiles', ?, ?, CURRENT_TIMESTAMP)`
       ).bind(
-        auditId,
         user.id,
         existingProfile.id,
         JSON.stringify({
@@ -1652,8 +1650,6 @@ app.put('/api/settings/ui', async (c) => {
       return jsonResponse(c, result)
     }
 
-    const auditId = createId('aud')
-
     await c.env.DB.batch([
       c.env.DB.prepare(
         `UPDATE HL_userProfiles
@@ -1662,10 +1658,9 @@ app.put('/api/settings/ui', async (c) => {
       ).bind(validation.data.theme, validation.data.accessibilityMode, user.id),
       c.env.DB.prepare(
         `INSERT INTO HL_auditLogs
-          (id, userId, action, entityType, entityId, metadataJson, createdAt)
-         VALUES (?, ?, 'uiSettingsUpdate', 'HL_userProfiles', ?, ?, CURRENT_TIMESTAMP)`
+          (userId, action, entityType, entityId, metadataJson, createdAt)
+         VALUES (?, 'uiSettingsUpdate', 'HL_userProfiles', ?, ?, CURRENT_TIMESTAMP)`
       ).bind(
-        auditId,
         user.id,
         existingProfile.id,
         JSON.stringify({
@@ -1809,7 +1804,7 @@ app.post('/api/measurements/validate', async (c) => {
     if (!sessionQuery) {
       return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid atau kadaluarsa.', 401, [], startedAt))
     }
-    const userId = (sessionQuery as { userId: string }).userId
+    const userId = (sessionQuery as { userId: number }).userId
 
     const body = await c.req.json() as ValidateInput
     if (!body.metrics || !Array.isArray(body.metrics)) {
@@ -1880,7 +1875,7 @@ type SubmitMetricValue = {
 }
 
 type SubmitInput = {
-  profileId?: string
+  profileId?: string | number
   measuredAt?: string
   source?: 'photo' | 'upload' | 'manual' | 'mixed'
   notes?: string
@@ -1901,7 +1896,7 @@ type RuleEvaluation = {
   popupTitle: string | null
   popupMessage: string | null
   recommendation: string | null
-  ruleId: string | null
+  ruleId: number | null
 }
 
 async function getCurrentSession(c: Context<{ Bindings: Env }>) {
@@ -1910,8 +1905,8 @@ async function getCurrentSession(c: Context<{ Bindings: Env }>) {
   const sessionTokenHash = await sha256Token(sessionToken)
   const row = await c.env.DB.prepare(
     'SELECT userId FROM HL_sessions WHERE sessionTokenHash = ? AND expiresAt > datetime("now") AND revokedAt IS NULL'
-  ).bind(sessionTokenHash).first<{ userId: string }>()
-  return row?.userId || null
+  ).bind(sessionTokenHash).first<{ userId: number }>()
+  return row?.userId ?? null
 }
 
 async function evaluateRule(
@@ -1943,7 +1938,7 @@ async function evaluateRule(
      ORDER BY rulePriority ASC, id ASC
      LIMIT 1`
   ).bind(metricCode, sex, ageYears, ageYears, value, value).first<{
-    id: string
+    id: number
     status: string
     severity: string
     emergencyLevel: string
@@ -1984,7 +1979,7 @@ function calculateAgeYears(birthDate: string): number {
 
 async function sendTelegramNotification(
   c: Context<{ Bindings: Env }>,
-  userId: string,
+  userId: number,
   notificationType: string,
   title: string,
   message: string
@@ -2040,7 +2035,7 @@ async function sendTelegramNotification(
 
 async function logNotification(
   c: Context<{ Bindings: Env }>,
-  userId: string,
+  userId: number,
   channel: string,
   notificationType: string,
   title: string,
@@ -2052,10 +2047,9 @@ async function logNotification(
   try {
     await c.env.DB.prepare(
       `INSERT INTO HL_notifications
-       (id, userId, channel, notificationType, title, message, status, payloadJson, errorMessage, sentAt, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${status === 'sent' ? 'CURRENT_TIMESTAMP' : 'NULL'}, CURRENT_TIMESTAMP)`
+       (userId, channel, notificationType, title, message, status, payloadJson, errorMessage, sentAt, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${status === 'sent' ? 'CURRENT_TIMESTAMP' : 'NULL'}, CURRENT_TIMESTAMP)`
     ).bind(
-      crypto.randomUUID(),
       userId,
       channel,
       notificationType,
@@ -2090,7 +2084,7 @@ app.post('/api/measurements/submit', async (c) => {
 
     const profile = await c.env.DB.prepare(
       'SELECT id, userId, sex, birthDate, heightCm FROM HL_userProfiles WHERE id = ? AND userId = ?'
-    ).bind(profileId, userId).first<{ id: string; userId: string; sex: string; birthDate: string; heightCm: number | null }>()
+    ).bind(profileId, userId).first<{ id: number; userId: number; sex: string; birthDate: string; heightCm: number | null }>()
 
     if (!profile) {
       return jsonResponse(c, failure('NOT_FOUND', 'Profil tidak ditemukan.', 404, [], startedAt))
@@ -2118,17 +2112,15 @@ app.post('/api/measurements/submit', async (c) => {
       })
     }
 
-    const sessionId = crypto.randomUUID()
     const hasAi = body.values.some(v => v.rawAiValue !== null && v.rawAiValue !== undefined) ? 1 : 0
     const hasAttachment = body.attachments && body.attachments.length > 0 ? 1 : 0
     const encryptedNotes = await encryptSensitive(c, body.notes)
 
-    await c.env.DB.prepare(
+    const sessionId = await insertAndGetId(c.env.DB.prepare(
       `INSERT INTO HL_measurementSessions
-       (id, userId, profileId, measuredAt, source, notes, hasAi, hasAttachment, hasEmergency, submittedAt, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+       (userId, profileId, measuredAt, source, notes, hasAi, hasAttachment, hasEmergency, submittedAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(
-      sessionId,
       userId,
       profileId,
       measuredAt,
@@ -2136,9 +2128,9 @@ app.post('/api/measurements/submit', async (c) => {
       encryptedNotes,
       hasAi,
       hasAttachment
-    ).run()
+    ))
 
-    const savedValues: Array<{ id: string; metricCode: string; status: string; severity: string; ruleId: string | null; finalValue: number; unit: string }> = []
+    const savedValues: Array<{ id: number; metricCode: string; status: string; severity: string; ruleId: number | null; finalValue: number; unit: string }> = []
     let hasEmergency = 0
     const missingRules: Array<{ metricCode: string; finalValue: number }> = []
 
@@ -2157,15 +2149,13 @@ app.post('/api/measurements/submit', async (c) => {
       if (!rule.ruleId) {
         missingRules.push({ metricCode: v.metricCode, finalValue: v.finalValue })
       }
-      const valueId = crypto.randomUUID()
       const manualOverride = v.manualOverride ? 1 : 0
 
-      await c.env.DB.prepare(
+      const valueId = await insertAndGetId(c.env.DB.prepare(
         `INSERT INTO HL_measurementValues
-         (id, sessionId, userId, metricCode, deviceCode, rawAiValue, finalValue, unit, confidence, manualOverride, status, severity, emergencyLevel, ruleId, measuredAt, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+         (sessionId, userId, metricCode, deviceCode, rawAiValue, finalValue, unit, confidence, manualOverride, status, severity, emergencyLevel, ruleId, measuredAt, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       ).bind(
-        valueId,
         sessionId,
         userId,
         v.metricCode,
@@ -2180,7 +2170,7 @@ app.post('/api/measurements/submit', async (c) => {
         rule.emergencyLevel,
         rule.ruleId,
         measuredAt
-      ).run()
+      ))
 
       if (rule.emergencyLevel === 'emergency' || rule.severity === 'emergency') {
         hasEmergency = 1
@@ -2199,22 +2189,20 @@ app.post('/api/measurements/submit', async (c) => {
 
     if (hasAttachment && body.attachments) {
       for (const att of body.attachments) {
-        const attId = crypto.randomUUID()
-        await c.env.DB.prepare(
+        const attId = await insertAndGetId(c.env.DB.prepare(
           `INSERT INTO HL_measurementAttachments
-           (id, sessionId, userId, metricCode, r2Key, fileName, fileType, fileSize, watermarked, compressed, compressionQuality, imageWidth, imageHeight, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?, 'image/webp', ?, 1, 1, 50, ?, ?, CURRENT_TIMESTAMP)`
+           (sessionId, userId, metricCode, r2Key, fileName, fileType, fileSize, watermarked, compressed, compressionQuality, imageWidth, imageHeight, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 50, ?, ?, CURRENT_TIMESTAMP)`
         ).bind(
-          attId,
           sessionId,
           userId,
           att.metricCode,
           att.r2Key,
-          `${att.metricCode}-${attId}.webp`,
+          `${att.metricCode}-att.webp`,
           att.sizeBytes,
           att.width,
           att.height
-        ).run()
+        ))
       }
     }
 
@@ -2226,10 +2214,9 @@ app.post('/api/measurements/submit', async (c) => {
 
     if (missingRules.length > 0) {
       await c.env.DB.prepare(
-        `INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt)
-         VALUES (?, ?, 'missingRule', 'HL_measurementSessions', ?, ?, CURRENT_TIMESTAMP)`
+        `INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt)
+         VALUES (?, 'missingRule', 'HL_measurementSessions', ?, ?, CURRENT_TIMESTAMP)`
       ).bind(
-        crypto.randomUUID(),
         userId,
         sessionId,
         JSON.stringify({ missing: missingRules })
@@ -2237,10 +2224,9 @@ app.post('/api/measurements/submit', async (c) => {
     }
 
     await c.env.DB.prepare(
-      `INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt)
-       VALUES (?, ?, 'measurementSubmit', 'HL_measurementSessions', ?, ?, CURRENT_TIMESTAMP)`
+      `INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt)
+       VALUES (?, 'measurementSubmit', 'HL_measurementSessions', ?, ?, CURRENT_TIMESTAMP)`
     ).bind(
-      crypto.randomUUID(),
       userId,
       sessionId,
       JSON.stringify({
@@ -2339,7 +2325,7 @@ app.post('/api/measurements/attachments/upload', async (c) => {
 
     const sessionRow = await c.env.DB.prepare(
       'SELECT userId FROM HL_measurementSessions WHERE id = ?'
-    ).bind(sessionId).first<{ userId: string }>()
+    ).bind(sessionId).first<{ userId: number }>()
 
     if (!sessionRow || sessionRow.userId !== userId) {
       return jsonResponse(c, failure('NOT_FOUND', 'Sesi tidak ditemukan.', 404, [], startedAt))
@@ -2350,8 +2336,8 @@ app.post('/api/measurements/attachments/upload', async (c) => {
       return jsonResponse(c, failure('VALIDATION_ERROR', `File terlalu besar. Maks ${Math.round(maxUploadSize / 1024 / 1024)}MB.`, 400, [], startedAt))
     }
 
-    const attachmentId = crypto.randomUUID()
-    const r2Key = `HL/users/${userId}/measurements/${sessionId}/${metricCode}-${attachmentId}.webp`
+    const uniqueSuffix = Date.now().toString(36)
+    const r2Key = `HL/users/${userId}/measurements/${sessionId}/${metricCode}-${uniqueSuffix}.webp`
 
     const arrayBuffer = await file.arrayBuffer()
     await c.env.LOGS.put(r2Key, arrayBuffer, {
@@ -2363,12 +2349,11 @@ app.post('/api/measurements/attachments/upload', async (c) => {
     const width = parseInt((formData.width as string) || '0', 10) || null
     const height = parseInt((formData.height as string) || '0', 10) || null
 
-    await c.env.DB.prepare(
+    const attachmentId = await insertAndGetId(c.env.DB.prepare(
       `INSERT INTO HL_measurementAttachments
-       (id, sessionId, userId, metricCode, r2Key, fileName, fileType, fileSize, watermarked, compressed, compressionQuality, imageWidth, imageHeight)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 50, ?, ?)`
+       (sessionId, userId, metricCode, r2Key, fileName, fileType, fileSize, watermarked, compressed, compressionQuality, imageWidth, imageHeight)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 50, ?, ?)`
     ).bind(
-      attachmentId,
       sessionId,
       userId,
       metricCode,
@@ -2378,7 +2363,7 @@ app.post('/api/measurements/attachments/upload', async (c) => {
       file.size,
       width,
       height
-    ).run()
+    ))
 
     await c.env.DB.prepare(
       'UPDATE HL_measurementSessions SET hasAttachment = 1 WHERE id = ?'
@@ -2499,6 +2484,44 @@ app.get('/api/measurements/history', async (c) => {
   }
 })
 
+// Get last measurements for rarely-changing metrics (auto-fill)
+app.get('/api/measurements/last', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const rows = await c.env.DB.prepare(
+      'SELECT metricCode, deviceCode, finalValue, unit, measuredAt FROM HL_lastMeasurements WHERE userId = ? ORDER BY measuredAt DESC'
+    ).bind(userId).all<{ metricCode: string; deviceCode: string | null; finalValue: number; unit: string; measuredAt: string }>()
+    return jsonResponse(c, success({ data: rows.results || [] }, 200, startedAt))
+  } catch (error) {
+    console.error('last measurements error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat data terakhir.', 500, [], startedAt))
+  }
+})
+
+// Save/update last measurement for rarely-changing metrics
+app.post('/api/measurements/last/save', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { metricCode?: string; deviceCode?: string; finalValue?: number; unit?: string; measuredAt?: string }
+    if (!body.metricCode || body.finalValue == null || !body.unit || !body.measuredAt) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'metricCode, finalValue, unit, measuredAt wajib.', 400, [], startedAt))
+    }
+    await c.env.DB.prepare(
+      `INSERT INTO HL_lastMeasurements (userId, deviceCode, metricCode, finalValue, unit, measuredAt)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(userId, deviceCode, metricCode) DO UPDATE SET finalValue = excluded.finalValue, unit = excluded.unit, measuredAt = excluded.measuredAt`
+    ).bind(userId, body.deviceCode || null, body.metricCode, body.finalValue, body.unit, body.measuredAt).run()
+    return jsonResponse(c, success({ saved: true }, 200, startedAt))
+  } catch (error) {
+    console.error('save last measurement error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menyimpan data terakhir.', 500, [], startedAt))
+  }
+})
+
 app.get('/api/measurements/attachments/:id', async (c) => {
   const startedAt = Date.now()
   try {
@@ -2509,7 +2532,7 @@ app.get('/api/measurements/attachments/:id', async (c) => {
 
     const attachment = await c.env.DB.prepare(
       'SELECT id, userId, r2Key, fileType, fileName FROM HL_measurementAttachments WHERE id = ?'
-    ).bind(c.req.param('id')).first<{ id: string; userId: string; r2Key: string; fileType: string; fileName: string }>()
+    ).bind(c.req.param('id')).first<{ id: number; userId: number; r2Key: string; fileType: string; fileName: string }>()
 
     if (!attachment || attachment.userId !== userId) {
       return jsonResponse(c, failure('NOT_FOUND', 'Lampiran tidak ditemukan.', 404, [], startedAt))
@@ -2731,7 +2754,7 @@ async function callConfiguredTextAi(
   return null
 }
 
-async function getRecentValues(c: Context<{ Bindings: Env }>, userId: string, days: number) {
+async function getRecentValues(c: Context<{ Bindings: Env }>, userId: number, days: number) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   const rows = await c.env.DB.prepare(
     `SELECT metricCode, finalValue, unit, status, severity, measuredAt
@@ -2799,13 +2822,11 @@ Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
       modelName = aiResult.model
     }
 
-    const recId = crypto.randomUUID()
-    await c.env.DB.prepare(
+    const recId = await insertAndGetId(c.env.DB.prepare(
       `INSERT INTO HL_aiRecommendations
-       (id, userId, sessionId, summaryText, todayJson, threeDayJson, sevenDayJson, ruleStatusJson, modelName, durationMs, safetyStatus, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+       (userId, sessionId, summaryText, todayJson, threeDayJson, sevenDayJson, ruleStatusJson, modelName, durationMs, safetyStatus, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
     ).bind(
-      recId,
       userId,
       sessionId || null,
       recommendationText,
@@ -2816,7 +2837,7 @@ Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
       modelName,
       Date.now() - startedAt,
       safetyStatus
-    ).run()
+    ))
 
     // US-2.3.2/3: Append data availability messages
     const has3Day = last3Days.length >= 3
@@ -3241,12 +3262,11 @@ app.post('/api/telegram/connect', async (c) => {
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const code = String(Math.floor(100000 + Math.random() * 900000))
     const codeHash = await sha256Token(code)
-    const linkId = createId('tgl')
     await c.env.DB.prepare(
-      `INSERT INTO HL_telegramLinks (id, userId, verificationCodeHash, verified, enabled, createdAt, updatedAt)
-       VALUES (?, ?, ?, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `INSERT INTO HL_telegramLinks (userId, verificationCodeHash, verified, enabled, createdAt, updatedAt)
+       VALUES (?, ?, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        ON CONFLICT(userId) DO UPDATE SET verificationCodeHash = excluded.verificationCodeHash, updatedAt = CURRENT_TIMESTAMP`
-    ).bind(linkId, userId, codeHash).run()
+    ).bind(userId, codeHash).run()
     return jsonResponse(c, success({ verificationCode: code, expiresInMinutes: 10 }, 200, startedAt))
   } catch (error) {
     console.error('telegram connect error:', error)
@@ -3295,7 +3315,6 @@ app.post('/api/family/invite', async (c) => {
     if (!inviteEmail) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'inviteEmail wajib.', 400, [], startedAt))
     }
-    const inviteId = createId('fmi')
     const shareToken = crypto.randomUUID().replace(/-/g, '')
     const shareTokenHash = await sha256Token(shareToken)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -3305,23 +3324,20 @@ app.post('/api/family/invite', async (c) => {
       canInputMeasurement: Boolean(body.permissions?.canInputMeasurement),
       canReceiveAlert: body.permissions?.canReceiveAlert !== false
     }
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `INSERT INTO HL_familyInvites (id, ownerUserId, inviteEmail, role, inviteTokenHash, status, expiresAt, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(inviteId, userId, inviteEmail, role, shareTokenHash, expiresAt),
-      c.env.DB.prepare(
-        `INSERT INTO HL_familyLinks (id, ownerUserId, linkedUserId, role, status, canViewDashboard, canInputMeasurement, canReceiveAlert, createdAt, updatedAt)
-         VALUES (?, ?, NULL, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(
-        inviteId,
-        userId,
-        role,
-        permissions.canViewDashboard ? 1 : 0,
-        permissions.canInputMeasurement ? 1 : 0,
-        permissions.canReceiveAlert ? 1 : 0
-      )
-    ])
+    const inviteId = await insertAndGetId(c.env.DB.prepare(
+      `INSERT INTO HL_familyInvites (ownerUserId, inviteEmail, role, inviteTokenHash, status, expiresAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(userId, inviteEmail, role, shareTokenHash, expiresAt))
+    await c.env.DB.prepare(
+      `INSERT INTO HL_familyLinks (ownerUserId, linkedUserId, role, status, canViewDashboard, canInputMeasurement, canReceiveAlert, createdAt, updatedAt)
+       VALUES (?, NULL, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(
+      userId,
+      role,
+      permissions.canViewDashboard ? 1 : 0,
+      permissions.canInputMeasurement ? 1 : 0,
+      permissions.canReceiveAlert ? 1 : 0
+    ).run()
     return jsonResponse(
       c,
       success(
@@ -3467,15 +3483,16 @@ app.post('/api/emergency/contacts', async (c) => {
     const contactPhone = body.contactPhone || body.phone || ''
     const contactRelation = body.contactRelation || body.relationship || null
     if (!contactName || !contactPhone) return jsonResponse(c, failure('VALIDATION_ERROR', 'name dan phone wajib.', 400, [], startedAt))
-    const contactId = createId('emc')
-    const encryptedName = await encryptSensitive(c, contactName)
-    const encryptedPhone = await encryptSensitive(c, contactPhone)
-    const encryptedTelegramChatId = await encryptSensitive(c, body.telegramChatId)
-    const consentGiven = body.canReceiveAlert || body.consentGiven ? 1 : 0
-    await c.env.DB.prepare(
-      `INSERT INTO HL_emergencyContacts (id, userId, contactName, contactRelation, contactPhone, telegramChatId, consentGiven, enabled, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).bind(contactId, userId, encryptedName, contactRelation, encryptedPhone, encryptedTelegramChatId, consentGiven).run()
+    const contactId = await (async () => {
+      const encryptedName = await encryptSensitive(c, contactName)
+      const encryptedPhone = await encryptSensitive(c, contactPhone)
+      const encryptedTelegramChatId = await encryptSensitive(c, body.telegramChatId)
+      const consentGiven = body.canReceiveAlert || body.consentGiven ? 1 : 0
+      return insertAndGetId(c.env.DB.prepare(
+        `INSERT INTO HL_emergencyContacts (userId, contactName, contactRelation, contactPhone, telegramChatId, consentGiven, enabled, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(userId, encryptedName, contactRelation, encryptedPhone, encryptedTelegramChatId, consentGiven))
+    })()
     return jsonResponse(c, success({ contactId }, 201, startedAt))
   } catch (error) {
     console.error('emergency contact error:', error)
@@ -3545,12 +3562,11 @@ app.post('/api/reminders', async (c) => {
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const body = await c.req.json() as { metricCode?: string; time: string; daysOfWeek?: string; label?: string }
     if (!body.time) return jsonResponse(c, failure('VALIDATION_ERROR', 'time wajib.', 400, [], startedAt))
-    const remId = createId('rem')
     const reminderType = body.metricCode || 'general'
-    await c.env.DB.prepare(
-      `INSERT INTO HL_reminderSettings (id, userId, reminderType, scheduleTime, timezone, payloadJson, enabled, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, 'Asia/Jakarta', ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).bind(remId, userId, reminderType, body.time, JSON.stringify({ label: body.label || null, daysOfWeek: body.daysOfWeek || '1,2,3,4,5,6,7' })).run()
+    const remId = await insertAndGetId(c.env.DB.prepare(
+      `INSERT INTO HL_reminderSettings (userId, reminderType, scheduleTime, timezone, payloadJson, enabled, createdAt, updatedAt)
+       VALUES (?, ?, ?, 'Asia/Jakarta', ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(userId, reminderType, body.time, JSON.stringify({ label: body.label || null, daysOfWeek: body.daysOfWeek || '1,2,3,4,5,6,7' })))
     return jsonResponse(c, success({ reminderId: remId }, 201, startedAt))
   } catch (error) {
     console.error('reminder create error:', error)
@@ -3594,11 +3610,10 @@ app.post('/api/patterns/generate', async (c) => {
       }, 200, startedAt))
     }
     const insightText = `Pola tidur rata-rata ${sleep?.avg?.toFixed(1)} jam/hari dengan tekanan darah sistolik rata-rata ${bp?.avg?.toFixed(0)} mmHg. Konsultasikan dengan dokter untuk interpretasi lebih lanjut.`
-    const insightId = createId('pi')
-    await c.env.DB.prepare(
-      `INSERT INTO HL_patternInsights (id, userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-    ).bind(insightId, userId, body.patternType || 'sleep_bp', since, new Date().toISOString(), insightText, JSON.stringify({ sleep, bp })).run()
+    const insightId = await insertAndGetId(c.env.DB.prepare(
+      `INSERT INTO HL_patternInsights (userId, insightType, rangeStart, rangeEnd, summaryText, dataJson, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(userId, body.patternType || 'sleep_bp', since, new Date().toISOString(), insightText, JSON.stringify({ sleep, bp })))
     return jsonResponse(c, success({ insightId, insight: insightText, hasEnoughData: true }, 200, startedAt))
   } catch (error) {
     console.error('pattern error:', error)
@@ -3616,12 +3631,11 @@ app.post('/api/measurements/sync', async (c) => {
     if (!body.drafts || !Array.isArray(body.drafts)) return jsonResponse(c, failure('VALIDATION_ERROR', 'drafts wajib.', 400, [], startedAt))
     const synced: any[] = []
     for (const d of body.drafts) {
-      const draftId = createId('drf')
       const profileId = d.profileId && typeof d.profileId === 'string' ? d.profileId : null
-      await c.env.DB.prepare(
-        `INSERT INTO HL_measurementDrafts (id, userId, profileId, selectedMetricsJson, draftDataJson, status, createdAt, updatedAt, expiresAt)
-         VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)`
-      ).bind(draftId, userId, profileId, JSON.stringify(d.metrics || []), JSON.stringify(d), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()).run()
+      const draftId = await insertAndGetId(c.env.DB.prepare(
+        `INSERT INTO HL_measurementDrafts (userId, profileId, selectedMetricsJson, draftDataJson, status, createdAt, updatedAt, expiresAt)
+         VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)`
+      ).bind(userId, profileId, JSON.stringify(d.metrics || []), JSON.stringify(d), new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()))
       synced.push({ clientId: d.clientId, draftId })
     }
     return jsonResponse(c, success({ synced, count: synced.length }, 200, startedAt))
@@ -3664,9 +3678,8 @@ app.post('/api/privacy/deleteAccount', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const auditId = createId('aud')
     await c.env.DB.batch([
-      c.env.DB.prepare(`INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'accountDelete', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`).bind(auditId, userId, userId, JSON.stringify({ requestedAt: new Date().toISOString() })),
+      c.env.DB.prepare(`INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'accountDelete', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`).bind(userId, userId, JSON.stringify({ requestedAt: new Date().toISOString() })),
       c.env.DB.prepare(`UPDATE HL_users SET active = 0 WHERE id = ?`).bind(userId),
       c.env.DB.prepare(`UPDATE HL_sessions SET revokedAt = CURRENT_TIMESTAMP WHERE userId = ? AND revokedAt IS NULL`).bind(userId)
     ])
@@ -3686,9 +3699,8 @@ app.post('/api/account/delete', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const auditId = createId('aud')
     await c.env.DB.batch([
-      c.env.DB.prepare(`INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'accountDelete', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`).bind(auditId, userId, userId, JSON.stringify({ requestedAt: new Date().toISOString() })),
+      c.env.DB.prepare(`INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'accountDelete', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`).bind(userId, userId, JSON.stringify({ requestedAt: new Date().toISOString() })),
       c.env.DB.prepare(`UPDATE HL_users SET active = 0 WHERE id = ?`).bind(userId),
       c.env.DB.prepare(`UPDATE HL_sessions SET revokedAt = CURRENT_TIMESTAMP WHERE userId = ? AND revokedAt IS NULL`).bind(userId)
     ])
@@ -3719,18 +3731,22 @@ export {
   validateRegistrationInput,
   validateUiSettingsInput,
   verifyPassword,
-  metricCatalogResponse
+  metricCatalogResponse,
+  getInsertedId,
+  insertAndGetId,
+  idsEqual,
+  nullableInteger
 }
 
 
 
 // US-3.1.3: Async Telegram summary via Cloudflare Queue.
 interface TelegramQueueMessage {
-  userId: string
+  userId: number
   notificationType: 'submit_summary' | 'emergency_alert'
   title: string
   message: string
-  sessionId?: string
+  sessionId?: number
   hasEmergency?: boolean
 }
 
@@ -3841,7 +3857,7 @@ app.post('/api/measurements/extract', async (c) => {
       return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid atau kadaluarsa.', 401, []))
     }
 
-    const userId = (sessionQuery as { userId: string }).userId
+    const userId = (sessionQuery as { userId: number }).userId
 
     // Parse multipart form data
     const formData = await c.req.parseBody()
@@ -4037,13 +4053,11 @@ app.post('/api/measurements/extract', async (c) => {
     const durationMs = Date.now() - aiStartedAt
 
     // Log extraction to database
-    const extractionId = crypto.randomUUID()
     await c.env.DB.prepare(
       `INSERT INTO HL_aiExtractions 
-       (id, userId, sessionDraftId, deviceCode, metricGroup, selectedMetricsJson, rawResponse, parsedJson, durationMs, success, timeout, confidence, modelName) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (userId, sessionDraftId, deviceCode, metricGroup, selectedMetricsJson, rawResponse, parsedJson, durationMs, success, timeout, confidence, modelName) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      extractionId,
       userId,
       sessionDraftId || null,
       deviceCode,
@@ -4184,8 +4198,8 @@ app.put('/api/admin/configs/:configKey', async (c) => {
     await c.env.DB.prepare('UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = ?').bind(body.configValue, configKey).run()
     invalidateSystemConfigCache(c.env.DB, configKey)
     await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configUpdate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), user.id, configKey, systemConfigAuditMetadata(configKey, { updated: true })).run()
+      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'configUpdate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(user.id, configKey, systemConfigAuditMetadata(configKey, { updated: true })).run()
     return jsonResponse(c, success({ updated: true, cacheInvalidated: true }, 200, startedAt))
   } catch (error) {
     console.error('admin config update error:', error)
@@ -4218,8 +4232,8 @@ app.post('/api/admin/configs', async (c) => {
     ).bind(configKey, body.configValue, dataType, body.description || null).run()
     invalidateSystemConfigCache(c.env.DB, configKey)
     await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configCreate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), user.id, configKey, systemConfigAuditMetadata(configKey, { dataType, created: true })).run()
+      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'configCreate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(user.id, configKey, systemConfigAuditMetadata(configKey, { dataType, created: true })).run()
     return jsonResponse(c, success({ created: true, configKey, cacheInvalidated: true }, 201, startedAt))
   } catch (error) {
     console.error('admin config create error:', error)
@@ -4245,8 +4259,8 @@ app.delete('/api/admin/configs/:configKey', async (c) => {
     await c.env.DB.prepare('DELETE FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).run()
     invalidateSystemConfigCache(c.env.DB, configKey)
     await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configDelete', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), user.id, configKey, systemConfigAuditMetadata(configKey, { deleted: true })).run()
+      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'configDelete', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(user.id, configKey, systemConfigAuditMetadata(configKey, { deleted: true })).run()
     return jsonResponse(c, success({ deleted: true, cacheInvalidated: true }, 200, startedAt))
   } catch (error) {
     console.error('admin config delete error:', error)
@@ -4273,8 +4287,8 @@ app.post('/api/telegram/verify', async (c) => {
       c.env.DB.prepare('UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId)
     ])
     await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), userId, link.id, JSON.stringify({ telegramChatLinked: true })).run()
+      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(userId, link.id, JSON.stringify({ telegramChatLinked: true })).run()
     return jsonResponse(c, success({ verified: true, enabled: true }, 200, startedAt))
   } catch (error) {
     console.error('telegram verify error:', error)
@@ -4289,8 +4303,8 @@ app.put('/api/telegram/settings', async (c) => {
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const body = await c.req.json() as { telegramSubmitSummary?: boolean; telegramEmergencyAlert?: boolean }
     await c.env.DB.prepare(
-      "INSERT INTO HL_notificationSettings (id, userId, telegramSubmitSummary, telegramEmergencyAlert, createdAt, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(userId) DO UPDATE SET telegramSubmitSummary = excluded.telegramSubmitSummary, telegramEmergencyAlert = excluded.telegramEmergencyAlert, updatedAt = CURRENT_TIMESTAMP"
-    ).bind(createId('nts'), userId, body.telegramSubmitSummary ? 1 : 0, body.telegramEmergencyAlert ? 1 : 0).run()
+      "INSERT INTO HL_notificationSettings (userId, telegramSubmitSummary, telegramEmergencyAlert, createdAt, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(userId) DO UPDATE SET telegramSubmitSummary = excluded.telegramSubmitSummary, telegramEmergencyAlert = excluded.telegramEmergencyAlert, updatedAt = CURRENT_TIMESTAMP"
+    ).bind(userId, body.telegramSubmitSummary ? 1 : 0, body.telegramEmergencyAlert ? 1 : 0).run()
     return jsonResponse(c, success({ updated: true }, 200, startedAt))
   } catch (error) {
     console.error('telegram settings error:', error)
@@ -4346,7 +4360,7 @@ app.post('/api/alerts/:id/acknowledge', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const alertId = c.req.param('id')
-    const alert = await c.env.DB.prepare('SELECT id, userId, acknowledged FROM HL_alerts WHERE id = ?').bind(alertId).first<{ id: string; userId: string; acknowledged: number }>()
+    const alert = await c.env.DB.prepare('SELECT id, userId, acknowledged FROM HL_alerts WHERE id = ?').bind(alertId).first<{ id: number; userId: number; acknowledged: number }>()
     if (!alert) return jsonResponse(c, failure('NOT_FOUND', 'Alert tidak ditemukan.', 404, [], startedAt))
     if (alert.acknowledged === 1) return jsonResponse(c, success({ alreadyAcknowledged: true }, 200, startedAt))
     if (alert.userId !== userId) {
@@ -4355,8 +4369,8 @@ app.post('/api/alerts/:id/acknowledge', async (c) => {
     }
     await c.env.DB.prepare('UPDATE HL_alerts SET acknowledged = 1, acknowledgedBy = ?, acknowledgedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId, alertId).run()
     await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'alertAcknowledge', 'HL_alerts', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), userId, alertId, JSON.stringify({ alertId })).run()
+      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'alertAcknowledge', 'HL_alerts', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(userId, alertId, JSON.stringify({ alertId })).run()
     return jsonResponse(c, success({ acknowledged: true, acknowledgedAt: new Date().toISOString() }, 200, startedAt))
   } catch (error) {
     console.error('alert acknowledge error:', error)
@@ -4420,8 +4434,8 @@ app.post('/api/notifications/browser/subscribe', async (c) => {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'endpoint, keys.p256dh, dan keys.auth wajib.', 400, [], startedAt))
     }
     await c.env.DB.prepare(
-      "INSERT INTO HL_pushSubscriptions (id, userId, endpoint, p256dh, auth, userAgent, enabled, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(endpoint) DO UPDATE SET userId = excluded.userId, p256dh = excluded.p256dh, auth = excluded.auth, userAgent = excluded.userAgent, updatedAt = CURRENT_TIMESTAMP"
-    ).bind(createId('psh'), userId, body.endpoint, body.keys.p256dh, body.keys.auth, body.userAgent || null).run()
+      "INSERT INTO HL_pushSubscriptions (userId, endpoint, p256dh, auth, userAgent, enabled, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(endpoint) DO UPDATE SET userId = excluded.userId, p256dh = excluded.p256dh, auth = excluded.auth, userAgent = excluded.userAgent, updatedAt = CURRENT_TIMESTAMP"
+    ).bind(userId, body.endpoint, body.keys.p256dh, body.keys.auth, body.userAgent || null).run()
     await c.env.DB.prepare('UPDATE HL_users SET browserPushEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId).run()
     return jsonResponse(c, success({ subscribed: true }, 201, startedAt))
   } catch (error) {
@@ -4490,11 +4504,10 @@ app.post('/api/medications', async (c) => {
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const body = await c.req.json() as { medicationName?: string; dosageText?: string; scheduleText?: string; active?: boolean; schedules?: Array<{ scheduleTime: string; timezone?: string }> }
     if (!body.medicationName) return jsonResponse(c, failure('VALIDATION_ERROR', 'medicationName wajib.', 400, [], startedAt))
-    const medId = createId('med')
-    await c.env.DB.prepare('INSERT INTO HL_medications (id, userId, medicationName, dosageText, scheduleText, active, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(medId, userId, body.medicationName, body.dosageText || null, body.scheduleText || null, body.active !== false ? 1 : 0).run()
+    const medId = await insertAndGetId(c.env.DB.prepare('INSERT INTO HL_medications (userId, medicationName, dosageText, scheduleText, active, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(userId, body.medicationName, body.dosageText || null, body.scheduleText || null, body.active !== false ? 1 : 0))
     if (body.schedules && body.schedules.length > 0) {
       for (const s of body.schedules) {
-        await c.env.DB.prepare('INSERT INTO HL_medicationSchedules (id, userId, medicationId, scheduleTime, timezone, active, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(createId('msc'), userId, medId, s.scheduleTime, s.timezone || 'Asia/Jakarta').run()
+        await insertAndGetId(c.env.DB.prepare('INSERT INTO HL_medicationSchedules (userId, medicationId, scheduleTime, timezone, active, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(userId, medId, s.scheduleTime, s.timezone || 'Asia/Jakarta'))
       }
     }
     return jsonResponse(c, success({ medicationId: medId }, 201, startedAt))
@@ -4546,9 +4559,8 @@ app.post('/api/medications/:id/log', async (c) => {
     if (!['taken', 'skipped', 'missed', 'unknown'].includes(body.status || '')) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'Status harus taken, skipped, missed, atau unknown.', 400, [], startedAt))
     }
-    const logId = createId('mlog')
     const encryptedNote = await encryptSensitive(c, body.note)
-    await c.env.DB.prepare('INSERT INTO HL_medicationLogs (id, userId, medicationId, takenAt, status, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(logId, userId, medId, body.takenAt || new Date().toISOString(), body.status, encryptedNote).run()
+    const logId = await insertAndGetId(c.env.DB.prepare('INSERT INTO HL_medicationLogs (userId, medicationId, takenAt, status, note, createdAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(userId, medId, body.takenAt || new Date().toISOString(), body.status, encryptedNote))
     return jsonResponse(c, success({ logId }, 201, startedAt))
   } catch (error) {
     console.error('medication log error:', error)
@@ -4602,8 +4614,8 @@ app.post('/api/telegram/webhook', async (c) => {
           c.env.DB.prepare('UPDATE HL_users SET telegramEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(link.userId)
         ])
         await c.env.DB.prepare(
-          "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
-        ).bind(createId('aud'), link.userId, link.id, JSON.stringify({ telegramChatLinked: true })).run()
+          "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'telegramConnect', 'HL_telegramLinks', ?, ?, CURRENT_TIMESTAMP)"
+        ).bind(link.userId, link.id, JSON.stringify({ telegramChatLinked: true })).run()
       }
     }
     return c.json({ ok: true })

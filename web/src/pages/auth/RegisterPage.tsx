@@ -8,7 +8,7 @@ type RegisterResponse = {
   success: boolean
   data?: {
     user: {
-      id: string
+      id: number
       email: string
       displayName: string
     }
@@ -24,18 +24,35 @@ type RegisterResponse = {
   }
 }
 
+function passwordStrength(pw: string): { level: number; label: string; color: string } {
+  let score = 0
+  if (pw.length >= 8) score++
+  if (pw.length >= 12) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[a-z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+
+  if (score <= 2) return { level: 1, label: 'Weak', color: 'var(--colorDanger)' }
+  if (score <= 4) return { level: 2, label: 'Fair', color: 'var(--colorWarning)' }
+  return { level: 3, label: 'Strong', color: 'var(--colorSuccess)' }
+}
+
 export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
   const { setAuthenticated } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [status, setStatus] = useState<RegisterState>('idle')
   const [message, setMessage] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setStatus('submitting')
     setMessage('')
+    setFieldErrors({})
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -54,9 +71,11 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
       const body = (await response.json()) as RegisterResponse
 
       if (!response.ok || !body.success) {
-        const detail = body.error?.details?.[0]?.message
+        const nextErrors: Record<string, string> = {}
+        body.error?.details?.forEach((d) => { nextErrors[d.field] = d.message })
+        setFieldErrors(nextErrors)
         setStatus('error')
-        setMessage(detail ?? body.error?.message ?? 'Registrasi gagal diproses.')
+        setMessage(body.error?.message ?? 'Registrasi gagal diproses.')
         return
       }
 
@@ -84,6 +103,7 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
   }
 
   const submitting = status === 'submitting'
+  const strength = password.length > 0 ? passwordStrength(password) : null
 
   return (
     <main className="auth-page">
@@ -111,46 +131,78 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
             Nama tampilan
             <input
               autoComplete="name"
+              className={fieldErrors.displayName ? 'field-error-input' : ''}
               minLength={2}
               name="displayName"
-              onChange={(event) => setDisplayName(event.target.value)}
+              onChange={(event) => { setDisplayName(event.target.value); setFieldErrors((p) => { const n = { ...p }; delete n.displayName; return n }) }}
+              placeholder="e.g. Budi Santoso"
               required
               type="text"
               value={displayName}
             />
+            {fieldErrors.displayName ? <span className="field-error">{fieldErrors.displayName}</span> : null}
           </label>
 
           <label>
             Email
             <input
               autoComplete="email"
+              className={fieldErrors.email ? 'field-error-input' : ''}
               name="email"
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => { setEmail(event.target.value); setFieldErrors((p) => { const n = { ...p }; delete n.email; return n }) }}
+              placeholder="you@clinic.com"
               required
               type="email"
               value={email}
             />
+            {fieldErrors.email ? <span className="field-error">{fieldErrors.email}</span> : null}
           </label>
 
           <label>
             Password
-            <input
-              autoComplete="new-password"
-              minLength={8}
-              name="password"
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
+            <div className="password-input-wrap">
+              <input
+                autoComplete="new-password"
+                className={fieldErrors.password ? 'field-error-input' : ''}
+                minLength={8}
+                name="password"
+                onChange={(event) => { setPassword(event.target.value); setFieldErrors((p) => { const n = { ...p }; delete n.password; return n }) }}
+                placeholder="Min 8 chars, upper + lower + number"
+                required
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+              />
+              <button
+                className="password-toggle-btn"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                type="button"
+              >
+                <span className="material-symbols-outlined">{showPassword ? 'visibility_off' : 'visibility'}</span>
+              </button>
+            </div>
+            {strength ? (
+              <div className="password-strength">
+                <div className="password-strength-bar">
+                  <div className="password-strength-fill" style={{ width: `${(strength.level / 3) * 100}%`, background: strength.color }} />
+                </div>
+                <span style={{ color: strength.color, fontSize: 12, fontWeight: 500 }}>{strength.label}</span>
+              </div>
+            ) : null}
+            {fieldErrors.password ? <span className="field-error">{fieldErrors.password}</span> : null}
           </label>
 
-          <button disabled={submitting} type="submit">
-            {submitting ? 'Membuat akun...' : 'Daftar'}
+          <button className="btn-primary" disabled={submitting} type="submit">
+            {submitting ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="spinner" />
+                Membuat akun...
+              </span>
+            ) : 'Daftar'}
           </button>
 
           <button className="secondary-action" onClick={onShowLogin} type="button">
-            Sudah punya akun
+            Sudah punya akun? Login di sini
           </button>
 
           {message ? (

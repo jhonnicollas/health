@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { formatIndonesianDate } from '../../utils/dateFormat'
 
 type AlertItem = {
-  id: string
+  id: number
   metricCode: string
   finalValue: number
   unit: string
@@ -14,7 +15,7 @@ type AlertItem = {
 }
 
 type NotificationItem = {
-  id: string
+  id: number
   channel: string
   notificationType: string
   title: string
@@ -68,7 +69,7 @@ export function AlertsPage() {
     void load()
   }, [])
 
-  async function acknowledge(id: string) {
+  async function acknowledge(id: number) {
     const res = await fetch(`/api/alerts/${id}/acknowledge`, {
       method: 'POST',
       credentials: 'include',
@@ -117,7 +118,7 @@ export function AlertsPage() {
                 <div>
                   <strong>{alert.metricCode}</strong>: {alert.message}
                   <div className="muted">
-                    Value {alert.finalValue} {alert.unit} · {new Date(alert.createdAt).toLocaleString()}
+                    Value {alert.finalValue} {alert.unit} · {formatIndonesianDate(alert.createdAt)}
                   </div>
                 </div>
                 {alert.acknowledged === true || alert.acknowledged === 1 ? (
@@ -142,7 +143,7 @@ export function AlertsPage() {
                 </span>
                 <strong>{notification.title}</strong>
                 <p>{notification.message}</p>
-                <small>{notification.channel} · {notification.notificationType} · {new Date(notification.createdAt).toLocaleString()}</small>
+                <small>{notification.channel} · {notification.notificationType} · {formatIndonesianDate(notification.createdAt)}</small>
                 {notification.errorMessage ? <small className="form-message error">{notification.errorMessage}</small> : null}
               </li>
             ))}

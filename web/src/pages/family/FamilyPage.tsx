@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type FamilyLink = {
-  id: string
+  id: number
   ownerUserId?: string
   linkedUserId?: string | null
   linkedDisplayName?: string | null
@@ -89,7 +89,7 @@ export function FamilyPage() {
     }
   }
 
-  async function revoke(id: string) {
+  async function revoke(id: number) {
     const res = await fetch(`/api/family/${id}`, { method: 'DELETE', credentials: 'include' })
     if (res.ok) await load()
   }

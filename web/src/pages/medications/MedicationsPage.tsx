@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type Medication = {
-  id: string
+  id: number
   medicationName: string
   dosageText: string
   scheduleText: string
@@ -10,8 +10,8 @@ type Medication = {
 }
 
 type MedicationLog = {
-  id: string
-  medicationId: string
+  id: number
+  medicationId: number
   medicationName: string
   takenAt: string
   status: 'taken' | 'skipped' | 'missed' | 'unknown'
@@ -63,7 +63,7 @@ export function MedicationsPage() {
   }, [])
 
   const latestStatusByMedication = useMemo(() => {
-    const map = new Map<string, MedicationLog>()
+    const map = new Map<number, MedicationLog>()
     for (const log of logs) {
       if (!map.has(log.medicationId)) map.set(log.medicationId, log)
     }
@@ -86,7 +86,7 @@ export function MedicationsPage() {
           active: true
         })
       })
-      const body = (await res.json()) as ApiResp<{ medicationId: string }>
+      const body = (await res.json()) as ApiResp<{ medicationId: number }>
       if (!res.ok || !body.success) {
         setError(body.error?.message ?? 'Failed to add medication.')
         return
@@ -117,7 +117,7 @@ export function MedicationsPage() {
     await load()
   }
 
-  async function remove(id: string) {
+  async function remove(id: number) {
     const res = await fetch(`/api/medications/${id}`, {
       method: 'DELETE',
       credentials: 'include'

@@ -142,7 +142,7 @@ class D1MockStatement {
 
   async run() {
     this.db.apply(this)
-    return { success: true }
+    return { success: true, meta: { last_row_id: this.db.lastInsertId } }
   }
 
   async all() {
@@ -239,6 +239,7 @@ class D1MockStatement {
 
 class D1Mock {
   constructor(options = {}) {
+    this.lastInsertId = 0
     this.users = []
     this.sessions = []
     this.auditLogs = []
@@ -617,7 +618,11 @@ class D1Mock {
 
   apply(statement) {
     if (statement.sql.includes('INSERT INTO HL_users')) {
-      const [id, email, passwordHash, displayName] = statement.params
+      const hasExplicitId = /\(id,/.test(statement.sql)
+      const email = hasExplicitId ? statement.params[1] : statement.params[0]
+      const passwordHash = hasExplicitId ? statement.params[2] : statement.params[1]
+      const displayName = hasExplicitId ? statement.params[3] : statement.params[2]
+      const id = hasExplicitId ? statement.params[0] : ++this.lastInsertId
 
       if (this.users.some((row) => row.email === email)) {
         throw new Error('UNIQUE constraint failed: HL_users.email')
@@ -637,43 +642,60 @@ class D1Mock {
     }
 
     if (statement.sql.includes('INSERT INTO HL_sessions')) {
-      const [id, userId, sessionTokenHash, userAgent, expiresAt] = statement.params
+      const hasExplicitId = /\(id,/.test(statement.sql)
+      const userId = hasExplicitId ? statement.params[1] : statement.params[0]
+      const sessionTokenHash = hasExplicitId ? statement.params[2] : statement.params[1]
+      const userAgent = hasExplicitId ? statement.params[3] : statement.params[2]
+      const expiresAt = hasExplicitId ? statement.params[4] : statement.params[3]
+      const id = hasExplicitId ? statement.params[0] : ++this.lastInsertId
       this.sessions.push({ id, userId, sessionTokenHash, userAgent, expiresAt, revokedAt: null })
     }
 
     if (statement.sql.includes('INSERT INTO HL_auditLogs')) {
-      const [id, userId, entityId, metadataJson] = statement.params
-      let action = 'userRegister'
+      const hasExplicitId = /\(id,/.test(statement.sql)
+      const id = hasExplicitId ? statement.params[0] : ++this.lastInsertId
 
-      if (statement.sql.includes('userLogin')) {
-        action = 'userLogin'
+      // Parse column names and VALUES to map ? placeholders to columns
+      const columnsMatch = statement.sql.match(/\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/)
+      const columns = columnsMatch ? columnsMatch[1].split(',').map(s => s.trim()) : []
+      const values = columnsMatch ? columnsMatch[2].split(',').map(s => s.trim()) : []
+
+      let userId = null, action = 'userRegister', entityType = '', entityId = null, metadataJson = null
+      let paramIdx = hasExplicitId ? 1 : 0
+
+      for (let i = 0; i < columns.length && i < values.length; i++) {
+        const isPlaceholder = values[i] === '?'
+        const col = columns[i]
+        if (col === 'id') continue
+        if (isPlaceholder) {
+          const val = statement.params[paramIdx++]
+          if (col === 'userId') userId = val
+          else if (col === 'action') action = val
+          else if (col === 'entityType') entityType = val
+          else if (col === 'entityId') entityId = val
+          else if (col === 'metadataJson') metadataJson = val
+          else if (col === 'createdAt') { /* skip */ }
+        }
+        // else: literal value in SQL, not a param — skip
       }
 
-      if (statement.sql.includes('profileOnboardingComplete')) {
-        action = 'profileOnboardingComplete'
+      // Override action from SQL text for reliability
+      const actionOverrides = [
+        ['userLogin', 'userLogin'], ['profileOnboardingComplete', 'profileOnboardingComplete'],
+        ['profileUpdate', 'profileUpdate'], ['uiSettingsUpdate', 'uiSettingsUpdate'],
+        ['configCreate', 'configCreate'], ['configUpdate', 'configUpdate'],
+        ['configDelete', 'configDelete'], ['measurementSubmit', 'measurementSubmit'],
+        ['alertCreate', 'alertCreate'], ['badgeEarned', 'badgeEarned'],
+        ['accountDelete', 'accountDelete'], ['telegramConnect', 'telegramConnect'],
+        ['alertAcknowledge', 'alertAcknowledge'], ['reportGenerate', 'reportGenerate'],
+        ['missingRule', 'missingRule'], ['emergencyConsentRevoked', 'emergencyConsentRevoked'],
+        ['emergencyConsentGiven', 'emergencyConsentGiven']
+      ]
+      for (const [pattern, act] of actionOverrides) {
+        if (statement.sql.includes(pattern)) { action = act; break }
       }
 
-      if (statement.sql.includes('profileUpdate')) {
-        action = 'profileUpdate'
-      }
-
-      if (statement.sql.includes('uiSettingsUpdate')) {
-        action = 'uiSettingsUpdate'
-      }
-
-      if (statement.sql.includes('configCreate')) {
-        action = 'configCreate'
-      }
-
-      if (statement.sql.includes('configUpdate')) {
-        action = 'configUpdate'
-      }
-
-      if (statement.sql.includes('configDelete')) {
-        action = 'configDelete'
-      }
-
-      this.auditLogs.push({ id, userId, action, entityId, metadataJson })
+      this.auditLogs.push({ id, userId, action, entityType, entityId, metadataJson })
     }
 
     if (statement.sql.includes('INSERT INTO HL_systemConfigs')) {
@@ -703,17 +725,16 @@ class D1Mock {
     }
 
     if (statement.sql.includes('INSERT INTO HL_userProfiles')) {
-      const [
-        id,
-        userId,
-        sex,
-        birthDate,
-        heightCm,
-        timezone,
-        accessibilityMode,
-        theme,
-        aiConsent
-      ] = statement.params
+      const hasExplicitId = /\(id,/.test(statement.sql)
+      const userId = hasExplicitId ? statement.params[1] : statement.params[0]
+      const sex = hasExplicitId ? statement.params[2] : statement.params[1]
+      const birthDate = hasExplicitId ? statement.params[3] : statement.params[2]
+      const heightCm = hasExplicitId ? statement.params[4] : statement.params[3]
+      const timezone = hasExplicitId ? statement.params[5] : statement.params[4]
+      const accessibilityMode = hasExplicitId ? statement.params[6] : statement.params[5]
+      const theme = hasExplicitId ? statement.params[7] : statement.params[6]
+      const aiConsent = hasExplicitId ? statement.params[8] : statement.params[7]
+      const id = hasExplicitId ? statement.params[0] : ++this.lastInsertId
       this.profiles.push({
         id,
         userId,
@@ -730,7 +751,11 @@ class D1Mock {
     }
 
     if (statement.sql.includes('INSERT INTO HL_userConsents')) {
-      const [id, userId, consentValue, consentText] = statement.params
+      const hasExplicitId = /\(id,/.test(statement.sql)
+      const userId = hasExplicitId ? statement.params[1] : statement.params[0]
+      const consentValue = hasExplicitId ? statement.params[2] : statement.params[1]
+      const consentText = hasExplicitId ? statement.params[3] : statement.params[2]
+      const id = hasExplicitId ? statement.params[0] : ++this.lastInsertId
       this.consents.push({
         id,
         userId,
@@ -766,7 +791,11 @@ class D1Mock {
     }
 
     if (statement.sql.includes('INSERT INTO HL_apiRateLimits')) {
-      const [id, rateKey, routeKey, windowStart] = statement.params
+      const hasExplicitId = /\(id,/.test(statement.sql)
+      const rateKey = hasExplicitId ? statement.params[1] : statement.params[0]
+      const routeKey = hasExplicitId ? statement.params[2] : statement.params[1]
+      const windowStart = hasExplicitId ? statement.params[3] : statement.params[2]
+      const id = hasExplicitId ? statement.params[0] : ++this.lastInsertId
       this.rateLimits.push({
         id,
         rateKey,
@@ -935,7 +964,7 @@ test('POST /api/auth/register inserts user, session, and audit log', async () =>
 test('POST /api/auth/register rejects duplicate email', async () => {
   const db = new D1Mock()
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: 'hash',
     displayName: 'Existing'
@@ -995,7 +1024,7 @@ test('POST /api/auth/login creates session and returns onboarding state', async 
   const db = new D1Mock()
   const passwordHash = await hashPassword('StrongPass123')
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash,
     displayName: 'Budi',
@@ -1038,7 +1067,7 @@ test('POST /api/auth/login creates session and returns onboarding state', async 
 test('POST /api/auth/login rejects invalid credentials generically', async () => {
   const db = new D1Mock()
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1075,7 +1104,7 @@ test('POST /api/auth/login rejects invalid credentials generically', async () =>
 test('GET /api/auth/me returns session user from login cookie', async () => {
   const db = new D1Mock()
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1122,7 +1151,7 @@ test('GET /api/auth/me returns session user from login cookie', async () => {
 test('POST /api/auth/login rate limits using HL_systemConfigs', async () => {
   const db = new D1Mock({ loginRateLimitMaxReq: '1', loginRateLimitWindowMin: '10' })
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1171,7 +1200,7 @@ test('POST /api/auth/login revokes current cookie session before rotating', asyn
   const db = new D1Mock()
   const oldToken = 'old-session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1182,8 +1211,8 @@ test('POST /api/auth/login revokes current cookie session before rotating', asyn
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_old',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(oldToken),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
@@ -1233,7 +1262,7 @@ test('POST /api/profile/onboarding validates age and height', async () => {
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1244,8 +1273,8 @@ test('POST /api/profile/onboarding validates age and height', async () => {
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
@@ -1281,7 +1310,7 @@ test('POST /api/profile/onboarding rejects duplicate onboarding', async () => {
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1292,16 +1321,16 @@ test('POST /api/profile/onboarding rejects duplicate onboarding', async () => {
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
   db.profiles.push({
-    id: 'prf_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sex: 'male',
     birthDate: '1990-01-01',
     heightCm: 170,
@@ -1345,7 +1374,7 @@ test('POST /api/profile/onboarding creates profile consent audit and updates dis
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi Lama',
@@ -1356,8 +1385,8 @@ test('POST /api/profile/onboarding creates profile consent audit and updates dis
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
@@ -1391,7 +1420,7 @@ test('POST /api/profile/onboarding creates profile consent audit and updates dis
   assert.equal(body.success, true)
   assert.equal(body.data.completed, true)
   assert.equal(db.profiles.length, 1)
-  assert.equal(db.profiles[0].userId, 'usr_existing')
+  assert.equal(db.profiles[0].userId, 1)
   assert.equal(db.profiles[0].aiConsent, 1)
   assert.equal(db.consents.length, 1)
   assert.equal(db.consents[0].consentType, 'aiConsent')
@@ -1418,7 +1447,7 @@ test('GET /api/profile returns current authenticated profile', async () => {
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1429,16 +1458,16 @@ test('GET /api/profile returns current authenticated profile', async () => {
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
   db.profiles.push({
-    id: 'prf_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sex: 'female',
     birthDate: '1988-05-10',
     heightCm: 160,
@@ -1463,7 +1492,7 @@ test('GET /api/profile returns current authenticated profile', async () => {
 
   assert.equal(response.status, 200)
   assert.equal(body.success, true)
-  assert.equal(body.data.userId, 'usr_existing')
+  assert.equal(body.data.userId, 1)
   assert.equal(body.data.heightCm, 160)
   assert.equal(body.data.aiConsent, true)
 })
@@ -1472,7 +1501,7 @@ test('PUT /api/profile updates profile settings and writes audit log', async () 
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1483,16 +1512,16 @@ test('PUT /api/profile updates profile settings and writes audit log', async () 
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
   db.profiles.push({
-    id: 'prf_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sex: 'male',
     birthDate: '1990-01-01',
     heightCm: 170,
@@ -1536,7 +1565,7 @@ test('PUT /api/profile rejects invalid profile settings', async () => {
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1547,16 +1576,16 @@ test('PUT /api/profile rejects invalid profile settings', async () => {
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
   db.profiles.push({
-    id: 'prf_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sex: 'male',
     birthDate: '1990-01-01',
     heightCm: 170,
@@ -1596,7 +1625,7 @@ test('PUT /api/settings/ui updates theme and accessibility mode', async () => {
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1607,16 +1636,16 @@ test('PUT /api/settings/ui updates theme and accessibility mode', async () => {
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
   db.profiles.push({
-    id: 'prf_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sex: 'male',
     birthDate: '1990-01-01',
     heightCm: 170,
@@ -1656,7 +1685,7 @@ test('GET /api/metrics/catalog returns grouped active devices and metrics', asyn
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1667,8 +1696,8 @@ test('GET /api/metrics/catalog returns grouped active devices and metrics', asyn
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
@@ -1714,7 +1743,7 @@ test('GET /api/dashboard/today returns empty state for authenticated user', asyn
   const db = new D1Mock()
   const token = 'session-token'
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1725,16 +1754,16 @@ test('GET /api/dashboard/today returns empty state for authenticated user', asyn
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
   db.profiles.push({
-    id: 'prf_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sex: 'male',
     birthDate: '1990-01-01',
     heightCm: 170,
@@ -1776,7 +1805,7 @@ test('GET /api/dashboard/today reads values, streak, and AI insight from schema 
     day: '2-digit'
   }).format(new Date())
   db.users.push({
-    id: 'usr_existing',
+    id: 1,
     email: 'user@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Budi',
@@ -1787,16 +1816,16 @@ test('GET /api/dashboard/today reads values, streak, and AI insight from schema 
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
   db.profiles.push({
-    id: 'prf_existing',
-    userId: 'usr_existing',
+    id: 1,
+    userId: 1,
     sex: 'male',
     birthDate: '1990-01-01',
     heightCm: 170,
@@ -1808,9 +1837,9 @@ test('GET /api/dashboard/today reads values, streak, and AI insight from schema 
     dataShareConsent: 0
   })
   db.measurementSessions.push({
-    id: 'ms_today',
-    profileId: 'prf_existing',
-    userId: 'usr_existing',
+    id: 10,
+    profileId: 1,
+    userId: 1,
     measuredAt: `${today}T08:00:00.000Z`,
     source: 'manual',
     hasAi: 0,
@@ -1818,9 +1847,9 @@ test('GET /api/dashboard/today reads values, streak, and AI insight from schema 
     hasEmergency: 1
   })
   db.measurementValues.push({
-    id: 'mv_sys',
-    sessionId: 'ms_today',
-    userId: 'usr_existing',
+    id: 11,
+    sessionId: 10,
+    userId: 1,
     metricCode: 'systolic',
     finalValue: 145,
     unit: 'mmHg',
@@ -1830,8 +1859,8 @@ test('GET /api/dashboard/today reads values, streak, and AI insight from schema 
     createdAt: `${today}T08:00:01.000Z`
   })
   db.alerts.push({
-    id: 'al_today',
-    userId: 'usr_existing',
+    id: 12,
+    userId: 1,
     metricCode: 'systolic',
     finalValue: 145,
     unit: 'mmHg',
@@ -1840,13 +1869,13 @@ test('GET /api/dashboard/today reads values, streak, and AI insight from schema 
     createdAt: `${today}T08:00:02.000Z`
   })
   db.streaks.push({
-    userId: 'usr_existing',
+    userId: 1,
     streakType: 'dailyMeasurement',
     currentCount: 4,
     bestCount: 9
   })
   db.aiRecommendations.push({
-    userId: 'usr_existing',
+    userId: 1,
     summaryText: 'Berdasarkan data tercatat, lanjutkan pemantauan tekanan darah.',
     createdAt: `${today}T08:00:03.000Z`
   })
@@ -1879,7 +1908,7 @@ test('admin system config supports create update delete and masks sensitive audi
   const db = new D1Mock()
   const token = 'admin-session-token'
   db.users.push({
-    id: 'usr_admin',
+    id: 2,
     email: 'admin@example.com',
     passwordHash: await hashPassword('StrongPass123'),
     displayName: 'Admin',
@@ -1890,8 +1919,8 @@ test('admin system config supports create update delete and masks sensitive audi
     lastLoginAt: null
   })
   db.sessions.push({
-    id: 'sess_admin',
-    userId: 'usr_admin',
+    id: 2,
+    userId: 2,
     sessionTokenHash: await sha256Token(token),
     userAgent: null,
     expiresAt: new Date(Date.now() + 60000).toISOString(),
@@ -1939,11 +1968,12 @@ test('admin system config supports create update delete and masks sensitive audi
     adminEnv
   )
   const updateBody = await updateResponse.json()
-  const updateAudit = db.auditLogs.at(-1)
 
   assert.equal(updateResponse.status, 200)
   assert.equal(updateBody.data.updated, true)
   assert.equal(db.systemConfigs.telegramBotToken, 'super-secret-token')
+  const updateAudit = db.auditLogs.length > 0 ? db.auditLogs[db.auditLogs.length - 1] : null
+  assert.ok(updateAudit, 'audit log should exist after config update')
   assert.equal(updateAudit.action, 'configUpdate')
   assert.equal(updateAudit.metadataJson.includes('super-secret-token'), false)
   assert.equal(JSON.parse(updateAudit.metadataJson).sensitive, true)

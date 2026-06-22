@@ -232,6 +232,21 @@ CREATE TABLE IF NOT EXISTS HL_measurementAttachments (
   FOREIGN KEY (metricCode) REFERENCES HL_metricCatalog(metricCode) ON DELETE RESTRICT
 );
 
+-- Table to store most recent measurement values for quick autofill of rarely-changing metrics
+-- metrics that rarely change frequently: bodyWeight, waistCircumference, bodyTemperature, spo2
+CREATE TABLE IF NOT EXISTS HL_lastMeasurements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  deviceCode TEXT,
+  metricCode TEXT NOT NULL,
+  finalValue REAL NOT NULL,
+  unit TEXT NOT NULL,
+  measuredAt TEXT NOT NULL,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  UNIQUE(userId, deviceCode, metricCode),
+  INDEX idxLastMeterialsUserDevice (userId, deviceCode, metricCode)
+);
+
 CREATE TABLE IF NOT EXISTS HL_aiExtractions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER NOT NULL,
@@ -575,6 +590,7 @@ CREATE INDEX IF NOT EXISTS idxHLMeasurementValuesUserMetricDate ON HL_measuremen
 CREATE INDEX IF NOT EXISTS idxHLMeasurementValuesSession ON HL_measurementValues(sessionId);
 CREATE INDEX IF NOT EXISTS idxHLMeasurementAttachmentsSession ON HL_measurementAttachments(sessionId);
 CREATE INDEX IF NOT EXISTS idxHLMeasurementAttachmentsUser ON HL_measurementAttachments(userId);
+CREATE INDEX IF NOT EXISTS idxLastMeterialsUserDevice ON HL_lastMeasurements(userId, deviceCode, metricCode);
 
 CREATE INDEX IF NOT EXISTS idxHLAiExtractionsUserDate ON HL_aiExtractions(userId, createdAt);
 CREATE INDEX IF NOT EXISTS idxHLAiRecommendationsUserDate ON HL_aiRecommendations(userId, createdAt);

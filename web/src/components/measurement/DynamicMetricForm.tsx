@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
 import { useAiExtract } from '../../hooks/useAiExtract'
 import { compressImage } from '../../utils/imageCompressor'
 import { addWatermark } from '../../utils/watermark'
-import { ManualOverrideInput } from './ManualOverrideInput'
 
 export type DynamicMetric = {
   metricCode: string
@@ -36,29 +35,49 @@ type SubmitValue = {
 
 type DynamicMetricFormProps = {
   selectedMetrics: DynamicMetricSelection[]
+  onClearSelection?: () => void
   onSubmit?: (values: SubmitValue[]) => void
 }
 
 type ValueState = {
   raw: string
   final: string
-  manual: boolean
   confidence?: number | null
+  error?: string
 }
 
 type SubmitResponse = {
   success: boolean
-  data?: {
-    sessionId: string
-  }
-  error?: {
-    message?: string
-  }
+  data?: { sessionId: number }
+  error?: { message?: string }
 }
 
-type AiMetricStatus = {
-  kind: 'success' | 'warning' | 'error'
+type AiDeviceStatus = {
+  kind: 'success' | 'warning' | 'error' | 'loading'
   message: string
+}
+
+async function getLastMeasurements(): Promise<Map<string, { value: number; measuredAt: string }>> {
+  try {
+    const response = await fetch('/api/measurements/last', { credentials: 'include' })
+    if (!response.ok) return new Map()
+    const body = await response.json() as { success: boolean; data?: Array<{ metricCode: string; deviceCode?: string; finalValue: number; measuredAt: string }> }
+    if (!body.success || !body.data) return new Map()
+    const map = new Map<string, { value: number; measuredAt: string }>()
+    body.data.forEach(item => map.set(`${item.metricCode}-${item.deviceCode || ''}`, { value: item.finalValue, measuredAt: item.measuredAt }))
+    return map
+  } catch { return new Map() }
+}
+
+function calculateAge(birthDate: string): { years: number; months: number; days: number } {
+  const birth = new Date(birthDate)
+  const now = new Date()
+  let years = now.getFullYear() - birth.getFullYear()
+  let months = now.getMonth() - birth.getMonth()
+  let days = now.getDate() - birth.getDate()
+  if (days < 0) { months--; days += new Date(now.getFullYear(), now.getMonth(), 0).getDate() }
+  if (months < 0) { years--; months += 12 }
+  return { years, months, days }
 }
 
 function deriveMetricGroup(selection: DynamicMetricSelection) {
@@ -69,184 +88,209 @@ function deriveMetricGroup(selection: DynamicMetricSelection) {
   return 'manualInput'
 }
 
-export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFormProps) {
+const DEVICE_ICON_MAP: Record<string, string> = {
+  bloodPressure: 'favorite',
+  oximeter: 'oxygen_saturation',
+  gcu: 'bloodtype',
+  bodyScale: 'monitor_weight',
+  thermometer: 'thermostat',
+  sleepTracker: 'bedtime',
+}
+
+const DEVICE_COLOR_MAP: Record<string, string> = {
+  bloodPressure: 'var(--colorDanger)',
+  oximeter: 'var(--colorPrimary)',
+  gcu: 'var(--colorWarning)',
+  bodyScale: 'var(--colorSuccess)',
+  thermometer: 'var(--colorInfo)',
+  sleepTracker: 'var(--colorTertiary)',
+}
+
+export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit }: DynamicMetricFormProps) {
   const { profile, user } = useAuth()
-  const { extract, loading: aiLoading, error: aiError } = useAiExtract()
+  const { extract, error: aiError } = useAiExtract()
   const [values, setValues] = useState<Record<string, ValueState>>({})
-  const [files, setFiles] = useState<Record<string, File | null>>({})
-  const [extractingMetricCode, setExtractingMetricCode] = useState<string | null>(null)
-  const [aiMetricStatus, setAiMetricStatus] = useState<Record<string, AiMetricStatus>>({})
+  const [deviceFiles, setDeviceFiles] = useState<Record<string, File | null>>({})
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
+  const [extractingDevice, setExtractingDevice] = useState<string | null>(null)
+  const [aiDeviceStatus, setAiDeviceStatus] = useState<Record<string, AiDeviceStatus>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [ageInfo, setAgeInfo] = useState<{ years: number; months: number; days: number } | null>(null)
+  const [lastMeasurements, setLastMeasurements] = useState<Map<string, { value: number; measuredAt: string }>>(new Map())
 
-  const metricsByDevice = useMemo(() => {
-    const grouped = new Map<string, DynamicMetricSelection[]>()
+  useEffect(() => { void getLastMeasurements().then(setLastMeasurements) }, [])
+  useEffect(() => { if (profile?.birthDate) setAgeInfo(calculateAge(profile.birthDate)) }, [profile?.birthDate])
+
+  // Auto-fill from last measurements
+  useEffect(() => {
+    const autofillMetrics = ['bodyWeight', 'waistCircumference', 'bodyTemperature', 'spo2']
+    setValues(prev => {
+      const updated = { ...prev }
+      for (const selection of selectedMetrics) {
+        const key = `${selection.metric.metricCode}-${selection.device?.deviceCode || ''}`
+        const lastData = lastMeasurements.get(key)
+        if (autofillMetrics.includes(selection.metric.metricCode) && lastData && !updated[selection.metric.metricCode]?.final) {
+          updated[selection.metric.metricCode] = {
+            ...updated[selection.metric.metricCode],
+            final: String(lastData.value),
+            confidence: null,
+            error: undefined
+          }
+        } else if (!updated[selection.metric.metricCode]) {
+          updated[selection.metric.metricCode] = { raw: '', final: '', confidence: null }
+        }
+      }
+      return updated
+    })
+  }, [selectedMetrics, lastMeasurements])
+
+  const deviceGroups = useMemo(() => {
+    const groups = new Map<string, { device: DynamicMetricDevice; selections: DynamicMetricSelection[] }>()
     for (const selection of selectedMetrics) {
       const key = selection.device?.deviceCode || selection.metric.metricCode
-      if (!grouped.has(key)) grouped.set(key, [])
-      grouped.get(key)!.push(selection)
+      if (!groups.has(key)) {
+        groups.set(key, {
+          device: selection.device || { deviceCode: key, deviceName: selection.metric.metricName },
+          selections: []
+        })
+      }
+      groups.get(key)!.selections.push(selection)
     }
-    return grouped
+    return groups
   }, [selectedMetrics])
 
-  function setField(metricCode: string, partial: Partial<ValueState>) {
-    setValues((prev) => ({
+  const setField = useCallback((metricCode: string, partial: Partial<ValueState>) => {
+    setValues(prev => ({
       ...prev,
       [metricCode]: {
         raw: partial.raw ?? prev[metricCode]?.raw ?? '',
         final: partial.final ?? prev[metricCode]?.final ?? '',
-        manual: partial.manual ?? prev[metricCode]?.manual ?? false,
-        confidence: partial.confidence ?? prev[metricCode]?.confidence ?? null
+        confidence: partial.confidence ?? prev[metricCode]?.confidence ?? null,
+        error: partial.error
       }
     }))
+  }, [])
+
+  // Enforce maxLength on number inputs (maxLength doesn't work on type=number)
+  function handleValueChange(metricCode: string, raw: string, physicalMax: number | null | undefined) {
+    const maxDigits = physicalMax != null ? String(Math.ceil(physicalMax)).length + 3 : 8
+    const truncated = raw.length > maxDigits ? raw.slice(0, maxDigits) : raw
+    setField(metricCode, { final: truncated, error: undefined })
   }
+
+  // BMI auto-calculate
+  useEffect(() => {
+    const weightEntry = values['bodyWeight']
+    if (weightEntry?.final && profile?.heightCm) {
+      const weight = Number(weightEntry.final)
+      const heightM = profile.heightCm / 100
+      if (weight > 0 && heightM > 0) {
+        const bmi = Math.round((weight / (heightM * heightM)) * 10) / 10
+        if (!values['bmi'] || values['bmi'].final === '' || values['bmi'].final !== String(bmi)) {
+          setValues(prev => ({ ...prev, bmi: { ...prev['bmi'], final: String(bmi), raw: String(bmi), confidence: null } }))
+        }
+      }
+    }
+  }, [values['bodyWeight']?.final, profile?.heightCm])
 
   function validate() {
     const nextErrors: Record<string, string> = {}
     for (const selection of selectedMetrics) {
       const metric = selection.metric
+      if (metric.metricCode === 'bmi') continue // BMI is auto-calculated
       const entry = values[metric.metricCode]
       const finalRaw = entry?.final?.trim() ?? ''
-      if (!finalRaw) {
-        nextErrors[metric.metricCode] = 'Nilai wajib diisi.'
-        continue
-      }
+      if (!finalRaw) { nextErrors[metric.metricCode] = 'Nilai wajib diisi.'; continue }
       const num = Number(finalRaw)
-      if (!Number.isFinite(num)) {
-        nextErrors[metric.metricCode] = 'Nilai harus angka.'
-        continue
-      }
-      if (metric.physicalMin !== null && metric.physicalMin !== undefined && num < metric.physicalMin) {
-        nextErrors[metric.metricCode] = `Nilai minimum ${metric.physicalMin}.`
-      }
-      if (metric.physicalMax !== null && metric.physicalMax !== undefined && num > metric.physicalMax) {
-        nextErrors[metric.metricCode] = `Nilai maksimum ${metric.physicalMax}.`
-      }
+      if (!Number.isFinite(num)) { nextErrors[metric.metricCode] = 'Nilai harus angka.'; continue }
+      if (metric.physicalMin != null && num < metric.physicalMin) nextErrors[metric.metricCode] = `Minimum ${metric.physicalMin} ${metric.unit}`
+      if (metric.physicalMax != null && num > metric.physicalMax) nextErrors[metric.metricCode] = `Maksimum ${metric.physicalMax} ${metric.unit}`
     }
     return nextErrors
   }
 
-  async function handleAiFill(selection: DynamicMetricSelection) {
-    const file = files[selection.metric.metricCode]
-    const deviceCode = selection.device?.deviceCode
-    if (!file || !deviceCode) {
-      setError('Pilih bukti gambar terlebih dahulu untuk pembacaan AI.')
-      return
-    }
-
-    setError(null)
-    setSuccessMessage(null)
-    setExtractingMetricCode(selection.metric.metricCode)
-    setAiMetricStatus((prev) => ({
-      ...prev,
-      [selection.metric.metricCode]: {
-        kind: 'warning',
-        message: 'AI sedang membaca foto. Input manual tetap bisa digunakan.'
-      }
-    }))
-    const siblings = metricsByDevice.get(deviceCode) || [selection]
-    const selectedMetricCodes = siblings.map((item) => item.metric.metricCode)
-    try {
-      const { result, error: resultError } = await extract(
-        file,
-        deviceCode,
-        deriveMetricGroup(selection),
-        selectedMetricCodes
-      )
-
-      if (result?.metrics?.length) {
-        for (const metric of result.metrics) {
-          setField(metric.metricCode, {
-            raw: String(metric.rawAiValue),
-            final: String(metric.rawAiValue),
-            manual: false,
-            confidence: metric.confidence
-          })
-          setAiMetricStatus((prev) => ({
-            ...prev,
-            [metric.metricCode]: {
-              kind: result.needsManualReview ? 'warning' : 'success',
-              message: `AI terbaca. Confidence ${Math.round(metric.confidence * 100)}%. Verifikasi sebelum simpan.`
-            }
-          }))
-        }
-        setSuccessMessage('AI berhasil mengisi angka awal. Silakan verifikasi dan ubah jika perlu.')
-        return
-      }
-
-      const fallbackMessage = resultError?.error.code === 'AI_TIMEOUT'
-        ? 'AI terlalu lama membaca foto. Silakan input manual.'
-        : resultError?.error.message ?? 'AI belum bisa membaca bukti ini. Silakan input manual.'
-      setAiMetricStatus((prev) => ({
-        ...prev,
-        [selection.metric.metricCode]: {
-          kind: resultError?.error.code === 'AI_TIMEOUT' ? 'warning' : 'error',
-          message: fallbackMessage
-        }
-      }))
-      setError(fallbackMessage)
-    } finally {
-      setExtractingMetricCode(null)
-    }
+  async function handleFileChange(deviceCode: string, event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const objectUrl = URL.createObjectURL(file)
+    setPreviewUrls(prev => ({ ...prev, [deviceCode]: objectUrl }))
+    setDeviceFiles(prev => ({ ...prev, [deviceCode]: file }))
+    setTimeout(() => {
+      const group = deviceGroups.get(deviceCode)
+      if (group) void handleAiExtract(deviceCode, group)
+    }, 800)
   }
 
-  async function uploadAttachment(sessionId: string, selection: DynamicMetricSelection, measuredAt: string) {
-    const original = files[selection.metric.metricCode]
-    if (!original || !user) return
-
-    const compressed = await compressImage(original)
-    const watermarked = await addWatermark(compressed.file, {
-      displayName: user.displayName,
-      measuredAt,
-      metrics: [
-        {
-          metricName: selection.metric.metricName,
-          finalValue: Number(values[selection.metric.metricCode]?.final || 0),
-          unit: selection.metric.unit
+  async function handleAiExtract(deviceCode: string, group: { device: DynamicMetricDevice; selections: DynamicMetricSelection[] }) {
+    const file = deviceFiles[deviceCode]
+    if (!file) return
+    setError(null); setSuccessMessage(null); setExtractingDevice(deviceCode)
+    setAiDeviceStatus(prev => ({ ...prev, [deviceCode]: { kind: 'loading', message: 'AI sedang membaca foto...' } }))
+    const selectedMetricCodes = group.selections.map(s => s.metric.metricCode)
+    const metricGroup = deriveMetricGroup(group.selections[0])
+    try {
+      const { result, error: resultError } = await extract(file, deviceCode, metricGroup, selectedMetricCodes)
+      if (result?.metrics?.length) {
+        const updates: Record<string, ValueState> = {}
+        for (const metric of result.metrics) {
+          updates[metric.metricCode] = { raw: String(metric.rawAiValue), final: String(metric.rawAiValue), confidence: metric.confidence, error: undefined }
         }
-      ]
-    })
+        const avgConfidence = result.metrics.reduce((sum, m) => sum + m.confidence, 0) / result.metrics.length
+        const metricsCount = result.metrics.length
+        setAiDeviceStatus(prev => ({ ...prev, [deviceCode]: { kind: result.needsManualReview ? 'warning' : 'success', message: `AI berhasil membaca ${metricsCount} nilai (${Math.round(avgConfidence * 100)}% confidence). Verifikasi sebelum simpan.` } }))
+        setValues(prev => ({ ...prev, ...updates }))
+        setSuccessMessage('AI berhasil mengisi nilai. Silakan verifikasi.')
+        return
+      }
+      const msg = resultError?.error.code === 'AI_TIMEOUT' ? 'AI terlalu lama membaca foto. Silakan input manual.' : resultError?.error.message ?? 'AI belum bisa membaca bukti ini.'
+      setAiDeviceStatus(prev => ({ ...prev, [deviceCode]: { kind: resultError?.error.code === 'AI_TIMEOUT' ? 'warning' : 'error', message: msg } }))
+      setError(msg)
+    } finally { setExtractingDevice(null) }
+  }
 
-    const formData = new FormData()
-    formData.append('file', watermarked.file)
-    formData.append('sessionId', sessionId)
-    formData.append('metricCode', selection.metric.metricCode)
-    formData.append('fileName', watermarked.file.name)
-    formData.append('width', String(watermarked.width))
-    formData.append('height', String(watermarked.height))
-
-    const response = await fetch('/api/measurements/attachments/upload', {
-      method: 'POST',
-      credentials: 'include',
-      body: formData
-    })
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
-      throw new Error(body?.error?.message || 'Upload bukti pengukuran gagal.')
+  async function uploadAttachments(sessionId: number, measuredAt: string) {
+    if (!user) return
+    for (const [deviceCode, file] of Object.entries(deviceFiles)) {
+      if (!file) continue
+      const group = deviceGroups.get(deviceCode)
+      if (!group) continue
+      const compressed = await compressImage(file)
+      const watermarked = await addWatermark(compressed.file, {
+        displayName: user.displayName, measuredAt,
+        metrics: group.selections.map(s => ({ metricName: s.metric.metricName, finalValue: Number(values[s.metric.metricCode]?.final || 0), unit: s.metric.unit }))
+      })
+      const formData = new FormData()
+      formData.append('file', watermarked.file)
+      formData.append('sessionId', String(sessionId))
+      formData.append('metricCode', group.selections[0].metric.metricCode)
+      formData.append('fileName', watermarked.file.name)
+      formData.append('width', String(watermarked.width))
+      formData.append('height', String(watermarked.height))
+      const response = await fetch('/api/measurements/attachments/upload', { method: 'POST', credentials: 'include', body: formData })
+      if (!response.ok) throw new Error('Upload bukti pengukuran gagal.')
     }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setError(null)
-    setSuccessMessage(null)
-
-    if (!profile?.id) {
-      setError('Profil kesehatan belum aktif. Selesaikan onboarding terlebih dahulu.')
-      return
-    }
-
+    setError(null); setSuccessMessage(null)
+    if (!profile?.id) { setError('Profil kesehatan belum aktif.'); return }
     const nextErrors = validate()
     if (Object.keys(nextErrors).length > 0) {
+      setValues(prev => {
+        const updated = { ...prev }
+        for (const [code, msg] of Object.entries(nextErrors)) {
+          updated[code] = { ...updated[code], error: msg }
+        }
+        return updated
+      })
       setError('Periksa nilai pengukuran sebelum menyimpan.')
       return
     }
-
     const measuredAt = new Date().toISOString()
-    const payload = selectedMetrics.map((selection) => {
+    const payload = selectedMetrics.map(selection => {
       const entry = values[selection.metric.metricCode]
       return {
         metricCode: selection.metric.metricCode,
@@ -255,165 +299,229 @@ export function DynamicMetricForm({ selectedMetrics, onSubmit }: DynamicMetricFo
         finalValue: Number(entry?.final || 0),
         unit: selection.metric.unit,
         confidence: entry?.confidence ?? null,
-        manualOverride: entry?.manual && entry?.raw !== entry?.final
+        manualOverride: entry?.raw !== entry?.final
       }
     })
-
     setSubmitting(true)
     try {
       const response = await fetch('/api/measurements/submit', {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId: profile.id,
-          measuredAt,
-          source: Object.values(files).some(Boolean) ? 'mixed' : 'manual',
-          values: payload
-        })
+        body: JSON.stringify({ profileId: profile.id, measuredAt, source: Object.values(deviceFiles).some(Boolean) ? 'mixed' : 'manual', values: payload })
       })
       const body = (await response.json()) as SubmitResponse
-      if (!response.ok || !body.success || !body.data?.sessionId) {
-        setError(body.error?.message ?? 'Gagal menyimpan pengukuran.')
-        return
-      }
-
-      for (const selection of selectedMetrics.filter((item) => item.metric.requiresAttachment)) {
-        if (files[selection.metric.metricCode]) {
-          await uploadAttachment(body.data.sessionId, selection, measuredAt)
+      if (!response.ok || !body.success || !body.data?.sessionId) { setError(body.error?.message ?? 'Gagal menyimpan.'); return }
+      await uploadAttachments(body.data.sessionId, measuredAt)
+      const metricsToSave = ['bodyWeight', 'waistCircumference', 'bodyTemperature', 'spo2']
+      for (const p of payload) {
+        if (metricsToSave.includes(p.metricCode)) {
+          await fetch('/api/measurements/last/save', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ metricCode: p.metricCode, deviceCode: p.deviceCode, finalValue: p.finalValue, unit: p.unit, measuredAt })
+          }).catch(() => {})
         }
       }
-
-      onSubmit?.(
-        payload.map((value) => ({
-          metricCode: value.metricCode,
-          finalValue: value.finalValue,
-          manualOverride: value.manualOverride
-        }))
-      )
-      setValues({})
-      setFiles({})
-      setSuccessMessage('Pengukuran tersimpan ke database dan bukti final berhasil diunggah.')
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Tidak bisa terhubung ke server.')
-    } finally {
-      setSubmitting(false)
-    }
+      onSubmit?.(payload.map(v => ({ metricCode: v.metricCode, finalValue: v.finalValue, manualOverride: v.manualOverride })))
+      setValues({}); setDeviceFiles({}); setPreviewUrls({})
+      setSuccessMessage('Pengukuran berhasil tersimpan.')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Tidak bisa terhubung ke server.') }
+    finally { setSubmitting(false) }
   }
 
   if (selectedMetrics.length === 0) {
-    return <p className="muted">Pilih metrik pada checklist di atas untuk mulai mengisi.</p>
-  }
-
-  function toggleCollapse(key: string) {
-    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
+    return <p className="muted" style={{ textAlign: 'center', padding: '40px 0' }}>Pilih alat pada daftar di atas untuk mulai mengisi.</p>
   }
 
   return (
-    <form className="dynamic-metric-form" onSubmit={handleSubmit}>
-      {selectedMetrics.map((selection) => {
-        const metric = selection.metric
-        const entry = values[metric.metricCode] ?? { raw: '', final: '', manual: false, confidence: null }
-        const isCollapsed = collapsed[metric.metricCode] ?? false
-        return (
-          <fieldset key={selection.id ?? metric.metricCode} className="metric-card">
-            <div className="metric-card-header" onClick={() => toggleCollapse(metric.metricCode)} style={{ cursor: 'pointer', userSelect: 'none' }}>
-              <div className="metric-card-header-left">
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--colorTextMuted)', transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>expand_more</span>
-                <legend style={{ margin: 0, padding: 0, border: 'none' }}>
-                  {metric.metricName} <span className="muted">({metric.unit})</span>
-                </legend>
-              </div>
-              {entry.final ? (
-                <span className="badge-status badge-normal" style={{ fontSize: 12 }}>{entry.final} {metric.unit}</span>
-              ) : null}
-            </div>
+    <form className="stitch-measurement-form" onSubmit={handleSubmit}>
+      {/* Age Banner - Prominent at top */}
+      {ageInfo ? (
+        <div className="user-info-banner">
+          <span className="material-symbols-outlined">person</span>
+          <span>Anda berusia <strong>{ageInfo.years} Tahun {ageInfo.months} Bulan {ageInfo.days} Hari</strong></span>
+        </div>
+      ) : null}
 
-            {!isCollapsed && (
-              <div className="metric-card-body">
-                {metric.requiresAttachment ? (
-                  <div className="metric-file-row">
-                    <label className="metric-file-field" style={{ flex: 1 }}>
-                      <input
-                        accept="image/png,image/jpeg,image/webp"
-                        capture="environment"
-                        onChange={(event) =>
-                          setFiles((prev) => ({
-                            ...prev,
-                            [metric.metricCode]: event.target.files?.[0] ?? null
-                          }))
-                        }
-                        type="file"
-                      />
-                    </label>
-                    <div className="metric-ai-col">
-                      {selection.device?.deviceCode && metric.requiresAttachment ? (
-                        <button
-                          className="btn-ai-extract"
-                          disabled={aiLoading || extractingMetricCode === metric.metricCode || !files[metric.metricCode]}
-                          onClick={() => void handleAiFill(selection)}
-                          type="button"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>document_scanner</span>
-                          {extractingMetricCode === metric.metricCode ? 'Processing...' : 'Auto-Read with AI'}
-                        </button>
-                      ) : null}
-                      {metric.requiresAttachment && !files[metric.metricCode] ? (
-                        <p className="muted" style={{ textAlign: 'center', fontSize: 12 }}>Select image first</p>
-                      ) : null}
-                    </div>
+      {/* Device Cards */}
+      <div className="stitch-device-cards">
+        {Array.from(deviceGroups.entries()).map(([deviceCode, group]) => {
+          const hasAttachment = group.selections.some(s => s.metric.requiresAttachment)
+          const file = deviceFiles[deviceCode]
+          const previewUrl = previewUrls[deviceCode]
+          const aiStatus = aiDeviceStatus[deviceCode]
+          const isExtracting = extractingDevice === deviceCode
+          const icon = DEVICE_ICON_MAP[group.device.deviceType || ''] || 'medical_services'
+          const color = DEVICE_COLOR_MAP[group.device.deviceType || ''] || 'var(--colorPrimary)'
+
+          return (
+            <div key={deviceCode} className="stitch-device-card">
+              {/* Card Header */}
+              <div className="stitch-card-header">
+                <div className="stitch-card-header-left">
+                  <div className="stitch-device-icon" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color }}>
+                    <span className="material-symbols-outlined">{icon}</span>
+                  </div>
+                  <h3 className="stitch-device-title">{group.device.deviceName}</h3>
+                </div>
+                {aiStatus && (
+                  <span className={`stitch-ai-badge stitch-ai-badge-${aiStatus.kind}`}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      {aiStatus.kind === 'success' ? 'check_circle' : aiStatus.kind === 'error' ? 'error' : aiStatus.kind === 'loading' ? 'hourglass_empty' : 'warning'}
+                    </span>
+                    {aiStatus.kind === 'loading' ? 'Processing...' : aiStatus.kind}
+                  </span>
+                )}
+              </div>
+
+              {/* Card Body - 2 column layout */}
+              <div className="stitch-card-body">
+                {/* Left: Image capture */}
+                {hasAttachment ? (
+                  <div className="stitch-image-side">
+                    {previewUrl ? (
+                      <div className="stitch-preview">
+                        <img src={previewUrl} alt="Preview" />
+                        <label className="stitch-retake-btn">
+                          <input accept="image/png,image/jpeg,image/webp" capture="environment" onChange={(e) => void handleFileChange(deviceCode, e)} type="file" />
+                          <span className="material-symbols-outlined">photo_camera</span> Retake
+                        </label>
+                      </div>
+                    ) : (
+                      <label className="stitch-capture-area">
+                        <input accept="image/png,image/jpeg,image/webp" capture="environment" onChange={(e) => void handleFileChange(deviceCode, e)} type="file" />
+                        <span className="material-symbols-outlined">add_a_photo</span>
+                        <span className="stitch-capture-label">Tap to Capture</span>
+                        <span className="stitch-capture-hint">{file ? file.name : 'Photo or Upload'}</span>
+                      </label>
+                    )}
+                    {isExtracting && (
+                      <div className="stitch-ai-progress">
+                        <div className="stitch-ai-progress-bar" />
+                        <span>AI reading...</span>
+                      </div>
+                    )}
                   </div>
                 ) : null}
 
-                <ManualOverrideInput
-                  metric={metric}
-                  raw={entry.raw}
-                  final={entry.final}
-                  manual={entry.manual}
-                  onChange={(partial) => setField(metric.metricCode, partial)}
-                />
-
-                {entry.confidence !== null && entry.confidence !== undefined ? (
-                  <p className="ai-confidence">
-                    rawAiValue: {entry.raw || '-'} / confidence {Math.round(entry.confidence * 100)}%
-                  </p>
-                ) : null}
-
-                {aiMetricStatus[metric.metricCode] ? (
-                  <p className={`form-message ${aiMetricStatus[metric.metricCode].kind}`} role="status">
-                    {aiMetricStatus[metric.metricCode].message}
-                  </p>
-                ) : null}
-
-                {files[metric.metricCode] ? (
-                  <p className="muted">File: {files[metric.metricCode]?.name}</p>
-                ) : null}
+                {/* Right: Metric inputs */}
+                <div className="stitch-input-side">
+                  {(() => {
+                    const isBpGroup = group.device.deviceType === 'bloodPressure' && group.selections.length >= 2
+                    if (isBpGroup) {
+                      const sysMetric = group.selections.find(s => s.metric.metricCode === 'systolic')?.metric
+                      const diaMetric = group.selections.find(s => s.metric.metricCode === 'diastolic')?.metric
+                      const pulseMetric = group.selections.find(s => ['bloodPressurePulse','heartRate'].includes(s.metric.metricCode))?.metric
+                      const sysEntry = values['systolic'] ?? { raw: '', final: '', confidence: null }
+                      const diaEntry = values['diastolic'] ?? { raw: '', final: '', confidence: null }
+                      const pulseEntry = pulseMetric ? (values[pulseMetric.metricCode] ?? { raw: '', final: '', confidence: null }) : null
+                      return (
+                        <>
+                          <div className="stitch-bp-row">
+                            {sysMetric ? (
+                              <div className="stitch-metric-input-group stitch-bp-field">
+                                <label htmlFor="input-systolic" className="stitch-metric-label">Systolic</label>
+                                <div className="stitch-input-wrap">
+                                  <input id="input-systolic" className={`stitch-metric-input ${sysEntry.error ? 'has-error' : ''}`} inputMode="decimal" min={sysMetric.physicalMin ?? ''} max={sysMetric.physicalMax ?? ''} step="1" placeholder="120" type="number" value={sysEntry.final} onChange={(e) => handleValueChange('systolic', e.target.value, sysMetric.physicalMax)} onFocus={(e) => e.target.select()} />
+                                  <span className="stitch-input-unit">mmHg</span>
+                                </div>
+                                {sysEntry.error ? <span className="stitch-field-error">{sysEntry.error}</span> : null}
+                              </div>
+                            ) : null}
+                            <span className="stitch-bp-divider">/</span>
+                            {diaMetric ? (
+                              <div className="stitch-metric-input-group stitch-bp-field">
+                                <label htmlFor="input-diastolic" className="stitch-metric-label">Diastolic</label>
+                                <div className="stitch-input-wrap">
+                                  <input id="input-diastolic" className={`stitch-metric-input ${diaEntry.error ? 'has-error' : ''}`} inputMode="decimal" min={diaMetric.physicalMin ?? ''} max={diaMetric.physicalMax ?? ''} step="1" placeholder="80" type="number" value={diaEntry.final} onChange={(e) => handleValueChange('diastolic', e.target.value, diaMetric.physicalMax)} onFocus={(e) => e.target.select()} />
+                                  <span className="stitch-input-unit">mmHg</span>
+                                </div>
+                                {diaEntry.error ? <span className="stitch-field-error">{diaEntry.error}</span> : null}
+                              </div>
+                            ) : null}
+                          </div>
+                          {pulseMetric && pulseEntry ? (
+                            <div className="stitch-metric-input-group">
+                              <label htmlFor={`input-${pulseMetric.metricCode}`} className="stitch-metric-label">{pulseMetric.metricName}</label>
+                              <div className="stitch-input-wrap">
+                                <input id={`input-${pulseMetric.metricCode}`} className={`stitch-metric-input ${pulseEntry.error ? 'has-error' : ''}`} inputMode="decimal" min={pulseMetric.physicalMin ?? ''} max={pulseMetric.physicalMax ?? ''} step="1" placeholder="72" type="number" value={pulseEntry.final} onChange={(e) => handleValueChange(pulseMetric.metricCode, e.target.value, pulseMetric.physicalMax)} onFocus={(e) => e.target.select()} />
+                                <span className="stitch-input-unit">{pulseMetric.unit}</span>
+                              </div>
+                              {pulseEntry.error ? <span className="stitch-field-error">{pulseEntry.error}</span> : null}
+                            </div>
+                          ) : null}
+                        </>
+                      )
+                    }
+                    return group.selections.map((selection) => {
+                      const metric = selection.metric
+                      const entry = values[metric.metricCode] ?? { raw: '', final: '', confidence: null }
+                      const isBmi = metric.metricCode === 'bmi'
+                      return (
+                        <div key={metric.metricCode} className="stitch-metric-input-group">
+                          <label htmlFor={`input-${metric.metricCode}`} className="stitch-metric-label">
+                            {metric.metricName}
+                            {entry.confidence != null ? (
+                              <span className="stitch-confidence">AI {Math.round(entry.confidence * 100)}%</span>
+                            ) : null}
+                          </label>
+                          <div className="stitch-input-wrap">
+                            <input
+                              id={`input-${metric.metricCode}`}
+                              className={`stitch-metric-input ${entry.error ? 'has-error' : ''} ${isBmi ? 'is-calculated' : ''}`}
+                              inputMode="decimal"
+                              min={metric.physicalMin ?? ''}
+                              max={metric.physicalMax ?? ''}
+                              step={(metric.physicalMin != null && metric.physicalMax != null) ? ((metric.physicalMax - metric.physicalMin) >= 10 ? '1' : '0.1') : 'any'}
+                              placeholder={isBmi ? 'Auto' : (metric.physicalMin != null && metric.physicalMax != null ? `${metric.physicalMin}–${metric.physicalMax}` : '0')}
+                              readOnly={isBmi}
+                              type="number"
+                              value={entry.final}
+                              onChange={(e) => handleValueChange(metric.metricCode, e.target.value, metric.physicalMax)}
+                              onFocus={(e) => e.target.select()}
+                            />
+                            <span className="stitch-input-unit">{metric.unit}</span>
+                          </div>
+                          {entry.error ? <span className="stitch-field-error">{entry.error}</span> : null}
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
               </div>
-            )}
-          </fieldset>
-        )
-      })}
 
-      <button disabled={submitting} type="submit" className="btn-submit" style={{ minHeight: 56, border: 0, borderRadius: 'var(--radiusXl)', padding: '16px 24px', color: 'var(--colorPrimaryText)', background: 'var(--colorPrimary)', font: 'var(--typHeadlineMd)', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,97,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <span className="material-symbols-outlined">check_circle</span>
-        {submitting ? 'Saving...' : 'Validate & Save Results'}
-      </button>
+              {/* AI status message */}
+              {aiStatus && !isExtracting ? (
+                <div className={`stitch-ai-message stitch-ai-message-${aiStatus.kind}`}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                    {aiStatus.kind === 'success' ? 'check_circle' : aiStatus.kind === 'error' ? 'error' : 'warning'}
+                  </span>
+                  {aiStatus.message}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
 
-      {aiError ? (
-        <p className="form-message error" role="status">
-          {aiError}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="form-message error" role="status">
-          {error}
-        </p>
-      ) : null}
-      {successMessage ? (
-        <p className="form-message success" role="status">
-          {successMessage}
-        </p>
-      ) : null}
+      {/* Footer Actions */}
+      <div className="stitch-form-footer">
+        <button type="button" onClick={onClearSelection} className="stitch-btn-clear" disabled={submitting}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+          Clear Selection
+        </button>
+        <button disabled={submitting} type="submit" className="stitch-btn-submit">
+          {submitting ? (
+            <><span className="spinner" /> Saving...</>
+          ) : (
+            <><span className="material-symbols-outlined">check_circle</span> Validate & Save Results</>
+          )}
+        </button>
+      </div>
+
+      {aiError ? <p className="form-message error" role="status">{aiError}</p> : null}
+      {error ? <p className="form-message error" role="status">{error}</p> : null}
+      {successMessage ? <p className="form-message success" role="status">{successMessage}</p> : null}
     </form>
   )
 }

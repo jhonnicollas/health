@@ -6,8 +6,8 @@ type Comparison = {
 }
 
 type MetricValue = {
-  id: string
-  sessionId: string
+  id: number
+  sessionId: number
   metricCode: string
   finalValue: number
   unit: string
@@ -19,7 +19,7 @@ type MetricValue = {
 }
 
 type Alert = {
-  id: string
+  id: number
   metricCode: string
   finalValue: number
   unit: string
@@ -86,7 +86,7 @@ const SEVERITY_BADGE: Record<string, { label: string, className: string }> = {
   emergency: { label: 'Emergency', className: 'badge-emergency' }
 }
 
-export function TodayDashboard() {
+export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: string) => void }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -174,9 +174,9 @@ export function TodayDashboard() {
       </div>
 
       <div className="dashboard-tabs">
-        <button className="tab-btn active" type="button">Today</button>
-        <button className="tab-btn" type="button">Weekly View</button>
-        <button className="tab-btn" type="button">Monthly Summary</button>
+        <button className="tab-btn active" type="button" onClick={() => onNavigateTab?.('/dashboard')}>Today</button>
+        <button className="tab-btn" type="button" onClick={() => onNavigateTab?.('/dashboard/week')}>Weekly View</button>
+        <button className="tab-btn" type="button" onClick={() => onNavigateTab?.('/dashboard/month')}>Monthly Summary</button>
       </div>
 
       {data.alerts.length > 0 && (

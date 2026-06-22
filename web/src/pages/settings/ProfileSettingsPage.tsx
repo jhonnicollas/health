@@ -373,6 +373,37 @@ export function ProfileSettingsPage() {
             </div>
           </section>
 
+          <section className="card" style={{ marginTop: 24 }}>
+            <h3 style={{ font: 'var(--typHeadlineMd)', color: 'var(--colorTextPrimary)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--colorPrimary)' }}>tune</span>
+              Settings Center
+            </h3>
+            <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)', marginBottom: 16 }}>Manage all app configurations and preferences.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { icon: 'alarm', label: 'Reminders', desc: 'Schedule measurement reminders', path: '/reminders' },
+                { icon: 'send', label: 'Telegram', desc: 'Link Telegram for instant alerts', path: '/telegram' },
+                { icon: 'medication', label: 'Medications', desc: 'Track medication schedule', path: '/medications' },
+                { icon: 'group', label: 'Family / Caregiver', desc: 'Manage access permissions', path: '/family' },
+                { icon: 'emergency', label: 'Emergency Contacts', desc: 'Configure emergency alerts', path: '/emergency' },
+                { icon: 'download', label: 'Export Data', desc: 'Download measurement CSV', path: '/settings/export' },
+                { icon: 'delete_forever', label: 'Delete Account', desc: 'Remove all data permanently', path: '/settings/delete' }
+              ].map((item) => (
+                <a key={item.path} href={item.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--radiusMd)', border: '1px solid var(--colorBorderSoft)', textDecoration: 'none', color: 'var(--colorText)', transition: 'background 0.15s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--colorSurfaceHover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--colorTextMuted)' }}>{item.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <strong style={{ font: 'var(--typLabelMd)', display: 'block' }}>{item.label}</strong>
+                    <small style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>{item.desc}</small>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--colorTextSubdued)' }}>chevron_right</span>
+                </a>
+              ))}
+            </div>
+          </section>
+
           {configPanelVisible ? (
             <section className="card" style={{ marginTop: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
