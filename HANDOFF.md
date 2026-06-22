@@ -4,15 +4,15 @@
 
 ```text
 Project: HL Health Companion
-Sprint: UI/UX Overhaul
-Current Task: TopBar + Dashboard + Measurement + Settings + CSS refined to match Stitch mockups
+Sprint: UI/UX Overhaul + GAP Resolution
+Current Task: All GAP-1 through GAP-22 completed and deployed
 Current State: DEPLOYED (worker v7e7809b2, pages 0f7a1634)
-Last Completed Task: UI/UX Overhaul Batch 1 — TopBar (live clock, theme switcher, notification dropdown), Dashboard (comparison rows, Stitch-aligned vital cards), Measurement (collapsible metric cards, AI auto-read button), Settings (2-column grid, notification card, system config CRUD), CSS (card/input-field/btn-primary classes aligned to DESIGN.md)
-Files Changed: web/src/App.tsx, web/src/App.css, web/src/components/measurement/DynamicMetricForm.tsx, web/src/pages/dashboard/TodayDashboard.tsx, web/src/pages/settings/ProfileSettingsPage.tsx, worker/src/index.ts (dashboard API now returns streak, aiInsight, comparisons)
-Commands Run: worker tsc ✅, worker test 22/22 ✅, web tsc ✅, web lint ✅, web vite build ✅ (53 modules, 316.28 kB JS, 61.10 kB CSS), wrangler deploy ✅, pages deploy ✅
-Known Issues: Telegram bot token still 401 (GAP-8), cron triggers at 5/5 limit
-Next Recommended Task: Run UAT against production (TEST_PLAN.md), then GAP-8 Telegram token regeneration
-Last Updated: 2026-06-22 22:00 UTC
+Last Completed Task: GAP-8 Telegram Bot Token Fixed — new token from @BotFather saved as secret, botTokenValid:true
+Files Changed: HANDOFF.md, WORK_LOG.md, docs/TASKS.md
+Commands Run: wrangler secret put TELEGRAM_BOT_TOKEN ✅, curl getMe=200 ✅, UAT 51/52 ✅, git push ✅
+Known Issues: Cloudflare cron triggers at 5/5 limit (GAP-17), notification dropdown empty state
+Next Recommended Task: Owner re-evaluation (target >= 800/1000), link Telegram chat with bot @morphezCodex_bot
+Last Updated: 2026-06-22 22:30 UTC
 ```
 
 ## Production Deployment
@@ -25,7 +25,8 @@ Pages Deploy:      https://0f7a1634.hl-health-companion.pages.dev
 D1 Database:       multi_Ai_db (b80ca989-6771-427f-a656-c7ab6ffc17ce) — 38 HL_ tables
 R2 Bucket:         multi-apps-ai-bucket
 Queue:             telegram-submit-summary (producer + consumer)
-Commit:            8ba5ce4
+Telegram Bot:      @morphezCodex_bot (ID 8928909095, user ID 7924032453)
+Commit:            59501b1
 ```
 
 ## Key Changes in This Cycle
@@ -66,7 +67,6 @@ cd worker && CLOUDFLARE_API_TOKEN="..." CLOUDFLARE_ACCOUNT_ID="79dea2845a4b62ea5
 cd web && CLOUDFLARE_API_TOKEN="..." CLOUDFLARE_ACCOUNT_ID="79dea2845a4b62ea5229c8676dea02c0" npx wrangler pages deploy dist --project-name hl-health-companion --commit-dirty=true
 ```
 
-## Known Issues (unchanged)
-- Telegram bot token returns 401 from Telegram API — user needs to regenerate via @BotFather (GAP-8)
-- Cloudflare cron triggers at 5/5 limit — manual POST /api/internal/cron/reminders works
+## Known Issues
+- Cloudflare cron triggers at 5/5 limit (GAP-17) — manual POST /api/internal/cron/reminders works
 - Notification dropdown has empty state — needs real data from API

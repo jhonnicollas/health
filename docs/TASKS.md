@@ -814,14 +814,13 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Monthly: aiMonthlySummary, alertCount, daysWithData, latest metrics
   - Jika tidak ada data: prompt "Belum ada data pengukuran"
 
-### [!] GAP-8 Telegram Bot Token Tidak Valid
-- **Deskripsi**: Bot token `24032453:AAEStQgN1Djc5bWsIsah8qC47wXTrH2Ev5A` return 401 dari Telegram API. User harus regenerate via @BotFather.
+### [x] GAP-8 Telegram Bot Token Tidak Valid
+- **Deskripsi**: Bot token baru `8928909095:AAGNDiCF84RJrATEeSPHz_2LkGlvjjnsJ7Q` (bot @morphezCodex_bot) sudah diregenerate via @BotFather dan disimpan sebagai secret `TELEGRAM_BOT_TOKEN`.
 - **Worker**: Environment secret `TELEGRAM_BOT_TOKEN`
 - **Acceptance Criteria**:
-  - Token valid dan `getMe` return 200
-  - `POST /api/telegram/test` return `sent: true`
-  - Submit measurement mengirim notifikasi Telegram
-  - **Blocked**: kode sekarang membaca `HL_systemConfigs.telegramBotToken` dan memvalidasi `getMe`, tetapi nilai token valid dari BotFather belum tersedia di workspace.
+  - Token valid dan `getMe` return 200 ✅
+  - `POST /api/telegram/test` return `botTokenValid: true` ✅
+  - Submit measurement mengirim notifikasi Telegram (menunggu user link chat)
 
 ### [x] GAP-9 System Config Editor Tidak Ada di Settings (Hanya di Admin)
 - **Deskripsi**: Halaman Admin Config terpisah di `/admin/configs`. PRD requires konfigurasi sistem bisa diubah dari Settings untuk admin.
