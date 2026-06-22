@@ -5364,4 +5364,145 @@ input:-webkit-autofill {
   .stitch-device-cards { grid-template-columns: 1fr !important; }
 }
 
+/* ===== Dashboard 7-day chart ===== */
+.dashboard-chart-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid var(--colorBorderSoft);
+  border-radius: var(--radiusXl);
+  background: var(--colorSurfaceElevated);
+  box-shadow: var(--shadowCard);
+}
+.dashboard-chart-card h3 {
+  margin: 0;
+  font: var(--typHeadlineMd);
+  color: var(--colorTextPrimary);
+}
+.dashboard-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 16px;
+  align-items: end;
+  min-height: 200px;
+}
+.dashboard-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dashboard-chart-bar-wrap {
+  width: 100%;
+  height: 160px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--colorSurface);
+  border-radius: 8px;
+  padding: 4px;
+}
+.dashboard-chart-bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.4s ease;
+}
+.dashboard-chart-label {
+  font: var(--typLabelSm);
+  color: var(--colorTextSecondary);
+  text-align: center;
+  line-height: 1.2;
+}
+.dashboard-chart-value {
+  font: var(--typLabelMd);
+  color: var(--colorTextPrimary);
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .dashboard-chart-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .dashboard-chart-bar-wrap {
+    height: 100px;
+  }
+}
+
+/* ===== Page heading with help icon ===== */
+.page-heading-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-heading-help {
+  width: 22px;
+  height: 22px;
+}
+.page-heading-help .material-symbols-outlined {
+  font-size: 14px;
+}
+
+/* ===== Metric code badge with medical term icon ===== */
+.metric-code-badge-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--colorSurface);
+  border: 1px solid var(--colorBorder);
+  border-radius: var(--radiusSm);
+  font: var(--typLabelSm);
+  font-weight: 600;
+  color: var(--colorText);
+}
+.metric-code-badge-cell .medical-term {
+  margin-left: 0;
+}
+.metric-code-badge-cell .medical-term-info {
+  width: 16px;
+  height: 16px;
+}
+.metric-code-badge-cell .medical-term-info .material-symbols-outlined {
+  font-size: 11px;
+}
+
+/* ===== Page heading actions (right side buttons) ===== */
+.page-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.page-heading-actions .btn-primary {
+  white-space: nowrap;
+}
+
+/* ===== AI summary blocks ===== */
+.ai-summary {
+  padding: 20px 24px;
+  border: 1px solid color-mix(in srgb, var(--colorPrimary) 24%, var(--colorBorder));
+  border-radius: var(--radiusXl);
+  background: color-mix(in srgb, var(--colorPrimary) 6%, var(--colorSurfaceElevated));
+  box-shadow: var(--shadowCard);
+}
+.ai-summary h3 {
+  margin: 0 0 8px;
+  font: var(--typHeadlineMd);
+  color: var(--colorTextPrimary);
+}
+.ai-summary p {
+  margin: 0;
+  font: var(--typBodyMd);
+  color: var(--colorTextSecondary);
+  line-height: 1.6;
+}
+.ai-summary-error {
+  border-color: var(--colorStatusCritical);
+  background: color-mix(in srgb, var(--colorStatusCritical) 6%, var(--colorSurfaceElevated));
+}
+.ai-summary-error p { color: var(--colorStatusCritical); }
+
 

@@ -10,7 +10,8 @@ import {
   validateProfileUpdateInput,
   validateRegistrationInput,
   validateUiSettingsInput,
-  verifyPassword
+  verifyPassword,
+  formatIdShortDateTime
 } from '../dist/index.js'
 
 class D1MockStatement {
@@ -160,6 +161,14 @@ class D1MockStatement {
       }
     }
 
+    if (this.sql.includes('FROM HL_measurementSessions') && this.sql.includes('measuredAt >=')) {
+      const [userId, sinceIso] = this.params
+      const rows = this.db.measurementSessions
+        .filter((row) => row.userId === userId && row.measuredAt >= sinceIso)
+        .sort((left, right) => right.measuredAt.localeCompare(left.measuredAt))
+      return { results: rows }
+    }
+
     if (this.sql.includes('FROM HL_measurementSessions')) {
       const [userId, day] = this.params
       const rows = this.db.measurementSessions
@@ -172,6 +181,14 @@ class D1MockStatement {
       const [userId, ...sessionIds] = this.params
       const rows = this.db.measurementValues
         .filter((row) => row.userId === userId && sessionIds.includes(row.sessionId))
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      return { results: rows }
+    }
+
+    if (this.sql.includes('FROM HL_alerts') && this.sql.includes('createdAt >=')) {
+      const [userId, sinceIso] = this.params
+      const rows = this.db.alerts
+        .filter((row) => row.userId === userId && row.createdAt >= sinceIso)
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       return { results: rows }
     }
@@ -2060,4 +2077,83 @@ test('GET /api/measurements/today returns sessions with deviceCodes (Asia/Jakart
   assert.ok(Array.isArray(emptyBody.data.sessions))
   assert.equal(emptyBody.data.sessions.length, 0)
   assert.equal(emptyBody.data.date.length, 10, 'date is YYYY-MM-DD format')
+})
+
+test('formatIdShortDateTime renders Indonesian short-month dd MMM yyyy HH:mm', () => {
+  assert.equal(formatIdShortDateTime('2026-06-23T18:30:00.000Z'), '23 Jun 2026 18:30')
+  assert.equal(formatIdShortDateTime('2026-01-01T00:05:00.000Z'), '01 Jan 2026 00:05')
+  assert.equal(formatIdShortDateTime('2026-05-15T23:59:00.000Z'), '15 Mei 2026 23:59')
+  assert.equal(formatIdShortDateTime('2026-07-10T09:00:00.000Z'), '10 Jul 2026 09:00')
+  assert.equal(formatIdShortDateTime('2026-08-20T12:00:00.000Z'), '20 Agu 2026 12:00')
+  assert.equal(formatIdShortDateTime('2026-10-25T16:45:00.000Z'), '25 Okt 2026 16:45')
+  assert.equal(formatIdShortDateTime('2026-12-31T23:00:00.000Z'), '31 Des 2026 23:00')
+  assert.equal(formatIdShortDateTime(null), '-')
+  assert.equal(formatIdShortDateTime(''), '-')
+  assert.equal(formatIdShortDateTime('not-a-date'), 'not-a-date')
+})
+
+test('GET /api/dashboard/today uses user-timezone date filter (Asia/Jakarta late-UTC measurement)', async () => {
+  // Simulates the production bug: user submits a measurement at UTC time 2026-06-22T19:17:00.000Z,
+  // which is already 2026-06-23 in Asia/Jakarta (UTC+7). The old SQL filter
+  // `substr(measuredAt, 1, 10) = '2026-06-23'` would miss the row because measuredAt's UTC prefix
+  // is '2026-06-22'. The JS-side Intl.DateTimeFormat filter must include it.
+  const db = new D1Mock()
+  const token = 'session-token'
+  const jakartaToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date())
+
+  db.users.push({
+    id: 1, email: 'tz@example.com', passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'TZ User',
+    telegramEnabled: 0, browserPushEnabled: 0, active: 1, authProvider: 'local', lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 1, userId: 1, sessionTokenHash: await sha256Token(token),
+    userAgent: null, expiresAt: new Date(Date.now() + 60000).toISOString(), revokedAt: null
+  })
+  db.profiles.push({
+    id: 1, userId: 1, sex: 'male', birthDate: '1990-01-01', heightCm: 170,
+    timezone: 'Asia/Jakarta', accessibilityMode: 'normal', theme: 'light',
+    emergencyConsent: 0, aiConsent: 1, dataShareConsent: 0
+  })
+
+  // Construct a measurement that is "today" in Jakarta but "yesterday" in UTC.
+  // Jakarta midnight = UTC 17:00 of the previous calendar day. A reading at e.g.
+  // 2026-06-22T22:00:00Z is 2026-06-23 05:00 Jakarta (today) but 2026-06-22 UTC (yesterday).
+  const [yy, mm, dd] = jakartaToday.split('-').map(Number)
+  const lateUtc = new Date(Date.UTC(yy, mm - 1, dd - 1, 22, 0, 0)).toISOString()
+
+  // Sanity: confirm the chosen UTC time falls on the previous calendar day in UTC.
+  const utcPrefix = lateUtc.slice(0, 10)
+  assert.notEqual(utcPrefix, jakartaToday, 'test setup: UTC prefix must differ from Jakarta today')
+
+  db.measurementSessions.push({
+    id: 20, profileId: 1, userId: 1,
+    measuredAt: lateUtc,
+    source: 'manual',
+    hasAi: 0, hasAttachment: 0, hasEmergency: 0
+  })
+  db.measurementValues.push({
+    id: 21, sessionId: 20, userId: 1,
+    metricCode: 'systolic', finalValue: 120, unit: 'mmHg',
+    status: 'Normal', severity: 'normal', manualOverride: 0,
+    createdAt: lateUtc
+  })
+
+  const response = await app.request(
+    '/api/dashboard/today',
+    { headers: { Cookie: `hlSession=${token}` } },
+    env(db)
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(body.success, true)
+  assert.equal(body.data.date, jakartaToday, 'response date is user-timezone today')
+  assert.equal(body.data.hasData, true, 'late-UTC measurement must still appear as today in Jakarta')
+  assert.equal(body.data.sessionCount, 1)
+  assert.equal(body.data.metricCount, 1)
+  assert.equal(body.data.values[0].metricCode, 'systolic')
 })

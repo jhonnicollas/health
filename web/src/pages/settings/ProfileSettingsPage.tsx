@@ -47,6 +47,8 @@ export function ProfileSettingsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [exporting, setExporting] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
   const [configPanelVisible, setConfigPanelVisible] = useState(false)
   const [configs, setConfigs] = useState<ConfigRow[]>([])
   const [editingConfigs, setEditingConfigs] = useState<Record<string, string>>({})
@@ -108,6 +110,33 @@ export function ProfileSettingsPage() {
   function applyUiMode(nextTheme: string, nextAccessibilityMode: string) {
     document.documentElement.dataset.theme = nextTheme
     document.documentElement.dataset.accessibility = nextAccessibilityMode
+  }
+
+  async function handleExportCsv() {
+    setExporting(true)
+    setExportMessage('')
+    try {
+      const res = await fetch('/api/export/csv', { credentials: 'include' })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(text || `HTTP ${res.status}`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `measurement-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+      setExportMessage(`CSV berhasil diunduh (${(blob.size / 1024).toFixed(1)} KB).`)
+    } catch (err) {
+      setExportMessage('')
+      setMessage(err instanceof Error ? err.message : 'Gagal mengunduh CSV.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   function handleThemeChange(nextTheme: string) {
@@ -392,7 +421,6 @@ export function ProfileSettingsPage() {
                 { icon: 'medication', label: 'Medications', desc: 'Track medication schedule', path: '/medications' },
                 { icon: 'group', label: 'Family / Caregiver', desc: 'Manage access permissions', path: '/family' },
                 { icon: 'emergency', label: 'Emergency Contacts', desc: 'Configure emergency alerts', path: '/emergency' },
-                { icon: 'download', label: 'Export Data', desc: 'Download measurement CSV', path: '/settings/export' },
                 { icon: 'delete_forever', label: 'Delete Account', desc: 'Remove all data permanently', path: '/settings/delete' }
               ].map((item) => (
                 <a key={item.path} href={item.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--radiusMd)', border: '1px solid var(--colorBorderSoft)', textDecoration: 'none', color: 'var(--colorText)', transition: 'background 0.15s' }}
@@ -407,6 +435,20 @@ export function ProfileSettingsPage() {
                   <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--colorTextSubdued)' }}>chevron_right</span>
                 </a>
               ))}
+              <button
+                type="button"
+                onClick={() => void handleExportCsv()}
+                disabled={exporting}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--radiusMd)', border: '1px solid var(--colorBorderSoft)', textDecoration: 'none', color: 'var(--colorText)', background: 'transparent', textAlign: 'left', cursor: exporting ? 'progress' : 'pointer', marginTop: 8, width: '100%' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--colorTextMuted)' }}>download</span>
+                <div style={{ flex: 1 }}>
+                  <strong style={{ font: 'var(--typLabelMd)', display: 'block' }}>{exporting ? 'Mengunduh…' : 'Export Data'}</strong>
+                  <small style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>Download measurement CSV</small>
+                </div>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--colorTextSubdued)' }}>download</span>
+              </button>
+              {exportMessage ? <p className="form-message success" role="status">{exportMessage}</p> : null}
             </div>
           </section>
 

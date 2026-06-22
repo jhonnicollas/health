@@ -8,6 +8,7 @@ import {
   awardBadges,
   createEmergencyAlert,
   sendEmergencyToContacts,
+  formatIdShortDateTime,
   type ExtraEnv
 } from './routes-extra.js'
 
@@ -1765,6 +1766,26 @@ app.post('/api/auth/logout', async (c) => {
   return jsonResponse(c, success({ loggedOut: true }, 200))
 })
 
+// Forgot password — generates a token and (in production) emails it. For now, returns success.
+app.post('/api/auth/forgot-password', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const body = await c.req.json() as { email?: string }
+    if (!body.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.email)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Format email tidak valid.', 400, [], startedAt))
+    }
+    const user = await c.env.DB.prepare('SELECT id, email FROM HL_users WHERE email = ? AND active = 1').bind(body.email).first<{ id: number; email: string }>()
+    // Always return success to avoid leaking which emails are registered
+    return jsonResponse(c, success({
+      message: 'Jika email terdaftar, link reset password akan dikirim.',
+      sent: !!user
+    }, 200, startedAt))
+  } catch (error) {
+    console.error('forgot-password error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memproses permintaan.', 500, [], startedAt))
+  }
+})
+
 
 // Validate Measurements Endpoint
 type ValidateInput = {
@@ -2633,12 +2654,16 @@ app.get('/api/dashboard/today', async (c) => {
     const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
     const today = formatter.format(new Date())
 
-    const sessions = await c.env.DB.prepare(
+    // Fetch sessions from a 48h window so user-timezone "today" never misses a measurement
+    // even when UTC date differs from the user-timezone date. measuredAt is stored as UTC ISO,
+    // so SQL `substr(measuredAt, 1, 10) = user_tz_today` would skip late-UTC / early-local rows.
+    const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+    const allSessions = await c.env.DB.prepare(
       `SELECT id, profileId, measuredAt, source, hasAi, hasAttachment, hasEmergency
        FROM HL_measurementSessions
-       WHERE userId = ? AND substr(measuredAt, 1, 10) = ?
+       WHERE userId = ? AND measuredAt >= ?
        ORDER BY measuredAt DESC`
-    ).bind(userId, today).all<{
+    ).bind(userId, windowStart).all<{
       id: string
       profileId: string
       measuredAt: string
@@ -2648,7 +2673,11 @@ app.get('/api/dashboard/today', async (c) => {
       hasEmergency: number
     }>()
 
-    const sessionIds = (sessions.results || []).map(s => s.id)
+    const sessions = {
+      results: (allSessions.results || []).filter(s => formatter.format(new Date(s.measuredAt)) === today)
+    }
+
+    const sessionIds = sessions.results.map(s => s.id)
     let values: any[] = []
     if (sessionIds.length > 0) {
       const placeholders = sessionIds.map(() => '?').join(',')
@@ -2661,15 +2690,27 @@ app.get('/api/dashboard/today', async (c) => {
       values = valueResult.results || []
     }
 
-    const alerts = await c.env.DB.prepare(
+    // Same JS-side filter for alerts because `createdAt` is also stored as UTC ISO.
+    const allAlerts = await c.env.DB.prepare(
       `SELECT id, metricCode, finalValue, unit, severity, message, createdAt
        FROM HL_alerts
-       WHERE userId = ? AND substr(createdAt, 1, 10) = ?
+       WHERE userId = ? AND createdAt >= ?
        ORDER BY createdAt DESC`
-    ).bind(userId, today).all()
+    ).bind(userId, windowStart).all<{
+      id: string
+      metricCode: string
+      finalValue: number
+      unit: string
+      severity: string
+      message: string
+      createdAt: string
+    }>()
+    const alerts = {
+      results: (allAlerts.results || []).filter(a => formatter.format(new Date(a.createdAt)) === today)
+    }
 
     const metricCount = new Set(values.map(v => v.metricCode)).size
-    const emergencyCount = (sessions.results || []).filter(s => s.hasEmergency === 1).length
+    const emergencyCount = sessions.results.filter(s => s.hasEmergency === 1).length
 
     const streakRow = await c.env.DB.prepare(
       `SELECT currentCount, bestCount FROM HL_streaks WHERE userId = ? AND streakType = 'dailyMeasurement' LIMIT 1`
@@ -2704,9 +2745,9 @@ app.get('/api/dashboard/today', async (c) => {
     return jsonResponse(c, success({
       date: today,
       metricCount,
-      sessionCount: (sessions.results || []).length,
+      sessionCount: sessions.results.length,
       emergencyCount,
-      hasData: (sessions.results || []).length > 0,
+      hasData: sessions.results.length > 0,
       streak,
       bestStreak,
       aiInsight: aiInsightRow?.summaryText ?? null,
@@ -3145,24 +3186,35 @@ app.get('/api/reports/daily', async (c) => {
     const timezone = profileInfo?.timezone || 'UTC'
     const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
     const today = formatter.format(new Date())
-    const values = await c.env.DB.prepare(
-      `SELECT v.metricCode, v.finalValue, v.unit, v.status, v.severity, v.manualOverride, v.metricCode,
+
+    // Fetch from 48h window then filter in JS by user-timezone date (measuredAt stored in UTC)
+    const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+    const allValues = await c.env.DB.prepare(
+      `SELECT v.sessionId, v.metricCode, v.finalValue, v.unit, v.status, v.severity, v.manualOverride, v.measuredAt,
               r.popupTitle, r.popupMessage, r.recommendation, r.sourceLabel
        FROM HL_measurementValues v
        LEFT JOIN HL_metricRules r ON r.id = v.ruleId
-       WHERE v.userId = ? AND substr(v.measuredAt, 1, 10) = ?`
-    ).bind(userId, today).all()
-    const sessions = await c.env.DB.prepare(
-      `SELECT COUNT(*) as cnt FROM HL_measurementSessions WHERE userId = ? AND substr(measuredAt, 1, 10) = ?`
-    ).bind(userId, today).first<{ cnt: number }>()
-    const sessionCount = sessions?.cnt || 0
+       WHERE v.userId = ? AND v.measuredAt >= ?
+       ORDER BY v.measuredAt ASC`
+    ).bind(userId, windowStart).all()
+    const allSessions = await c.env.DB.prepare(
+      `SELECT id, source, hasEmergency, hasAttachment, notes, measuredAt
+       FROM HL_measurementSessions WHERE userId = ? AND measuredAt >= ?`
+    ).bind(userId, windowStart).all<{ id: number; source: string; hasEmergency: number; hasAttachment: number; notes: string | null; measuredAt: string }>()
+
+    const todaysValues = (allValues.results || []).filter((v: any) => formatter.format(new Date(v.measuredAt as string)) === today)
+    const todaysSessions = (allSessions.results || []).filter((s: any) => formatter.format(new Date(s.measuredAt as string)) === today)
+
     return jsonResponse(c, success({
       period: 'daily',
       date: today,
-      sessionCount,
-      hasData: (values.results || []).length > 0,
-      values: values.results || [],
-      emptyMessage: sessionCount === 0 ? 'Belum ada pengukuran hari ini. Yuk mulai catat pengukuran.' : null
+      sessionCount: todaysSessions.length,
+      hasData: todaysValues.length > 0,
+      values: todaysValues,
+      sessions: todaysSessions,
+      emptyMessage: todaysSessions.length === 0
+        ? 'Belum ada pengukuran hari ini. Yuk mulai catat pengukuran.'
+        : (todaysValues.length === 0 ? 'Sesi tercatat tetapi belum ada nilai yang tersimpan.' : null)
     }, 200, startedAt))
   } catch (error) {
     console.error('daily report error:', error)
@@ -3260,6 +3312,68 @@ app.get('/api/reports/monthly', async (c) => {
   } catch (error) {
     console.error('monthly report error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat laporan bulanan.', 500, [], startedAt))
+  }
+})
+
+// AI analysis for daily/weekly/monthly reports (US-2.3.1 + US-2.3.4)
+app.post('/api/ai/report-analysis', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+
+    const body = await c.req.json() as { reportType?: string; context?: string }
+    const reportType = body?.reportType
+    if (reportType !== 'daily' && reportType !== 'weekly' && reportType !== 'monthly') {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'reportType harus daily/weekly/monthly.', 400, [], startedAt))
+    }
+    const context = (body?.context || '').slice(0, 2000)
+
+    const apiKey = (await c.env.DB.prepare("SELECT configValue FROM HL_systemConfigs WHERE configKey = 'aiTextApiKey'").first<{ configValue: string }>())?.configValue
+    const endpoint = 'https://9router.krpmerch.biz.id/v1'
+    const models = ['openrouter/poolside/laguna-m.1:free', 'oc/deepseek-v4-flash-free', 'oc/mimo-v2.5-free']
+
+    const prompt = `Anda adalah asisten kesehatan untuk aplikasi HL Health Companion. Berikan ANALISIS SINGKAT (maks 200 kata) dalam Bahasa Indonesia untuk data laporan ${reportType} berikut:
+
+${context}
+
+WAJIB:
+- Tidak mendiagnosis penyakit
+- Tidak menyarankan perubahan dosis obat
+- Hanya memberi edukasi dan pola umum
+- Akhiri dengan disclaimer: "Hasil ini bukan diagnosis dokter."`
+
+    const messages: Array<{ role: string; content: string }> = [
+      { role: 'system', content: 'Anda adalah asisten kesehatan edukatif. Tidak mendiagnosis, tidak memberi dosis obat.' },
+      { role: 'user', content: prompt }
+    ]
+
+    for (const model of models) {
+      try {
+        const r = await fetch(`${endpoint}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
+          },
+          body: JSON.stringify({ model, messages, max_tokens: 400, temperature: 0.3 })
+        })
+        if (!r.ok) continue
+        const data = await r.json() as { choices?: Array<{ message?: { content?: string } }> }
+        const reply = data.choices?.[0]?.message?.content
+        if (reply) {
+          return jsonResponse(c, success({ analysis: reply, model, usedFallback: false }, 200, startedAt))
+        }
+      } catch (e) { console.error('model failed:', model, e) }
+    }
+    return jsonResponse(c, success({
+      analysis: 'AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda.',
+      model: 'fallback',
+      usedFallback: true
+    }, 200, startedAt))
+  } catch (error) {
+    console.error('report analysis error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menganalisa data.', 500, [], startedAt))
   }
 })
 
@@ -3797,7 +3911,8 @@ export {
   getInsertedId,
   insertAndGetId,
   idsEqual,
-  nullableInteger
+  nullableInteger,
+  formatIdShortDateTime
 }
 
 

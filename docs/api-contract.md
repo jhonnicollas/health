@@ -1757,9 +1757,16 @@ GET /api/reports/:id/download
 ### Response
 
 ```http
-Content-Type: application/pdf
-Content-Disposition: attachment; filename="hl-doctor-ready-30d.pdf"
+Content-Type: text/html; charset=utf-8
+Content-Disposition: inline
 ```
+
+### Body Format
+
+The body is HTML containing the 30-day doctor report. All timestamps
+inside the HTML use the Indonesian short-month format
+`dd MMM yyyy HH:mm` (e.g., `23 Jun 2026 18:30`). Indonesian short month
+names: `Jan, Feb, Mar, Apr, Mei, Jun, Jul, Agu, Sep, Okt, Nov, Des`.
 
 ### Access Rules
 

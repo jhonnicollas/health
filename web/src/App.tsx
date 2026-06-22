@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatIndonesianDate } from './utils/dateFormat'
+import { formatDateTimeShort } from './utils/dateFormat'
+import { MedicalTerm, MEDICAL_GLOSSARY } from './components/MedicalTerm'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/auth'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -188,6 +189,7 @@ function MeasurementHistoryPage() {
   const [selectedAttachment, setSelectedAttachment] = useState<HistoryAttachment | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showUnitInfo, setShowUnitInfo] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -216,8 +218,19 @@ function MeasurementHistoryPage() {
     <section className="settings-panel history-panel" aria-labelledby="history-title">
       <div className="page-heading">
         <div>
-          <h2 id="history-title">Measurement History</h2>
-          <p>Comprehensive log of all patient vitals and raw data inputs.</p>
+          <h2 id="history-title" className="page-heading-with-help">
+            Measurement History
+            <button
+              type="button"
+              className="medical-term-info page-heading-help"
+              onClick={() => setShowUnitInfo(true)}
+              aria-label="Lihat satuan yang digunakan"
+              title="Lihat satuan"
+            >
+              <span className="material-symbols-outlined">help</span>
+            </button>
+          </h2>
+          <p>Log lengkap semua pengukuran dengan rekomendasi.</p>
         </div>
         <span className="status-chip">{sessions.length} sessions</span>
       </div>
@@ -230,10 +243,11 @@ function MeasurementHistoryPage() {
         <table className="report-table">
           <thead>
             <tr>
-              <th>Date & Time</th>
+              <th>Date &amp; Time</th>
               <th>Metric</th>
               <th>Result Value</th>
               <th>Status</th>
+              <th>Rekomendasi</th>
               <th>Evidence</th>
             </tr>
           </thead>
@@ -241,23 +255,34 @@ function MeasurementHistoryPage() {
             {sessions.flatMap((session) =>
               session.values.map((value, idx) => {
                 const attachment = session.attachments.find(a => a.metricCode === value.metricCode)
+                const dt = formatDateTimeShort(session.measuredAt)
                 return (
                   <tr key={`${session.id}-${value.id}`}>
                     {idx === 0 ? (
                       <td rowSpan={session.values.length} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--colorBorder)' }}>
-                        <strong>{formatIndonesianDate(session.measuredAt)}</strong>
+                        <div className="history-date-cell">
+                          <span className="date">{dt.date}</span>
+                          <span className="time">{dt.time}</span>
+                        </div>
                       </td>
                     ) : null}
                     <td>
-                      <span className="metric-code-badge">{value.metricCode}</span>
+                      <span className="metric-code-badge-cell">
+                        <span>{value.metricCode}</span>
+                        <MedicalTerm term="" shortDef={MEDICAL_GLOSSARY[value.metricCode] || ''} />
+                      </span>
                     </td>
                     <td>
-                      <strong style={{ fontSize: '1.1em' }}>{value.finalValue}</strong> <span className="meta">{value.unit}</span>
-                      {value.manualOverride === 1 ? <span className="badge-override">Manual</span> : null}
+                      <strong style={{ fontSize: '1.05em' }}>{value.finalValue}</strong> <span className="meta">{value.unit}</span>
                     </td>
                     <td>
                       <span className={`badge-status badge-${value.status}`}>
                         <span className="status-dot" />{value.status}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="muted" style={{ fontSize: '0.85em' }}>
+                        {value.severity === 'normal' ? 'Lanjutkan pola hidup sehat.' : `Lihat saran: ${value.status}`}
                       </span>
                     </td>
                     <td>
@@ -285,6 +310,33 @@ function MeasurementHistoryPage() {
               <button onClick={() => setSelectedAttachment(null)} type="button">Close</button>
             </div>
             <img alt="Watermarked measurement evidence" src={`/api/measurements/attachments/${selectedAttachment.id}`} />
+          </div>
+        </div>
+      ) : null}
+
+      {showUnitInfo ? (
+        <div className="evidence-modal" role="dialog" aria-modal="true" aria-label="Unit glossary">
+          <div className="evidence-lightbox">
+            <div className="page-heading compact">
+              <h3>Satuan yang Digunakan</h3>
+              <button onClick={() => setShowUnitInfo(false)} type="button">Tutup</button>
+            </div>
+            <table className="report-table" style={{ marginTop: 0 }}>
+              <thead>
+                <tr><th>Satuan</th><th>Untuk Metrik</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>%</code></td><td>SpO2 (Saturasi Oksigen)</td></tr>
+                <tr><td><code>bpm</code></td><td>Denyut Jantung, Pulse Tensimeter</td></tr>
+                <tr><td><code>mmHg</code></td><td>Sistolik, Diastolik</td></tr>
+                <tr><td><code>mg/dL</code></td><td>Gula Darah, Kolesterol, Asam Urat</td></tr>
+                <tr><td><code>kg</code></td><td>Berat Badan</td></tr>
+                <tr><td><code>cm</code></td><td>Lingkar Perut</td></tr>
+                <tr><td><code>°C</code></td><td>Suhu Tubuh</td></tr>
+                <tr><td><code>index</code></td><td>BMI (Body Mass Index)</td></tr>
+                <tr><td><code>hour</code></td><td>Durasi Tidur</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       ) : null}
@@ -543,7 +595,7 @@ function AppRoutes() {
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
   const notifRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'Reports']))
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'Reports', 'Health']))
 
   function toggleSidebar() {
     setSidebarCollapsed((prev) => {
@@ -709,6 +761,36 @@ function AppRoutes() {
     }).catch(() => {})
   }
 
+  function setAccessibilityMode(next: 'normal' | 'senior' | 'highContrast') {
+    document.documentElement.dataset.accessibility = next
+    fetch('/api/profile', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: currentTheme, timezone: profile?.timezone ?? 'Asia/Jakarta', heightCm: profile?.heightCm ?? 170, accessibilityMode: next })
+    }).catch(() => {})
+  }
+
+  async function handleResetPassword() {
+    setUserMenuOpen(false)
+    if (!user) return
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email })
+      })
+      const body = await res.json() as { success: boolean; error?: { message: string } }
+      if (body.success) {
+        window.alert('Link reset password sudah dikirim ke email Anda. Silakan cek inbox/spam dalam beberapa menit.')
+      } else {
+        window.alert('Gagal: ' + (body.error?.message ?? 'Tidak bisa mengirim link reset.'))
+      }
+    } catch {
+      window.alert('Tidak bisa terhubung ke server.')
+    }
+  }
+
   return (
     <main className={`app-page ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="app-sidebar" aria-label="App navigation">
@@ -866,6 +948,11 @@ function AppRoutes() {
               <button className={currentTheme === 'warm' ? 'active' : ''} onClick={() => setTheme('warm')} type="button" aria-label="Warm mode"><Icon name="wb_sunny" /></button>
               <button className={currentTheme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')} type="button" aria-label="Dark mode"><Icon name="dark_mode" /></button>
             </div>
+            <div className="topbar-display-mode" role="group" aria-label="Display mode">
+              <button className={profile?.accessibilityMode === 'normal' || !profile?.accessibilityMode ? 'active' : ''} onClick={() => setAccessibilityMode('normal')} type="button" aria-label="Normal mode" title="Normal"><Icon name="desktop_windows" /></button>
+              <button className={profile?.accessibilityMode === 'senior' ? 'active' : ''} onClick={() => setAccessibilityMode('senior')} type="button" aria-label="Senior mode" title="Senior"><Icon name="elderly" /></button>
+              <button className={profile?.accessibilityMode === 'highContrast' ? 'active' : ''} onClick={() => setAccessibilityMode('highContrast')} type="button" aria-label="High contrast" title="Kontras tinggi"><Icon name="contrast" /></button>
+            </div>
             <button className="topbar-icon-btn" onClick={() => navigate('/kb')} type="button" aria-label="Knowledge Base"><Icon name="menu_book" /></button>
             <div className="topbar-notif-wrap" ref={notifRef}>
               <button className="topbar-icon-btn has-alert" onClick={() => setNotifOpen(o => !o)} type="button" aria-label="Notifications"><Icon name="notifications" /></button>
@@ -888,6 +975,9 @@ function AppRoutes() {
                   </button>
                   <button onClick={() => { setUserMenuOpen(false); navigate('/reports/daily') }} type="button">
                     <Icon name="assessment" /> My Reports
+                  </button>
+                  <button onClick={handleResetPassword} type="button">
+                    <Icon name="lock_reset" /> Reset Password
                   </button>
                   <hr />
                   <button onClick={handleLogout} type="button" className="user-dropdown-logout">

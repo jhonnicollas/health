@@ -22,6 +22,24 @@ function dateInTz(tz: string): string {
   catch { return new Date().toISOString().slice(0, 10) }
 }
 
+const ID_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+
+function pad2(n: number): string { return String(n).padStart(2, '0') }
+
+function formatIdShortDateTime(iso: string | null | undefined): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  const day = pad2(d.getUTCDate())
+  const month = ID_MONTHS_SHORT[d.getUTCMonth()]
+  const year = d.getUTCFullYear()
+  const hh = pad2(d.getUTCHours())
+  const mm = pad2(d.getUTCMinutes())
+  return `${day} ${month} ${year} ${hh}:${mm}`
+}
+
+export { formatIdShortDateTime }
+
 function getCookie(c: Context, name: string): string | undefined {
   return honoGetCookie(c as any, name)
 }
@@ -418,7 +436,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
         'SELECT metricCode, finalValue, unit, status, severity, measuredAt FROM HL_measurementValues WHERE userId = ? AND measuredAt BETWEEN ? AND ? ORDER BY measuredAt ASC'
       ).bind(userId, rangeStart, rangeEnd).all()
       const profile = await c.env.DB.prepare('SELECT displayName FROM HL_users WHERE id = ?').bind(userId).first<{ displayName: string }>()
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Laporan 30 Hari</title></head><body><h1>Laporan Kesehatan 30 Hari</h1><p>Nama: ${escapeHtml(profile?.displayName || '-')}</p><p>Rentang: ${rangeStart} s/d ${rangeEnd}</p><table border="1" cellpadding="4"><tr><th>Tanggal</th><th>Metrik</th><th>Nilai</th><th>Unit</th><th>Status</th><th>Severity</th></tr>${(values.results || []).map((v: any) => `<tr><td>${v.measuredAt}</td><td>${v.metricCode}</td><td>${v.finalValue}</td><td>${v.unit}</td><td>${v.status}</td><td>${v.severity}</td></tr>`).join('')}</table><p><em>Laporan ini hanya data, bukan diagnosis. Konsultasikan dengan dokter.</em></p></body></html>`
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Laporan 30 Hari</title></head><body><h1>Laporan Kesehatan 30 Hari</h1><p>Nama: ${escapeHtml(profile?.displayName || '-')}</p><p>Rentang: ${formatIdShortDateTime(rangeStart)} s/d ${formatIdShortDateTime(rangeEnd)}</p><table border="1" cellpadding="4"><tr><th>Tanggal</th><th>Metrik</th><th>Nilai</th><th>Unit</th><th>Status</th><th>Severity</th></tr>${(values.results || []).map((v: any) => `<tr><td>${formatIdShortDateTime(v.measuredAt)}</td><td>${v.metricCode}</td><td>${v.finalValue}</td><td>${v.unit}</td><td>${v.status}</td><td>${v.severity}</td></tr>`).join('')}</table><p><em>Laporan ini hanya data, bukan diagnosis. Konsultasikan dengan dokter.</em></p></body></html>`
       const reportId = await (async () => {
         const tempId = Date.now().toString(36)
         const r2Key = `HL/users/${userId}/reports/${tempId}.html`

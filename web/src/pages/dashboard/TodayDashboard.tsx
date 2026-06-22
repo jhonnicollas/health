@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
 
 type Comparison = {
   avg3day: number | null
@@ -202,7 +203,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
                   <span className="material-symbols-outlined vital-icon" aria-hidden="true">
                     {METRIC_ICONS[v.metricCode] ?? 'monitor_heart'}
                   </span>
-                  <span className="vital-label-text">{METRIC_LABELS[v.metricCode] || v.metricCode}</span>
+                  <span className="vital-label-text"><MedicalTerm term={METRIC_LABELS[v.metricCode] || v.metricCode} shortDef={MEDICAL_GLOSSARY[v.metricCode] || ''} /></span>
                 </div>
                 <span className={`vital-badge ${badge.className}`}>{badge.label}</span>
               </div>
@@ -224,6 +225,33 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
           )
         })}
       </div>
+
+      {data.values.length > 0 ? (
+        <div className="dashboard-chart-card">
+          <h3>Tren 7 Hari Terakhir</h3>
+          <div className="dashboard-chart-grid">
+            {['systolic','diastolic','spo2','heartRate','bodyWeight','bodyTemperature','sleepDuration'].map(code => {
+              const v = data.values.find(x => x.metricCode === code)
+              if (!v) return null
+              const comp = v.comparisons?.avg7day ?? null
+              const max = comp && comp > 0 ? Math.max(v.finalValue, comp) : v.finalValue * 1.2
+              const min = comp && comp > 0 ? Math.min(v.finalValue, comp) * 0.8 : 0
+              const range = max - min
+              const heightPct = range > 0 ? Math.min(100, Math.max(5, ((v.finalValue - min) / range) * 100)) : 50
+              const sev = v.severity || 'normal'
+              return (
+                <div key={code} className="dashboard-chart-col">
+                  <div className="dashboard-chart-bar-wrap">
+                    <div className={`dashboard-chart-bar ${sev}`} style={{ height: `${heightPct}%` }} />
+                  </div>
+                  <span className="dashboard-chart-label">{METRIC_LABELS[code] || code}</span>
+                  <strong className="dashboard-chart-value">{v.finalValue} {v.unit}</strong>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

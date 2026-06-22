@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
+const PHONE_RE = /^[\d+\-\s()]{6,20}$/
+const TG_USER_RE = /^@?[A-Za-z0-9_]{4,32}$/
+const TG_NUM_RE = /^-?\d{5,15}$/
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
 type EmergencyContact = {
   id: number
   contactName: string
@@ -22,16 +27,42 @@ type RawEmergencyContact = EmergencyContact & { name?: string; relationship?: st
 
 type EmergencyContactsPayload = RawEmergencyContact[] | { contacts?: RawEmergencyContact[] }
 
+function validatePhone(v: string): string | null {
+  if (!v.trim()) return 'Nomor telepon wajib diisi.'
+  if (!PHONE_RE.test(v.trim())) return 'Nomor telepon tidak valid. Hanya angka, +, -, spasi, tanda kurung.'
+  return null
+}
+
+function validateTelegram(v: string): string | null {
+  if (!v.trim()) return null
+  const trimmed = v.trim()
+  if (trimmed.startsWith('@')) {
+    if (!TG_USER_RE.test(trimmed)) return 'Username Telegram harus 4-32 karakter (huruf, angka, underscore).'
+  } else if (!TG_NUM_RE.test(trimmed)) {
+    return 'ID Telegram harus angka 5-15 digit, atau mulai dengan @ untuk username.'
+  }
+  return null
+}
+
+function validateEmail(v: string): string | null {
+  if (!v.trim()) return null
+  if (!EMAIL_RE.test(v.trim())) return 'Format email tidak valid.'
+  return null
+}
+
 export function EmergencyContactsPage() {
   const [contacts, setContacts] = useState<EmergencyContact[]>([])
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [testStatus, setTestStatus] = useState<string | null>(null)
   const [contactName, setContactName] = useState('')
   const [contactRelation, setContactRelation] = useState('Spouse')
   const [contactPhone, setContactPhone] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [telegramChatId, setTelegramChatId] = useState('')
   const [consent, setConsent] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<{ phone?: string; email?: string; telegram?: string }>({})
+  const [touched, setTouched] = useState<{ phone?: boolean; email?: boolean; telegram?: boolean }>({})
 
   async function load() {
     setError(null)
@@ -61,6 +92,15 @@ export function EmergencyContactsPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const phoneErr = validatePhone(contactPhone)
+    const emailErr = validateEmail(contactEmail)
+    const tgErr = validateTelegram(telegramChatId)
+    setFieldErrors({ phone: phoneErr || undefined, email: emailErr || undefined, telegram: tgErr || undefined })
+    setTouched({ phone: true, email: true, telegram: true })
+    if (phoneErr || emailErr || tgErr) {
+      setError('Perbaiki field yang ditandai sebelum menyimpan.')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
@@ -71,9 +111,9 @@ export function EmergencyContactsPage() {
         body: JSON.stringify({
           contactName,
           contactRelation,
-          contactPhone,
-          contactEmail,
-          telegramChatId,
+          contactPhone: contactPhone.trim(),
+          contactEmail: contactEmail.trim() || undefined,
+          telegramChatId: telegramChatId.trim() || undefined,
           consentGiven: consent,
           enabled: true
         })
@@ -83,13 +123,50 @@ export function EmergencyContactsPage() {
         setError(body.error?.message ?? 'Failed to add contact.')
         return
       }
+      // Auto-send a test notification if telegramChatId present
+      if (telegramChatId.trim()) {
+        try {
+          await fetch('/api/telegram/test', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chatId: telegramChatId.trim(), message: 'Halo dari HL Health Companion. Kontak darurat Anda sudah terdaftar.' })
+          })
+          setTestStatus('Telegram test terkirim ke ' + telegramChatId.trim())
+        } catch {
+          setTestStatus('Kontak tersimpan, tapi test Telegram gagal.')
+        }
+      }
       setContactName('')
       setContactPhone('')
+      setContactEmail('')
+      setTelegramChatId('')
+      setFieldErrors({})
+      setTouched({})
       await load()
     } catch {
       setError('Could not connect to server.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function sendTestNotification(contact: EmergencyContact) {
+    setTestStatus(`Mengirim test ke ${contact.contactName}...`)
+    try {
+      if (contact.telegramChatId) {
+        const res = await fetch('/api/telegram/test', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatId: contact.telegramChatId, message: 'Test notifikasi darurat dari HL Health Companion.' })
+        })
+        const body = (await res.json().catch(() => null)) as { success?: boolean; error?: { message: string } } | null
+        setTestStatus(body?.success ? `Test Telegram ke ${contact.contactName} berhasil.` : `Gagal: ${body?.error?.message ?? 'Tidak bisa mengirim.'}`)
+      } else {
+        setTestStatus('Kontak ini belum punya Telegram chat ID. Isi dulu.')
+      }
+    } catch {
+      setTestStatus('Tidak bisa terhubung ke server.')
     }
   }
 
@@ -139,15 +216,41 @@ export function EmergencyContactsPage() {
         </label>
         <label>
           Phone number
-          <input onChange={(e) => setContactPhone(e.target.value)} required type="tel" value={contactPhone} />
+          <input
+            onChange={(e) => { setContactPhone(e.target.value); if (touched.phone) setFieldErrors(prev => ({ ...prev, phone: validatePhone(e.target.value) || undefined })) }}
+            onBlur={() => { setTouched(t => ({ ...t, phone: true })); setFieldErrors(prev => ({ ...prev, phone: validatePhone(contactPhone) || undefined })) }}
+            required
+            inputMode="tel"
+            className={touched.phone && fieldErrors.phone ? 'field-error-input' : ''}
+            type="tel"
+            value={contactPhone}
+          />
+          {touched.phone && fieldErrors.phone ? <small className="form-message error">{fieldErrors.phone}</small> : null}
         </label>
         <label>
           Email (optional)
-          <input onChange={(e) => setContactEmail(e.target.value)} type="email" value={contactEmail} />
+          <input
+            onChange={(e) => { setContactEmail(e.target.value); if (touched.email) setFieldErrors(prev => ({ ...prev, email: validateEmail(e.target.value) || undefined })) }}
+            onBlur={() => { setTouched(t => ({ ...t, email: true })); setFieldErrors(prev => ({ ...prev, email: validateEmail(contactEmail) || undefined })) }}
+            inputMode="email"
+            className={touched.email && fieldErrors.email ? 'field-error-input' : ''}
+            type="email"
+            value={contactEmail}
+          />
+          {touched.email && fieldErrors.email ? <small className="form-message error">{fieldErrors.email}</small> : null}
         </label>
         <label>
           Telegram chat ID (optional)
-          <input onChange={(e) => setTelegramChatId(e.target.value)} type="text" value={telegramChatId} />
+          <input
+            onChange={(e) => { setTelegramChatId(e.target.value); if (touched.telegram) setFieldErrors(prev => ({ ...prev, telegram: validateTelegram(e.target.value) || undefined })) }}
+            onBlur={() => { setTouched(t => ({ ...t, telegram: true })); setFieldErrors(prev => ({ ...prev, telegram: validateTelegram(telegramChatId) || undefined })) }}
+            inputMode="numeric"
+            placeholder="contoh: @username atau 8727919072"
+            className={touched.telegram && fieldErrors.telegram ? 'field-error-input' : ''}
+            type="text"
+            value={telegramChatId}
+          />
+          {touched.telegram && fieldErrors.telegram ? <small className="form-message error">{fieldErrors.telegram}</small> : <small className="muted">Username (@...) atau numeric chat ID (5-15 digit).</small>}
         </label>
         <label className="checkbox-row">
           <input checked={consent} onChange={(e) => setConsent(e.target.checked)} type="checkbox" />
@@ -167,6 +270,7 @@ export function EmergencyContactsPage() {
               <li key={c.id} className="emergency-item">
                 <div>
                   <strong>{c.contactName}</strong> · {c.contactRelation} · {c.contactPhone}
+                  {c.contactEmail ? <div className="muted">Email: {c.contactEmail}</div> : null}
                   {c.telegramChatId ? <div className="muted">Telegram: {c.telegramChatId}</div> : null}
                   <div className="consent-toggle-row">
                     <label className="checkbox-row compact">
@@ -175,12 +279,17 @@ export function EmergencyContactsPage() {
                     </label>
                   </div>
                 </div>
-                <button className="danger" onClick={() => remove(c.id)} type="button">Remove</button>
+                <div className="action-row">
+                  <button onClick={() => void sendTestNotification(c)} type="button">Test Send</button>
+                  <button className="danger" onClick={() => remove(c.id)} type="button">Remove</button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {testStatus ? <p className="form-message success" role="status">{testStatus}</p> : null}
     </section>
   )
 }

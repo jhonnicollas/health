@@ -4,16 +4,26 @@
 
 ```text
 Project: HL Health Companion
-Sprint: UI/UX Overhaul + GAP Resolution
-Current Task: All GAP-1 through GAP-22 completed and deployed
-Current State: DEPLOYED (worker v7e7809b2, pages 0f7a1634)
-Last Completed Task: GAP-8 Telegram Bot Token Fixed — new token from @BotFather saved as secret, botTokenValid:true
-Files Changed: HANDOFF.md, WORK_LOG.md, docs/TASKS.md
-Commands Run: wrangler secret put TELEGRAM_BOT_TOKEN ✅, curl getMe=200 ✅, UAT 51/52 ✅, git push ✅
-Known Issues: Cloudflare cron triggers at 5/5 limit (GAP-17), notification dropdown empty state
-Next Recommended Task: Owner re-evaluation (target >= 800/1000), link Telegram chat with bot @morphezCodex_bot
-Last Updated: 2026-06-22 22:30 UTC
+Sprint: User-Reported Bug Fixes
+Current Task: BUG-DASH-1 Dashboard Today Empty Across Timezone
+Current State: COMPLETED (awaiting production deploy + smoke)
+Last Completed Task: BUG-DASH-1
+Files Changed: HANDOFF.md, WORK_LOG.md, docs/TASKS.md, worker/src/routes-extra.ts, worker/src/index.ts, worker/test/register.test.mjs, docs/api-contract.md
+Commands Run: worker typecheck PASS, worker test 29/29 PASS, regression test confirmed FAIL on pre-fix code
+Known Issues: Production deploy + post-deploy smoke pending (login + submit late-UTC measurement + curl /api/dashboard/today)
+Next Recommended Task: Deploy Worker + Pages to production, then production smoke for both bug fixes
+Last Updated: 2026-06-23 UTC
 ```
+
+### BUG-FMT-1 (Doctor Report Date Format)
+- New helper `formatIdShortDateTime(iso)` in worker/src/routes-extra.ts.
+- Doctor report HTML now uses `dd MMM yyyy HH:mm` Indonesian short month (Jan, Feb, Mar, Apr, Mei, Jun, Jul, Agu, Sep, Okt, Nov, Des).
+- `/api/reports/share/:shareToken` reads same R2 HTML, so format applies there too.
+
+### BUG-DASH-1 (Dashboard Empty Across Timezone)
+- `/api/dashboard/today` now fetches sessions/alerts from a 48h window and filters in JS via `Intl.DateTimeFormat('en-CA', { timeZone: userTz, ... })`.
+- Same UTC-vs-user-tz fix applied to `HL_alerts` query.
+- Regression test added at worker/test/register.test.mjs covers Asia/Jakarta user with late-UTC measurement.
 
 ## Current Status Override — 2026-06-22 16:22 UTC
 
@@ -256,6 +266,21 @@ cd worker && CLOUDFLARE_API_TOKEN="..." CLOUDFLARE_ACCOUNT_ID="79dea2845a4b62ea5
 cd web && CLOUDFLARE_API_TOKEN="..." CLOUDFLARE_ACCOUNT_ID="79dea2845a4b62ea5229c8676dea02c0" npx wrangler pages deploy dist --project-name hl-health-companion --commit-dirty=true
 ```
 
+## Hotfix Override — 2026-06-23 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Hotfix (user-reported UI bugs)
+Current Task: AlertsPage tabs + EmergencyContacts validation/test-send
+Current State: CODE COMPLETE, NOT YET DEPLOYED
+Last Completed Task: HOTFIX-alerts-tabs-and-emergency-validation
+Files Changed: web/src/pages/alerts/AlertsPage.tsx, web/src/pages/emergency/EmergencyContactsPage.tsx, WORK_LOG.md, HANDOFF.md
+Commands Run: web typecheck ✅, web lint ✅
+Known Issues: needs `npm run build` + `wrangler pages deploy` to ship to production
+Next Recommended Task: build + deploy hotfix; then resume EP-P* backlog
+```
+
 ## Known Issues
 - Cloudflare cron triggers at 5/5 limit (GAP-17) — manual POST /api/internal/cron/reminders works
 - Notification dropdown has empty state — needs real data from API
+- AlertsPage tabs hotfix built but not yet deployed (worker code unchanged; /api/notifications already exists)

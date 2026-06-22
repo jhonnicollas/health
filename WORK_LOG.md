@@ -4607,3 +4607,158 @@ Final state of audit + fixes:
 - docs/TASKS.md (EP-P6.2 [x] Done)
 - HANDOFF.md (deployed state)
 - WORK_LOG.md (this entry)
+
+## 2026-06-23 — Agent: opencode
+
+### Task
+- Task ID: BUG-FMT-1 Doctor Report Date Format
+- Sprint: User-Reported Bugs
+- Status: Started
+
+### Files Read
+- docs/TASKS.md
+- docs/api-contract.md
+- worker/src/routes-extra.ts
+- worker/src/index.ts
+- web/src/pages/dashboard/TodayDashboard.tsx
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Added BUG-FMT-1 and BUG-DASH-1 to docs/TASKS.md; BUG-FMT-1 marked In Progress.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue BUG-FMT-1 only. Add Indonesian short-month formatter to routes-extra.ts and apply to doctor-ready HTML.
+
+## 2026-06-23 — Agent: opencode
+
+### Task
+- Task ID: BUG-FMT-1 Doctor Report Date Format
+- Sprint: User-Reported Bugs
+- Status: Completed
+
+### Files Read
+- docs/TASKS.md
+- docs/api-contract.md
+- worker/src/routes-extra.ts
+- worker/src/index.ts
+- worker/test/register.test.mjs
+
+### Files Changed
+- worker/src/routes-extra.ts: added `ID_MONTHS_SHORT`, `pad2`, and exported `formatIdShortDateTime(iso)` helper. Rewrote doctor-ready HTML `Rentang` line and per-row `Tanggal` cell to call the new formatter.
+- worker/src/index.ts: re-exported `formatIdShortDateTime` for test access.
+- worker/test/register.test.mjs: imported `formatIdShortDateTime` and added unit test covering all 12 Indonesian short months + null/empty/invalid fallbacks.
+- docs/api-contract.md: 16.5 Download Report — documented body format `dd MMM yyyy HH:mm` and Indonesian short month list.
+- docs/TASKS.md: BUG-FMT-1 [x] Done.
+- HANDOFF.md: refresh current state.
+
+### What Changed
+- Doctor report HTML now renders `Rentang: 23 Jun 2026 18:30 s/d 22 Jul 2026 09:00` and table cells show `23 Jun 2026 18:30` instead of raw ISO like `2026-06-23T18:30:00.000Z`.
+- Shared view (`/api/reports/share/:shareToken`) reads same R2 HTML, so the format applies there too.
+- Indonesian short month set used: `Jan, Feb, Mar, Apr, Mei, Jun, Jul, Agu, Sep, Okt, Nov, Des`.
+
+### Validation
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+- `cd worker && npm test` — PASS (28/28, +1 new formatIdShortDateTime unit test)
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/api-contract.md
+- HANDOFF.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Start BUG-DASH-1 next: change `/api/dashboard/today` SQL `substr(measuredAt, 1, 10) = ?` filter to a JS-side user-timezone filter using `Intl.DateTimeFormat`, mirroring `/api/measurements/today` at `worker/src/index.ts:2553-2564`. Add regression test where measurement UTC date differs from user TZ today.
+
+## 2026-06-23 — Agent: opencode
+
+### Task
+- Task ID: BUG-DASH-1 Dashboard Today Empty Across Timezone
+- Sprint: User-Reported Bugs
+- Status: Completed
+
+### Files Read
+- docs/TASKS.md
+- worker/src/index.ts (`/api/dashboard/today` at line ~2623)
+- worker/src/index.ts (`/api/measurements/today` reference at line ~2545)
+- worker/test/register.test.mjs (D1Mock SQL patterns)
+
+### Files Changed
+- worker/src/index.ts: replaced SQL `substr(measuredAt,1,10)=?` filters on `HL_measurementSessions` and `HL_alerts` with a 48h window fetch (`measuredAt >= now-48h`) + JS-side `Intl.DateTimeFormat(...).format(measuredAt) === today_jakarta` filter using the user's profile timezone.
+- worker/test/register.test.mjs: extended D1Mock first() with `measuredAt >=` / `createdAt >=` handlers for HL_measurementSessions and HL_alerts; added regression test `GET /api/dashboard/today uses user-timezone date filter (Asia/Jakarta late-UTC measurement)` that constructs a UTC-evening timestamp whose UTC prefix differs from Jakarta today and asserts `hasData=true`, `sessionCount=1`, `metricCount=1`.
+- docs/TASKS.md: BUG-DASH-1 [x] Done.
+- HANDOFF.md: refresh current state.
+
+### What Changed
+- `/api/dashboard/today` now reads sessions/alerts from the last 48h and filters by user-timezone date in JS, mirroring `/api/measurements/today`.
+- Same fix applied to alerts query (was `substr(createdAt,1,10)=?`, same UTC-vs-user-tz mismatch).
+- Regression test verified to FAIL on the pre-fix SQL (manual revert confirmed) and PASS on the post-fix code.
+
+### Validation
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+- `cd worker && npm test` — PASS (29/29; +1 regression test for BUG-DASH-1, existing 28 still green)
+- Sanity check: reverted worker/src/index.ts to pre-fix SQL and ran npm test. Regression test failed with `hasData` false, confirming the test catches the bug.
+
+### Documentation Updated
+- docs/TASKS.md
+- HANDOFF.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Both BUG-FMT-1 and BUG-DASH-1 fixed and tested locally. Deploy to production via `wrangler deploy`, then production smoke `/api/reports/doctor-ready` + `/api/dashboard/today` for late-UTC submission. Owner visual review of doctor PDF download remains pending.
+
+
+## 2026-06-23 UTC — Agent: opencode
+
+### Task
+- Task ID: HOTFIX-alerts-tabs-and-emergency-validation
+- Sprint: Hotfix (user-reported)
+- Status: Completed
+
+### Context
+- User reported /alerts page tabs (Emergency Alerts + Telegram Log) not functional
+- User reported /emergency page lacks input validation for phone / telegram / email and no test-send feature
+
+### Files Read
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+- worker/src/index.ts (notifications + alerts endpoints, /api/telegram/test, getCurrentSession helper)
+- web/src/utils/dateFormat.ts (formatDateTimeShort exists)
+- web/src/App.css (alerts-tabs / alerts-tab classes exist)
+
+### Files Changed
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/emergency/EmergencyContactsPage.tsx
+
+### What Changed
+- AlertsPage.tsx: rewrote with tab state `activeTab: "alerts" | "telegram"`, .alerts-tabs / .alerts-tab markup, two independent loaders (loadAlerts hits /api/alerts, loadNotifications hits /api/notifications), per-tab loading flag, per-tab empty state, timestamps rendered with formatDateTimeShort ({date, time}) instead of formatIndonesianDate. Removed stale segmented-control filter UI.
+- EmergencyContactsPage.tsx: added validateContact helper with regex PHONE_REGEX /^[\d+\-\s()]{6,20}$/, TELEGRAM_USERNAME_REGEX /^@?[A-Za-z0-9_]{4,32}$/, TELEGRAM_NUMERIC_REGEX /^-?\d{5,15}$/, EMAIL_REGEX /^[^\s@]+@[^\s@]+\.[^\s@]+$/; per-field error rendering with touched gating; inputMode="tel" on phone, inputMode="email" on email, inputMode="numeric" on telegram; after successful POST, auto-call /api/telegram/test when telegramChatId present and surface result; per-contact "Test Send" button calling /api/telegram/test with status feedback; .emergency-actions row for Test Send + Remove.
+
+### Validation
+- cd web && npx tsc -b --noEmit: ✅ 0 errors
+- cd web && npm run lint: ✅ 0 new errors (pre-existing DynamicMetricForm warnings only)
+
+### Backend Notes
+- /api/notifications already exists at worker/src/index.ts:4465 with same response shape (`{ notifications: [...] }`); no new endpoint created.
+- /api/telegram/test already exists at worker/src/index.ts:3339; reused for test-send.
+- No schema or seed changes; api-contract.md requires no update for this hotfix.
+
+### Documentation Updated
+- WORK_LOG.md (this entry)
+- HANDOFF.md (hotfix status appended)
+- docs/TASKS.md — no edit; this hotfix was user-reported outside EP-* plan
+
+### Next Agent Notes
+- If owner wants per-contact email test, add POST /api/emergency/contacts/:id/test (requires email transport + HL_emergencyContactDeliveries table; not in scope here).
+- If owner wants persistent telegram test history, extend /api/notifications query with channel=test after the send.
+- Deploy this hotfix via `wrangler pages deploy dist` once `npm run build` runs clean in web/.

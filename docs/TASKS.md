@@ -1119,3 +1119,17 @@ Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
 - [x] HL_lastMeasurements table + auto-fill API for rarely-changing metrics
 - [x] Image compression (max 1280px, quality 50%, webp)
 - [x] Watermark on final attachment
+
+### [x] BUG-FMT-1 Doctor Report Date Format
+- **Deskripsi**: `/api/reports/doctor-ready` and `/api/reports/:id/download` currently embed raw ISO UTC strings (`2026-06-23T18:30:00.000Z`). Reformat every timestamp in the doctor report HTML to Indonesian short format `dd MMM yyyy HH:mm` (e.g., `23 Jun 2026 18:30`).
+- **Acceptance Criteria**:
+  - `rangeStart`, `rangeEnd`, and every `measuredAt` cell render as `dd MMM yyyy HH:mm` in Indonesian short month (Jan, Feb, Mar, Apr, Mei, Jun, Jul, Agu, Sep, Okt, Nov, Des).
+  - Worker typecheck + tests still pass.
+  - Production deploy + manual curl `/api/reports/:id/download` shows new format.
+
+### [x] BUG-DASH-1 Dashboard Today Empty Across Timezone
+- **Deskripsi**: `/api/dashboard/today` filters `HL_measurementSessions` with `substr(measuredAt, 1, 10) = today_jakarta`. Because `measuredAt` is stored as UTC ISO, the SQL filter fails whenever the measurement was submitted late UTC / early Jakarta local. Fetch sessions without a date filter and filter by user-timezone date in JS using `Intl.DateTimeFormat` (same pattern as `/api/measurements/today` at `worker/src/index.ts:2553-2564`).
+- **Acceptance Criteria**:
+  - `hasData=true` and `sessionCount>=1` when measurement submitted in the user-timezone "today" even if UTC date differs.
+  - Add regression test for late-UTC measurement with Jakarta timezone.
+  - Worker typecheck + tests still pass.
