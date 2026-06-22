@@ -981,7 +981,17 @@ Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
   - Migration runs on local/dev D1 copy.
   - FK integrity checks pass with no orphan rows.
 
-### [ ] EP-P1.3 Backend ID Refactor
+### [x] EP-P1.2A Schema/Seed Integer Alignment
+- **Deskripsi**: Align `docs/schema.sql`, `docs/seed.sql`, and `docs/seed-rules.generated.sql` with owner request that UUID/TEXT table IDs become integer autoincrement IDs before backend refactor.
+- **Files**: `docs/schema.sql`, `docs/seed.sql`, `docs/seed-rules.generated.sql`, `docs/rules-seeder.js.txt`.
+- **Acceptance Criteria**:
+  - Surrogate table `id` columns use `INTEGER PRIMARY KEY AUTOINCREMENT`.
+  - Internal FK ID columns such as `userId`, `profileId`, `sessionId`, `ruleId`, `medicationId`, and `reportId` use `INTEGER`.
+  - Natural keys stay TEXT: `configKey`, `deviceCode`, `metricCode`, `badgeCode`, `slug`, token hashes, `r2Key`, push endpoint, and polymorphic audit `entityId`.
+  - Seed files no longer insert UUID/string values into integer `id` columns.
+  - Metric rules remain idempotent through a natural `ruleCode` key while `HL_metricRules.id` is integer.
+
+### [-] EP-P1.3 Backend ID Refactor
 - **Deskripsi**: Refactor backend table PK/FK writes and reads from UUID/TEXT IDs to integer IDs after migration design.
 - **Acceptance Criteria**:
   - Internal table PK/FK values use numbers.

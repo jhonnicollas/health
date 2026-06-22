@@ -145,6 +145,48 @@ Known Issues: INTEGER_IDS_V2.sql is dev-copy design mode and only includes full 
 Next Recommended Task: EP-P1.3 Backend ID Refactor
 ```
 
+## Current Status Override - 2026-06-22 10:27 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P1.2A Schema/Seed Integer Alignment
+Current State: IN PROGRESS
+Last Completed Task: EP-P1.2 Migration SQL Design
+Files Changed: docs/TASKS.md, WORK_LOG.md, HANDOFF.md
+Commands Run: schema/seed context reads
+Known Issues: backend/frontend still expect string IDs until EP-P1.3/EP-P1.4; do not apply production DB migration yet
+Next Recommended Task: finish aligning docs/schema.sql, docs/seed.sql, docs/seed-rules.generated.sql
+```
+
+## Current Status Override - 2026-06-22 10:32 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P1.2A Schema/Seed Integer Alignment
+Current State: COMPLETED
+Last Completed Task: EP-P1.2A
+Files Changed: docs/TASKS.md, docs/schema.sql, docs/seed.sql, docs/seed-rules.generated.sql, docs/rules-seeder.js.txt, docs/INTEGER_ID_MIGRATION_PLAN.md, WORK_LOG.md, HANDOFF.md
+Commands Run: regex legacy-ID scan; SQLite schema+seed validation; git diff --check
+Known Issues: backend/frontend still expect string IDs until EP-P1.3/EP-P1.4; production D1 migration must not be applied yet
+Next Recommended Task: EP-P1.3 Backend ID Refactor
+```
+
+## Current Status Override - 2026-06-22 10:37 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P1.3 Backend ID Refactor
+Current State: IN PROGRESS
+Last Completed Task: EP-P1.2A
+Files Changed: docs/TASKS.md, WORK_LOG.md, HANDOFF.md
+Commands Run: mandatory context reads
+Known Issues: backend source audit pending; production D1 reset must wait until backend/frontend integer-ID compatibility and full tests pass
+Next Recommended Task: continue EP-P1.3 only; refactor backend CRUD writes/reads from text IDs to integer autoincrement IDs
+```
+
 ## Production Deployment
 
 ```text

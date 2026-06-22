@@ -31,59 +31,59 @@ VALUES
 
 -- Devices
 
-INSERT OR IGNORE INTO HL_devices (id, deviceCode, deviceName, deviceType, brand, model, aiPromptKey, active)
+INSERT OR IGNORE INTO HL_devices (deviceCode, deviceName, deviceType, brand, model, aiPromptKey, active)
 VALUES
-('dev-yuwell-yx106','yuwellYx106','Yuwell YX106 Oximeter','oximeter','Yuwell','YX106','oximeter',1),
-('dev-omron-hem7194t1fl','omronHem7194t1fl','OMRON BT HEM 7194 T1 FL','bloodPressure','OMRON','HEM 7194 T1 FL','bloodPressure',1),
-('dev-sinocare-m101','sinocareM101','Sinocare M101 GCU 3 in 1','gcu','Sinocare','M101','sinocareGcu',1),
-('dev-thermometer','thermometer','Thermometer','thermometer','Generic','Thermometer','thermometer',1),
-('dev-body-scale','bodyScale','Body Scale','bodyScale','Generic','Body Scale','bodyScale',1),
-('dev-manual-input','manualInput','Manual Input','manual','Manual','Manual','manual',1);
+('yuwellYx106','Yuwell YX106 Oximeter','oximeter','Yuwell','YX106','oximeter',1),
+('omronHem7194t1fl','OMRON BT HEM 7194 T1 FL','bloodPressure','OMRON','HEM 7194 T1 FL','bloodPressure',1),
+('sinocareM101','Sinocare M101 GCU 3 in 1','gcu','Sinocare','M101','sinocareGcu',1),
+('thermometer','Thermometer','thermometer','Generic','Thermometer','thermometer',1),
+('bodyScale','Body Scale','bodyScale','Generic','Body Scale','bodyScale',1),
+('manualInput','Manual Input','manual','Manual','Manual','manual',1);
 
 -- Metric catalog
 
 INSERT OR IGNORE INTO HL_metricCatalog
-(id, metricCode, metricName, category, unit, inputType, requiresAttachment, requiresSex, requiresFasting, isCalculated, physicalMin, physicalMax, sortOrder, active)
+(metricCode, metricName, category, unit, inputType, requiresAttachment, requiresSex, requiresFasting, isCalculated, physicalMin, physicalMax, sortOrder, active)
 VALUES
-('metric-spo2','spo2','Saturasi Oksigen','Oksigen','%','mixed',1,0,0,0,0,100,10,1),
-('metric-heart-rate','heartRate','Denyut Jantung','Detak Jantung','bpm','mixed',1,0,0,0,20,250,20,1),
-('metric-systolic','systolic','Tekanan Sistolik','Tekanan Darah','mmHg','mixed',1,0,0,0,50,300,30,1),
-('metric-diastolic','diastolic','Tekanan Diastolik','Tekanan Darah','mmHg','mixed',1,0,0,0,30,200,40,1),
-('metric-bp-pulse','bloodPressurePulse','Pulse Tensimeter','Tekanan Darah','bpm','mixed',1,0,0,0,20,250,50,1),
-('metric-glucose-fasting','glucoseFasting','Gula Darah Puasa','Metabolisme Glukosa','mg/dL','mixed',1,0,1,0,20,600,60,1),
-('metric-glucose-post-meal','glucosePostMeal','Gula Darah 2 Jam PP','Metabolisme Glukosa','mg/dL','mixed',1,0,0,0,20,600,70,1),
-('metric-cholesterol-total','cholesterolTotal','Kolesterol Total','Profil Lipid','mg/dL','mixed',1,0,1,0,50,600,80,1),
-('metric-uric-acid','uricAcid','Asam Urat','Metabolisme Purin','mg/dL','mixed',1,1,0,0,0,20,90,1),
-('metric-body-weight','bodyWeight','Berat Badan','Komposisi Tubuh','kg','mixed',1,0,0,0,1,300,100,1),
-('metric-bmi','bmi','Body Mass Index','Komposisi Tubuh','index','calculated',0,0,0,1,0,100,110,1),
-('metric-waist','waistCircumference','Lingkar Perut','Komposisi Tubuh','cm','mixed',0,1,0,0,20,300,120,1),
-('metric-temperature','bodyTemperature','Suhu Tubuh','Suhu Tubuh','°C','mixed',1,0,0,0,30,45,130,1),
-('metric-sleep','sleepDuration','Durasi Tidur','Tidur','hour','manual',0,0,0,0,0,24,140,1),
-('metric-height','height','Tinggi Badan','Profil','cm','manual',0,0,0,0,30,250,150,1);
+('spo2','Saturasi Oksigen','Oksigen','%','mixed',1,0,0,0,0,100,10,1),
+('heartRate','Denyut Jantung','Detak Jantung','bpm','mixed',1,0,0,0,20,250,20,1),
+('systolic','Tekanan Sistolik','Tekanan Darah','mmHg','mixed',1,0,0,0,50,300,30,1),
+('diastolic','Tekanan Diastolik','Tekanan Darah','mmHg','mixed',1,0,0,0,30,200,40,1),
+('bloodPressurePulse','Pulse Tensimeter','Tekanan Darah','bpm','mixed',1,0,0,0,20,250,50,1),
+('glucoseFasting','Gula Darah Puasa','Metabolisme Glukosa','mg/dL','mixed',1,0,1,0,20,600,60,1),
+('glucosePostMeal','Gula Darah 2 Jam PP','Metabolisme Glukosa','mg/dL','mixed',1,0,0,0,20,600,70,1),
+('cholesterolTotal','Kolesterol Total','Profil Lipid','mg/dL','mixed',1,0,1,0,50,600,80,1),
+('uricAcid','Asam Urat','Metabolisme Purin','mg/dL','mixed',1,1,0,0,0,20,90,1),
+('bodyWeight','Berat Badan','Komposisi Tubuh','kg','mixed',1,0,0,0,1,300,100,1),
+('bmi','Body Mass Index','Komposisi Tubuh','index','calculated',0,0,0,1,0,100,110,1),
+('waistCircumference','Lingkar Perut','Komposisi Tubuh','cm','mixed',0,1,0,0,20,300,120,1),
+('bodyTemperature','Suhu Tubuh','Suhu Tubuh','°C','mixed',1,0,0,0,30,45,130,1),
+('sleepDuration','Durasi Tidur','Tidur','hour','manual',0,0,0,0,0,24,140,1),
+('height','Tinggi Badan','Profil','cm','manual',0,0,0,0,30,250,150,1);
 
 -- Device metrics
 
-INSERT OR IGNORE INTO HL_deviceMetrics (id, deviceCode, metricCode, requiredMetric, sortOrder, active)
+INSERT OR IGNORE INTO HL_deviceMetrics (deviceCode, metricCode, requiredMetric, sortOrder, active)
 VALUES
-('dm-yuwell-spo2','yuwellYx106','spo2',1,10,1),
-('dm-yuwell-heart','yuwellYx106','heartRate',1,20,1),
-('dm-omron-sys','omronHem7194t1fl','systolic',1,10,1),
-('dm-omron-dia','omronHem7194t1fl','diastolic',1,20,1),
-('dm-omron-pulse','omronHem7194t1fl','bloodPressurePulse',1,30,1),
-('dm-sinocare-gfp','sinocareM101','glucoseFasting',0,10,1),
-('dm-sinocare-gpp','sinocareM101','glucosePostMeal',0,20,1),
-('dm-sinocare-chol','sinocareM101','cholesterolTotal',0,30,1),
-('dm-sinocare-uric','sinocareM101','uricAcid',0,40,1),
-('dm-thermo-temp','thermometer','bodyTemperature',1,10,1),
-('dm-scale-weight','bodyScale','bodyWeight',1,10,1),
-('dm-scale-bmi','bodyScale','bmi',0,20,1),
-('dm-manual-waist','manualInput','waistCircumference',0,10,1),
-('dm-manual-sleep','manualInput','sleepDuration',0,20,1);
+('yuwellYx106','spo2',1,10,1),
+('yuwellYx106','heartRate',1,20,1),
+('omronHem7194t1fl','systolic',1,10,1),
+('omronHem7194t1fl','diastolic',1,20,1),
+('omronHem7194t1fl','bloodPressurePulse',1,30,1),
+('sinocareM101','glucoseFasting',0,10,1),
+('sinocareM101','glucosePostMeal',0,20,1),
+('sinocareM101','cholesterolTotal',0,30,1),
+('sinocareM101','uricAcid',0,40,1),
+('thermometer','bodyTemperature',1,10,1),
+('bodyScale','bodyWeight',1,10,1),
+('bodyScale','bmi',0,20,1),
+('manualInput','waistCircumference',0,10,1),
+('manualInput','sleepDuration',0,20,1);
 
 -- Metric rules
 
 INSERT OR IGNORE INTO HL_metricRules
-(id, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority, active)
+(ruleCode, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority, active)
 VALUES
 ('rule-spo2-normal','spo2','all',0,200,95,100,'%','Normal','normal','SpO2 Normal','Saturasi oksigen berada dalam rentang umum normal.','Pertahankan aktivitas ringan, pola napas baik, dan cek ulang sesuai kebutuhan.','CSV internal + clinical common threshold','none',10,1),
 ('rule-spo2-mild','spo2','all',0,200,90,94.9,'%','Hipoksemia Ringan','warning','SpO2 Agak Rendah','Saturasi oksigen agak rendah.','Istirahat, cek ulang posisi alat, hangatkan jari, dan ulangi pengukuran. Jika disertai sesak, hubungi tenaga medis.','CSV internal + clinical common threshold','watch',20,1),
@@ -159,29 +159,29 @@ VALUES
 
 -- Badges
 
-INSERT OR IGNORE INTO HL_badges (id, badgeCode, badgeName, description, icon, active)
+INSERT OR IGNORE INTO HL_badges (badgeCode, badgeName, description, icon, active)
 VALUES
-('badge-three-day','threeDayConsistent','3 Hari Konsisten','Mencatat pengukuran minimal 3 hari berturut-turut.','calendarCheck',1),
-('badge-seven-day','sevenDayConsistent','7 Hari Konsisten','Mencatat pengukuran minimal 7 hari berturut-turut.','flame',1),
-('badge-thirty-day','thirtyDayConsistent','30 Hari Konsisten','Mencatat pengukuran minimal 30 hari berturut-turut.','trophy',1),
-('badge-doctor-report','doctorReportReady','Report Dokter Dibuat','Berhasil membuat Doctor Ready PDF.','fileText',1),
-('badge-medication-week','medicationWeekComplete','Obat Rutin 7 Hari','Mencatat konsumsi obat selama 7 hari.','pill',1),
-('badge-sleep-week','sleepWeekGood','Tidur Cukup 7 Hari','Mencatat tidur cukup selama 7 hari.','moon',1);
+('threeDayConsistent','3 Hari Konsisten','Mencatat pengukuran minimal 3 hari berturut-turut.','calendarCheck',1),
+('sevenDayConsistent','7 Hari Konsisten','Mencatat pengukuran minimal 7 hari berturut-turut.','flame',1),
+('thirtyDayConsistent','30 Hari Konsisten','Mencatat pengukuran minimal 30 hari berturut-turut.','trophy',1),
+('doctorReportReady','Report Dokter Dibuat','Berhasil membuat Doctor Ready PDF.','fileText',1),
+('medicationWeekComplete','Obat Rutin 7 Hari','Mencatat konsumsi obat selama 7 hari.','pill',1),
+('sleepWeekGood','Tidur Cukup 7 Hari','Mencatat tidur cukup selama 7 hari.','moon',1);
 
 -- Knowledge base
 
-INSERT OR IGNORE INTO HL_knowledgeArticles (id, slug, title, category, contentMarkdown, sortOrder, active)
+INSERT OR IGNORE INTO HL_knowledgeArticles (slug, title, category, contentMarkdown, sortOrder, active)
 VALUES
-('kb-yuwell-yx106','yuwell-yx106','Panduan Yuwell YX106 Oximeter','device','## Yuwell YX106 Oximeter\n\nGunakan pada jari yang bersih dan hangat. Tunggu angka stabil sebelum difoto. Hindari pantulan cahaya dan pastikan layar terlihat jelas.\n\n### Tips Foto\n\n- Foto dari atas layar.\n- Pastikan angka merah terlihat tajam.\n- Jangan menutup layar dengan jari.\n- Jika AI gagal, input manual.',10,1),
-('kb-omron-hem7194t1fl','omron-hem7194t1fl','Panduan OMRON HEM 7194 T1 FL','device','## OMRON HEM 7194 T1 FL\n\nDuduk tenang 5 menit, pasang manset dengan benar, dan ukur di posisi lengan sejajar jantung. Foto layar setelah hasil stabil.\n\n### Data yang Dibaca\n\n- SYS / Sistolik\n- DIA / Diastolik\n- Pulse / bpm',20,1),
-('kb-sinocare-m101','sinocare-m101','Panduan Sinocare M101 GCU','device','## Sinocare M101 GCU\n\nPilih mode test yang benar sebelum input: gula darah, kolesterol, atau asam urat. Untuk gula darah puasa, catat status puasa.\n\n### Catatan\n\nAI tidak boleh menebak jenis test. User wajib memilih metric terlebih dahulu.',30,1),
-('kb-thermometer','thermometer','Panduan Termometer','device','## Termometer\n\nPastikan alat bersih dan ikuti instruksi penggunaan alat. Foto layar saat angka sudah stabil.\n\nSuhu tubuh 38°C atau lebih umumnya masuk kategori demam.',40,1),
-('kb-body-scale','body-scale','Panduan Timbangan Badan','device','## Timbangan Badan\n\nTimbang pada permukaan datar. Usahakan waktu timbang konsisten, misalnya pagi setelah bangun. BMI dihitung otomatis dari berat dan tinggi badan.',50,1),
-('kb-waist-circumference','waist-circumference','Panduan Lingkar Perut','metric','## Lingkar Perut\n\nUkur di area perut sesuai instruksi, jangan menahan napas, dan gunakan pita ukur yang tidak terlalu ketat. Lingkar perut membantu memantau risiko obesitas sentral.',60,1),
-('kb-sleep-duration','sleep-duration','Panduan Durasi Tidur','metric','## Durasi Tidur\n\nCatat total jam tidur malam. Untuk dewasa, durasi sekitar 7–9 jam umumnya dianggap cukup. Gunakan data ini untuk melihat pola dengan tekanan darah dan gula darah.',70,1),
-('kb-disclaimer','health-disclaimer','Disclaimer Kesehatan','safety','## Disclaimer\n\nAplikasi ini membantu pencatatan dan edukasi. Hasil tidak menggantikan diagnosis dokter. Selalu verifikasi angka alat dan konsultasikan ke tenaga medis bila ada keluhan.',100,1);
+('yuwell-yx106','Panduan Yuwell YX106 Oximeter','device','## Yuwell YX106 Oximeter\n\nGunakan pada jari yang bersih dan hangat. Tunggu angka stabil sebelum difoto. Hindari pantulan cahaya dan pastikan layar terlihat jelas.\n\n### Tips Foto\n\n- Foto dari atas layar.\n- Pastikan angka merah terlihat tajam.\n- Jangan menutup layar dengan jari.\n- Jika AI gagal, input manual.',10,1),
+('omron-hem7194t1fl','Panduan OMRON HEM 7194 T1 FL','device','## OMRON HEM 7194 T1 FL\n\nDuduk tenang 5 menit, pasang manset dengan benar, dan ukur di posisi lengan sejajar jantung. Foto layar setelah hasil stabil.\n\n### Data yang Dibaca\n\n- SYS / Sistolik\n- DIA / Diastolik\n- Pulse / bpm',20,1),
+('sinocare-m101','Panduan Sinocare M101 GCU','device','## Sinocare M101 GCU\n\nPilih mode test yang benar sebelum input: gula darah, kolesterol, atau asam urat. Untuk gula darah puasa, catat status puasa.\n\n### Catatan\n\nAI tidak boleh menebak jenis test. User wajib memilih metric terlebih dahulu.',30,1),
+('thermometer','Panduan Termometer','device','## Termometer\n\nPastikan alat bersih dan ikuti instruksi penggunaan alat. Foto layar saat angka sudah stabil.\n\nSuhu tubuh 38°C atau lebih umumnya masuk kategori demam.',40,1),
+('body-scale','Panduan Timbangan Badan','device','## Timbangan Badan\n\nTimbang pada permukaan datar. Usahakan waktu timbang konsisten, misalnya pagi setelah bangun. BMI dihitung otomatis dari berat dan tinggi badan.',50,1),
+('waist-circumference','Panduan Lingkar Perut','metric','## Lingkar Perut\n\nUkur di area perut sesuai instruksi, jangan menahan napas, dan gunakan pita ukur yang tidak terlalu ketat. Lingkar perut membantu memantau risiko obesitas sentral.',60,1),
+('sleep-duration','Panduan Durasi Tidur','metric','## Durasi Tidur\n\nCatat total jam tidur malam. Untuk dewasa, durasi sekitar 7–9 jam umumnya dianggap cukup. Gunakan data ini untuk melihat pola dengan tekanan darah dan gula darah.',70,1),
+('health-disclaimer','Disclaimer Kesehatan','safety','## Disclaimer\n\nAplikasi ini membantu pencatatan dan edukasi. Hasil tidak menggantikan diagnosis dokter. Selalu verifikasi angka alat dan konsultasikan ke tenaga medis bila ada keluhan.',100,1);
 
-INSERT OR IGNORE INTO HL_schemaMigrations (id, migrationName)
-VALUES ('seed-20260620-default-data','20260620DefaultSeedData');
+INSERT OR IGNORE INTO HL_schemaMigrations (migrationName)
+VALUES ('20260620DefaultSeedData');
 
 COMMIT;

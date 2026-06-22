@@ -15,7 +15,7 @@ PRAGMA foreign_keys = ON;
 BEGIN TRANSACTION;
 
 CREATE TABLE IF NOT EXISTS HL_schemaMigrations (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   migrationName TEXT NOT NULL UNIQUE,
   appliedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS HL_systemConfigs (
 );
 
 CREATE TABLE IF NOT EXISTS HL_users (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
   passwordHash TEXT,
   authProvider TEXT NOT NULL DEFAULT 'local',
@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS HL_users (
 );
 
 CREATE TABLE IF NOT EXISTS HL_sessions (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   sessionTokenHash TEXT NOT NULL UNIQUE,
   userAgent TEXT,
   ipHash TEXT,
@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS HL_sessions (
 );
 
 CREATE TABLE IF NOT EXISTS HL_userProfiles (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL UNIQUE,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL UNIQUE,
   sex TEXT NOT NULL CHECK (sex IN ('male','female','other')),
   birthDate TEXT NOT NULL,
   heightCm REAL NOT NULL CHECK (heightCm > 0),
@@ -75,8 +75,8 @@ CREATE TABLE IF NOT EXISTS HL_userProfiles (
 );
 
 CREATE TABLE IF NOT EXISTS HL_userConsents (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   consentType TEXT NOT NULL,
   consentValue INTEGER NOT NULL DEFAULT 0,
   consentText TEXT,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS HL_userConsents (
 );
 
 CREATE TABLE IF NOT EXISTS HL_devices (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   deviceCode TEXT NOT NULL UNIQUE,
   deviceName TEXT NOT NULL,
   deviceType TEXT NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS HL_devices (
 );
 
 CREATE TABLE IF NOT EXISTS HL_metricCatalog (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   metricCode TEXT NOT NULL UNIQUE,
   metricName TEXT NOT NULL,
   category TEXT NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS HL_metricCatalog (
 );
 
 CREATE TABLE IF NOT EXISTS HL_deviceMetrics (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   deviceCode TEXT NOT NULL,
   metricCode TEXT NOT NULL,
   requiredMetric INTEGER NOT NULL DEFAULT 1,
@@ -132,7 +132,8 @@ CREATE TABLE IF NOT EXISTS HL_deviceMetrics (
 );
 
 CREATE TABLE IF NOT EXISTS HL_metricRules (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ruleCode TEXT NOT NULL UNIQUE,
   metricCode TEXT NOT NULL,
   sex TEXT NOT NULL DEFAULT 'all' CHECK (sex IN ('all','male','female','other')),
   ageMin INTEGER NOT NULL DEFAULT 0,
@@ -151,13 +152,14 @@ CREATE TABLE IF NOT EXISTS HL_metricRules (
   active INTEGER NOT NULL DEFAULT 1,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, emergencyLevel),
   FOREIGN KEY (metricCode) REFERENCES HL_metricCatalog(metricCode) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS HL_measurementDrafts (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  profileId TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  profileId INTEGER,
   selectedMetricsJson TEXT NOT NULL,
   draftDataJson TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','submitted','cancelled','expired')),
@@ -169,9 +171,9 @@ CREATE TABLE IF NOT EXISTS HL_measurementDrafts (
 );
 
 CREATE TABLE IF NOT EXISTS HL_measurementSessions (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  profileId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  profileId INTEGER NOT NULL,
   measuredAt TEXT NOT NULL,
   source TEXT NOT NULL CHECK (source IN ('photo','upload','manual','mixed')),
   notes TEXT,
@@ -186,9 +188,9 @@ CREATE TABLE IF NOT EXISTS HL_measurementSessions (
 );
 
 CREATE TABLE IF NOT EXISTS HL_measurementValues (
-  id TEXT PRIMARY KEY,
-  sessionId TEXT NOT NULL,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sessionId INTEGER NOT NULL,
+  userId INTEGER NOT NULL,
   metricCode TEXT NOT NULL,
   deviceCode TEXT,
   rawAiValue REAL,
@@ -199,7 +201,7 @@ CREATE TABLE IF NOT EXISTS HL_measurementValues (
   status TEXT NOT NULL,
   severity TEXT NOT NULL CHECK (severity IN ('normal','info','warning','high','critical','emergency')),
   emergencyLevel TEXT NOT NULL DEFAULT 'none' CHECK (emergencyLevel IN ('none','watch','urgent','emergency')),
-  ruleId TEXT,
+  ruleId INTEGER,
   measuredAt TEXT NOT NULL,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -211,9 +213,9 @@ CREATE TABLE IF NOT EXISTS HL_measurementValues (
 );
 
 CREATE TABLE IF NOT EXISTS HL_measurementAttachments (
-  id TEXT PRIMARY KEY,
-  sessionId TEXT NOT NULL,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sessionId INTEGER NOT NULL,
+  userId INTEGER NOT NULL,
   metricCode TEXT NOT NULL,
   r2Key TEXT NOT NULL UNIQUE,
   fileName TEXT NOT NULL,
@@ -231,9 +233,9 @@ CREATE TABLE IF NOT EXISTS HL_measurementAttachments (
 );
 
 CREATE TABLE IF NOT EXISTS HL_aiExtractions (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  sessionDraftId TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  sessionDraftId INTEGER,
   deviceCode TEXT,
   metricGroup TEXT NOT NULL,
   selectedMetricsJson TEXT NOT NULL,
@@ -251,9 +253,9 @@ CREATE TABLE IF NOT EXISTS HL_aiExtractions (
 );
 
 CREATE TABLE IF NOT EXISTS HL_aiRecommendations (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  sessionId TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  sessionId INTEGER,
   summaryText TEXT NOT NULL,
   todayJson TEXT,
   threeDayJson TEXT,
@@ -268,9 +270,9 @@ CREATE TABLE IF NOT EXISTS HL_aiRecommendations (
 );
 
 CREATE TABLE IF NOT EXISTS HL_alerts (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  sessionId TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  sessionId INTEGER,
   metricCode TEXT NOT NULL,
   finalValue REAL NOT NULL,
   unit TEXT NOT NULL,
@@ -279,17 +281,18 @@ CREATE TABLE IF NOT EXISTS HL_alerts (
   alertType TEXT NOT NULL CHECK (alertType IN ('rule','emergency','reminder','system')),
   message TEXT NOT NULL,
   acknowledged INTEGER NOT NULL DEFAULT 0,
-  acknowledgedBy TEXT,
+  acknowledgedBy INTEGER,
   acknowledgedAt TEXT,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
   FOREIGN KEY (sessionId) REFERENCES HL_measurementSessions(id) ON DELETE CASCADE,
-  FOREIGN KEY (metricCode) REFERENCES HL_metricCatalog(metricCode) ON DELETE RESTRICT
+  FOREIGN KEY (metricCode) REFERENCES HL_metricCatalog(metricCode) ON DELETE RESTRICT,
+  FOREIGN KEY (acknowledgedBy) REFERENCES HL_users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS HL_notifications (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   channel TEXT NOT NULL CHECK (channel IN ('inApp','telegram','browser','email')),
   notificationType TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -303,8 +306,8 @@ CREATE TABLE IF NOT EXISTS HL_notifications (
 );
 
 CREATE TABLE IF NOT EXISTS HL_telegramLinks (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL UNIQUE,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL UNIQUE,
   telegramChatId TEXT,
   telegramUsername TEXT,
   verificationCodeHash TEXT,
@@ -316,8 +319,8 @@ CREATE TABLE IF NOT EXISTS HL_telegramLinks (
 );
 
 CREATE TABLE IF NOT EXISTS HL_pushSubscriptions (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   endpoint TEXT NOT NULL UNIQUE,
   p256dh TEXT NOT NULL,
   auth TEXT NOT NULL,
@@ -329,8 +332,8 @@ CREATE TABLE IF NOT EXISTS HL_pushSubscriptions (
 );
 
 CREATE TABLE IF NOT EXISTS HL_notificationSettings (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL UNIQUE,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL UNIQUE,
   telegramSubmitSummary INTEGER NOT NULL DEFAULT 1,
   telegramEmergencyAlert INTEGER NOT NULL DEFAULT 1,
   browserReminder INTEGER NOT NULL DEFAULT 0,
@@ -342,8 +345,8 @@ CREATE TABLE IF NOT EXISTS HL_notificationSettings (
 );
 
 CREATE TABLE IF NOT EXISTS HL_reminderSettings (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   reminderType TEXT NOT NULL,
   enabled INTEGER NOT NULL DEFAULT 1,
   scheduleTime TEXT NOT NULL,
@@ -357,9 +360,9 @@ CREATE TABLE IF NOT EXISTS HL_reminderSettings (
 );
 
 CREATE TABLE IF NOT EXISTS HL_familyLinks (
-  id TEXT PRIMARY KEY,
-  ownerUserId TEXT NOT NULL,
-  linkedUserId TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ownerUserId INTEGER NOT NULL,
+  linkedUserId INTEGER,
   role TEXT NOT NULL CHECK (role IN ('owner','caregiver','viewer','emergencyContact','doctorViewer')),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','active','rejected','revoked','expired')),
   canViewDashboard INTEGER NOT NULL DEFAULT 0,
@@ -372,8 +375,8 @@ CREATE TABLE IF NOT EXISTS HL_familyLinks (
 );
 
 CREATE TABLE IF NOT EXISTS HL_familyInvites (
-  id TEXT PRIMARY KEY,
-  ownerUserId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ownerUserId INTEGER NOT NULL,
   inviteEmail TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('caregiver','viewer','emergencyContact','doctorViewer')),
   inviteTokenHash TEXT NOT NULL UNIQUE,
@@ -385,8 +388,8 @@ CREATE TABLE IF NOT EXISTS HL_familyInvites (
 );
 
 CREATE TABLE IF NOT EXISTS HL_emergencyContacts (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   contactName TEXT NOT NULL,
   contactRelation TEXT,
   contactPhone TEXT,
@@ -400,8 +403,8 @@ CREATE TABLE IF NOT EXISTS HL_emergencyContacts (
 );
 
 CREATE TABLE IF NOT EXISTS HL_medications (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   medicationName TEXT NOT NULL,
   dosageText TEXT,
   scheduleText TEXT,
@@ -412,9 +415,9 @@ CREATE TABLE IF NOT EXISTS HL_medications (
 );
 
 CREATE TABLE IF NOT EXISTS HL_medicationSchedules (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  medicationId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  medicationId INTEGER NOT NULL,
   scheduleTime TEXT NOT NULL,
   timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',
   active INTEGER NOT NULL DEFAULT 1,
@@ -425,9 +428,9 @@ CREATE TABLE IF NOT EXISTS HL_medicationSchedules (
 );
 
 CREATE TABLE IF NOT EXISTS HL_medicationLogs (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  medicationId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  medicationId INTEGER NOT NULL,
   takenAt TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('taken','skipped','missed','unknown')),
   note TEXT,
@@ -437,8 +440,8 @@ CREATE TABLE IF NOT EXISTS HL_medicationLogs (
 );
 
 CREATE TABLE IF NOT EXISTS HL_fastingSessions (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   fastingType TEXT NOT NULL CHECK (fastingType IN ('glucoseFasting','cholesterolTotal','uricAcid','general')),
   targetHours REAL NOT NULL,
   startedAt TEXT NOT NULL,
@@ -450,7 +453,7 @@ CREATE TABLE IF NOT EXISTS HL_fastingSessions (
 );
 
 CREATE TABLE IF NOT EXISTS HL_badges (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   badgeCode TEXT NOT NULL UNIQUE,
   badgeName TEXT NOT NULL,
   description TEXT NOT NULL,
@@ -460,8 +463,8 @@ CREATE TABLE IF NOT EXISTS HL_badges (
 );
 
 CREATE TABLE IF NOT EXISTS HL_userBadges (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   badgeCode TEXT NOT NULL,
   earnedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -471,8 +474,8 @@ CREATE TABLE IF NOT EXISTS HL_userBadges (
 );
 
 CREATE TABLE IF NOT EXISTS HL_streaks (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   streakType TEXT NOT NULL,
   currentCount INTEGER NOT NULL DEFAULT 0,
   bestCount INTEGER NOT NULL DEFAULT 0,
@@ -483,8 +486,8 @@ CREATE TABLE IF NOT EXISTS HL_streaks (
 );
 
 CREATE TABLE IF NOT EXISTS HL_reports (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   reportType TEXT NOT NULL CHECK (reportType IN ('daily','weekly','monthly','doctorReady30d')),
   rangeStart TEXT NOT NULL,
   rangeEnd TEXT NOT NULL,
@@ -497,9 +500,9 @@ CREATE TABLE IF NOT EXISTS HL_reports (
 );
 
 CREATE TABLE IF NOT EXISTS HL_reportShares (
-  id TEXT PRIMARY KEY,
-  reportId TEXT NOT NULL,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reportId INTEGER NOT NULL,
+  userId INTEGER NOT NULL,
   shareTokenHash TEXT NOT NULL UNIQUE,
   recipientLabel TEXT,
   expiresAt TEXT NOT NULL,
@@ -510,8 +513,8 @@ CREATE TABLE IF NOT EXISTS HL_reportShares (
 );
 
 CREATE TABLE IF NOT EXISTS HL_patternInsights (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
   insightType TEXT NOT NULL,
   rangeStart TEXT NOT NULL,
   rangeEnd TEXT NOT NULL,
@@ -523,7 +526,7 @@ CREATE TABLE IF NOT EXISTS HL_patternInsights (
 );
 
 CREATE TABLE IF NOT EXISTS HL_knowledgeArticles (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   slug TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
   category TEXT NOT NULL,
@@ -535,8 +538,8 @@ CREATE TABLE IF NOT EXISTS HL_knowledgeArticles (
 );
 
 CREATE TABLE IF NOT EXISTS HL_auditLogs (
-  id TEXT PRIMARY KEY,
-  userId TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER,
   action TEXT NOT NULL,
   entityType TEXT NOT NULL,
   entityId TEXT,
@@ -546,7 +549,7 @@ CREATE TABLE IF NOT EXISTS HL_auditLogs (
 );
 
 CREATE TABLE IF NOT EXISTS HL_apiRateLimits (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   rateKey TEXT NOT NULL,
   routeKey TEXT NOT NULL,
   windowStart TEXT NOT NULL,
@@ -598,7 +601,7 @@ CREATE INDEX IF NOT EXISTS idxHLRateLimitsLookup ON HL_apiRateLimits(rateKey, ro
 -- Seed data is maintained separately in seed.sql and seed-rules.generated.sql
 -- Run those files after applying this schema.
 
-INSERT OR IGNORE INTO HL_schemaMigrations (id, migrationName)
-VALUES ('migration-20260620-initial','20260620InitialHealthCompanionSchema');
+INSERT OR IGNORE INTO HL_schemaMigrations (migrationName)
+VALUES ('20260620InitialHealthCompanionSchema');
 
 COMMIT;

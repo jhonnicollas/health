@@ -325,6 +325,125 @@ This log is append-only. Never delete previous entries.
 - Continue strict sequence with EP-P1.3 Backend ID Refactor.
 - Do not apply integer ID migration to production until EP-P1.3 and EP-P1.4 are complete and full migration SQL is expanded beyond design examples.
 
+## 2026-06-22 10:27 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P1.2A
+- Sprint: Enterprise Production Remediation
+- Status: Started
+
+### Files Read
+- AGENTS.md
+- docs/TASKS.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/seed-rules.generated.sql
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Added and marked EP-P1.2A Schema/Seed Integer Alignment as In Progress per owner request before EP-P1.3.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue EP-P1.2A only. Align schema and seed files with integer surrogate IDs; do not start backend refactor yet.
+
+## 2026-06-22 10:32 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P1.2A
+- Sprint: Enterprise Production Remediation
+- Status: Completed
+
+### Files Read
+- AGENTS.md
+- docs/TASKS.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/seed-rules.generated.sql
+- docs/rules-seeder.js.txt
+- docs/INTEGER_ID_MIGRATION_PLAN.md
+
+### Files Changed
+- docs/TASKS.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/seed-rules.generated.sql
+- docs/rules-seeder.js.txt
+- docs/INTEGER_ID_MIGRATION_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Converted surrogate `id` columns in schema docs to `INTEGER PRIMARY KEY AUTOINCREMENT`.
+- Converted internal FK columns such as `userId`, `profileId`, `sessionId`, `ruleId`, `medicationId`, and `reportId` to `INTEGER`.
+- Kept natural keys and security tokens as `TEXT`, including `configKey`, `deviceCode`, `metricCode`, `badgeCode`, `slug`, token hashes, `r2Key`, endpoint, and polymorphic audit `entityId`.
+- Added `HL_metricRules.ruleCode TEXT NOT NULL UNIQUE` so metric rule seeds remain idempotent while `id` is integer.
+- Removed explicit string `id` values from seed inserts and updated generated rule seeder output format.
+
+### Validation
+- `rg` check for legacy `id TEXT PRIMARY KEY`, internal FK `TEXT`, and seed `INSERT ... (id)` patterns returned no matches.
+- SQLite validation executed `docs/schema.sql`, `docs/seed.sql`, and `docs/seed-rules.generated.sql` in order.
+- `PRAGMA foreign_key_check` returned `[]`.
+- `HL_metricRules` validation returned `COUNT(*) = 80` and `COUNT(DISTINCT ruleCode) = 80`.
+- `git diff --check` passed; only CRLF normalization warnings were reported.
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/INTEGER_ID_MIGRATION_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue strict sequence with EP-P1.3 Backend ID Refactor.
+- Backend/frontend still expect string IDs until EP-P1.3 and EP-P1.4 are completed; do not apply production DB migration yet.
+
+## 2026-06-22 10:37 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P1.3
+- Sprint: Enterprise Production Remediation
+- Status: Started
+
+### Files Read
+- AGENTS.md
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/design-system.md
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked EP-P1.3 Backend ID Refactor as In Progress before source changes.
+- Owner requested full CRUD validation and D1 reset/redeploy after integer ID type changes; implementation will proceed sequentially from backend integer-ID compatibility before production reset.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue EP-P1.3 only. Audit backend ID generation, route params, CRUD writes, and tests against integer autoincrement schema.
+
 ## 2026-06-22 16:22 UTC — Agent: Codex
 
 ### Task

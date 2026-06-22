@@ -384,7 +384,7 @@ function buildRulesSql(rules) {
   lines.push('BEGIN TRANSACTION;');
   lines.push('');
   lines.push('INSERT OR IGNORE INTO HL_metricRules');
-  lines.push('(id, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority, active)');
+  lines.push('(ruleCode, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority, active)');
   lines.push('VALUES');
 
   const valueLines = rules.map((item) => `(${[
@@ -409,7 +409,7 @@ function buildRulesSql(rules) {
 
   lines.push(valueLines.join(',\n') + ';');
   lines.push('');
-  lines.push("INSERT OR IGNORE INTO HL_schemaMigrations (id, migrationName) VALUES ('seed-rules-generated', 'GeneratedMetricRulesSeed');");
+  lines.push("INSERT OR IGNORE INTO HL_schemaMigrations (migrationName) VALUES ('GeneratedMetricRulesSeed');");
   lines.push('COMMIT;');
   lines.push('');
 

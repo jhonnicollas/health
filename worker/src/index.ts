@@ -70,7 +70,7 @@ type UiSettingsInput = {
 }
 
 type UserRow = {
-  id: string
+  id: number
   email: string
   passwordHash: string | null
   displayName: string
@@ -80,8 +80,8 @@ type UserRow = {
 }
 
 type ProfileRow = {
-  id: string
-  userId?: string
+  id: number
+  userId?: number
   sex: string
   birthDate: string
   heightCm: number
@@ -590,6 +590,29 @@ function createId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`
 }
 
+function getInsertedId(result: D1Result<unknown>): number {
+  const meta = result.meta as Record<string, unknown> | undefined
+  const id = Number(meta?.last_row_id ?? meta?.lastRowId)
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('D1 insert did not return a valid last_row_id')
+  }
+  return id
+}
+
+async function insertAndGetId(statement: D1PreparedStatement): Promise<number> {
+  return getInsertedId(await statement.run())
+}
+
+function idsEqual(left: unknown, right: unknown): boolean {
+  return Number(left) === Number(right)
+}
+
+function nullableInteger(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 function isUniqueEmailError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
 
@@ -772,10 +795,10 @@ async function enforceLoginRateLimit(
   } else {
     await c.env.DB.prepare(
       `INSERT INTO HL_apiRateLimits
-        (id, rateKey, routeKey, windowStart, requestCount, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        (rateKey, routeKey, windowStart, requestCount, createdAt, updatedAt)
+       VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     )
-      .bind(createId('rate'), rateKey, routeKey, windowStart)
+      .bind(rateKey, routeKey, windowStart)
       .run()
   }
 
@@ -867,8 +890,7 @@ function metricCatalogResponse(rows: MetricCatalogRow[]) {
   }
 }
 
-async function createSession(c: Context<{ Bindings: Env }>, userId: string) {
-  const sessionId = createId('sess')
+async function createSession(c: Context<{ Bindings: Env }>, userId: number) {
   const sessionToken = generateToken()
   const sessionTokenHash = await sha256Token(sessionToken)
   const expiresAt = new Date(
@@ -877,16 +899,15 @@ async function createSession(c: Context<{ Bindings: Env }>, userId: string) {
   const userAgent = c.req.header('User-Agent') ?? null
 
   return {
-    sessionId,
     sessionToken,
     sessionTokenHash,
     expiresAt,
     userAgent,
     statement: c.env.DB.prepare(
       `INSERT INTO HL_sessions
-        (id, userId, sessionTokenHash, userAgent, ipHash, expiresAt, createdAt)
-      VALUES (?, ?, ?, ?, NULL, ?, CURRENT_TIMESTAMP)`
-    ).bind(sessionId, userId, sessionTokenHash, userAgent, expiresAt)
+        (userId, sessionTokenHash, userAgent, ipHash, expiresAt, createdAt)
+      VALUES (?, ?, ?, NULL, ?, CURRENT_TIMESTAMP)`
+    ).bind(userId, sessionTokenHash, userAgent, expiresAt)
   }
 }
 
@@ -968,12 +989,12 @@ app.post('/api/auth/register', async (c) => {
     return jsonResponse(c, result)
   }
 
-  let existing: { id: string } | null
+  let existing: { id: number } | null
 
   try {
     existing = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ? LIMIT 1')
       .bind(validation.data.email)
-      .first<{ id: string }>()
+      .first<{ id: number }>()
   } catch (error) {
     console.error('register duplicate check failed', error)
 
@@ -1000,28 +1021,27 @@ app.post('/api/auth/register', async (c) => {
     return jsonResponse(c, result)
   }
 
-  const userId = createId('usr')
-  const auditId = createId('aud')
+  let userId: number | null = null
   let sessionToken = ''
 
   try {
     const passwordHash = await hashPassword(validation.data.password)
+    userId = await insertAndGetId(c.env.DB.prepare(
+      `INSERT INTO HL_users
+        (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, createdAt, updatedAt)
+       VALUES (?, ?, 'local', ?, 0, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(validation.data.email, passwordHash, validation.data.displayName))
+
     const session = await createSession(c, userId)
     sessionToken = session.sessionToken
 
     await c.env.DB.batch([
-      c.env.DB.prepare(
-        `INSERT INTO HL_users
-          (id, email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, createdAt, updatedAt)
-        VALUES (?, ?, ?, 'local', ?, 0, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(userId, validation.data.email, passwordHash, validation.data.displayName),
       session.statement,
       c.env.DB.prepare(
         `INSERT INTO HL_auditLogs
-          (id, userId, action, entityType, entityId, metadataJson, createdAt)
-        VALUES (?, ?, 'userRegister', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`
+          (userId, action, entityType, entityId, metadataJson, createdAt)
+        VALUES (?, 'userRegister', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`
       ).bind(
-        auditId,
         userId,
         userId,
         JSON.stringify({
@@ -1161,7 +1181,6 @@ app.post('/api/auth/login', async (c) => {
 
   let profile: ProfileRow | null
   let sessionToken = ''
-  const auditId = createId('aud')
 
   try {
     const session = await createSession(c, user.id)
@@ -1183,10 +1202,9 @@ app.post('/api/auth/login', async (c) => {
       c.env.DB.prepare('UPDATE HL_users SET lastLoginAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(user.id),
       c.env.DB.prepare(
         `INSERT INTO HL_auditLogs
-          (id, userId, action, entityType, entityId, metadataJson, createdAt)
-        VALUES (?, ?, 'userLogin', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`
+          (userId, action, entityType, entityId, metadataJson, createdAt)
+        VALUES (?, 'userLogin', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`
       ).bind(
-        auditId,
         user.id,
         user.id,
         JSON.stringify({
@@ -1254,7 +1272,7 @@ app.get('/api/auth/me', async (c) => {
       .bind(sessionTokenHash)
       .first<
         UserRow & {
-          profileId: string | null
+          profileId: number | null
           sex: string | null
           birthDate: string | null
           heightCm: number | null
@@ -1350,7 +1368,7 @@ app.post('/api/profile/onboarding', async (c) => {
       'SELECT id FROM HL_userProfiles WHERE userId = ? LIMIT 1'
     )
       .bind(user.id)
-      .first<{ id: string }>()
+      .first<{ id: number }>()
 
     if (existingProfile) {
       const result = failure(
@@ -1364,33 +1382,28 @@ app.post('/api/profile/onboarding', async (c) => {
       return jsonResponse(c, result)
     }
 
-    const profileId = createId('prf')
-    const aiConsentId = createId('cns')
-    const auditId = createId('aud')
+    const profileId = await insertAndGetId(c.env.DB.prepare(
+      `INSERT INTO HL_userProfiles
+        (userId, sex, birthDate, heightCm, timezone, accessibilityMode, theme,
+         emergencyConsent, aiConsent, dataShareConsent, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(
+      user.id,
+      validation.data.sex,
+      validation.data.birthDate,
+      validation.data.heightCm,
+      validation.data.timezone,
+      validation.data.accessibilityMode,
+      validation.data.theme,
+      validation.data.aiConsent ? 1 : 0
+    ))
 
     await c.env.DB.batch([
       c.env.DB.prepare(
-        `INSERT INTO HL_userProfiles
-          (id, userId, sex, birthDate, heightCm, timezone, accessibilityMode, theme,
-           emergencyConsent, aiConsent, dataShareConsent, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-      ).bind(
-        profileId,
-        user.id,
-        validation.data.sex,
-        validation.data.birthDate,
-        validation.data.heightCm,
-        validation.data.timezone,
-        validation.data.accessibilityMode,
-        validation.data.theme,
-        validation.data.aiConsent ? 1 : 0
-      ),
-      c.env.DB.prepare(
         `INSERT INTO HL_userConsents
-          (id, userId, consentType, consentValue, consentText, version, createdAt, updatedAt)
-         VALUES (?, ?, 'aiConsent', ?, ?, '2026-06-20', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+          (userId, consentType, consentValue, consentText, version, createdAt, updatedAt)
+         VALUES (?, 'aiConsent', ?, ?, '2026-06-20', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       ).bind(
-        aiConsentId,
         user.id,
         validation.data.aiConsent ? 1 : 0,
         'User consent for AI-assisted extraction and safe summaries.'
@@ -1400,10 +1413,9 @@ app.post('/api/profile/onboarding', async (c) => {
       ).bind(validation.data.displayName, user.id),
       c.env.DB.prepare(
         `INSERT INTO HL_auditLogs
-          (id, userId, action, entityType, entityId, metadataJson, createdAt)
-         VALUES (?, ?, 'profileOnboardingComplete', 'HL_userProfiles', ?, ?, CURRENT_TIMESTAMP)`
+          (userId, action, entityType, entityId, metadataJson, createdAt)
+         VALUES (?, 'profileOnboardingComplete', 'HL_userProfiles', ?, ?, CURRENT_TIMESTAMP)`
       ).bind(
-        auditId,
         user.id,
         profileId,
         JSON.stringify({

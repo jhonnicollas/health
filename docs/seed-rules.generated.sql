@@ -4,7 +4,7 @@ PRAGMA foreign_keys = ON;
 BEGIN TRANSACTION;
 
 INSERT OR IGNORE INTO HL_metricRules
-(id, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority, active)
+(ruleCode, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, popupTitle, popupMessage, recommendation, sourceLabel, emergencyLevel, rulePriority, active)
 VALUES
 ('rule-bmi-all-underweight-0-18p4', 'bmi', 'all', 0, 200, 0, 18.499, 'index', 'Underweight', 'warning', 'BMI Underweight', 'BMI berada pada status Underweight. Gunakan hasil ini sebagai catatan dan verifikasi ulang angka pada alat.', 'Berat badan kurang. Tingkatkan asupan kalori dan nutrisi seimbang.', 'CSV internal', 'watch', 100, 1),
 ('rule-bmi-all-normal-18p5-24p9', 'bmi', 'all', 0, 200, 18.5, 24.999, 'index', 'Normal', 'normal', 'BMI Normal', 'BMI berada pada status Normal. Gunakan hasil ini sebagai catatan dan verifikasi ulang angka pada alat.', 'Berat badan ideal. Proporsi tubuh terjaga!', 'CSV internal', 'none', 100, 1),
@@ -53,5 +53,5 @@ VALUES
 ('rule-waist-male-inc', 'waistCircumference', 'male', 0, 200, 94, 102, 'cm', 'Risiko Meningkat', 'warning', 'Lingkar Perut Meningkat', 'Lingkar perut meningkat untuk pria.', 'Mulai kendalikan porsi makan, aktivitas fisik, dan berat badan.', 'WHO waist circumference cutoff', 'watch', 20, 1),
 ('rule-waist-male-high', 'waistCircumference', 'male', 0, 200, 102.1, 300, 'cm', 'Risiko Sangat Meningkat', 'high', 'Lingkar Perut Sangat Meningkat', 'Lingkar perut berada pada kategori risiko sangat meningkat untuk pria.', 'Fokus pada penurunan lemak perut secara bertahap dan konsultasikan jika ada faktor risiko lain.', 'WHO waist circumference cutoff', 'watch', 30, 1);
 
-INSERT OR IGNORE INTO HL_schemaMigrations (id, migrationName) VALUES ('seed-rules-generated', 'GeneratedMetricRulesSeed');
+INSERT OR IGNORE INTO HL_schemaMigrations (migrationName) VALUES ('GeneratedMetricRulesSeed');
 COMMIT;

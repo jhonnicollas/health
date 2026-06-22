@@ -1,6 +1,6 @@
 # Integer ID Migration Plan
 
-Status: EP-P1.1 inventory complete. No schema migration has been applied yet.
+Status: EP-P1.2A schema/seed alignment complete. No production migration has been applied yet.
 
 Owner requirement:
 
@@ -33,6 +33,7 @@ deviceCode
 metricCode
 badgeCode
 slug
+ruleCode
 sessionTokenHash
 verificationCodeHash
 inviteTokenHash
@@ -48,11 +49,13 @@ entityId
 
 `entityId` in `HL_auditLogs` should remain `TEXT` because it is polymorphic and can point to integer IDs, config keys, metric codes, badge codes, and external references.
 
+`ruleCode` in `HL_metricRules` should remain `TEXT` because it is the idempotent natural key for seed data after `id` becomes autoincrement.
+
 ## Table Inventory
 
 | Table | Current PK | Target PK | FK fields to migrate | TEXT fields to keep |
 |---|---|---|---|---|
-| `HL_schemaMigrations` | `id TEXT` | Keep TEXT | none | `id`, `migrationName` are migration markers, not app entity UUIDs |
+| `HL_schemaMigrations` | `id TEXT` | INTEGER | none | `migrationName` remains the stable migration marker |
 | `HL_systemConfigs` | `configKey TEXT` | Keep TEXT | none | `configKey` natural key |
 | `HL_users` | `id TEXT` | INTEGER | referenced by all `userId`, `ownerUserId`, `linkedUserId`, `acknowledgedBy` | `email`, auth fields |
 | `HL_sessions` | `id TEXT` | INTEGER | `userId` | `sessionTokenHash` must remain secure TEXT |
@@ -61,7 +64,7 @@ entityId
 | `HL_devices` | `id TEXT` | INTEGER | none currently by `id` | `deviceCode` stays TEXT natural key |
 | `HL_metricCatalog` | `id TEXT` | INTEGER | none currently by `id` | `metricCode` stays TEXT natural key |
 | `HL_deviceMetrics` | `id TEXT` | INTEGER | none by integer ID; keeps natural-code FKs | `deviceCode`, `metricCode` stay TEXT |
-| `HL_metricRules` | `id TEXT` | INTEGER | referenced by `HL_measurementValues.ruleId` | `metricCode` stays TEXT |
+| `HL_metricRules` | `id TEXT` | INTEGER | referenced by `HL_measurementValues.ruleId` | `ruleCode` and `metricCode` stay TEXT |
 | `HL_measurementDrafts` | `id TEXT` | INTEGER | `userId`, `profileId`; referenced by `HL_aiExtractions.sessionDraftId` | JSON/status fields |
 | `HL_measurementSessions` | `id TEXT` | INTEGER | `userId`, `profileId`; referenced by `sessionId` fields | none |
 | `HL_measurementValues` | `id TEXT` | INTEGER | `sessionId`, `userId`, `ruleId` | `metricCode`, `deviceCode` stay TEXT |
@@ -179,6 +182,8 @@ idxHLMetricCatalogCode(metricCode)
 idxHLDeviceMetricsDevice(deviceCode)
 ```
 
+Metric-rule seed idempotency uses `HL_metricRules.ruleCode TEXT UNIQUE`; seed files must not insert explicit values into integer `id`.
+
 ## Source Code References To Refactor Later
 
 Backend sources still generate string IDs:
@@ -267,6 +272,7 @@ deviceCode: stable catalog natural key used in seed/UI/AI prompts
 metricCode: stable clinical metric natural key used in rules/reports
 badgeCode: stable badge natural key
 slug: public knowledge article route key
+ruleCode: metric-rule seed natural key
 sessionTokenHash: secure auth token hash
 verificationCodeHash: Telegram verification hash
 inviteTokenHash: family invite token hash
