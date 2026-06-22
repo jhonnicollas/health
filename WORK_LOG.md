@@ -2,6 +2,365 @@
 
 This log is append-only. Never delete previous entries.
 
+## 2026-06-22 09:29 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P0.1
+- Sprint: Enterprise Production Remediation
+- Status: Started
+
+### Files Read
+- AGENTS.md
+- docs/PRD_UserStory.docx.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/design-system.md
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+- docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Added Enterprise Production Remediation tasks to `docs/TASKS.md`.
+- Marked EP-P0.1 Fix Production Dashboard 500 as In Progress.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue only EP-P0.1: reproduce production dashboard 500, inspect Worker route and production D1 schema, fix, validate, deploy/check production.
+
+## 2026-06-22 09:38 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P0.1
+- Sprint: Enterprise Production Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/api-contract.md
+- worker/src/index.ts
+- worker/test/register.test.mjs
+- web/functions/api/[[path]].ts
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- worker/test/register.test.mjs
+
+### What Changed
+- Fixed production dashboard 500 root cause: `/api/dashboard/today` queried non-existent `HL_userStreaks` and `HL_recommendations`.
+- Updated dashboard route to use schema-backed `HL_streaks.currentCount/bestCount` and `HL_aiRecommendations.summaryText`.
+- Added regression tests for authenticated dashboard empty state and dashboard with saved measurement values, streak, alert, and AI insight.
+- Deployed Worker and Pages to production.
+
+### Validation
+- Pre-fix production smoke with authenticated account: `/api/dashboard/today` returned 500.
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+- `cd worker && npm test` — PASS (24/24)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS
+- `cd worker && npx wrangler deploy` — PASS, Worker version `0c8d6f34-3354-44b9-836d-5f565ac7b843`.
+- `cd web && npx wrangler pages deploy dist --project-name hl-health-companion --commit-dirty=true` — PASS, Pages deploy `https://12983a45.hl-health-companion.pages.dev`.
+- Post-fix production empty-account smoke: register -> onboarding -> `/api/dashboard/today` returned 200 with `hasData=false`.
+- Post-fix production data smoke: register -> onboarding -> submit OMRON manual measurement -> `/api/dashboard/today` returned 200 with `sessionCount=1`, `metricCount=3`, and BP values.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+- Documentation reviewed; no API contract/schema changes required because the endpoint response contract stayed the same and code was corrected to existing schema tables.
+
+### Next Agent Notes
+- Continue strict sequence with EP-P0.2 Secret/Config Readiness.
+- Do not start integer ID migration until config readiness has been inventoried and completed or explicitly marked blocked.
+
+## 2026-06-22 09:39 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P0.2
+- Sprint: Enterprise Production Remediation
+- Status: Started
+
+### Files Read
+- docs/TASKS.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- docs/design-system.md
+- HANDOFF.md
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked EP-P0.2 Secret/Config Readiness as In Progress.
+- Started inventory of mutable hardcoded app config, frontend Settings exposure, and Worker secrets separation.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue only EP-P0.2. Inventory hardcoded config first; do not begin integer ID migration yet.
+
+## 2026-06-22 09:49 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P0.2
+- Sprint: Enterprise Production Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/api-contract.md
+- docs/design-system.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- worker/test/register.test.mjs
+- web/src/pages/settings/ProfileSettingsPage.tsx
+
+### Files Changed
+- docs/TASKS.md
+- docs/seed.sql
+- docs/api-contract.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- worker/test/register.test.mjs
+- web/src/pages/settings/ProfileSettingsPage.tsx
+
+### What Changed
+- Added DB-backed config keys for `aiVisionModel`, `ocrRateLimitMax`, and `ocrRateLimitWindowMin`.
+- Fixed AI Vision extraction to use `HL_systemConfigs.aiExtractTimeoutMs`, `aiVisionModel`, and `maxUploadSizeBytes` instead of hardcoded/default values.
+- Removed hardcoded cron fallback secret; cron manual trigger now requires Worker secret `CRON_SECRET`.
+- Added admin config create/delete API endpoints, protected required keys from deletion, and masked sensitive values in audit logs.
+- Extended Settings System Config panel with create/delete controls for admin users.
+- Seeded missing production config keys in D1.
+- Deployed Worker and Pages.
+
+### Validation
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+- `cd worker && npm test` — PASS (25/25)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npm run lint` — PASS
+- `cd web && npm run build` — PASS
+- Production D1 config verification showed `aiExtractTimeoutMs`, `aiVisionModel`, `maxUploadSizeBytes`, `ocrRateLimitMax`, and `ocrRateLimitWindowMin`.
+- `cd worker && npx wrangler deploy` — PASS, Worker version `f348fac4-9798-4b5c-a9a8-9522693d6b7b`.
+- `cd web && npx wrangler pages deploy dist --project-name hl-health-companion --commit-dirty=true` — PASS, Pages deploy `https://d0b2cf6e.hl-health-companion.pages.dev`.
+- Production smoke: register -> onboarding -> dashboard returned 200.
+- Production smoke: `/api/measurements/extract/limit-check` returned 200 from DB-backed OCR config.
+- Production smoke: non-admin `/api/admin/configs` returned 403.
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/seed.sql
+- docs/api-contract.md
+- docs/design-system.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue strict sequence with EP-P1.1 ID/FK Inventory.
+- Do not edit schema IDs yet; produce inventory and migration plan first.
+
+## 2026-06-22 09:51 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P1.1
+- Sprint: Enterprise Production Remediation
+- Status: Started
+
+### Files Read
+- docs/TASKS.md
+- docs/schema.sql
+- docs/seed.sql
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked EP-P1.1 ID/FK Inventory as In Progress.
+- Started inventory of all table IDs, foreign keys, natural text keys, indexes, and source-code references.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue EP-P1.1 only. Produce `docs/INTEGER_ID_MIGRATION_PLAN.md`; do not alter schema IDs in this task.
+
+## 2026-06-22 09:53 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P1.1
+- Sprint: Enterprise Production Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src
+
+### Files Changed
+- docs/TASKS.md
+- docs/INTEGER_ID_MIGRATION_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Created complete integer ID migration inventory in `docs/INTEGER_ID_MIGRATION_PLAN.md`.
+- Listed every table PK, target PK decision, FK fields to migrate, and TEXT natural keys to keep.
+- Documented foreign-key conversion groups, indexes to rebuild, backend/frontend string ID references, and non-converted TEXT justifications.
+- Flagged schema/code mismatch: `worker/src/routes-extra.ts` references `HL_familyMembers`, while schema has `HL_familyLinks`/`HL_familyInvites`.
+
+### Validation
+- `git diff --check` — PASS, only existing CRLF conversion warnings.
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/INTEGER_ID_MIGRATION_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue strict sequence with EP-P1.2 Migration SQL Design.
+- Do not apply production migration yet; EP-P1.2 must produce SQL design and validate on a dev/local copy first.
+
+## 2026-06-22 09:54 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P1.2
+- Sprint: Enterprise Production Remediation
+- Status: Started
+
+### Files Read
+- docs/TASKS.md
+- docs/schema.sql
+- docs/INTEGER_ID_MIGRATION_PLAN.md
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Marked EP-P1.2 Migration SQL Design as In Progress.
+- Started shadow-table SQL design for integer ID migration.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue EP-P1.2 only. Create `docs/migrations/INTEGER_IDS_V2.sql`; do not run against production.
+
+## 2026-06-22 09:58 UTC — Agent: Codex
+
+### Task
+- Task ID: EP-P1.2
+- Sprint: Enterprise Production Remediation
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/INTEGER_ID_MIGRATION_PLAN.md
+
+### Files Changed
+- docs/TASKS.md
+- docs/migrations/INTEGER_IDS_V2.sql
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Created `docs/migrations/INTEGER_IDS_V2.sql` as a D1-compatible dev-copy migration design.
+- Added mapping tables for every surrogate ID table listed in the inventory.
+- Added shadow-table examples for `HL_users` and `HL_sessions`, FK mapping examples, swap template, validation queries, and backup notes.
+- Kept production swap disabled by design until backend/frontend numeric ID refactors are complete.
+
+### Validation
+- `cd worker && npx wrangler d1 execute multi_Ai_db --local --file ..\docs\schema.sql` — PASS.
+- Initial migration validation failed because D1 CLI rejects explicit `BEGIN TRANSACTION`; SQL design was patched to D1-compatible idempotent design mode.
+- `cd worker && npx wrangler d1 execute multi_Ai_db --local --file ..\docs\migrations\INTEGER_IDS_V2.sql` — PASS (87 commands).
+- Validation queries returned equal old/v2 row counts for the design tables on the local empty schema and `PRAGMA foreign_key_check` returned no errors.
+
+### Documentation Updated
+- docs/TASKS.md
+- docs/migrations/INTEGER_IDS_V2.sql
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Continue strict sequence with EP-P1.3 Backend ID Refactor.
+- Do not apply integer ID migration to production until EP-P1.3 and EP-P1.4 are complete and full migration SQL is expanded beyond design examples.
+
+## 2026-06-22 16:22 UTC — Agent: Codex
+
+### Task
+- Task ID: ENTERPRISE-PRODUCTION-REMEDIATION-PLAN
+- Sprint: Gap Remediation Reset
+- Status: Completed
+
+### Files Read
+- AGENTS.md
+- docs/PRD.docx.md
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Files Changed
+- docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### What Changed
+- Created a new execution task plan after owner rejected GAP-12 result with score 20/1000.
+- Covered integer ID migration, device-first measurement UX, one editable AI/manual textbox per metric, compact selector, full-width enterprise layout, collapsible sidebar, Android/laptop layouts, dashboard 500, KB workflow, settings config CRUD, and PRD SaaS readiness.
+- Documented the storage decision: keep normalized `HL_measurementSessions` + `HL_measurementValues`, not separate tables per device and not one wide table.
+
+### Validation
+- Documentation-only task; no build required.
+
+### Documentation Updated
+- docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Start with EP-P0.1 Fix Production Dashboard 500.
+- Do not continue blind visual polish before production 500 and measurement device flow are fixed.
+
 ## 2026-06-22 09:46 UTC — Agent: Codex
 
 ### Task

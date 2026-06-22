@@ -2333,7 +2333,7 @@ app.post('/api/measurements/attachments/upload', async (c) => {
       return jsonResponse(c, failure('NOT_FOUND', 'Sesi tidak ditemukan.', 404, [], startedAt))
     }
 
-    const maxUploadSize = await getSystemConfigNumber(c, 'maxUploadSizeBytes').catch(() => 2 * 1024 * 1024)
+    const maxUploadSize = await getSystemConfigNumber(c, 'maxUploadSizeBytes')
     if (file.size > maxUploadSize) {
       return jsonResponse(c, failure('VALIDATION_ERROR', `File terlalu besar. Maks ${Math.round(maxUploadSize / 1024 / 1024)}MB.`, 400, [], startedAt))
     }
@@ -2575,14 +2575,14 @@ app.get('/api/dashboard/today', async (c) => {
     const emergencyCount = (sessions.results || []).filter(s => s.hasEmergency === 1).length
 
     const streakRow = await c.env.DB.prepare(
-      `SELECT currentStreak, bestStreak FROM HL_userStreaks WHERE userId = ? LIMIT 1`
-    ).bind(userId).first<{ currentStreak: number; bestStreak: number }>()
-    const streak = streakRow?.currentStreak ?? 0
-    const bestStreak = streakRow?.bestStreak ?? 0
+      `SELECT currentCount, bestCount FROM HL_streaks WHERE userId = ? AND streakType = 'dailyMeasurement' LIMIT 1`
+    ).bind(userId).first<{ currentCount: number; bestCount: number }>()
+    const streak = streakRow?.currentCount ?? 0
+    const bestStreak = streakRow?.bestCount ?? 0
 
     const aiInsightRow = await c.env.DB.prepare(
-      `SELECT summary FROM HL_recommendations WHERE userId = ? ORDER BY createdAt DESC LIMIT 1`
-    ).bind(userId).first<{ summary: string }>()
+      `SELECT summaryText FROM HL_aiRecommendations WHERE userId = ? ORDER BY createdAt DESC LIMIT 1`
+    ).bind(userId).first<{ summaryText: string }>()
 
     const threeDaysAgo = new Date()
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
@@ -2612,7 +2612,7 @@ app.get('/api/dashboard/today', async (c) => {
       hasData: (sessions.results || []).length > 0,
       streak,
       bestStreak,
-      aiInsight: aiInsightRow?.summary ?? null,
+      aiInsight: aiInsightRow?.summaryText ?? null,
       sessions: sessions.results || [],
       values: values.map((v: any) => ({
         ...v,
@@ -3839,12 +3839,7 @@ app.post('/api/measurements/extract', async (c) => {
     const selectedMetricCodesJson = formData.selectedMetricCodes as string
     const sessionDraftId = formData.sessionDraftId as string | undefined
 
-    // Get max file size from config
-    const maxUploadSizeConfig = await c.env.DB.prepare(
-      'SELECT configValue FROM HL_systemConfigs WHERE configKey = ?'
-    ).bind('maxUploadSizeBytes').first()
-
-    const maxUploadSize = maxUploadSizeConfig ? parseInt(maxUploadSizeConfig.configValue as string) : 2 * 1024 * 1024 // Default 2MB
+    const maxUploadSize = await getSystemConfigNumber(c, 'maxUploadSizeBytes')
 
     // Validate file size
     if (!file) {
@@ -3874,12 +3869,11 @@ app.post('/api/measurements/extract', async (c) => {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'Input tidak valid.', 400, inputErrors))
     }
 
-    // Get AI timeout config
-    const aiTimeoutConfig = await c.env.DB.prepare(
-      'SELECT configValue FROM HL_systemConfigs WHERE configKey = ?'
-    ).bind('aiVisionTimeoutMs').first()
-
-    const aiTimeout = aiTimeoutConfig ? parseInt(aiTimeoutConfig.configValue as string) : 5000 // Default 5s
+    const aiTimeout = await getSystemConfigNumber(c, 'aiExtractTimeoutMs')
+    const configuredVisionModel = await getSystemConfigString(c, 'aiVisionModel')
+    if (!configuredVisionModel) {
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Model AI Vision belum dikonfigurasi.', 500, []))
+    }
 
     // Prepare AI Vision call
     const aiStartedAt = Date.now()
@@ -3889,7 +3883,7 @@ app.post('/api/measurements/extract', async (c) => {
     let parsedJson: string | null = null
     let extractedMetrics: any[] = []
     let confidence = 0
-    let modelName = '@cf/meta/llama-3.2-11b-vision-instruct' // Default multimodal model
+    let modelName = configuredVisionModel
 
     try {
       // Convert file to base64 for AI Vision
@@ -3902,7 +3896,7 @@ app.post('/api/measurements/extract', async (c) => {
 
       try {
         const aiResponse = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/models/@cf/meta/llama-3.2-11b-vision-instruct/inference`,
+          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/models/${modelName}/inference`,
           {
             method: 'POST',
             headers: {
@@ -4110,6 +4104,39 @@ function isAdminUser(c: Context<{ Bindings: Env }>, user: UserRow): boolean {
   return adminEmails.includes(user.email.toLowerCase())
 }
 
+const PROTECTED_SYSTEM_CONFIG_KEYS = new Set([
+  'aiExtractTimeoutMs',
+  'aiVisionModel',
+  'aiTextEndpoint',
+  'aiTextModels',
+  'aiTextDefaultModel',
+  'aiTextApiKey',
+  'maxUploadSizeBytes',
+  'loginRateLimitMaxReq',
+  'loginRateLimitWindowMin',
+  'ocrRateLimitMax',
+  'ocrRateLimitWindowMin',
+  'telegramBotToken',
+  'telegramBotActive'
+])
+
+function isValidSystemConfigKey(configKey: string) {
+  return /^[A-Za-z][A-Za-z0-9]*$/.test(configKey) && configKey.length <= 80
+}
+
+function isSensitiveSystemConfigKey(configKey: string) {
+  const lowered = configKey.toLowerCase()
+  return lowered.includes('token') || lowered.includes('secret') || lowered.includes('apikey') || lowered.includes('apiKey'.toLowerCase())
+}
+
+function systemConfigAuditMetadata(configKey: string, extra: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    configKey,
+    sensitive: isSensitiveSystemConfigKey(configKey),
+    ...extra
+  })
+}
+
 app.get('/api/admin/configs', async (c) => {
   const startedAt = Date.now()
   try {
@@ -4137,17 +4164,81 @@ app.put('/api/admin/configs/:configKey', async (c) => {
     if (!body.configValue && body.configValue !== '0' && body.configValue !== '') {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'configValue wajib.', 400, [], startedAt))
     }
+    if (!isValidSystemConfigKey(configKey)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'configKey tidak valid.', 400, [], startedAt))
+    }
     const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
     if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
     await c.env.DB.prepare('UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = ?').bind(body.configValue, configKey).run()
     invalidateSystemConfigCache(c.env.DB, configKey)
     await c.env.DB.prepare(
       "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configUpdate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(createId('aud'), user.id, configKey, JSON.stringify({ configKey, newValue: body.configValue })).run()
+    ).bind(createId('aud'), user.id, configKey, systemConfigAuditMetadata(configKey, { updated: true })).run()
     return jsonResponse(c, success({ updated: true, cacheInvalidated: true }, 200, startedAt))
   } catch (error) {
     console.error('admin config update error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update konfigurasi.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/admin/configs', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
+    const body = await c.req.json() as { configKey?: string; configValue?: string; dataType?: string; description?: string }
+    const configKey = (body.configKey || '').trim()
+    const dataType = (body.dataType || 'string').trim()
+    if (!isValidSystemConfigKey(configKey)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'configKey tidak valid.', 400, [], startedAt))
+    }
+    if (!['string', 'number', 'boolean', 'json'].includes(dataType)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'dataType tidak valid.', 400, [], startedAt))
+    }
+    if (!body.configValue && body.configValue !== '0' && body.configValue !== '') {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'configValue wajib.', 400, [], startedAt))
+    }
+    const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
+    if (existing) return jsonResponse(c, failure('VALIDATION_ERROR', 'configKey sudah ada.', 400, [], startedAt))
+    await c.env.DB.prepare(
+      'INSERT INTO HL_systemConfigs (configKey, configValue, dataType, description, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)'
+    ).bind(configKey, body.configValue, dataType, body.description || null).run()
+    invalidateSystemConfigCache(c.env.DB, configKey)
+    await c.env.DB.prepare(
+      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configCreate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(createId('aud'), user.id, configKey, systemConfigAuditMetadata(configKey, { dataType, created: true })).run()
+    return jsonResponse(c, success({ created: true, configKey, cacheInvalidated: true }, 201, startedAt))
+  } catch (error) {
+    console.error('admin config create error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal membuat konfigurasi.', 500, [], startedAt))
+  }
+})
+
+app.delete('/api/admin/configs/:configKey', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
+    const configKey = c.req.param('configKey')
+    if (!isValidSystemConfigKey(configKey)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'configKey tidak valid.', 400, [], startedAt))
+    }
+    if (PROTECTED_SYSTEM_CONFIG_KEYS.has(configKey)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Konfigurasi wajib tidak boleh dihapus.', 400, [], startedAt))
+    }
+    const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
+    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
+    await c.env.DB.prepare('DELETE FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).run()
+    invalidateSystemConfigCache(c.env.DB, configKey)
+    await c.env.DB.prepare(
+      "INSERT INTO HL_auditLogs (id, userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, 'configDelete', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
+    ).bind(createId('aud'), user.id, configKey, systemConfigAuditMetadata(configKey, { deleted: true })).run()
+    return jsonResponse(c, success({ deleted: true, cacheInvalidated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin config delete error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menghapus konfigurasi.', 500, [], startedAt))
   }
 })
 

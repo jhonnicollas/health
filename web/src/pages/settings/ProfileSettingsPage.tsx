@@ -32,7 +32,7 @@ type ConfigListResponse = {
 
 type ConfigUpdateResponse = {
   success: boolean
-  data?: { updated: boolean; cacheInvalidated: boolean }
+  data?: { updated?: boolean; created?: boolean; deleted?: boolean; cacheInvalidated: boolean }
   error?: { message: string }
 }
 
@@ -54,6 +54,13 @@ export function ProfileSettingsPage() {
   const [configMessage, setConfigMessage] = useState('')
   const [configError, setConfigError] = useState('')
   const [savingConfigKey, setSavingConfigKey] = useState<string | null>(null)
+  const [deletingConfigKey, setDeletingConfigKey] = useState<string | null>(null)
+  const [newConfig, setNewConfig] = useState({
+    configKey: '',
+    configValue: '',
+    dataType: 'string',
+    description: ''
+  })
 
   useEffect(() => {
     void loadConfigs()
@@ -192,8 +199,80 @@ export function ProfileSettingsPage() {
     }
   }
 
+  async function handleConfigCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSavingConfigKey('__new__')
+    setConfigMessage('')
+    setConfigError('')
+    try {
+      const response = await fetch('/api/admin/configs', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify(newConfig)
+      })
+      const body = (await response.json()) as ConfigUpdateResponse
+      if (!response.ok || !body.success) {
+        setConfigError(body.error?.message ?? 'Unable to create system config.')
+        return
+      }
+      setConfigMessage(`${newConfig.configKey} created.`)
+      setNewConfig({ configKey: '', configValue: '', dataType: 'string', description: '' })
+      await loadConfigs()
+    } catch {
+      setConfigError('Could not connect to server.')
+    } finally {
+      setSavingConfigKey(null)
+    }
+  }
+
+  async function handleConfigDelete(configKey: string) {
+    setDeletingConfigKey(configKey)
+    setConfigMessage('')
+    setConfigError('')
+    try {
+      const response = await fetch(`/api/admin/configs/${encodeURIComponent(configKey)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      })
+      const body = (await response.json()) as ConfigUpdateResponse
+      if (!response.ok || !body.success) {
+        setConfigError(body.error?.message ?? 'Unable to delete system config.')
+        return
+      }
+      setConfigMessage(`${configKey} deleted.`)
+      await loadConfigs()
+    } catch {
+      setConfigError('Could not connect to server.')
+    } finally {
+      setDeletingConfigKey(null)
+    }
+  }
+
   function isSensitiveConfig(configKey: string) {
     return configKey.toLowerCase().includes('token') || configKey.toLowerCase().includes('secret')
+  }
+
+  function isProtectedConfig(configKey: string) {
+    return [
+      'aiExtractTimeoutMs',
+      'aiVisionModel',
+      'aiTextEndpoint',
+      'aiTextModels',
+      'aiTextDefaultModel',
+      'aiTextApiKey',
+      'maxUploadSizeBytes',
+      'loginRateLimitMaxReq',
+      'loginRateLimitWindowMin',
+      'ocrRateLimitMax',
+      'ocrRateLimitWindowMin',
+      'telegramBotToken',
+      'telegramBotActive'
+    ].includes(configKey)
   }
 
   return (
@@ -310,6 +389,52 @@ export function ProfileSettingsPage() {
 
               {!configsLoading && !configError ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <form
+                    style={{ padding: 12, borderRadius: 'var(--radiusLg)', border: '1px solid var(--colorBorder)', background: 'var(--colorSurfaceElevated)', display: 'grid', gap: 10 }}
+                    onSubmit={handleConfigCreate}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(90px, 120px)', gap: 8 }}>
+                      <input
+                        style={{ minHeight: 36, padding: '6px 10px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', font: 'var(--typBodySm)' }}
+                        aria-label="New config key"
+                        onChange={(event) => setNewConfig((prev) => ({ ...prev, configKey: event.target.value }))}
+                        placeholder="configKey"
+                        type="text"
+                        value={newConfig.configKey}
+                      />
+                      <select
+                        style={{ minHeight: 36, padding: '6px 10px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', font: 'var(--typBodySm)' }}
+                        aria-label="New config data type"
+                        onChange={(event) => setNewConfig((prev) => ({ ...prev, dataType: event.target.value }))}
+                        value={newConfig.dataType}
+                      >
+                        <option value="string">string</option>
+                        <option value="number">number</option>
+                        <option value="boolean">boolean</option>
+                        <option value="json">json</option>
+                      </select>
+                    </div>
+                    <input
+                      style={{ minHeight: 36, padding: '6px 10px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', font: 'var(--typBodySm)' }}
+                      aria-label="New config value"
+                      onChange={(event) => setNewConfig((prev) => ({ ...prev, configValue: event.target.value }))}
+                      placeholder="Value"
+                      type={isSensitiveConfig(newConfig.configKey) ? 'password' : 'text'}
+                      value={newConfig.configValue}
+                    />
+                    <input
+                      style={{ minHeight: 36, padding: '6px 10px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', font: 'var(--typBodySm)' }}
+                      aria-label="New config description"
+                      onChange={(event) => setNewConfig((prev) => ({ ...prev, description: event.target.value }))}
+                      placeholder="Description"
+                      type="text"
+                      value={newConfig.description}
+                    />
+                    <button className="btn-secondary" disabled={savingConfigKey === '__new__'} type="submit">
+                      {savingConfigKey === '__new__' ? 'Creating...' : 'Create Config'}
+                    </button>
+                  </form>
+
                   {configs.map((row) => (
                     <div key={row.configKey} style={{ padding: 12, borderRadius: 'var(--radiusLg)', border: '1px solid var(--colorBorderSoft)', background: 'var(--colorSurface)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -330,6 +455,14 @@ export function ProfileSettingsPage() {
                         />
                         <button style={{ minHeight: 36, padding: '6px 14px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', background: 'var(--colorSurface)', cursor: 'pointer', font: 'var(--typLabelSm)' }} disabled={savingConfigKey === row.configKey} type="submit">
                           {savingConfigKey === row.configKey ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          style={{ minHeight: 36, padding: '6px 14px', border: '1px solid var(--colorStatusCritical)', borderRadius: 'var(--radiusMd)', background: 'var(--colorSurface)', color: 'var(--colorStatusCritical)', cursor: isProtectedConfig(row.configKey) ? 'not-allowed' : 'pointer', font: 'var(--typLabelSm)', opacity: isProtectedConfig(row.configKey) ? 0.55 : 1 }}
+                          disabled={isProtectedConfig(row.configKey) || deletingConfigKey === row.configKey}
+                          onClick={() => void handleConfigDelete(row.configKey)}
+                          type="button"
+                        >
+                          {deletingConfigKey === row.configKey ? 'Deleting...' : 'Delete'}
                         </button>
                       </form>
                     </div>

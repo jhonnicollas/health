@@ -943,3 +943,153 @@ Gap-gap kritis antara PRD (Product Requirements Document) dan source code saat i
   - Monthly: mini bar chart atau sparkline
   - Lazy load chart library
   - Accessible fallback text
+
+---
+
+## Enterprise Production Remediation - Owner Rejection 20/1000
+
+Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
+
+### [x] EP-P0.1 Fix Production Dashboard 500
+- **Deskripsi**: Production `GET https://hl-health-companion.pages.dev/api/dashboard/today` returns 500 and blocks dashboard confidence.
+- **Files**: `worker/src/index.ts`, `web/functions/api/[[path]].ts`, production D1 schema, Wrangler deployment config.
+- **Acceptance Criteria**:
+  - Reproduce production 500 and identify root cause.
+  - Verify D1 schema columns used by dashboard queries.
+  - Fix query/schema mismatch or proxy/runtime issue.
+  - Add regression coverage for dashboard today empty-data and value-data cases.
+  - Production `/api/dashboard/today` returns 200 and dashboard renders without red error state.
+
+### [x] EP-P0.2 Secret/Config Readiness
+- **Deskripsi**: Inventory mutable app config and ensure DB-backed frontend-editable settings through `HL_systemConfigs`.
+- **Acceptance Criteria**:
+  - No mutable timeout/model/feature flag/token value hardcoded in app code.
+  - Admin Settings shows all `HL_systemConfigs` rows.
+  - Sensitive runtime secrets are Worker secrets or masked config inputs.
+
+### [x] EP-P1.1 ID/FK Inventory
+- **Deskripsi**: Inventory every `id TEXT`, FK, index, and source-code reference before integer ID migration.
+- **Deliverable**: `docs/INTEGER_ID_MIGRATION_PLAN.md`.
+- **Acceptance Criteria**:
+  - Every table ID/FK is listed.
+  - Natural text keys such as `metricCode`, `deviceCode`, `configKey`, `slug` have explicit non-conversion reason.
+
+### [x] EP-P1.2 Migration SQL Design
+- **Deskripsi**: Design shadow-table migration for integer autoincrement table IDs.
+- **Deliverable**: `docs/migrations/INTEGER_IDS_V2.sql`.
+- **Acceptance Criteria**:
+  - Migration runs on local/dev D1 copy.
+  - FK integrity checks pass with no orphan rows.
+
+### [ ] EP-P1.3 Backend ID Refactor
+- **Deskripsi**: Refactor backend table PK/FK writes and reads from UUID/TEXT IDs to integer IDs after migration design.
+- **Acceptance Criteria**:
+  - Internal table PK/FK values use numbers.
+  - Auth/session/share tokens remain secure strings where appropriate.
+
+### [ ] EP-P1.4 Frontend ID Refactor
+- **Deskripsi**: Update frontend API types and route/action handlers for integer IDs.
+- **Acceptance Criteria**:
+  - History, evidence, medications, alerts, family, reports all work with integer IDs.
+
+### [ ] EP-P2.1 Compact Device Selection
+- **Deskripsi**: Replace metric checklist with compact device/mode selector so one physical device reading is one selection.
+- **Acceptance Criteria**:
+  - Yuwell selection includes SpO2 + PR bpm together.
+  - OMRON selection includes SYS + DIA + Pulse together.
+  - Sinocare requires one selected mode value.
+
+### [ ] EP-P2.2 Device Reading Cards
+- **Deskripsi**: Render one enterprise measurement card per selected device/group with one attachment area and textboxes matching device display values.
+- **Acceptance Criteria**:
+  - AI fills the same textbox user edits.
+  - No visible separate "Nilai AI raw" field.
+  - Submit sends one final value per metric.
+
+### [ ] EP-P2.3 AI Extraction Mapping Per Device
+- **Deskripsi**: Make AI extraction one call per selected device reading card and map multi-value device output to visible inputs.
+- **Acceptance Criteria**:
+  - Yuwell extracts SpO2 and PR in one call.
+  - OMRON extracts SYS, DIA, Pulse in one call.
+  - Timeout fallback leaves all inputs editable.
+
+### [ ] EP-P2.4 Submit Payload and DB Save
+- **Deskripsi**: Save each selected device reading as one `HL_measurementSessions` row with multiple `HL_measurementValues` rows.
+- **Acceptance Criteria**:
+  - Yuwell creates 1 session + 2 values.
+  - OMRON creates 1 session + 3 values.
+  - Dashboard/history/report read grouped values correctly.
+
+### [ ] EP-P3.1 Full-Width Page Layout
+- **Deskripsi**: Use full SaaS workspace width on desktop while preserving readable form width.
+- **Acceptance Criteria**:
+  - Laptop layout uses available horizontal space.
+  - No horizontal overflow.
+
+### [ ] EP-P3.2 Collapsible Sidebar
+- **Deskripsi**: Add desktop sidebar collapse/expand with persisted preference or local user setting.
+- **Acceptance Criteria**:
+  - Collapsed icons remain clickable and accessible.
+  - Content margin updates correctly.
+
+### [ ] EP-P3.3 Clickable Topbar Profile and Icons
+- **Deskripsi**: Make avatar/profile, notification, help/book icons real buttons/links and ensure logout works.
+- **Acceptance Criteria**:
+  - Avatar opens menu with profile/settings/logout.
+  - Logout calls API, clears auth context, and redirects.
+
+### [ ] EP-P3.4 Android vs Laptop Layout
+- **Deskripsi**: Match distinct mobile and desktop layout intent from `web/frontend_stitch/new-measurement.html`.
+- **Acceptance Criteria**:
+  - Playwright screenshots at 390x844 and 1440x900 are intentionally different and Stitch-aligned.
+
+### [ ] EP-P3.5 Enterprise Input System
+- **Deskripsi**: Replace basic inputs with clinical enterprise instrument-style inputs across app surfaces.
+- **Acceptance Criteria**:
+  - Inputs match `web/frontend_stitch/` references and remain accessible.
+
+### [ ] EP-P4.1 Measurement History Date Format
+- **Deskripsi**: Format user-facing date/time as Indonesian readable datetime, e.g. `17 Juni 2026 18:23:45`.
+- **Acceptance Criteria**:
+  - No raw ISO datetime in user-facing history/report/alert tables.
+
+### [ ] EP-P4.2 Knowledge Base Workflow Redesign
+- **Deskripsi**: Turn KB into guided measurement workflows for each device.
+- **Acceptance Criteria**:
+  - KB covers purpose, start, device setup, photo, reading result, retry, and medical-contact guidance.
+
+### [ ] EP-P4.3 Settings Full Configuration Center
+- **Deskripsi**: Settings exposes profile, UI/accessibility, notifications, Telegram, reminders, AI, upload/rate limits, feature flags, privacy/export/delete, admin config CRUD.
+- **Acceptance Criteria**:
+  - All mutable app configs are visible/editable from frontend for admin.
+
+### [ ] EP-P4.4 Auth/Register Form Enterprise Polish
+- **Deskripsi**: Polish register/login/onboarding forms with validation, loading states, password visibility, and strict onboarding gate.
+- **Acceptance Criteria**:
+  - Register -> onboarding -> dashboard is production SaaS-ready.
+
+### [ ] EP-P5.1 PRD Traceability Matrix
+- **Deskripsi**: Map PRD section to source files, endpoint, DB table, UI route, test evidence, and status.
+- **Deliverable**: `docs/PRD_TRACEABILITY_MATRIX.md`.
+- **Acceptance Criteria**:
+  - Every PRD feature is mapped with source and evidence.
+
+### [ ] EP-P5.2 Feature Gap Closure
+- **Deskripsi**: Implement missing PRD features found by the traceability matrix.
+- **Acceptance Criteria**:
+  - All PRD P0/P1 features are usable through UI.
+
+### [ ] EP-P5.3 Enterprise Visual QA
+- **Deskripsi**: Screenshot compare primary routes against `web/frontend_stitch/` and fix route-by-route visual gaps.
+- **Acceptance Criteria**:
+  - Owner score target >= 850/1000.
+
+### [ ] EP-P6.1 Full Regression
+- **Deskripsi**: Run full worker/web validation and E2E across auth, onboarding, measurement, dashboard, history, KB, settings, logout, emergency, medication, reports, mobile and laptop.
+- **Acceptance Criteria**:
+  - No core route 500, no broken assets, no primary console error.
+
+### [ ] EP-P6.2 Production Deploy and UAT
+- **Deskripsi**: Backup D1, apply approved migrations, deploy Worker + Pages, and run production UAT.
+- **Acceptance Criteria**:
+  - Production E2E passes and all critical routes are live.

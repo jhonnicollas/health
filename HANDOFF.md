@@ -15,6 +15,136 @@ Next Recommended Task: Owner re-evaluation (target >= 800/1000), link Telegram c
 Last Updated: 2026-06-22 22:30 UTC
 ```
 
+## Current Status Override — 2026-06-22 16:22 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: ENTERPRISE-PRODUCTION-REMEDIATION task plan ready
+Current State: OWNER REJECTED CURRENT QUALITY (20/1000). New task plan created for production-grade rebuild.
+Last Completed Task: docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md
+Files Changed: docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md, WORK_LOG.md, HANDOFF.md
+Commands Run: doc/context reads only
+Known Issues: production dashboard today 500, measurement/new device UX wrong, ID strategy rejected by owner, UI not enterprise-ready
+Next Recommended Task: execute docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md starting at EP-P0.1 Fix Production Dashboard 500
+```
+
+## Current Status Override - 2026-06-22 09:29 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P0.1 Fix Production Dashboard 500
+Current State: IN PROGRESS
+Last Completed Task: ENTERPRISE-PRODUCTION-REMEDIATION task plan created
+Files Changed: docs/TASKS.md, WORK_LOG.md, HANDOFF.md
+Commands Run: mandatory context reads; no validation yet
+Known Issues: production dashboard today 500, owner rejected UI/UX score 20/1000, measurement device-first flow not yet fixed
+Next Recommended Task: continue EP-P0.1 only; reproduce production 500 and inspect production D1 schema before code edits
+```
+
+## Current Status Override - 2026-06-22 09:38 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P0.1 Fix Production Dashboard 500
+Current State: COMPLETED AND DEPLOYED
+Last Completed Task: EP-P0.1
+Files Changed: docs/TASKS.md, WORK_LOG.md, HANDOFF.md, worker/src/index.ts, worker/test/register.test.mjs
+Commands Run: worker typecheck, worker test 24/24, web typecheck, web lint, web build, wrangler worker deploy, wrangler pages deploy, production smoke empty/data dashboard
+Known Issues: owner rejected UI/UX score 20/1000, measurement device-first flow not yet fixed, integer ID migration not started
+Production Worker Version: 0c8d6f34-3354-44b9-836d-5f565ac7b843
+Production Pages Deploy: https://12983a45.hl-health-companion.pages.dev
+Next Recommended Task: EP-P0.2 Secret/Config Readiness
+```
+
+## Current Status Override - 2026-06-22 09:39 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P0.2 Secret/Config Readiness
+Current State: IN PROGRESS
+Last Completed Task: EP-P0.1 Fix Production Dashboard 500
+Files Changed: docs/TASKS.md, WORK_LOG.md, HANDOFF.md
+Commands Run: no EP-P0.2 validation yet
+Known Issues: hardcoded mutable config inventory pending, settings full config CRUD pending, measurement device-first flow not yet fixed
+Next Recommended Task: continue EP-P0.2 only; audit worker/web hardcoded mutable config and compare to HL_systemConfigs/Settings admin exposure
+```
+
+## Current Status Override - 2026-06-22 09:49 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P0.2 Secret/Config Readiness
+Current State: COMPLETED AND DEPLOYED
+Last Completed Task: EP-P0.2
+Files Changed: docs/TASKS.md, docs/seed.sql, docs/api-contract.md, docs/design-system.md, WORK_LOG.md, HANDOFF.md, worker/src/index.ts, worker/src/routes-extra.ts, worker/test/register.test.mjs, web/src/pages/settings/ProfileSettingsPage.tsx
+Commands Run: worker typecheck, worker test 25/25, web typecheck, web lint, web build, production D1 seed/verify, wrangler worker deploy, wrangler pages deploy, production smoke dashboard/ocr-limit/admin-guard
+Known Issues: owner rejected UI/UX score 20/1000, measurement device-first flow not yet fixed, integer ID migration not started
+Production Worker Version: f348fac4-9798-4b5c-a9a8-9522693d6b7b
+Production Pages Deploy: https://d0b2cf6e.hl-health-companion.pages.dev
+Next Recommended Task: EP-P1.1 ID/FK Inventory
+```
+
+## Current Status Override - 2026-06-22 09:51 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P1.1 ID/FK Inventory
+Current State: IN PROGRESS
+Last Completed Task: EP-P0.2 Secret/Config Readiness
+Files Changed: docs/TASKS.md, WORK_LOG.md, HANDOFF.md
+Commands Run: no EP-P1.1 validation yet
+Known Issues: integer ID migration inventory in progress; no schema migration has been applied
+Next Recommended Task: continue EP-P1.1 only; create docs/INTEGER_ID_MIGRATION_PLAN.md
+```
+
+## Current Status Override - 2026-06-22 09:53 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P1.1 ID/FK Inventory
+Current State: COMPLETED
+Last Completed Task: EP-P1.1
+Files Changed: docs/TASKS.md, docs/INTEGER_ID_MIGRATION_PLAN.md, WORK_LOG.md, HANDOFF.md
+Commands Run: schema/source inventory; git diff --check
+Known Issues: no integer ID migration applied; HL_familyMembers schema/code mismatch documented
+Next Recommended Task: EP-P1.2 Migration SQL Design
+```
+
+## Current Status Override - 2026-06-22 09:54 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P1.2 Migration SQL Design
+Current State: IN PROGRESS
+Last Completed Task: EP-P1.1 ID/FK Inventory
+Files Changed: docs/TASKS.md, WORK_LOG.md, HANDOFF.md
+Commands Run: no EP-P1.2 validation yet
+Known Issues: SQL design pending; must not apply integer migration to production before backend/frontend refactors
+Next Recommended Task: create docs/migrations/INTEGER_IDS_V2.sql and validate syntax/design locally
+```
+
+## Current Status Override - 2026-06-22 09:58 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Enterprise Production Remediation
+Current Task: EP-P1.2 Migration SQL Design
+Current State: COMPLETED
+Last Completed Task: EP-P1.2
+Files Changed: docs/TASKS.md, docs/migrations/INTEGER_IDS_V2.sql, WORK_LOG.md, HANDOFF.md
+Commands Run: local D1 schema apply; local D1 migration design validation
+Known Issues: INTEGER_IDS_V2.sql is dev-copy design mode and only includes full mapping plus example shadow copy; production swap remains disabled until EP-P1.3/EP-P1.4
+Next Recommended Task: EP-P1.3 Backend ID Refactor
+```
+
 ## Production Deployment
 
 ```text

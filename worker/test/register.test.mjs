@@ -26,10 +26,19 @@ class D1MockStatement {
   }
 
   async first() {
+    if (this.sql.includes('HL_userStreaks') || this.sql.includes('HL_recommendations')) {
+      throw new Error('no such table')
+    }
+
     if (this.sql.includes('SELECT configValue FROM HL_systemConfigs')) {
       const configKey = this.params[0]
       const configValue = this.db.systemConfigs[configKey]
       return configValue ? { configValue } : null
+    }
+
+    if (this.sql.includes('SELECT configKey FROM HL_systemConfigs')) {
+      const configKey = this.params[0]
+      return this.db.systemConfigs[configKey] !== undefined ? { configKey } : null
     }
 
     if (this.sql.includes('FROM HL_apiRateLimits')) {
@@ -91,6 +100,10 @@ class D1MockStatement {
         return null
       }
 
+      if (this.sql.includes('SELECT userId FROM HL_sessions')) {
+        return { userId: session.userId }
+      }
+
       const profile = this.db.profiles.find((row) => row.userId === user.id)
 
       return {
@@ -108,6 +121,22 @@ class D1MockStatement {
       }
     }
 
+    if (this.sql.includes('FROM HL_streaks')) {
+      const userId = this.params[0]
+      const streak = this.db.streaks.find(
+        (row) => row.userId === userId && row.streakType === 'dailyMeasurement'
+      )
+      return streak ? { currentCount: streak.currentCount, bestCount: streak.bestCount } : null
+    }
+
+    if (this.sql.includes('FROM HL_aiRecommendations')) {
+      const userId = this.params[0]
+      const recommendation = this.db.aiRecommendations
+        .filter((row) => row.userId === userId)
+        .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0]
+      return recommendation ? { summaryText: recommendation.summaryText } : null
+    }
+
     return null
   }
 
@@ -117,6 +146,44 @@ class D1MockStatement {
   }
 
   async all() {
+    if (this.sql.includes('FROM HL_systemConfigs')) {
+      return {
+        results: Object.entries(this.db.systemConfigs)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([configKey, configValue]) => ({
+            configKey,
+            configValue,
+            dataType: this.db.systemConfigMeta[configKey]?.dataType ?? 'string',
+            description: this.db.systemConfigMeta[configKey]?.description ?? null,
+            updatedAt: 'CURRENT_TIMESTAMP'
+          }))
+      }
+    }
+
+    if (this.sql.includes('FROM HL_measurementSessions')) {
+      const [userId, day] = this.params
+      const rows = this.db.measurementSessions
+        .filter((row) => row.userId === userId && row.measuredAt.slice(0, 10) === day)
+        .sort((left, right) => right.measuredAt.localeCompare(left.measuredAt))
+      return { results: rows }
+    }
+
+    if (this.sql.includes('FROM HL_measurementValues')) {
+      const [userId, ...sessionIds] = this.params
+      const rows = this.db.measurementValues
+        .filter((row) => row.userId === userId && sessionIds.includes(row.sessionId))
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      return { results: rows }
+    }
+
+    if (this.sql.includes('FROM HL_alerts')) {
+      const [userId, day] = this.params
+      const rows = this.db.alerts
+        .filter((row) => row.userId === userId && row.createdAt.slice(0, 10) === day)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      return { results: rows }
+    }
+
     if (this.sql.includes('FROM HL_devices')) {
       const activeOnly = this.params[0] === 1
       const rows = []
@@ -178,6 +245,11 @@ class D1Mock {
     this.profiles = []
     this.consents = []
     this.rateLimits = []
+    this.measurementSessions = []
+    this.measurementValues = []
+    this.alerts = []
+    this.streaks = []
+    this.aiRecommendations = []
     this.devices = [
       {
         deviceCode: 'yuwellYx106',
@@ -510,7 +582,23 @@ class D1Mock {
     ]
     this.systemConfigs = {
       loginRateLimitMaxReq: options.loginRateLimitMaxReq ?? '10',
-      loginRateLimitWindowMin: options.loginRateLimitWindowMin ?? '10'
+      loginRateLimitWindowMin: options.loginRateLimitWindowMin ?? '10',
+      aiExtractTimeoutMs: '5000',
+      aiVisionModel: '@cf/meta/llama-3.2-11b-vision-instruct',
+      maxUploadSizeBytes: '2097152',
+      ocrRateLimitMax: '10',
+      ocrRateLimitWindowMin: '5',
+      telegramBotToken: ''
+    }
+    this.systemConfigMeta = {
+      loginRateLimitMaxReq: { dataType: 'number', description: 'Max login requests' },
+      loginRateLimitWindowMin: { dataType: 'number', description: 'Login window' },
+      aiExtractTimeoutMs: { dataType: 'number', description: 'AI extract timeout' },
+      aiVisionModel: { dataType: 'string', description: 'AI vision model' },
+      maxUploadSizeBytes: { dataType: 'number', description: 'Max upload size' },
+      ocrRateLimitMax: { dataType: 'number', description: 'OCR max requests' },
+      ocrRateLimitWindowMin: { dataType: 'number', description: 'OCR window' },
+      telegramBotToken: { dataType: 'string', description: 'Telegram token' }
     }
     this.failSelect = options.failSelect ?? false
   }
@@ -573,7 +661,36 @@ class D1Mock {
         action = 'uiSettingsUpdate'
       }
 
+      if (statement.sql.includes('configCreate')) {
+        action = 'configCreate'
+      }
+
+      if (statement.sql.includes('configUpdate')) {
+        action = 'configUpdate'
+      }
+
+      if (statement.sql.includes('configDelete')) {
+        action = 'configDelete'
+      }
+
       this.auditLogs.push({ id, userId, action, entityId, metadataJson })
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_systemConfigs')) {
+      const [configKey, configValue, dataType, description] = statement.params
+      this.systemConfigs[configKey] = configValue
+      this.systemConfigMeta[configKey] = { dataType, description }
+    }
+
+    if (statement.sql.includes('UPDATE HL_systemConfigs')) {
+      const [configValue, configKey] = statement.params
+      this.systemConfigs[configKey] = configValue
+    }
+
+    if (statement.sql.includes('DELETE FROM HL_systemConfigs')) {
+      const [configKey] = statement.params
+      delete this.systemConfigs[configKey]
+      delete this.systemConfigMeta[configKey]
     }
 
     if (statement.sql.includes('UPDATE HL_users SET lastLoginAt')) {
@@ -1591,4 +1708,275 @@ test('GET /api/metrics/catalog requires auth', async () => {
 
   assert.equal(response.status, 401)
   assert.equal(body.error.code, 'UNAUTHORIZED')
+})
+
+test('GET /api/dashboard/today returns empty state for authenticated user', async () => {
+  const db = new D1Mock()
+  const token = 'session-token'
+  db.users.push({
+    id: 'usr_existing',
+    email: 'user@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Budi',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 'sess_existing',
+    userId: 'usr_existing',
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+  db.profiles.push({
+    id: 'prf_existing',
+    userId: 'usr_existing',
+    sex: 'male',
+    birthDate: '1990-01-01',
+    heightCm: 170,
+    timezone: 'UTC',
+    accessibilityMode: 'normal',
+    theme: 'light',
+    emergencyConsent: 0,
+    aiConsent: 1,
+    dataShareConsent: 0
+  })
+
+  const response = await app.request(
+    '/api/dashboard/today',
+    {
+      headers: {
+        Cookie: `hlSession=${token}`
+      }
+    },
+    env(db)
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(body.success, true)
+  assert.equal(body.data.hasData, false)
+  assert.equal(body.data.sessionCount, 0)
+  assert.equal(body.data.metricCount, 0)
+  assert.equal(body.data.streak, 0)
+  assert.equal(body.data.aiInsight, null)
+})
+
+test('GET /api/dashboard/today reads values, streak, and AI insight from schema tables', async () => {
+  const db = new D1Mock()
+  const token = 'session-token'
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date())
+  db.users.push({
+    id: 'usr_existing',
+    email: 'user@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Budi',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 'sess_existing',
+    userId: 'usr_existing',
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+  db.profiles.push({
+    id: 'prf_existing',
+    userId: 'usr_existing',
+    sex: 'male',
+    birthDate: '1990-01-01',
+    heightCm: 170,
+    timezone: 'UTC',
+    accessibilityMode: 'normal',
+    theme: 'light',
+    emergencyConsent: 0,
+    aiConsent: 1,
+    dataShareConsent: 0
+  })
+  db.measurementSessions.push({
+    id: 'ms_today',
+    profileId: 'prf_existing',
+    userId: 'usr_existing',
+    measuredAt: `${today}T08:00:00.000Z`,
+    source: 'manual',
+    hasAi: 0,
+    hasAttachment: 0,
+    hasEmergency: 1
+  })
+  db.measurementValues.push({
+    id: 'mv_sys',
+    sessionId: 'ms_today',
+    userId: 'usr_existing',
+    metricCode: 'systolic',
+    finalValue: 145,
+    unit: 'mmHg',
+    status: 'Hipertensi Tahap 2',
+    severity: 'high',
+    manualOverride: 1,
+    createdAt: `${today}T08:00:01.000Z`
+  })
+  db.alerts.push({
+    id: 'al_today',
+    userId: 'usr_existing',
+    metricCode: 'systolic',
+    finalValue: 145,
+    unit: 'mmHg',
+    severity: 'high',
+    message: 'Tekanan sistolik tinggi.',
+    createdAt: `${today}T08:00:02.000Z`
+  })
+  db.streaks.push({
+    userId: 'usr_existing',
+    streakType: 'dailyMeasurement',
+    currentCount: 4,
+    bestCount: 9
+  })
+  db.aiRecommendations.push({
+    userId: 'usr_existing',
+    summaryText: 'Berdasarkan data tercatat, lanjutkan pemantauan tekanan darah.',
+    createdAt: `${today}T08:00:03.000Z`
+  })
+
+  const response = await app.request(
+    '/api/dashboard/today',
+    {
+      headers: {
+        Cookie: `hlSession=${token}`
+      }
+    },
+    env(db)
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(body.success, true)
+  assert.equal(body.data.hasData, true)
+  assert.equal(body.data.sessionCount, 1)
+  assert.equal(body.data.metricCount, 1)
+  assert.equal(body.data.emergencyCount, 1)
+  assert.equal(body.data.streak, 4)
+  assert.equal(body.data.bestStreak, 9)
+  assert.equal(body.data.aiInsight, 'Berdasarkan data tercatat, lanjutkan pemantauan tekanan darah.')
+  assert.equal(body.data.values[0].metricCode, 'systolic')
+  assert.equal(body.data.alerts[0].message, 'Tekanan sistolik tinggi.')
+})
+
+test('admin system config supports create update delete and masks sensitive audit values', async () => {
+  const db = new D1Mock()
+  const token = 'admin-session-token'
+  db.users.push({
+    id: 'usr_admin',
+    email: 'admin@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Admin',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 'sess_admin',
+    userId: 'usr_admin',
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+
+  const adminEnv = { ...env(db), ADMIN_EMAILS: 'admin@example.com' }
+
+  const createResponse = await app.request(
+    '/api/admin/configs',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `hlSession=${token}`
+      },
+      body: JSON.stringify({
+        configKey: 'featureDoctorExportEnabled',
+        configValue: 'true',
+        dataType: 'boolean',
+        description: 'Enable doctor export'
+      })
+    },
+    adminEnv
+  )
+  const createBody = await createResponse.json()
+
+  assert.equal(createResponse.status, 201)
+  assert.equal(createBody.data.created, true)
+  assert.equal(db.systemConfigs.featureDoctorExportEnabled, 'true')
+  assert.equal(db.auditLogs.at(-1).action, 'configCreate')
+
+  const updateResponse = await app.request(
+    '/api/admin/configs/telegramBotToken',
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: `hlSession=${token}`
+      },
+      body: JSON.stringify({
+        configValue: 'super-secret-token'
+      })
+    },
+    adminEnv
+  )
+  const updateBody = await updateResponse.json()
+  const updateAudit = db.auditLogs.at(-1)
+
+  assert.equal(updateResponse.status, 200)
+  assert.equal(updateBody.data.updated, true)
+  assert.equal(db.systemConfigs.telegramBotToken, 'super-secret-token')
+  assert.equal(updateAudit.action, 'configUpdate')
+  assert.equal(updateAudit.metadataJson.includes('super-secret-token'), false)
+  assert.equal(JSON.parse(updateAudit.metadataJson).sensitive, true)
+
+  const protectedDeleteResponse = await app.request(
+    '/api/admin/configs/telegramBotToken',
+    {
+      method: 'DELETE',
+      headers: {
+        Cookie: `hlSession=${token}`
+      }
+    },
+    adminEnv
+  )
+  const protectedDeleteBody = await protectedDeleteResponse.json()
+
+  assert.equal(protectedDeleteResponse.status, 400)
+  assert.equal(protectedDeleteBody.error.code, 'VALIDATION_ERROR')
+
+  const deleteResponse = await app.request(
+    '/api/admin/configs/featureDoctorExportEnabled',
+    {
+      method: 'DELETE',
+      headers: {
+        Cookie: `hlSession=${token}`
+      }
+    },
+    adminEnv
+  )
+  const deleteBody = await deleteResponse.json()
+
+  assert.equal(deleteResponse.status, 200)
+  assert.equal(deleteBody.data.deleted, true)
+  assert.equal(db.systemConfigs.featureDoctorExportEnabled, undefined)
+  assert.equal(db.auditLogs.at(-1).action, 'configDelete')
 })

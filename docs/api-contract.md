@@ -3042,50 +3042,45 @@ GET /api/admin/configs
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "configKey": "aiExtractTimeoutMs",
-      "configValue": "5000",
-      "dataType": "number",
-      "description": "Timeout in milliseconds for AI Vision extraction",
-      "updatedAt": "2026-06-20T10:00:00Z"
-    },
-    {
-      "configKey": "aiTextEndpoint",
-      "configValue": "https://9router.krpmerch.biz.id/v1",
-      "dataType": "string",
-      "description": "OpenAI-compatible text AI base URL",
-      "updatedAt": "2026-06-20T10:00:00Z"
-    },
-    {
-      "configKey": "aiTextModels",
-      "configValue": "[\"cmc/deepseek/deepseek-v4-pro\",\"nvidia/z-ai/glm-5.1\",\"ollama/glm-4.7\"]",
-      "dataType": "json",
-      "description": "Ordered text AI model fallback list",
-      "updatedAt": "2026-06-20T10:00:00Z"
-    },
-    {
-      "configKey": "aiTextDefaultModel",
-      "configValue": "cmc/deepseek/deepseek-v4-pro",
-      "dataType": "string",
-      "description": "Default text AI model",
-      "updatedAt": "2026-06-20T10:00:00Z"
-    },
-    {
-      "configKey": "aiTextApiKey",
-      "configValue": "",
-      "dataType": "string",
-      "description": "Optional API key for OpenAI-compatible text AI endpoint",
-      "updatedAt": "2026-06-20T10:00:00Z"
-    },
-    {
-      "configKey": "telegramBotToken",
-      "configValue": "",
-      "dataType": "string",
-      "description": "Telegram bot token managed from system config",
-      "updatedAt": "2026-06-20T10:00:00Z"
-    }
-  ]
+  "data": {
+    "configs": [
+      {
+        "configKey": "aiExtractTimeoutMs",
+        "configValue": "5000",
+        "dataType": "number",
+        "description": "Timeout in milliseconds for AI Vision extraction",
+        "updatedAt": "2026-06-20T10:00:00Z"
+      },
+      {
+        "configKey": "aiVisionModel",
+        "configValue": "@cf/meta/llama-3.2-11b-vision-instruct",
+        "dataType": "string",
+        "description": "Cloudflare Workers AI vision model used for device display extraction",
+        "updatedAt": "2026-06-20T10:00:00Z"
+      },
+      {
+        "configKey": "aiTextEndpoint",
+        "configValue": "https://9router.krpmerch.biz.id/v1",
+        "dataType": "string",
+        "description": "OpenAI-compatible text AI base URL",
+        "updatedAt": "2026-06-20T10:00:00Z"
+      },
+      {
+        "configKey": "aiTextModels",
+        "configValue": "[\"cmc/deepseek/deepseek-v4-pro\",\"nvidia/z-ai/glm-5.1\",\"ollama/glm-4.7\"]",
+        "dataType": "json",
+        "description": "Ordered text AI model fallback list",
+        "updatedAt": "2026-06-20T10:00:00Z"
+      },
+      {
+        "configKey": "telegramBotToken",
+        "configValue": "",
+        "dataType": "string",
+        "description": "Telegram bot token managed from system config",
+        "updatedAt": "2026-06-20T10:00:00Z"
+      }
+    ]
+  }
 }
 ```
 
@@ -3112,6 +3107,58 @@ PUT /api/admin/configs/:configKey
   "success": true,
   "data": {
     "updated": true,
+    "cacheInvalidated": true
+  }
+}
+```
+
+## 34.3 Create Config
+
+```http
+POST /api/admin/configs
+```
+
+Admin only. Creates a new non-protected system config row.
+
+### Request
+
+```json
+{
+  "configKey": "featureDoctorExportEnabled",
+  "configValue": "true",
+  "dataType": "boolean",
+  "description": "Enable doctor export feature"
+}
+```
+
+### Response 201
+
+```json
+{
+  "success": true,
+  "data": {
+    "created": true,
+    "configKey": "featureDoctorExportEnabled",
+    "cacheInvalidated": true
+  }
+}
+```
+
+## 34.4 Delete Config
+
+```http
+DELETE /api/admin/configs/:configKey
+```
+
+Admin only. Protected required keys such as `aiExtractTimeoutMs`, `aiVisionModel`, upload limit, rate-limit, Telegram, and AI core keys cannot be deleted.
+
+### Response 200
+
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true,
     "cacheInvalidated": true
   }
 }

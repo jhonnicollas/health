@@ -1259,6 +1259,7 @@ Admin Settings must expose DB-backed system configuration without leaving the Se
 - Non-admin users must not see the System Config panel; frontend discovers permission by calling `/api/admin/configs` and hiding the panel on 401/403.
 - Admin users see a `System Config` section below profile settings.
 - Config rows reuse the admin config table/form pattern: key, description, editable value, and data type.
+- Admin users can create non-protected config keys and delete non-protected config keys from the Settings route.
 - Sensitive config keys such as `telegramBotToken` render as password inputs with clear placeholder text.
 - Settings panel width may expand to support config tables; the profile form remains capped for readability.
 

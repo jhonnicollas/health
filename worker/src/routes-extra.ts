@@ -120,6 +120,15 @@ async function getSystemConfigValue(c: Context<{ Bindings: ExtraEnv }>, configKe
   return row?.configValue?.trim() || null
 }
 
+async function getSystemConfigNumber(c: Context<{ Bindings: ExtraEnv }>, configKey: string): Promise<number> {
+  const raw = await getSystemConfigValue(c, configKey)
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`Invalid numeric system config: ${configKey}`)
+  }
+  return value
+}
+
 async function resolveTelegramBotToken(c: Context<{ Bindings: ExtraEnv }>): Promise<string | null> {
   const active = await getSystemConfigValue(c, 'telegramBotActive')
   if (active && !['1', 'true', 'yes', 'on', 'enabled'].includes(active.toLowerCase())) return null
@@ -310,8 +319,8 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     try {
       const userId = await getCurrentSession(c)
       if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const maxR = Number(await getSystemConfigValue(c, 'ocrRateLimitMax') || '10')
-      const windowMin = Number(await getSystemConfigValue(c, 'ocrRateLimitWindowMin') || '5')
+      const maxR = await getSystemConfigNumber(c, 'ocrRateLimitMax')
+      const windowMin = await getSystemConfigNumber(c, 'ocrRateLimitWindowMin')
       const since = new Date(Date.now() - windowMin * 60 * 1000).toISOString()
       const count = await c.env.DB.prepare(
         "SELECT COUNT(*) as cnt FROM HL_aiExtractions WHERE userId = ? AND createdAt >= ?"
@@ -344,7 +353,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     const startedAt = Date.now()
     try {
       const authHeader = c.req.header('authorization') || c.req.header('Authorization')
-      if (authHeader !== `Bearer ${c.env.CRON_SECRET || 'hl-cron'}`) {
+      if (!c.env.CRON_SECRET || authHeader !== `Bearer ${c.env.CRON_SECRET}`) {
         return jsonResponse(c, failure('UNAUTHORIZED', 'Unauthorized cron.', 401, [], startedAt), 401)
       }
       const now = new Date()
