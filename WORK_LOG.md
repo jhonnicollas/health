@@ -3794,3 +3794,48 @@ Final state of audit + fixes:
 - Deploy to production via wrangler deploy + pages deploy
 - Run UAT against production
 - GAP-8 needs regenerated bot token from @BotFather
+
+## 2026-06-22 22:00 UTC — Agent: opencode
+
+### Task
+- Task IDs: UI/UX Overhaul Batch 1
+- Sprint: UI/UX Overhaul
+- Status: Completed
+
+### Files Changed
+- web/src/App.tsx (TopBar: live clock, theme switcher, notif dropdown, KB/Help buttons)
+- web/src/App.css (added settings-grid, card, input-field, btn-primary, collapsible metric, theme switch, clock, notif dropdown styles)
+- web/src/pages/dashboard/TodayDashboard.tsx (comparison rows, Stitch vital cards)
+- web/src/pages/settings/ProfileSettingsPage.tsx (2-column Stitch layout)
+- web/src/components/measurement/DynamicMetricForm.tsx (collapsible cards, AI button, Stitch submit)
+- worker/src/index.ts (dashboard API: streak, bestStreak, aiInsight, comparisons per metric)
+
+### What Changed
+- Added live clock (date + time) to TopBar, updating every 1s
+- Added theme switcher (light/warm/dark) to TopBar with instant API save
+- Added notification dropdown (empty state placeholder)
+- Added KB + Help icon buttons to TopBar
+- Worker dashboard API now returns streak, bestStreak, aiInsight, per-metric comparisons (avg3day, avg7day)
+- Dashboard vital cards show comparison rows vs 3-day avg and 7-day avg with trend icons
+- Measurement metric cards are collapsible (click header to expand/collapse)
+- Measurement has AI auto-read button side-by-side with image upload
+- Settings page uses 2-column Stitch layout (profile left, notifications + config right)
+- System config CRUD rendered as inline card with per-key edit forms
+- CSS utility classes moved to inline styles / removed tailwind-like classes that broke parser
+
+### Validation
+- worker npx tsc — PASS
+- worker npm test — PASS (22/22)
+- web npx tsc -b — PASS
+- web npx eslint . — PASS
+- web npx vite build — PASS (53 modules, 316.28 kB JS, 61.10 kB CSS)
+
+### Documentation Updated
+- HANDOFF.md
+- WORK_LOG.md
+- Commit 8ba5ce4 pushed to origin/main
+
+### Next Agent Notes
+- Run UAT 52/52 against production
+- If UAT passes, do GAP-8 (Telegram bot token regeneration)
+- Owner re-evaluation needed (target >= 800/1000)
