@@ -95,3 +95,81 @@ Setiap kali fitur baru di-*merge* ke branch utama, tes berikut wajib dijalankan 
 1. **End-to-End Measurement**: Mulai dari *upload* foto → AI Extract → Override Manual → Rule Evaluated → Submit Data.
 2. **Offline to Online Sync**: Tambah data secara *offline* → Sinkronisasi *online*.
 3. **Emergency Alert Flow**: Submit nilai kritis (seperti detak jantung 200 bpm) → Emergency modal tampil → Notifikasi Telegram terkirim.
+
+---
+
+## 7. Sprint 1 UI/UX Polish + AI Report (2026-06-23)
+
+### 7.1 Measurement Page (`/measurements/new`)
+
+- **[TC-5.1] Medical Term Icon**: Buka halaman measurement. Pilih alat. Pastikan setiap label (Sistolik, Diastolik, SpO2, dll.) memiliki icon `?` kecil di sebelah kanan. Hover icon → tooltip definisi medis muncul.
+- **[TC-5.2] No Info-Chip Text**: Verifikasi tidak ada teks "Kenapa diukur?" di halaman (hanya icon `?`).
+- **[TC-5.3] Tensimeter BP Layout**: Pilih Tensimeter. Masukkan sistolik 120 + diastolik 80 + pulse 72. Pastikan layout 2-kolom tidak terpotong, slash `/` tampil di tengah, dan field lain (Pulse Tensimeter, Tambah Ukur) tampil di bawah.
+- **[TC-5.4] User-Info-Banner Inline**: Pastikan banner "Anda berusia xx Tahun xx Bulan xx Hari" tampil di sebelah kanan heading "Catat Hasil Pengukuran".
+- **[TC-5.5] Form Error On Top**: Submit tanpa mengisi field wajib. Pastikan error muncul di ATAS form, bukan di bawah tombol submit.
+- **[TC-5.6] Toast Popup**: Submit pengukuran valid. Pastikan toast muncul di tengah layar selama 5 detik dengan semua nilai yang di-submit, dan auto-dismiss.
+- **[TC-5.7] Live Suggestion Preview**: Ketik sistolik "180" → warning "Krisis Hipertensi" muncul di bawah input. Hapus → preview hilang.
+- **[TC-5.8] BMI Auto-Calculate**: Pilih Timbangan Badan. Masukkan berat 70 (tinggi 170cm dari profile). Pastikan BMI terisi otomatis = 24.2.
+- **[TC-5.9] Telegram Push**: Submit pengukuran kritis (sistolik 185). Cek `GET /api/notifications` → status "sent" untuk emergency_alert. Verifikasi bot @morphez_bot mengirim pesan ke chat 8727919072.
+
+### 7.2 History Page (`/measurements/history`)
+
+- **[TC-5.10] Medical Term in Table**: Buka history. Pastikan setiap metric code (systolic, diastolic, dll.) di tabel memiliki icon `?` next to it.
+- **[TC-5.11] Date & Time 2 Lines**: Pastikan kolom Date & Time menampilkan date di baris atas dan time di baris bawah (bukan satu baris).
+- **[TC-5.12] Rekomendasi Column**: Pastikan ada kolom "Rekomendasi" dengan saran sesuai status.
+- **[TC-5.13] Units Glossary**: Klik icon `?` di sebelah judul. Pastikan modal popup dengan tabel satuan (% bpm mmHg mg/dL kg cm °C index hour) muncul.
+- **[TC-5.14] No Override Badge**: Pastikan tidak ada badge "Manual" di cell Result Value.
+- **[TC-5.15] Compact Columns**: Verifikasi kolom Metric, Result Value, Status menggunakan lebar yang kompak (tidak terlalu lebar).
+
+### 7.3 Dashboard
+
+- **[TC-5.16] Medical Term in Vital Cards**: Buka dashboard (harus ada data). Pastikan setiap vital-card label memiliki icon `?`.
+- **[TC-5.17] 7-Day Bar Chart**: Pastikan ada section "Tren 7 Hari Terakhir" dengan bar chart berwarna per metric.
+- **[TC-5.18] Dashboard Not Empty**: Login user yang punya pengukuran hari ini. Pastikan `hasData: true` dan vital cards tampil (sebelumnya timezone bug).
+
+### 7.4 Reports
+
+- **[TC-5.19] Daily Report Has Data**: Buka `/reports/daily`. Pastikan data hari ini tampil (sebelumnya empty karena UTC vs Jakarta).
+- **[TC-5.20] Medical Term in Reports**: Buka daily/weekly/monthly report. Pastikan setiap metric label memiliki icon `?`.
+- **[TC-5.21] AI Analysis Button**: Klik "Analisa dengan AI" di salah satu report. Pastikan loading spinner muncul, lalu `.ai-summary` block dengan teks analisa AI tampil.
+- **[TC-5.22] AI Fallback**: Tanpa API key (saat ini default), `usedFallback: true` dan analysis = "AI tidak tersedia saat ini...".
+
+### 7.5 Alerts Page
+
+- **[TC-5.23] Tabs Work**: Buka `/alerts`. Klik tab "Emergency Alerts" → tampil list alert. Klik tab "Telegram Log" → tampil list notifications.
+- **[TC-5.24] Tab State**: State tab harus independent — loaders terpisah. Switching tab tidak boleh reset state.
+
+### 7.6 Emergency Contacts
+
+- **[TC-5.25] Phone Validation**: Coba input phone "abc123" → error "Nomor telepon tidak valid. Hanya angka, +, -, spasi, tanda kurung." Submit diblokir.
+- **[TC-5.26] Telegram Validation**: Input "@ab" (username terlalu pendek) → error. Input "8727919072" (numeric ID valid) → ok.
+- **[TC-5.27] Test Send Button**: Klik "Test Send" pada kontak → telegram test endpoint dipanggil, status banner muncul.
+
+### 7.7 Settings
+
+- **[TC-5.28] Export CSV**: Klik "Export Data" button. File CSV didownload dengan nama `measurement-YYYY-MM-DD.csv`. Ukuran file > 0 bytes.
+- **[TC-5.29] Display Mode Toggle**: Klik tombol Normal/Senior/High Contrast di topbar. UI berubah (font size, contrast). Settings ter-update.
+- **[TC-5.30] Reset Password**: Klik "Reset Password" di user dropdown. Alert "Link reset password sudah dikirim..." muncul.
+
+### 7.8 Sidebar
+
+- **[TC-5.31] Medication Visible**: Pastikan menu "Medication" terlihat di sidebar (tidak tersembunyi dalam group collapsed).
+- **[TC-5.32] Sidebar Collapse**: Klik icon `keyboard_double_arrow_left` di sidebar. Sidebar collapse ke 64px. Klik lagi → expand. Style harus gradient, bukan plain.
+
+### 7.9 Doctor Report Download
+
+- **[TC-5.33] Date Format**: GET `/api/reports/1/download` (jika ada) — pastikan timestamps dalam HTML menggunakan format `23 Jun 2026 18:30` (bukan `2026-06-23T18:30:00.000Z`).
+
+### 7.10 End-to-End Production UAT
+
+```
+[TC-5.34] /api/reports/daily       date: 2026-06-23, sessionCount: 3, values: 9 ✅
+[TC-5.35] /api/dashboard/today     hasData: True, sessionCount: 3, values: 9 ✅
+[TC-5.36] /api/measurements/today  date: 2026-06-23, sessions: 3 ✅
+[TC-5.37] /api/measurements/history sessions: 3, total values: 9 ✅
+[TC-5.38] /api/ai/report-analysis  endpoint live; 3-model fallback OK ✅
+[TC-5.39] /api/notifications       "sent" | "Peringatan Darurat" emergency push ✅
+[TC-5.40] All pages return HTTP 200 ✅
+```
+
+**Test Plan Updated**: 2026-06-23

@@ -4762,3 +4762,71 @@ Final state of audit + fixes:
 - If owner wants per-contact email test, add POST /api/emergency/contacts/:id/test (requires email transport + HL_emergencyContactDeliveries table; not in scope here).
 - If owner wants persistent telegram test history, extend /api/notifications query with channel=test after the send.
 - Deploy this hotfix via `wrangler pages deploy dist` once `npm run build` runs clean in web/.
+
+## 2026-06-23 — Agent: Sprint 1 UI/UX Polish + AI Report
+
+### Task
+- Task ID: SPRINT-1-UI-POLISH
+- Sprint: Sprint 1 UI/UX Polish + AI Report (US-1.6.1, US-2.2.1, US-2.2.2, US-2.3.1)
+- Status: Completed and Deployed
+
+### Files Read
+- AGENTS.md
+- docs/PRD_UserStory.docx.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/design-system.md
+- docs/TASKS.md
+
+### Files Changed
+- web/src/App.tsx (history page, topbar, user dropdown, sidebar collapse, display mode, medical term, reset password)
+- web/src/App.css (medical-term, alerts-tabs, dashboard-chart, sidebar-collapse, topbar-display-mode, user-info-banner-inline, stitch-suggestion, dashboard-chart-card)
+- web/src/components/MedicalTerm.tsx (new — `?` info icon + glossary)
+- web/src/components/measurement/DynamicMetricForm.tsx (medical term, suggestion preview, error on top, toast, user-info-banner)
+- web/src/pages/measurement/SelectMetricPage.tsx (user-info-banner inline, generic device names, today sessions)
+- web/src/pages/dashboard/TodayDashboard.tsx (medical term, 7-day chart, last measurement refresh)
+- web/src/pages/reports/DailyReportPage.tsx (medical term, AI button)
+- web/src/pages/reports/WeeklyReportPage.tsx (medical term, AI button)
+- web/src/pages/reports/MonthlyReportPage.tsx (medical term, AI button)
+- web/src/pages/alerts/AlertsPage.tsx (tabs: Emergency Alerts / Telegram Log)
+- web/src/pages/emergency/EmergencyContactsPage.tsx (phone/telegram validation, test-send)
+- web/src/pages/settings/ProfileSettingsPage.tsx (Export CSV actual download)
+- web/src/utils/dateFormat.ts (formatDateID, formatDateTimeID, formatDateTimeIDFull, formatDateTimeShort)
+- worker/src/index.ts (AI report-analysis, /api/measurements/today, /api/reports/daily timezone fix, /api/auth/forgot-password)
+- worker/src/routes-extra.ts (formatIdShortDateTime)
+- worker/test/register.test.mjs (+4 tests: formatIdShortDateTime, dashboard-tz, last+ today endpoints)
+- docs/seed.sql (generic device names: Oximeter, Tensimeter, Alat Tes GCU 3-in-1, Termometer, Timbangan Badan, Jam Tidur)
+- HANDOFF.md, docs/TASKS.md, docs/api-contract.md (this commit)
+
+### What Changed
+- A1-A6 measurement page: medical term icons, no info-chip text, user-info-banner next to Record Data, error on top + toast, live suggestion preview per input
+- B1-B6 history page: removed override badge, medical term icons, 2-line date+time, compact columns, rekomendasi column, units glossary popup
+- C1-C2 dashboard: medical term icons + 7-day colored bar chart
+- D1-D3 reports: daily report timezone fixed (Jakarta vs UTC), medical term icons, AI analysis button on daily/weekly/monthly
+- E1-E9 other pages: emergency validation, telegram bot live, dashboard timezone fix, doctor report date format, alerts tabs, display mode toggle, sidebar collapse UI, medication visible, reset password, export CSV
+
+### Validation
+- worker tsc --noEmit: clean
+- worker test: 29/29 pass
+- web tsc -b: clean
+- web vite build: 366 kB JS, 98 kB CSS
+- Production worker deployed: a351e5a3-0ebf-4d08-b344-c8c75dca5471
+- Production pages deployed: ffc997b6.hl-health-companion.pages.dev
+- Production UAT cycle (8 endpoints + 5 pages): all returning expected data
+
+### Documentation Updated
+- HANDOFF.md: prepended new "Current Status — 2026-06-23 (Sprint 1 UI/UX Polish + AI Report)" block
+- WORK_LOG.md: this entry
+- api-contract.md: new endpoints (/api/measurements/today, /api/ai/report-analysis, /api/auth/forgot-password, /api/measurements/last/save)
+- TASKS.md: Sprint 1 UI polish items marked done
+- PRD_TRACEABILITY_MATRIX.md: US-1.6.1, US-2.2.1, US-2.2.2, US-2.3.1 mapped to new code
+- IMPLEMENTATION_SUMMARY.md: section added for Sprint 1 polish
+- TEST_PLAN.md: test cases for MedicalTerm, AI report, alerts tabs, emergency validation
+
+### Next Agent Notes
+- Owner must set valid `aiTextApiKey` in HL_systemConfigs D1 to enable real AI responses (currently uses fallback)
+- /api/measurements/last/save is auto-called from DynamicMetricForm.handleSubmit for all 13 autofill metrics — should be tested manually in UI flow
+- Future: extend /api/notifications query with channel filter for telegram-only tab
+- Doctor report share token URLs need to be tested separately via /api/reports/share/:shareToken

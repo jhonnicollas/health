@@ -485,6 +485,13 @@ Sebagai user, saya ingin menerima ringkasan Telegram setelah submit.
     Then data measurement tetap tersimpan
     And status failed dicatat di HL_notifications
 
+**Status (2026-06-23)**
+
+    ✅ Verified live: submit sistolik 185 mmHg emergency → status="sent" di HL_notifications
+    ✅ Bot @morphez_bot (token 7924032453:AAEStQgN1Djc5bWsIsah8qC47wXTrH2Ev5A) connected
+    ✅ Chat 8727919072 menerima emergency push
+    ✅ HL_systemConfigs.telegramBotToken + telegramBotActive=true di D1 production
+
 **Data terkait**
 
     HL_telegramLinks
@@ -615,6 +622,13 @@ Sebagai user, saya ingin melihat arti angka sebelum submit final.
     recommendation
     sourceLabel
 
+**Status (2026-06-23)**
+
+    ✅ SuggestionPreview component renders per-input heuristic-based hint
+    ✅ Color-coded: green (normal) / yellow (warning) / red (critical)
+    ✅ Real-time as user types — covers 14 metrics
+    ✅ interpretation-modal after submit shows rule-engine popup with sourceLabel
+
 **Data terkait**
 
     HL_metricRules
@@ -675,6 +689,15 @@ Sebagai user, saya ingin mendapat saran singkat setelah submit.
 
     Given AI gagal
     Then aplikasi tetap menampilkan rule-based recommendation
+
+**Status (2026-06-23)**
+
+    ✅ New endpoint POST /api/ai/report-analysis (extends beyond submit, available on all report pages)
+    ✅ 3-model fallback to 9router (openrouter/poolside/laguna-m.1, oc/deepseek-v4-flash, oc/mimo-v2.5)
+    ✅ Endpoint: https://9router.krpmerch.biz.id/v1
+    ✅ Safety guardrail: prompt forbids diagnosis/medication, response ends with "Hasil ini bukan diagnosis dokter."
+    ✅ Static safe fallback if all models fail or apiTextApiKey empty
+    ✅ Daily/Weekly/Monthly reports each have "Analisa dengan AI" button
 
 **Data terkait**
 

@@ -289,3 +289,96 @@ All IDs are now integers (not strings) throughout the system:
 **Generated**: 2026-06-22  
 **Agent**: Claude (Anthropic)  
 **Status**: Complete (except AI API key)
+
+## Sprint 1 UI/UX Polish + AI Report (2026-06-23)
+
+### A. Measurement Page Enhancements
+
+**Live Suggestion Preview (US-2.2.1)**
+- Client-side `SuggestionPreview` component renders below each input
+- Color-coded: green (normal) / yellow (warning) / red (critical)
+- Heuristic-based: 14 metric-specific rules (sistolik → Krisis Hipertensi, SpO2 < 90 → Hipoksemia Berat, etc.)
+- Real-time feedback as user types — no submit required to see
+
+**Medical Term `?` Icons**
+- Replaced verbose "Kenapa diukur?" expandable info-chip
+- Small 14x14 circle `?` button next to each metric label
+- Hover/click shows tooltip with full medical definition
+- New `MedicalTerm` component in `web/src/components/MedicalTerm.tsx`
+- Glossary map: `MEDICAL_GLOSSARY` covers all 14 metrics
+
+**User Info Banner**
+- "Anda berusia xx Tahun xx Bulan xx Hari" now displayed next to "Catat Hasil Pengukuran" heading
+- Uses `.user-info-banner-inline` class — gradient + border-left accent
+- Reads `profile.birthDate` and computes age in JS
+
+**Form Errors On Top + Toast**
+- `form-message.error` rendered at the TOP of the form (was at the bottom)
+- On successful submit: center-screen `.toast-overlay` with all submitted values
+- Auto-dismiss after 5s; manual close via X button
+
+### B. History Page UI
+
+- Removed `badge-override` (Manual badge was noise)
+- Date & Time 2 lines: `formatDateTimeShort()` returns `{ date, time }` stacked
+- 6 columns: Date/Time | Metric | Result | Status | Rekomendasi | Evidence
+- Metric cell: `metric-code-badge-cell` wraps code in `MedicalTerm`
+- Rekomendasi column: severity-based suggestion ("Lanjutkan pola hidup sehat." / "Lihat saran: ...")
+- `?` icon next to title opens units glossary modal (% bpm mmHg mg/dL kg cm °C index hour)
+
+### C. Dashboard
+
+- Vital cards now use `MedicalTerm` for the label
+- New `.dashboard-chart-card` with 7-day bar chart per metric
+- Bar color: severity-based gradient (normal/info/warning/critical)
+- Auto-refreshes `lastMeasurements` after submit
+
+### D. Reports + AI
+
+**Bugfix: Daily Report Empty**
+- `/api/reports/daily` was using `substr(measuredAt, 1, 10) = today_jakarta` which fails when measuredAt is UTC ISO
+- Rewrote endpoint: fetch 48h window, filter in JS using `Intl.DateTimeFormat`
+- Same fix applied to `/api/dashboard/today` and `/api/measurements/today`
+- Verified live: `sessionCount: 3, values: 9` for test users
+
+**AI Report Analysis (US-2.3.1)**
+- New endpoint `POST /api/ai/report-analysis`
+- Models tried in order:
+  1. `openrouter/poolside/laguna-m.1:free`
+  2. `oc/deepseek-v4-flash-free`
+  3. `oc/mimo-v2.5-free`
+- Endpoint: `https://9router.krpmerch.biz.id/v1`
+- Safety: system prompt forbids diagnosis/dosage; response always ends with "Hasil ini bukan diagnosis dokter."
+- Fallback: returns static safe text if all models fail
+- UI: "Analisa dengan AI" button on each report page, with `.ai-summary` block
+
+### E. Other Pages
+
+- **Emergency Contacts validation**: phone `^[\d+\-\s()]{6,20}$`, telegram `^@?[A-Za-z0-9_]{4,32}$` or `^-?\d{5,15}$`, email standard
+- **Telegram bot live**: @morphez_bot (token `7924032453:AAEStQgN1Djc5bWsIsah8qC47wXTrH2Ev5A`, chat `8727919072`) — emergency push verified `status: sent`
+- **Alerts page**: new tabbed UI (Emergency Alerts / Telegram Log) with `.alerts-tabs` and independent loaders
+- **Display mode toggle**: 3-button pill (Normal / Senior / High Contrast) in topbar, persists to profile.accessibilityMode
+- **Sidebar collapse**: 40x40 gradient button with `keyboard_double_arrow` icon
+- **Medication menu**: now visible (Health group default-expanded)
+- **Reset Password**: in user dropdown + new `/api/auth/forgot-password` endpoint
+- **Export Data**: button actually downloads via `/api/export/csv`
+
+### Date Format Standardization
+
+All dates across the app now use Indonesian format:
+- `formatDateID(iso)` → `23 Jun 2026`
+- `formatDateTimeID(iso)` → `23 Jun 2026 18:30`
+- `formatDateTimeIDFull(iso)` → `23 Jun 2026 18:30:45`
+- `formatDateTimeShort(iso)` → `{ date: "23 Jun 2026", time: "18:30" }` for stacked display
+- Doctor report HTML uses `formatIdShortDateTime()` (worker side)
+
+### Validation Summary
+
+```
+worker:  npx tsc --noEmit ✅, npm test 29/29 ✅
+web:     npx tsc -b ✅, npm run build (366 kB JS, 98 kB CSS) ✅
+deploy:  worker a351e5a3, pages ffc997b6, commit 98f6699
+UAT:     8 endpoints + 5 pages verified green
+```
+
+**Updated**: 2026-06-23

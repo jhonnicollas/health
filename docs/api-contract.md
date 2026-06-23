@@ -576,6 +576,45 @@ GET /api/auth/me
 
 ---
 
+## 9.5 Forgot Password
+
+```http
+POST /api/auth/forgot-password
+```
+
+Generates a password reset token (in production, would email it). For now, the response is always successful to avoid leaking which emails are registered.
+
+### Request
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+### Response 200
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Jika email terdaftar, link reset password akan dikirim.",
+    "sent": true
+  }
+}
+```
+
+### Validation
+
+- 400 if `email` is missing or not a valid email format.
+
+### Notes
+
+- Rate-limited per IP.
+- For now, no token is generated; the endpoint is a placeholder for the future email-transport integration.
+
+---
+
 ## 10. Profile API
 
 ## 10.1 Get Profile
@@ -1372,6 +1411,108 @@ HL_auditLogs
 
 ---
 
+## 13.8 Get Today's Sessions
+
+```http
+GET /api/measurements/today
+```
+
+Returns all measurement sessions recorded by the authenticated user today, in the user's profile timezone.
+
+### Response 200
+
+```json
+{
+  "success": true,
+  "data": {
+    "date": "2026-06-23",
+    "sessions": [
+      {
+        "sessionId": 15,
+        "measuredAt": "2026-06-22T19:17:09.000Z",
+        "source": "manual",
+        "hasAttachment": 0,
+        "valueCount": 3,
+        "deviceCodes": ["omronHem7194t1fl", "yuwellYx106"]
+      }
+    ]
+  }
+}
+```
+
+### Timezone Handling
+
+measuredAt is stored in UTC. The endpoint fetches a 48h window then filters in JS using `Intl.DateTimeFormat('en-CA', { timeZone: profile.timezone })` so the user sees their local "today".
+
+### Notes
+
+- Used by the measurement page to mark devices that have already been measured today (green border UI).
+- Used by the history page and dashboard as an early signal.
+
+---
+
+## 13.9 Get Last Measurements (Auto-Fill Cache)
+
+```http
+GET /api/measurements/last
+```
+
+Returns the last-known value per `(userId, metricCode, deviceCode)` for rarely-changing metrics (bodyWeight, bodyTemperature, waistCircumference, etc.) so the measurement form can pre-fill on next visit.
+
+### Response 200
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "metricCode": "bodyWeight",
+      "deviceCode": "bodyScale",
+      "finalValue": 72,
+      "unit": "kg",
+      "measuredAt": "2026-06-22T20:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## 13.10 Save Last Measurement (Auto-Fill Update)
+
+```http
+POST /api/measurements/last/save
+```
+
+Persists the most recent value for a metric so the next visit's auto-fill cache stays fresh.
+
+### Request
+
+```json
+{
+  "metricCode": "bodyWeight",
+  "deviceCode": "bodyScale",
+  "finalValue": 72,
+  "unit": "kg",
+  "measuredAt": "2026-06-22T20:00:00.000Z"
+}
+```
+
+### Response 200
+
+```json
+{
+  "success": true,
+  "data": { "saved": true }
+}
+```
+
+### Idempotency
+
+`ON CONFLICT(userId, deviceCode, metricCode) DO UPDATE` — repeated saves overwrite.
+
+---
+
 ## 14. Dashboard API
 
 ## 14.1 Today Dashboard
@@ -1823,6 +1964,55 @@ GET /api/reports/share/:shareToken
 ### Response
 
 PDF stream if token is valid and not expired.
+
+---
+
+## 16.8 AI Report Analysis (US-2.3.1 + US-2.3.4)
+
+```http
+POST /api/ai/report-analysis
+```
+
+Sends the report context to the configured text AI service (9router) and returns a short, safe narrative analysis. Falls back to a deterministic message if all AI models fail or no API key is configured.
+
+### Request
+
+```json
+{
+  "reportType": "daily" | "weekly" | "monthly",
+  "context": "{\"date\":\"2026-06-23\",\"values\":[...]}"
+}
+```
+
+### Response 200
+
+```json
+{
+  "success": true,
+  "data": {
+    "analysis": "Data tekanan darah Anda hari ini masuk kategori krisis. Disarankan istirahat total...",
+    "model": "oc/deepseek-v4-flash-free",
+    "usedFallback": false
+  }
+}
+```
+
+If `usedFallback: true`, the analysis is the safe fallback text:
+
+> "AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda."
+
+### Models Tried (in order)
+
+1. `openrouter/poolside/laguna-m.1:free`
+2. `oc/deepseek-v4-flash-free`
+3. `oc/mimo-v2.5-free`
+
+Endpoint is `https://9router.krpmerch.biz.id/v1` (configurable via `HL_systemConfigs.aiTextEndpoint`).
+
+### Safety Guardrails
+
+- System prompt forbids diagnosis, medication dosage, and severity classification.
+- Response is forced to end with: "Hasil ini bukan diagnosis dokter."
 
 ---
 

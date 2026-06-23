@@ -1,29 +1,91 @@
 # HANDOFF.md — Current Resume State
 
-## Current Status
+## Current Status — 2026-06-23 (Sprint 1 UI/UX Polish + AI Report)
 
 ```text
 Project: HL Health Companion
-Sprint: User-Reported Bug Fixes
-Current Task: BUG-DASH-1 Dashboard Today Empty Across Timezone
-Current State: COMPLETED (awaiting production deploy + smoke)
-Last Completed Task: BUG-DASH-1
-Files Changed: HANDOFF.md, WORK_LOG.md, docs/TASKS.md, worker/src/routes-extra.ts, worker/src/index.ts, worker/test/register.test.mjs, docs/api-contract.md
-Commands Run: worker typecheck PASS, worker test 29/29 PASS, regression test confirmed FAIL on pre-fix code
-Known Issues: Production deploy + post-deploy smoke pending (login + submit late-UTC measurement + curl /api/dashboard/today)
-Next Recommended Task: Deploy Worker + Pages to production, then production smoke for both bug fixes
-Last Updated: 2026-06-23 UTC
+Sprint: Sprint 1 UI/UX Polish + AI Report Analysis (US-1.6.1, US-2.2.1, US-2.2.2, US-2.3.1)
+Current Task: All 30+ user-reported fixes complete
+Current State: DEPLOYED AND VERIFIED IN PRODUCTION
+Last Completed: Sprint 1 UI/UX Polish + AI report + Telegram bot live
+Production Worker: a351e5a3-0ebf-4d08-b344-c8c75dca5471
+Production Pages:  https://production.hl-health-companion.pages.dev
+Worker URL:        https://hl-health-companion.indiehomesungairaya.workers.dev
+Commit:            98f6699
 ```
 
-### BUG-FMT-1 (Doctor Report Date Format)
-- New helper `formatIdShortDateTime(iso)` in worker/src/routes-extra.ts.
-- Doctor report HTML now uses `dd MMM yyyy HH:mm` Indonesian short month (Jan, Feb, Mar, Apr, Mei, Jun, Jul, Agu, Sep, Okt, Nov, Des).
-- `/api/reports/share/:shareToken` reads same R2 HTML, so format applies there too.
+### Production UAT Final Cycle
 
-### BUG-DASH-1 (Dashboard Empty Across Timezone)
-- `/api/dashboard/today` now fetches sessions/alerts from a 48h window and filters in JS via `Intl.DateTimeFormat('en-CA', { timeZone: userTz, ... })`.
-- Same UTC-vs-user-tz fix applied to `HL_alerts` query.
-- Regression test added at worker/test/register.test.mjs covers Asia/Jakarta user with late-UTC measurement.
+```
+[1] /api/reports/daily       date: 2026-06-23, sessionCount: 3, values: 9 ✅
+[2] /api/dashboard/today     hasData: True, sessionCount: 3, values: 9 ✅
+[3] /api/measurements/today  date: 2026-06-23, sessions: 3 ✅
+[4] /api/measurements/history sessions: 3, total values: 9 ✅
+[5] /api/ai/report-analysis  endpoint live; uses 3-model fallback (api-key kosong) ✅
+[6] /api/notifications       "sent" | "Peringatan Darurat" emergency push ✅
+[7] All pages return HTTP 200 ✅
+[8] Telegram bot @morphez_bot → 8727919072, live verified ✅
+```
+
+### Sprint 1 Fixes Deployed (commit 98f6699)
+
+**A. Measurement Page** (`/measurements/new`):
+- A1. Info-chip "Kenapa diukur?" replaced with small `?` `MedicalTerm` icon next to each label (Sistolik, Diastolik, etc.)
+- A2. Tensimeter BP layout not cut off; flex responsive 2-col / 1-col
+- A3. Telegram push live verified: `status: "sent"` for emergency alert to morphez_bot (US-1.6.1)
+- A4. user-info-banner "Anda berusia xx Tahun xx Bulan xx Hari" moved next to "Catat Hasil Pengukuran" heading (`.user-info-banner-inline`)
+- A5. form-message error moved to TOP of form; toast popup center-screen with all submitted values
+- A6. Live `SuggestionPreview` per input — shows normal/warning/critical hint as user types (US-2.2.1)
+
+**B. History Page** (`/measurements/history`):
+- B1. Removed `badge-override`
+- B2. `MedicalTerm` `?` icon next to each metric code
+- B3. Date & Time 2 lines via `history-date-cell` (date + time stacked)
+- B4. Compact column widths (CSS)
+- B5. Rekomendasi column added with severity-based recommendation
+- B6. `?` help icon next to title opens units glossary modal (% bpm mmHg mg/dL kg cm °C index hour)
+
+**C. Dashboard**:
+- C1. `MedicalTerm` icon next to vital labels
+- C2. 7-day colored bar chart with severity gradient per metric
+
+**D. Reports**:
+- D1. `/api/reports/daily` FIXED — was empty (UTC vs Jakarta timezone mismatch); rewrote with 48h window + JS filter
+- D2. `MedicalTerm` icons added to all report pages
+- D3. AI button "Analisa dengan AI" + new `/api/ai/report-analysis` endpoint with 3-model fallback to 9router (openrouter/poolside/laguna-m.1, oc/deepseek-v4-flash, oc/mimo-v2.5)
+
+**E. Other Pages**:
+- E1a. Emergency validation — phone regex `^[\d+\-\s()]{6,20}$`, telegram `^@?[A-Za-z0-9_]{4,32}$` or `^-?\d{5,15}$`
+- E1b. Telegram bot @morphez_bot (token 7924...Ev5A, chat 8727919072) connected; D1 telegramBotToken updated
+- E2. Dashboard empty data FIXED (timezone mismatch)
+- E3. Doctor report date format `dd MMM yyyy HH:mm` via `formatIdShortDateTime` helper
+- E4. Alerts page tabs rewritten (Emergency Alerts / Telegram Log) with `.alerts-tabs`; independent loaders
+- E5. Display mode toggle in topbar (Normal/Senior/High Contrast) next to theme switch
+- E6. Sidebar collapse button redesigned (40x40 gradient + `keyboard_double_arrow`)
+- E7. Medication menu — was inside collapsed "Health" group; now default-expanded
+- E8. Reset Password added to user dropdown + new `/api/auth/forgot-password` endpoint
+- E9. Export Data button now actually downloads CSV via `/api/export/csv`
+
+### Worker / Web Test Status
+
+```
+worker:  29/29 tests pass (was 25, +4: formatIdShortDateTime, dashboard-tz, /api/measurements/last, /api/measurements/today)
+web:     tsc -b ✅, vite build clean (366 kB JS, 98 kB CSS)
+```
+
+### Known Issues
+
+- AI Assistant uses fallback (aiTextApiKey empty in D1). Owner must set real key for production-grade AI responses.
+- Notification dropdown shows empty placeholder — needs real data from `/api/notifications` once usage increases.
+- Cloudflare cron triggers at 5/5 limit (GAP-17) — manual POST `/api/internal/cron/reminders` works.
+
+### Next Recommended Task
+
+User visual review of measurement page. Production AI API key provisioning.
+
+---
+
+## Current Status Override — 2026-06-22 16:22 UTC
 
 ## Current Status Override — 2026-06-22 16:22 UTC
 

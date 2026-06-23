@@ -281,3 +281,52 @@
 ---
 
 *Last updated: auto-generated from PRD, source tree, and task plans.*
+
+### 24 — Sprint 1 UI/UX Polish + AI Report (2026-06-23)
+
+| User Story | Title | Source Files | Endpoints | Status |
+|------------|-------|--------------|-----------|--------|
+| US-1.6.1 | Telegram Push After Submit | `worker/src/index.ts` (submit endpoint + queue), `web/src/components/measurement/DynamicMetricForm.tsx` | POST `/api/measurements/submit` | ✅ Verified `status: "sent"` to morphez_bot |
+| US-1.2.4 | Client-Side Compression | `web/src/utils/imageCompressor.ts` (1280px max, 50% quality, webp) | n/a (browser) | ✅ |
+| US-1.3.1 | AI Extract Oximeter | `worker/src/index.ts` `/api/ai/extract` | POST `/api/ai/extract` | ✅ |
+| US-1.3.2 | AI Extract Tensimeter | same | same | ✅ |
+| US-1.3.3 | AI Extract Sinocare GCU | same | same | ✅ |
+| US-1.4.2 | Validasi Physical Range | `worker/src/index.ts` `evaluateRule`, `web/src/components/measurement/DynamicMetricForm.tsx` `validate()` | n/a | ✅ |
+| US-1.4.3 | BMI Auto Calculate | `web/src/components/measurement/DynamicMetricForm.tsx` useEffect | POST `/api/measurements/submit` (server-side fallback) | ✅ |
+| US-1.5.1 | Submit Measurement Session | `worker/src/index.ts` submit endpoint | POST `/api/measurements/submit` | ✅ Returns `interpretations[]` |
+| US-1.5.2 | Save Final Attachment ke R2 | `web/src/components/measurement/DynamicMetricForm.tsx` + R2 | POST `/api/measurements/attachments/upload` | ✅ |
+| US-1.5.3 | Audit Log Submit | `worker/src/index.ts` `measurementSubmit` log | n/a | ✅ |
+| US-1.6.2 | Dashboard Hari Ini | `worker/src/index.ts` + `web/src/pages/dashboard/TodayDashboard.tsx` | GET `/api/dashboard/today` | ✅ Fixed timezone, `hasData: true` |
+| US-2.1.1 | Metric Rules Engine | `docs/seed.sql` HL_metricRules + `worker/src/index.ts` `evaluateRule` | n/a | ✅ |
+| US-2.2.1 | Popup Setelah Validasi | `web/src/components/measurement/DynamicMetricForm.tsx` `SuggestionPreview` + `interpretation-modal` | n/a (live, client-side) | ✅ |
+| US-2.2.2 | Popup Multi Metric | `worker/src/index.ts` submit returns `interpretations[]` | POST `/api/measurements/submit` | ✅ |
+| US-2.3.1 | Generate AI Recommendation | `worker/src/index.ts` `/api/ai/report-analysis` | POST `/api/ai/report-analysis` | ✅ 3-model fallback |
+| US-2.3.4 | AI Safety Guardrail | worker prompt template | n/a | ✅ |
+| US-3.1.3 | Telegram Summary After Submit | `worker/src/index.ts` `enqueueTelegramSummary` + queue consumer | POST `/api/measurements/submit` | ✅ |
+| US-3.3.1 | Create Emergency Alert | `worker/src/routes-extra.ts` `createEmergencyAlert` | n/a | ✅ |
+| US-3.4.1 | Reminder Settings | `web/src/pages/reminders/RemindersPage.tsx` | GET/POST `/api/reminders` | ✅ |
+| US-4.6.1 | Installable PWA | `web/index.html` + `web/public/manifest.json` | n/a | ✅ |
+| US-4.7.1 | Export CSV | `web/src/pages/settings/ProfileSettingsPage.tsx` `handleExportCsv` | GET `/api/export/csv` | ✅ |
+
+| Aspect | Details |
+|--------|---------|
+| **Sub-features** | MedicalTerm `?` icon, last-measurements auto-fill, toast, suggestion preview, alerts tabs, AI report analysis, sidebar collapse UI, display mode, reset password, export CSV, dashboard chart, emergency validation |
+| **New files** | `web/src/components/MedicalTerm.tsx` |
+| **New endpoints** | GET `/api/measurements/today`, GET `/api/measurements/last`, POST `/api/measurements/last/save`, POST `/api/ai/report-analysis`, POST `/api/auth/forgot-password` |
+| **Docs** | `api-contract.md` (sections 13.8-13.10, 9.5, 16.8), `HANDOFF.md`, `WORK_LOG.md`, `TASKS.md` |
+| **Status** | ✅ All deployed and verified (commit 98f6699, worker a351e5a3) |
+
+---
+
+## Summary Update
+
+| Metric | Count |
+|--------|-------|
+| Total features | 24 (was 23) |
+| Fully done | 23 (was 22) |
+| Partial (migration pending) | 1 |
+| Total API endpoints | ~60 (was ~55; +5 new: measurements/today, measurements/last, measurements/last/save, ai/report-analysis, auth/forgot-password) |
+| Total DB tables | ~36 (was ~35; +1: HL_lastMeasurements) |
+| Total UI routes | ~20 |
+
+*Last updated: 2026-06-23 (Sprint 1 UI/UX Polish + AI Report).*

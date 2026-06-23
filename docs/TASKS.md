@@ -1133,3 +1133,52 @@ Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
   - `hasData=true` and `sessionCount>=1` when measurement submitted in the user-timezone "today" even if UTC date differs.
   - Add regression test for late-UTC measurement with Jakarta timezone.
   - Worker typecheck + tests still pass.
+
+### [x] SPRINT-1-UI-POLISH (2026-06-23)
+- **Deskripsi**: User-reported UI/UX polish across measurement, history, dashboard, reports, alerts, emergency, settings, and sidebar. Plus AI analysis for daily/weekly/monthly reports via 9router.
+- **Acceptance Criteria**:
+  - **A. Measurement page (`/measurements/new`)**:
+    - A1. Remove "Kenapa diukur?" expandable text; replace with small `?` `MedicalTerm` icon next to each label.
+    - A2. Tensimeter BP layout not cut off; clickable inputs not break layout.
+    - A3. Telegram push verified after every submit (US-1.6.1).
+    - A4. user-info-banner "Anda berusia xx Tahun xx Bulan xx Hari" visible next to "Catat Hasil Pengukuran" heading.
+    - A5. `form-message.error` rendered ABOVE form (not below); submit success shown as center-screen toast.
+    - A6. Live suggestion preview per input — shows normal/warning/critical hint as user types (US-2.2.1).
+  - **B. History page (`/measurements/history`)**:
+    - B1. Remove `badge-override`.
+    - B2. `MedicalTerm` `?` icon next to each metric code in table.
+    - B3. Date & Time displayed as 2 lines (date ENTER time).
+    - B4. Compact column widths for Metric, Result Value, Status.
+    - B5. Rekomendasi column with severity-based recommendation.
+    - B6. `?` help icon next to title opens units glossary modal.
+  - **C. Dashboard**:
+    - C1. `MedicalTerm` icon next to each vital label.
+    - C2. 7-day colored bar chart with severity-based gradient.
+  - **D. Reports**:
+    - D1. `/api/reports/daily` returns data (was empty due to UTC vs Jakarta timezone mismatch); rewrite with 48h window + JS filter.
+    - D2. `MedicalTerm` icons in all report pages.
+    - D3. "Analisa dengan AI" button on daily/weekly/monthly; new `/api/ai/report-analysis` endpoint with 3-model fallback to 9router.
+  - **E. Other pages**:
+    - E1. Emergency contact validation (phone regex `^[\d+\-\s()]{6,20}$`, telegram `^@?[A-Za-z0-9_]{4,32}$` or `^-?\d{5,15}$`).
+    - E2. Telegram bot @morphez_bot (token 7924...Ev5A, chat 8727919072) connected; live verified.
+    - E3. Dashboard data displays correctly (timezone fix).
+    - E4. Doctor report date format `dd MMM yyyy HH:mm` via `formatIdShortDateTime`.
+    - E5. Alerts page tabs work (Emergency Alerts / Telegram Log) with independent loaders.
+    - E6. Display mode toggle in topbar (Normal/Senior/High Contrast).
+    - E7. Sidebar collapse button redesigned (40x40 gradient + `keyboard_double_arrow`).
+    - E8. Medication menu visible (was inside collapsed "Health" group).
+    - E9. Reset Password in user dropdown + new `/api/auth/forgot-password` endpoint.
+    - E10. Export Data button actually downloads CSV via `/api/export/csv`.
+- **Implementation Notes**:
+  - `web/src/components/MedicalTerm.tsx` is the shared `?` icon component.
+  - `web/src/utils/dateFormat.ts` now exports `formatDateID`, `formatDateTimeID`, `formatDateTimeIDFull`, `formatDateTimeShort`.
+  - D1 telegramBotToken updated in D1 to `7924032453:AAEStQgN1Djc5bWsIsah8qC47wXTrH2Ev5A`.
+  - User 24/25 (test users) linked to HL_telegramLinks chat 8727919072.
+  - Production UAT cycle (8 endpoints + 5 pages) all green.
+- **Status**: Completed + Deployed (commit 98f6699, worker a351e5a3, pages ffc997b6)
+- **Validation**:
+  - worker `npx tsc --noEmit`: clean
+  - worker `npm test`: 29/29 pass
+  - web `npx tsc -b`: clean
+  - web `npm run build`: 366 kB JS, 98 kB CSS
+  - Production smoke: all 8 endpoints return expected data, all 5 pages HTTP 200
