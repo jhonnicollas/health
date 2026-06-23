@@ -1,3 +1,5 @@
+import { formatDateTimeIDFull } from './dateFormat'
+
 export type WatermarkOptions = {
   displayName: string
   measuredAt: string
@@ -44,12 +46,8 @@ function loadImage(file: File) {
 }
 
 function formatTimestamp(iso: string): string {
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return iso
-  return d.toLocaleString('id-ID', {
-    day: '2-digit', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit'
-  })
+  const formatted = formatDateTimeIDFull(iso)
+  return formatted === '-' ? iso : formatted
 }
 
 function supportsWebp(): boolean {

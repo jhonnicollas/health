@@ -8,8 +8,6 @@
 
 PRAGMA foreign_keys = ON;
 
-BEGIN TRANSACTION;
-
 -- ---------------------------------------------------------
 -- System Configurations
 -- ---------------------------------------------------------
@@ -18,8 +16,8 @@ VALUES
 ('aiExtractTimeoutMs', '5000', 'number', 'Timeout in milliseconds for AI Vision extraction'),
 ('aiVisionModel', '@cf/meta/llama-3.2-11b-vision-instruct', 'string', 'Cloudflare Workers AI vision model used for device display extraction'),
 ('aiTextEndpoint', 'https://9router.krpmerch.biz.id/v1', 'string', 'OpenAI-compatible text AI base URL'),
-('aiTextModels', '["cmc/deepseek/deepseek-v4-pro","nvidia/z-ai/glm-5.1","ollama/glm-4.7"]', 'json', 'Ordered text AI model fallback list'),
-('aiTextDefaultModel', 'cmc/deepseek/deepseek-v4-pro', 'string', 'Default text AI model for assistant and recommendations'),
+('aiTextModels', '["oc/deepseek-v4-flash-free","oc/mimo-v2.5-free","openrouter/poolside/laguna-m.1:free"]', 'json', 'Ordered text AI model fallback list'),
+('aiTextDefaultModel', 'oc/deepseek-v4-flash-free', 'string', 'Default text AI model for assistant and recommendations'),
 ('aiTextApiKey', '', 'string', 'Optional API key for OpenAI-compatible text AI endpoint'),
 ('maxUploadSizeBytes', '2097152', 'number', 'Maximum file size for uploads in bytes (default 2MB)'),
 ('loginRateLimitMaxReq', '10', 'number', 'Max login requests per window'),
@@ -184,5 +182,3 @@ VALUES
 
 INSERT OR IGNORE INTO HL_schemaMigrations (migrationName)
 VALUES ('20260620DefaultSeedData');
-
-COMMIT;

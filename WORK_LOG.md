@@ -4830,3 +4830,138 @@ Final state of audit + fixes:
 - /api/measurements/last/save is auto-called from DynamicMetricForm.handleSubmit for all 13 autofill metrics — should be tested manually in UI flow
 - Future: extend /api/notifications query with channel filter for telegram-only tab
 - Doctor report share token URLs need to be tested separately via /api/reports/share/:shareToken
+
+## 2026-06-23 12:26 UTC — Agent: Codex
+
+### Task
+- Task ID: CONFIG-DATE-FOLLOWUP-AUDIT
+- Sprint: Follow-up / Production Hardening
+- Status: Started
+
+### Files Read
+- docs/TASKS.md
+- docs/seed.sql
+- docs/api-contract.md
+- web/src/pages/fasting/FastingPage.tsx
+- web/src/pages/caregiver/CaregiverDashboardPage.tsx
+- web/src/utils/watermark.ts
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Started follow-up audit for AI model config and remaining date formatting leaks.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue with seed/API docs model update, production D1 config sync, date-format patch, validation, and handoff update.
+
+## 2026-06-23 04:58 UTC — Agent: Codex
+
+### Task
+- Task ID: CRUD-REGRESSION-D1-RESET-UAT
+- Sprint: Production Regression / D1 Reset
+- Status: Started
+
+### Files Read
+- AGENTS.md
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- docs/ARCHITECTURE.md
+- docs/api-contract.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/seed-rules.generated.sql
+- docs/design-system.md
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Files Changed
+- docs/TASKS.md
+- WORK_LOG.md
+
+### What Changed
+- Added active regression task for integer-ID CRUD audit, clean D1 rebuild, deploy, and production UAT.
+- Initial schema read found invalid SQLite/D1 syntax in `HL_lastMeasurements` inline `INDEX`.
+
+### Validation
+- Pending.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+
+### Next Agent Notes
+- Continue by fixing `docs/schema.sql`, validating schema/seed locally, then auditing CRUD endpoints and running full validation.
+
+## 2026-06-23 05:25 UTC — Agent: Codex
+
+### Task
+- Task ID: CRUD-REGRESSION-D1-RESET-UAT
+- Sprint: Production Regression / D1 Reset
+- Status: Completed
+
+### Files Read
+- docs/schema.sql
+- docs/seed.sql
+- docs/seed-rules.generated.sql
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src/App.tsx
+- web/src/components/measurement/DynamicMetricForm.tsx
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+
+### Files Changed
+- docs/TASKS.md
+- docs/schema.sql
+- docs/seed.sql
+- docs/seed-rules.generated.sql
+- WORK_LOG.md
+- HANDOFF.md
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- web/src/App.tsx
+- web/src/components/MedicalTerm.tsx
+- web/src/components/measurement/DynamicMetricForm.tsx
+- web/src/pages/alerts/AlertsPage.tsx
+- web/src/pages/measurement/SelectMetricPage.tsx
+- web/src/utils/dateFormat.ts
+- web/src/App.css
+
+### What Changed
+- Fixed invalid D1 schema syntax by removing inline `INDEX` from `HL_lastMeasurements`.
+- Made schema and seed SQL remote-safe by removing explicit `BEGIN TRANSACTION`/`COMMIT` statements rejected by remote D1 import.
+- Fixed family access-check query to use actual `HL_familyLinks` columns.
+- Fixed badge award codes to match seeded `HL_badges`.
+- Changed `/api/ai/report-analysis` to read endpoint/models/key through `HL_systemConfigs` instead of hardcoded endpoint/model list.
+- Fixed frontend lint/build blockers from topbar toggle, MedicalTerm export, measurement effects, alerts effects, and age memo dependency.
+
+### Validation
+- Fresh local D1 schema + seed + generated rules: PASS (`39` HL tables, `6` devices, `15` metrics, `80` rules, `13` configs).
+- `cd worker && npm test`: PASS (`29/29`).
+- `cd web && npm run lint`: PASS.
+- `cd web && npm run build`: PASS.
+- Remote D1 backup created before reset.
+- Remote D1 reset: PASS (drop all `HL_*`, apply `schema.sql`, `seed.sql`, `seed-rules.generated.sql`).
+- Production Worker deployed: `4761730f-285e-4a67-8105-1ae0ffc2f171`.
+- Production Pages deployed: `https://2d0ceb3d.hl-health-companion.pages.dev`.
+- Production UAT: PASS for auth, onboarding, catalog, Telegram verify/test, measurement validate/submit/history/dashboard, reports, notifications, medication CRUD, fasting CRUD, family invite/revoke, emergency contact CRUD/consent, export CSV, logout, page shell, and asset loading.
+
+### Documentation Updated
+- docs/TASKS.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- AI endpoints are operational with deterministic safe fallback.
+- Real 9router LLM calls currently return `401 API key required for remote API access` because `HL_systemConfigs.aiTextApiKey` is empty. Enter a valid 9router API key in Settings/Admin Config to enable non-fallback AI responses.
+- Production D1 backup exists locally under `.tmp-d1-backups/`; do not commit it.

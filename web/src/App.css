@@ -4054,6 +4054,21 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   font-weight: 600;
 }
 
+.user-info-banner-inline {
+  margin: 0 0 0 12px;
+  padding: 8px 12px;
+  border-left-width: 3px;
+  border-radius: 10px;
+  gap: 8px;
+  white-space: nowrap;
+  font: var(--typBodySm);
+  max-width: min(420px, 100%);
+}
+
+.user-info-banner-inline .material-symbols-outlined {
+  font-size: 18px;
+}
+
 /* Device Cards Container */
 .stitch-device-cards {
   display: flex;
@@ -4514,6 +4529,12 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
     gap: 8px;
   }
 
+  .user-info-banner-inline {
+    margin: 8px 0 0 0;
+    width: 100%;
+    white-space: normal;
+  }
+
   .stitch-card-body {
     flex-direction: column;
     padding: 16px;
@@ -4933,18 +4954,60 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   color: var(--colorPrimary);
   font: var(--typLabelMd);
   font-weight: 600;
   list-style: none;
-  padding: 4px 0;
+  padding: 4px;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  justify-content: center;
 }
 
 .metric-info-chip summary::-webkit-details-marker { display: none; }
 
 .metric-info-chip summary .material-symbols-outlined {
   font-size: 16px;
+}
+
+.metric-info-chip[open] {
+  position: relative;
+  z-index: 3;
+}
+
+.stitch-suggestion {
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--colorOutlineVariant);
+  background: var(--colorSurfaceContainerLow);
+  color: var(--colorTextSecondary);
+  font: var(--typBodySm);
+  line-height: 1.35;
+}
+
+.stitch-suggestion .material-symbols-outlined {
+  font-size: 17px;
+  flex: 0 0 auto;
+}
+
+.stitch-suggestion.normal {
+  border-color: color-mix(in srgb, var(--colorSuccess) 34%, var(--colorOutlineVariant));
+  background: color-mix(in srgb, var(--colorSuccess) 8%, var(--colorSurfaceContainerLow));
+}
+
+.stitch-suggestion.warning {
+  border-color: color-mix(in srgb, var(--colorWarning) 40%, var(--colorOutlineVariant));
+  background: color-mix(in srgb, var(--colorWarning) 10%, var(--colorSurfaceContainerLow));
+}
+
+.stitch-suggestion.critical {
+  border-color: color-mix(in srgb, var(--colorDanger) 38%, var(--colorOutlineVariant));
+  background: color-mix(in srgb, var(--colorDanger) 9%, var(--colorSurfaceContainerLow));
 }
 
 .metric-info-content {

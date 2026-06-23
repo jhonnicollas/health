@@ -654,11 +654,13 @@ function AppRoutes() {
   }
 
   const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
   function formatClock(d: Date) {
     const day = dayNames[d.getDay()]
-    const date = d.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
-    const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const padClock = (n: number) => String(n).padStart(2, '0')
+    const date = `${padClock(d.getDate())} ${monthNames[d.getMonth()]} ${d.getFullYear()}`
+    const time = `${padClock(d.getHours())}:${padClock(d.getMinutes())}:${padClock(d.getSeconds())}`
     return { dateStr: `${day}, ${date}`, timeStr: time }
   }
 
@@ -747,7 +749,11 @@ function AppRoutes() {
   function toggleGroup(label: string) {
     setExpandedGroups(prev => {
       const next = new Set(prev)
-      next.has(label) ? next.delete(label) : next.add(label)
+      if (next.has(label)) {
+        next.delete(label)
+      } else {
+        next.add(label)
+      }
       return next
     })
   }

@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
@@ -226,7 +228,7 @@ function calculateAge(birthDate: string): { years: number; months: number; days:
   return { years, months, days }
 }
 
-function idealWeightRange(heightCm: number, _sex: string): { min: number; max: number } {
+function idealWeightRange(heightCm: number): { min: number; max: number } {
   const h = heightCm / 100
   return {
     min: Math.round(18.5 * h * h * 10) / 10,
@@ -272,9 +274,8 @@ const ALL_AUTOFILL_METRICS = new Set([
 function InfoChip({ info }: { info: typeof METRIC_EDU[string] }) {
   return (
     <details className="metric-info-chip">
-      <summary>
+      <summary aria-label="Lihat penjelasan metric" title="Lihat penjelasan metric">
         <span className="material-symbols-outlined">info</span>
-        <span>Kenapa diukur?</span>
       </summary>
       <div className="metric-info-content">
         <div className="metric-info-row">
@@ -299,6 +300,58 @@ function InfoChip({ info }: { info: typeof METRIC_EDU[string] }) {
         </div>
       </div>
     </details>
+  )
+}
+
+function suggestionFor(metricCode: string, valueText: string) {
+  const value = Number(valueText)
+  if (!Number.isFinite(value)) return null
+  const rules: Record<string, Array<{ min: number; max: number; level: 'normal' | 'warning' | 'critical'; text: string }>> = {
+    spo2: [
+      { min: 95, max: 100, level: 'normal', text: 'Normal. Pertahankan napas tenang dan cek rutin.' },
+      { min: 90, max: 94.9, level: 'warning', text: 'Perlu dipantau. Cek ulang posisi jari dan istirahat.' },
+      { min: 0, max: 89.9, level: 'critical', text: 'Kritis. Cek ulang; bila sesak/lemas, hubungi tenaga medis.' }
+    ],
+    heartRate: [
+      { min: 60, max: 100, level: 'normal', text: 'Normal saat istirahat.' },
+      { min: 50, max: 59.9, level: 'warning', text: 'Agak rendah. Ulangi saat duduk tenang.' },
+      { min: 100.1, max: 250, level: 'warning', text: 'Cepat. Istirahat 5 menit lalu ukur ulang.' }
+    ],
+    bloodPressurePulse: [
+      { min: 60, max: 100, level: 'normal', text: 'Pulse normal.' },
+      { min: 20, max: 59.9, level: 'warning', text: 'Pulse rendah. Ulangi saat tenang.' },
+      { min: 100.1, max: 250, level: 'warning', text: 'Pulse cepat. Istirahat dan cek ulang.' }
+    ],
+    systolic: [
+      { min: 90, max: 119.9, level: 'normal', text: 'Sistolik normal.' },
+      { min: 120, max: 139.9, level: 'warning', text: 'Mulai tinggi. Kurangi garam dan cek ulang.' },
+      { min: 140, max: 179.9, level: 'warning', text: 'Tinggi. Catat dan konsultasi bila berulang.' },
+      { min: 180, max: 300, level: 'critical', text: 'Kritis. Cek ulang; jika tetap tinggi atau ada gejala, cari bantuan medis.' }
+    ],
+    diastolic: [
+      { min: 60, max: 79.9, level: 'normal', text: 'Diastolik normal.' },
+      { min: 80, max: 119.9, level: 'warning', text: 'Tinggi. Istirahat lalu ukur ulang.' },
+      { min: 120, max: 200, level: 'critical', text: 'Kritis. Cek ulang; jika ada gejala, cari bantuan medis.' }
+    ],
+    bodyTemperature: [
+      { min: 35, max: 37.4, level: 'normal', text: 'Suhu normal.' },
+      { min: 37.5, max: 38.9, level: 'warning', text: 'Demam. Cukup cairan dan pantau ulang.' },
+      { min: 39, max: 45, level: 'critical', text: 'Demam tinggi. Pantau ketat; cari bantuan bila ada gejala berat.' }
+    ]
+  }
+  const matched = rules[metricCode]?.find((rule) => value >= rule.min && value <= rule.max)
+  if (matched) return matched
+  return { level: 'warning' as const, text: 'Nilai akan divalidasi dengan rule medis saat submit.' }
+}
+
+function SuggestionPreview({ metricCode, value }: { metricCode: string; value: string }) {
+  const suggestion = suggestionFor(metricCode, value)
+  if (!suggestion) return null
+  return (
+    <div className={`stitch-suggestion ${suggestion.level}`}>
+      <span className="material-symbols-outlined">tips_and_updates</span>
+      <span>{suggestion.text}</span>
+    </div>
   )
 }
 
@@ -327,8 +380,8 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
 
   // Cleanup: revoke all Object URLs and clear pending timers on unmount
   useEffect(() => {
+    const timers = pendingTimersRef.current
     return () => {
-      const timers = pendingTimersRef.current
       for (const t of timers) window.clearTimeout(t)
       timers.clear()
       setPreviewUrls(current => {
@@ -409,23 +462,22 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
     setField(metricCode, { raw: sanitized, final: sanitized, error: undefined })
   }
 
+  const bodyWeightFinal = values.bodyWeight?.final ?? ''
   useEffect(() => {
-    const weightEntry = values['bodyWeight']
-    if (weightEntry?.final && profile?.heightCm) {
-      const weight = Number(weightEntry.final)
-      const heightM = profile.heightCm / 100
-      if (weight > 0 && heightM > 0) {
-        const bmi = Math.round((weight / (heightM * heightM)) * 10) / 10
-        const bmiEntry = values['bmi']
-        // Don't overwrite if user already manually set BMI (i.e. it isn't from auto-calc)
-        const isBmiAuto = !bmiEntry?.raw || bmiEntry.raw === bmiEntry.final
-        const differs = !bmiEntry || bmiEntry.final === '' || bmiEntry.final !== String(bmi)
-        if (differs && isBmiAuto) {
-          setValues(prev => ({ ...prev, bmi: { ...prev['bmi'], final: String(bmi), raw: String(bmi), confidence: null } }))
-        }
-      }
-    }
-  }, [values['bodyWeight']?.final, profile?.heightCm])
+    if (!bodyWeightFinal || !profile?.heightCm) return
+    const weight = Number(bodyWeightFinal)
+    const heightM = profile.heightCm / 100
+    if (weight <= 0 || heightM <= 0) return
+    const bmi = Math.round((weight / (heightM * heightM)) * 10) / 10
+    const bmiText = String(bmi)
+    setValues(prev => {
+      const bmiEntry = prev.bmi
+      const isBmiAuto = !bmiEntry?.raw || bmiEntry.raw === bmiEntry.final
+      const differs = !bmiEntry || bmiEntry.final === '' || bmiEntry.final !== bmiText
+      if (!differs || !isBmiAuto) return prev
+      return { ...prev, bmi: { ...prev.bmi, final: bmiText, raw: bmiText, confidence: null } }
+    })
+  }, [bodyWeightFinal, profile?.heightCm])
 
   function removeDevice(deviceCode: string) {
     setRemovedDevices(prev => new Set([...prev, deviceCode]))
@@ -605,11 +657,14 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
   }
 
   const heightCm = profile?.heightCm
-  const idealW = heightCm ? idealWeightRange(heightCm, profile?.sex || 'all') : null
+  const idealW = heightCm ? idealWeightRange(heightCm) : null
   const sleepRec = ageInfo ? sleepRecommendation(ageInfo.years) : null
 
   return (
     <form className="stitch-measurement-form" onSubmit={handleSubmit}>
+      {aiError ? <p className="form-message error" role="status">{aiError}</p> : null}
+      {error ? <p className="form-message error" role="status">{error}</p> : null}
+
       <div className="stitch-device-cards">
         {Array.from(deviceGroups.entries()).map(([deviceCode, group]) => {
           const hasAttachment = group.selections.some(s => s.metric.requiresAttachment)
@@ -737,6 +792,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                                     <span className="stitch-input-unit">mmHg</span>
                                   </div>
                                   {sysEntry.error ? <span className="stitch-field-error">{sysEntry.error}</span> : null}
+                                  <SuggestionPreview metricCode="systolic" value={sysEntry.final} />
                                   <InfoChip info={METRIC_EDU.systolic} />
                                 </div>
                               ) : null}
@@ -752,6 +808,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                                     <span className="stitch-input-unit">mmHg</span>
                                   </div>
                                   {diaEntry.error ? <span className="stitch-field-error">{diaEntry.error}</span> : null}
+                                  <SuggestionPreview metricCode="diastolic" value={diaEntry.final} />
                                   <InfoChip info={METRIC_EDU.diastolic} />
                                 </div>
                               ) : null}
@@ -774,6 +831,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                               <span className="stitch-input-unit">{pulseMetric.unit}</span>
                             </div>
                             {pulseEntry.error ? <span className="stitch-field-error">{pulseEntry.error}</span> : null}
+                            <SuggestionPreview metricCode="bloodPressurePulse" value={pulseEntry.final} />
                             <InfoChip info={METRIC_EDU.bloodPressurePulse} />
                           </div>
                         )
@@ -859,6 +917,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                           <span className="stitch-input-unit">{metric.unit}</span>
                         </div>
                         {entry.error ? <span className="stitch-field-error">{entry.error}</span> : null}
+                        <SuggestionPreview metricCode={metric.metricCode} value={entry.final} />
                         {edu ? <InfoChip info={edu} /> : null}
                       </div>
                     )
@@ -893,8 +952,6 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
         </button>
       </div>
 
-      {aiError ? <p className="form-message error" role="status">{aiError}</p> : null}
-      {error ? <p className="form-message error" role="status">{error}</p> : null}
       {successMessage && !toast ? <p className="form-message success" role="status">{successMessage}</p> : null}
 
       {toast ? (

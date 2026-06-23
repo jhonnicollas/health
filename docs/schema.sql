@@ -12,8 +12,6 @@
 
 PRAGMA foreign_keys = ON;
 
-BEGIN TRANSACTION;
-
 CREATE TABLE IF NOT EXISTS HL_schemaMigrations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   migrationName TEXT NOT NULL UNIQUE,
@@ -243,8 +241,7 @@ CREATE TABLE IF NOT EXISTS HL_lastMeasurements (
   unit TEXT NOT NULL,
   measuredAt TEXT NOT NULL,
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
-  UNIQUE(userId, deviceCode, metricCode),
-  INDEX idxLastMeterialsUserDevice (userId, deviceCode, metricCode)
+  UNIQUE(userId, deviceCode, metricCode)
 );
 
 CREATE TABLE IF NOT EXISTS HL_aiExtractions (
@@ -619,5 +616,3 @@ CREATE INDEX IF NOT EXISTS idxHLRateLimitsLookup ON HL_apiRateLimits(rateKey, ro
 
 INSERT OR IGNORE INTO HL_schemaMigrations (migrationName)
 VALUES ('20260620InitialHealthCompanionSchema');
-
-COMMIT;

@@ -1182,3 +1182,44 @@ Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
   - web `npx tsc -b`: clean
   - web `npm run build`: 366 kB JS, 98 kB CSS
   - Production smoke: all 8 endpoints return expected data, all 5 pages HTTP 200
+
+### [x] CRUD-REGRESSION-D1-RESET-UAT (2026-06-23)
+- **Deskripsi**: Full source audit after integer ID conversion, validate CRUD paths, reset production D1 from clean schema/seed, deploy current code, and run production UAT.
+- **Scope**:
+  - Check schema/seed validity before destructive reset.
+  - Audit backend/frontend CRUD routes for integer ID compatibility.
+  - Run worker/web validation.
+  - Drop and recreate HL_* production D1 tables using approved schema + seed.
+  - Run production UAT across auth, onboarding, measurement submit, dashboard, history, medication, fasting, family, notifications, AI, settings, reports, and logout.
+- **Acceptance Criteria**:
+  - `docs/schema.sql`, `docs/seed.sql`, and `docs/seed-rules.generated.sql` apply cleanly to a fresh D1/SQLite database.
+  - No CRUD regression caused by integer `id`/FK columns.
+  - Production D1 is rebuilt from schema + seed.
+  - Worker and Pages are deployed.
+  - Full UAT report records PASS/FAIL per critical flow.
+- **Result**:
+  - Local schema/seed fresh D1 validation: PASS (`39` HL tables, `6` devices, `15` catalog metrics, `80` rules, `13` configs).
+  - Production D1 reset: PASS (drop all `HL_*`, apply schema, seed, generated rules).
+  - Worker deploy: PASS (`4761730f-285e-4a67-8105-1ae0ffc2f171`).
+  - Pages deploy: PASS (`https://2d0ceb3d.hl-health-companion.pages.dev`).
+  - Local validation: worker tests `29/29` PASS; web lint PASS; web build PASS.
+  - Production UAT: PASS for auth, onboarding, catalog, Telegram verify/test, measurement validate/submit/history/dashboard, reports, notifications, medication CRUD, fasting CRUD, family invite/revoke, emergency contact CRUD/consent, export CSV, logout, page shell, assets.
+  - Known external config issue: 9router endpoint returns `401 API key required for remote API access` while `HL_systemConfigs.aiTextApiKey` is empty, so AI endpoints return deterministic safe fallback until admin enters a valid 9router API key.
+
+### [x] CONFIG-DATE-FOLLOWUP-AUDIT (2026-06-23)
+- **Deskripsi**: Follow-up audit after production UAT to align seeded AI model config with the requested 9router model list and remove remaining user-facing raw locale datetime renders.
+- **Scope**:
+  - Update seed/API docs for `aiTextModels` and `aiTextDefaultModel`.
+  - Update production D1 `HL_systemConfigs` model values.
+  - Replace remaining page-level `toLocaleString()` date displays with shared `dd MMM yyyy` helpers.
+- **Acceptance Criteria**:
+  - Fresh seed inserts requested 9router model order.
+  - Production D1 contains the same model order/default.
+  - Fasting and caregiver pages no longer render browser-default datetime strings.
+  - Web lint/build and worker tests still pass.
+- **Result**:
+  - Seed/API docs now use `oc/deepseek-v4-flash-free`, `oc/mimo-v2.5-free`, `openrouter/poolside/laguna-m.1:free` in that order.
+  - Production D1 `HL_systemConfigs.aiTextModels` updated and verified as valid JSON; `aiTextDefaultModel=oc/deepseek-v4-flash-free`.
+  - Removed remaining source `toLocaleString/toLocaleDateString/toLocaleTimeString` renders from page code.
+  - Validation PASS: fresh local D1 schema+seed+rules, worker tests `29/29`, web lint, web build, Pages deploy, production page/asset smoke.
+  - New Pages deployment: `https://935759af.hl-health-companion.pages.dev`.

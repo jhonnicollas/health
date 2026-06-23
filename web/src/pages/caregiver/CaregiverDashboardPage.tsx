@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDateTimeID } from '../../utils/dateFormat'
 
 type MonitorValue = {
   metricCode: string
@@ -104,7 +105,7 @@ export function CaregiverDashboardPage() {
               <div>
                 <strong>{p.displayName}</strong> · {p.role}
                 <div className="muted">
-                  Last measurement: {p.lastMeasurementAt ? new Date(p.lastMeasurementAt).toLocaleString() : '—'}
+                  Last measurement: {p.lastMeasurementAt ? formatDateTimeID(p.lastMeasurementAt) : '—'}
                 </div>
               </div>
               <button onClick={() => viewDetail(p.ownerUserId)} type="button">View Details</button>

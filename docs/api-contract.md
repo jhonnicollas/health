@@ -2003,9 +2003,9 @@ If `usedFallback: true`, the analysis is the safe fallback text:
 
 ### Models Tried (in order)
 
-1. `openrouter/poolside/laguna-m.1:free`
-2. `oc/deepseek-v4-flash-free`
-3. `oc/mimo-v2.5-free`
+1. `oc/deepseek-v4-flash-free`
+2. `oc/mimo-v2.5-free`
+3. `openrouter/poolside/laguna-m.1:free`
 
 Endpoint is `https://9router.krpmerch.biz.id/v1` (configurable via `HL_systemConfigs.aiTextEndpoint`).
 
@@ -3264,7 +3264,7 @@ GET /api/admin/configs
       },
       {
         "configKey": "aiTextModels",
-        "configValue": "[\"cmc/deepseek/deepseek-v4-pro\",\"nvidia/z-ai/glm-5.1\",\"ollama/glm-4.7\"]",
+        "configValue": "[\"oc/deepseek-v4-flash-free\",\"oc/mimo-v2.5-free\",\"openrouter/poolside/laguna-m.1:free\"]",
         "dataType": "json",
         "description": "Ordered text AI model fallback list",
         "updatedAt": "2026-06-20T10:00:00Z"
@@ -3457,7 +3457,7 @@ Example response:
   "success": true,
   "data": {
     "reply": "Pilih makan malam rendah garam...",
-    "model": "cmc/deepseek/deepseek-v4-pro",
+    "model": "oc/deepseek-v4-flash-free",
     "usedFallback": false,
     "vitals": [
       {

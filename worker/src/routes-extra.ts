@@ -236,9 +236,9 @@ export async function updateDailyStreak(c: Context<{ Bindings: ExtraEnv }>, user
 export async function awardBadges(c: Context<{ Bindings: ExtraEnv }>, userId: number, streakCount: number) {
   const awarded: string[] = []
   const map: Array<{ code: string; when: (s: number) => boolean }> = [
-    { code: 'streak3', when: s => s >= 3 },
-    { code: 'streak7', when: s => s >= 7 },
-    { code: 'streak30', when: s => s >= 30 }
+    { code: 'threeDayConsistent', when: s => s >= 3 },
+    { code: 'sevenDayConsistent', when: s => s >= 7 },
+    { code: 'thirtyDayConsistent', when: s => s >= 30 }
   ]
   for (const m of map) {
     if (!m.when(streakCount)) continue
@@ -287,19 +287,18 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       const userId = await getCurrentSession(c)
       if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
       const memberRows = await c.env.DB.prepare(
-        "SELECT id, role, canViewDashboard, canInputData, canEditLimited, canReceiveEmergencyAlert, canViewReports FROM HL_familyLinks WHERE linkedUserId = ? AND status = 'active'"
+        "SELECT id, role, canViewDashboard, canInputMeasurement, canReceiveAlert FROM HL_familyLinks WHERE linkedUserId = ? AND status = 'active'"
       ).bind(userId).all<{
-        id: number; role: string; canViewDashboard: number; canInputData: number; canEditLimited: number; canReceiveEmergencyAlert: number; canViewReports: number
+        id: number; role: string; canViewDashboard: number; canInputMeasurement: number; canReceiveAlert: number
       }>()
       const roles = (memberRows.results || []).map(row => ({
         memberId: row.id,
         role: row.role,
         permissions: {
           canViewDashboard: Boolean(row.canViewDashboard),
-          canInputData: Boolean(row.canInputData),
-          canEditLimited: Boolean(row.canEditLimited),
-          canReceiveEmergencyAlert: Boolean(row.canReceiveEmergencyAlert),
-          canViewReports: Boolean(row.canViewReports)
+          canInputMeasurement: Boolean(row.canInputMeasurement),
+          canReceiveAlert: Boolean(row.canReceiveAlert),
+          canViewReports: row.role === 'doctorViewer' || Boolean(row.canViewDashboard)
         }
       }))
       return jsonResponse(c, success({ roles }, 200, startedAt), 200)

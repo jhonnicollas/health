@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useState } from 'react'
 import { formatDateTimeShort } from '../../utils/dateFormat'
 
@@ -83,14 +85,12 @@ export function AlertsPage() {
 
   useEffect(() => {
     void loadAlerts()
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [])
 
   useEffect(() => {
     if (activeTab === 'telegram' && !telegramLoaded) {
       void loadTelegram()
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [activeTab, telegramLoaded])
 
   async function acknowledge(id: number) {

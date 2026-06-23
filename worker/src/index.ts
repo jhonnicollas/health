@@ -3329,10 +3329,6 @@ app.post('/api/ai/report-analysis', async (c) => {
     }
     const context = (body?.context || '').slice(0, 2000)
 
-    const apiKey = (await c.env.DB.prepare("SELECT configValue FROM HL_systemConfigs WHERE configKey = 'aiTextApiKey'").first<{ configValue: string }>())?.configValue
-    const endpoint = 'https://9router.krpmerch.biz.id/v1'
-    const models = ['openrouter/poolside/laguna-m.1:free', 'oc/deepseek-v4-flash-free', 'oc/mimo-v2.5-free']
-
     const prompt = `Anda adalah asisten kesehatan untuk aplikasi HL Health Companion. Berikan ANALISIS SINGKAT (maks 200 kata) dalam Bahasa Indonesia untuk data laporan ${reportType} berikut:
 
 ${context}
@@ -3343,28 +3339,14 @@ WAJIB:
 - Hanya memberi edukasi dan pola umum
 - Akhiri dengan disclaimer: "Hasil ini bukan diagnosis dokter."`
 
-    const messages: Array<{ role: string; content: string }> = [
+    const messages: AiChatMessage[] = [
       { role: 'system', content: 'Anda adalah asisten kesehatan edukatif. Tidak mendiagnosis, tidak memberi dosis obat.' },
       { role: 'user', content: prompt }
     ]
 
-    for (const model of models) {
-      try {
-        const r = await fetch(`${endpoint}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
-          },
-          body: JSON.stringify({ model, messages, max_tokens: 400, temperature: 0.3 })
-        })
-        if (!r.ok) continue
-        const data = await r.json() as { choices?: Array<{ message?: { content?: string } }> }
-        const reply = data.choices?.[0]?.message?.content
-        if (reply) {
-          return jsonResponse(c, success({ analysis: reply, model, usedFallback: false }, 200, startedAt))
-        }
-      } catch (e) { console.error('model failed:', model, e) }
+    const aiResult = await callConfiguredTextAi(c, messages, 400)
+    if (aiResult) {
+      return jsonResponse(c, success({ analysis: aiResult.text, model: aiResult.model, usedFallback: false }, 200, startedAt))
     }
     return jsonResponse(c, success({
       analysis: 'AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda.',

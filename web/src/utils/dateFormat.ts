@@ -43,21 +43,21 @@ export function formatIndonesianDateShort(isoString: string | null | undefined):
 export function formatDateID(iso: string | null | undefined): string {
   const date = parseIso(iso ?? '')
   if (!date) return '-'
-  return `${date.getDate()} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`
+  return `${pad(date.getDate())} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`
 }
 
 /** Date + time (HH:mm), short Indonesian month: "23 Jun 2026 18:30" */
 export function formatDateTimeID(iso: string | null | undefined): string {
   const date = parseIso(iso ?? '')
   if (!date) return '-'
-  return `${date.getDate()} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return `${pad(date.getDate())} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 /** Date + time (HH:mm:ss), short Indonesian month: "23 Jun 2026 18:30:45" */
 export function formatDateTimeIDFull(iso: string | null | undefined): string {
   const date = parseIso(iso ?? '')
   if (!date) return '-'
-  return `${date.getDate()} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  return `${pad(date.getDate())} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 /** Date + time split for stacking: { date: "23 Jun 2026", time: "18:30" } */
@@ -65,7 +65,7 @@ export function formatDateTimeShort(iso: string | null | undefined): { date: str
   const date = parseIso(iso ?? '')
   if (!date) return { date: '-', time: '-' }
   return {
-    date: `${date.getDate()} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`,
+    date: `${pad(date.getDate())} ${INDONESIAN_MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`,
     time: `${pad(date.getHours())}:${pad(date.getMinutes())}`
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { formatDateTimeID } from '../../utils/dateFormat'
 
 type FastingSession = {
   id: number
@@ -138,7 +139,7 @@ export function FastingPage() {
 
       {active && session ? (
         <div className="fasting-active">
-          <p>Fasting active since {new Date(session.startedAt).toLocaleString()}.</p>
+          <p>Fasting active since {formatDateTimeID(session.startedAt)}.</p>
           <div className="big-value">{countdown}</div>
           <div className="button-stack">
             <button disabled={submitting} onClick={() => void stop('completed')} type="button">

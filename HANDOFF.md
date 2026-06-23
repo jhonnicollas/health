@@ -346,3 +346,34 @@ Next Recommended Task: build + deploy hotfix; then resume EP-P* backlog
 - Cloudflare cron triggers at 5/5 limit (GAP-17) — manual POST /api/internal/cron/reminders works
 - Notification dropdown has empty state — needs real data from API
 - AlertsPage tabs hotfix built but not yet deployed (worker code unchanged; /api/notifications already exists)
+
+## Current Status — 2026-06-23 04:58 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Production Regression / D1 Reset
+Current Task: CRUD-REGRESSION-D1-RESET-UAT
+Current State: IN PROGRESS
+Last Completed: Sprint 1 UI/UX Polish + AI report
+Files Changed So Far: docs/TASKS.md, WORK_LOG.md, HANDOFF.md, web/src/App.css, web/src/components/measurement/DynamicMetricForm.tsx, web/src/pages/measurement/SelectMetricPage.tsx, web/src/utils/dateFormat.ts
+Commands Run So Far: worker npm test (pass before import fix), web build (failed on auth import, import now fixed)
+Known Issues: docs/schema.sql has invalid inline INDEX in HL_lastMeasurements; must fix before clean D1 rebuild.
+Next Recommended Task: validate schema/seed locally, audit CRUD integer-ID compatibility, run full tests, reset production D1, deploy, and UAT.
+```
+## Current Status — 2026-06-23 05:25 UTC
+
+```text
+Project: HL Health Companion
+Sprint: Production Regression / D1 Reset
+Current Task: CRUD-REGRESSION-D1-RESET-UAT
+Current State: COMPLETED AND DEPLOYED
+Last Completed: CRUD-REGRESSION-D1-RESET-UAT
+Production Worker: 4761730f-285e-4a67-8105-1ae0ffc2f171
+Production Pages: https://2d0ceb3d.hl-health-companion.pages.dev
+Stable Pages URL: https://hl-health-companion.pages.dev
+D1 State: Reset from scratch; 39 HL_* tables, 6 devices, 15 metrics, 80 metric rules, 13 system configs.
+Files Changed: docs/schema.sql, docs/seed.sql, docs/seed-rules.generated.sql, docs/TASKS.md, WORK_LOG.md, HANDOFF.md, worker/src/index.ts, worker/src/routes-extra.ts, web/src/App.tsx, web/src/components/MedicalTerm.tsx, web/src/components/measurement/DynamicMetricForm.tsx, web/src/pages/alerts/AlertsPage.tsx, web/src/pages/measurement/SelectMetricPage.tsx, web/src/utils/dateFormat.ts, web/src/App.css
+Commands Run: local D1 schema/seed validation, worker npm test, web lint, web build, D1 export backup, remote D1 drop/recreate/seed, wrangler deploy, wrangler pages deploy, production UAT.
+Known Issues: Real 9router LLM calls return 401 until HL_systemConfigs.aiTextApiKey is filled; AI endpoints fall back safely and do not 500.
+Next Recommended Task: Enter valid 9router API key through Settings/Admin Config, then rerun AI assistant/report-analysis UAT for non-fallback model response.
+```

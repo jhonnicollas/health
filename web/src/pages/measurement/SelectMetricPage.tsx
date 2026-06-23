@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DynamicMetricForm } from '../../components/measurement/DynamicMetricForm'
 import type { DynamicMetricSelection } from '../../components/measurement/DynamicMetricForm'
+import { useAuth } from '../../context/auth'
 
 type Metric = {
   metricCode: string
@@ -67,6 +68,7 @@ async function fetchTodaySessions(): Promise<TodaySession[]> {
 }
 
 export function SelectMetricPage() {
+  const { profile } = useAuth()
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDeviceCodes, setSelectedDeviceCodes] = useState<string[]>([])
   const [sinocareMode, setSinocareMode] = useState<string | null>(null)
@@ -75,6 +77,7 @@ export function SelectMetricPage() {
   const [todaySessions, setTodaySessions] = useState<TodaySession[]>([])
   const [now] = useState(() => new Date())
   const isPastNoon = now.getHours() >= 12
+  const birthDate = profile?.birthDate ?? null
 
   useEffect(() => {
     let cancelled = false
@@ -126,6 +129,25 @@ export function SelectMetricPage() {
     }
     return result
   }, [devices, selectedDeviceCodes, sinocareMode])
+
+  const ageInfo = useMemo(() => {
+    if (!birthDate) return null
+    const birth = new Date(`${birthDate}T00:00:00`)
+    if (Number.isNaN(birth.getTime())) return null
+    const today = new Date()
+    let years = today.getFullYear() - birth.getFullYear()
+    let months = today.getMonth() - birth.getMonth()
+    let days = today.getDate() - birth.getDate()
+    if (days < 0) {
+      months -= 1
+      days += new Date(today.getFullYear(), today.getMonth(), 0).getDate()
+    }
+    if (months < 0) {
+      years -= 1
+      months += 12
+    }
+    return { years, months, days }
+  }, [birthDate])
 
   function isDeviceRecordedToday(deviceCode: string): boolean {
     return todaySessions.some(s => s.deviceCodes.includes(deviceCode))
@@ -220,6 +242,12 @@ export function SelectMetricPage() {
           <div className="measurement-step-header">
             <span className="step-number">2</span>
             <h2>Catat Hasil Pengukuran</h2>
+            {ageInfo ? (
+              <div className="user-info-banner user-info-banner-inline">
+                <span className="material-symbols-outlined">cake</span>
+                <span>Anda berusia <strong>{ageInfo.years} Tahun {ageInfo.months} Bulan {ageInfo.days} Hari</strong></span>
+              </div>
+            ) : null}
             <button
               className="btn-secondary"
               onClick={() => { setSelectedDeviceCodes([]); setSinocareMode(null) }}

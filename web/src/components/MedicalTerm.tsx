@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 export const MEDICAL_GLOSSARY: Record<string, string> = {
   spo2: 'Saturasi oksigen dalam darah (%)',
   heartRate: 'Detak jantung per menit (bpm)',
