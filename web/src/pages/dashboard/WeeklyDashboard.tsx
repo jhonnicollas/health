@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { TrendBadge, type TrendDirection } from '../../components/dashboard/TrendBadge'
+import { formatDateID } from '../../utils/dateFormat'
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
 type DailyPoint = { day: string; metricCode: string; avgValue: number }
@@ -87,12 +88,12 @@ export function WeeklyDashboard() {
         </div>
         <div className="stat-card">
           <span className="stat-kicker">Best Day</span>
-          <div className="stat-value compact">{summary?.bestDay?.day ?? '-'}</div>
+          <div className="stat-value compact">{summary?.bestDay?.day ? formatDateID(summary.bestDay.day) : '-'}</div>
           <div className="stat-label">{summary?.bestDay?.sessionCount ?? 0} sessions</div>
         </div>
         <div className="stat-card">
           <span className="stat-kicker">Worst Day</span>
-          <div className="stat-value compact">{summary?.worstDay?.day ?? '-'}</div>
+          <div className="stat-value compact">{summary?.worstDay?.day ? formatDateID(summary.worstDay.day) : '-'}</div>
           <div className="stat-label">{summary?.worstDay?.sessionCount ?? 0} sessions</div>
         </div>
         <div className="stat-card">

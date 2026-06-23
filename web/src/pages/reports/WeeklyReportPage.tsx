@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
+import { formatDateID } from '../../utils/dateFormat'
 
 const METRIC_LABEL_DEF: Record<string, { label: string; def: string }> = {
   spo2: { label: 'SpO2', def: MEDICAL_GLOSSARY.spo2 },
@@ -102,9 +103,9 @@ export function WeeklyReportPage() {
           <p>{aiAnalysis}</p>
         </div>
       ) : null}
-      <div className="summary-cards">
-        <div className="summary-card"><span className="stat-kicker">Best Day</span><div className="big-value compact">{data.bestDay ?? '-'}</div><p>Most active day</p></div>
-        <div className="summary-card"><span className="stat-kicker">Worst Day</span><div className="big-value compact">{data.worstDay ?? '-'}</div><p>Least active day</p></div>
+        <div className="summary-cards">
+          <div className="summary-card"><span className="stat-kicker">Best Day</span><div className="big-value compact">{data.bestDay ? formatDateID(data.bestDay) : '-'}</div><p>Most active day</p></div>
+          <div className="summary-card"><span className="stat-kicker">Worst Day</span><div className="big-value compact">{data.worstDay ? formatDateID(data.worstDay) : '-'}</div><p>Least active day</p></div>
         <div className="summary-card"><span className="stat-kicker">Alerts</span><div className="big-value">{data.alertCount}</div><p>Rule-triggered alerts</p></div>
         <div className="summary-card"><span className="stat-kicker">Days</span><div className="big-value">{data.daysWithData}</div><p>Days with data</p></div>
       </div>

@@ -1,3 +1,5 @@
+import { useState, useRef, useEffect } from 'react'
+
 /* eslint-disable react-refresh/only-export-components */
 
 export const MEDICAL_GLOSSARY: Record<string, string> = {
@@ -23,17 +25,28 @@ export type MedicalTermProps = {
 }
 
 export function MedicalTerm({ term, shortDef }: MedicalTermProps) {
+  const [open, setOpen] = useState(false)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
   return (
     <span className="medical-term">
       {term}
-      <button
-        type="button"
-        className="medical-term-info"
-        aria-label={`Apa itu ${term}?`}
-        title={shortDef}
-      >
+      <button ref={btnRef} type="button" className="medical-term-info" aria-label={`Apa itu ${term}?`} onClick={() => setOpen(!open)}>
         <span className="material-symbols-outlined">help</span>
       </button>
+      {open && <div ref={popupRef} className="medical-term-popup">{shortDef}</div>}
     </span>
   )
 }

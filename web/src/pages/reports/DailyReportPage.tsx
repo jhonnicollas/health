@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
+import { formatDateID } from '../../utils/dateFormat'
 
 const METRIC_LABEL_DEF: Record<string, { label: string; def: string }> = {
   spo2: { label: 'SpO2', def: MEDICAL_GLOSSARY.spo2 },
@@ -18,6 +19,19 @@ const METRIC_LABEL_DEF: Record<string, { label: string; def: string }> = {
   sleepDuration: { label: 'Durasi Tidur', def: MEDICAL_GLOSSARY.sleepDuration }
 }
 
+const METRIC_SORT_ORDER: Record<string, number> = {
+  spo2: 1,
+  heartRate: 2,
+  bloodPressurePulse: 3,
+  systolic: 4,
+  diastolic: 5,
+  bodyTemperature: 6,
+  bodyWeight: 7,
+  bmi: 8,
+  waistCircumference: 9,
+  sleepDuration: 10
+}
+
 type DailyValue = {
   metricCode: string
   finalValue: number
@@ -27,7 +41,6 @@ type DailyValue = {
   popupTitle?: string | null
   popupMessage?: string | null
   recommendation?: string | null
-  sourceLabel?: string | null
 }
 
 type DailyData = {
@@ -83,12 +96,12 @@ export function DailyReportPage() {
 
   return (
     <div className="report-page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Reports</p>
-          <h2>Daily Report</h2>
-          <p>{data.date}</p>
-        </div>
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow">Reports</p>
+            <h2>Daily Report</h2>
+            <p>{formatDateID(data.date)}</p>
+          </div>
         <div className="page-heading-actions">
           <button onClick={analyzeWithAi} disabled={aiLoading} className="btn-primary">
             {aiLoading ? <><span className="spinner" /> Menganalisa...</> : <><span className="material-symbols-outlined">auto_awesome</span> Analisa dengan AI</>}
@@ -105,7 +118,7 @@ export function DailyReportPage() {
       ) : null}
       {data.values.length === 0 ? <p className="clinical-empty">Belum ada data pengukuran.</p> : (
         <div className="report-card-grid">
-          {data.values.map((v, i) => (
+          {[...data.values].sort((a, b) => (METRIC_SORT_ORDER[a.metricCode] || 99) - (METRIC_SORT_ORDER[b.metricCode] || 99)).map((v, i) => (
             <article key={`${v.metricCode}-${i}`} className="report-detail-card">
               <div className="report-detail-header">
                 <div>
@@ -119,7 +132,6 @@ export function DailyReportPage() {
                 <p>{v.popupMessage ?? 'Interpretasi rule engine belum tersedia untuk nilai ini.'}</p>
               </div>
               {v.recommendation ? <p className="report-recommendation">{v.recommendation}</p> : null}
-              {v.sourceLabel ? <small className="muted">Source: {v.sourceLabel}</small> : null}
             </article>
           ))}
         </div>

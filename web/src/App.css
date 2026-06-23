@@ -4174,7 +4174,7 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
 }
 
 .stitch-image-side {
-  flex: 1;
+  flex: 0 0 40%;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -4307,6 +4307,62 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   100% { transform: translateX(100%); }
 }
 
+/* Measurement Prep Tips Button */
+.stitch-prep-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid #f39c12;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #f39c12;
+  transition: background 0.15s, color 0.15s;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.stitch-prep-btn:hover {
+  background: #f39c12;
+  color: #fff;
+}
+.stitch-prep-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+.stitch-prep-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  margin-top: 6px;
+  padding: 12px 14px;
+  background: var(--colorSurface);
+  border: 1.5px solid #f39c12;
+  border-radius: var(--radiusSm);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  font: var(--typLabelSm);
+  color: var(--colorText);
+  white-space: normal;
+  max-width: 300px;
+  line-height: 1.5;
+  pointer-events: auto;
+}
+.stitch-prep-popup ul {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+}
+.stitch-prep-popup li {
+  margin-bottom: 4px;
+}
+.stitch-prep-popup-title {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 4px;
+  color: #f39c12;
+}
+
 .stitch-ai-progress span {
   font: var(--typBodySm);
   color: var(--colorTextMuted);
@@ -4314,7 +4370,7 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
 }
 
 .stitch-input-side {
-  flex: 1;
+  flex: 0 0 60%;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -4944,38 +5000,88 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
 }
 
 /* Info chip - education per metric */
-.metric-info-chip {
-  margin-top: 6px;
-  font: var(--typBodySm);
-  color: var(--colorTextSecondary);
+/* Info chip — small ? icon in label */
+.info-chip-inline {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  margin-left: 4px;
+  vertical-align: middle;
 }
-
-.metric-info-chip summary {
+.info-chip-btn {
+  all: unset;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  color: var(--colorPrimary);
-  font: var(--typLabelMd);
-  font-weight: 600;
-  list-style: none;
-  padding: 4px;
-  border-radius: 999px;
-  width: 28px;
-  height: 28px;
   justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--colorOutlineVariant) 40%, transparent);
+  color: var(--colorTextSecondary);
+  font-size: 13px;
+  line-height: 1;
+  transition: background 0.12s;
+}
+.info-chip-btn:hover {
+  background: var(--colorPrimary);
+  color: var(--colorPrimaryText);
+}
+.info-chip-btn .material-symbols-outlined {
+  font-size: 13px;
+  font-variation-settings: 'wght' 500;
+}
+.info-chip-popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  z-index: 100;
+  margin-top: 6px;
+  min-width: 260px;
+  max-width: 320px;
+  background: var(--colorSurfaceElevated);
+  border: 1px solid var(--colorBorder);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 12px 14px;
+  animation: infoPopupIn 0.14s ease;
+}
+@keyframes infoPopupIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.info-chip-content {
+  display: grid;
+  gap: 6px;
+}
+.metric-info-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.metric-info-label {
+  font-weight: 600;
+  color: var(--colorTextSecondary);
+}
+.metric-info-range {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--colorBorder);
+  font-weight: 500;
+  color: var(--colorTextPrimary);
+}
+.metric-info-range .material-symbols-outlined {
+  font-size: 15px;
+  color: var(--colorPrimary);
 }
 
-.metric-info-chip summary::-webkit-details-marker { display: none; }
-
-.metric-info-chip summary .material-symbols-outlined {
-  font-size: 16px;
-}
-
-.metric-info-chip[open] {
-  position: relative;
-  z-index: 3;
-}
-
+/* SuggestionPreview — live hint per input */
 .stitch-suggestion {
   margin-top: 8px;
   display: flex;
@@ -4989,45 +5095,21 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   font: var(--typBodySm);
   line-height: 1.35;
 }
-
 .stitch-suggestion .material-symbols-outlined {
   font-size: 17px;
   flex: 0 0 auto;
 }
-
 .stitch-suggestion.normal {
   border-color: color-mix(in srgb, var(--colorSuccess) 34%, var(--colorOutlineVariant));
   background: color-mix(in srgb, var(--colorSuccess) 8%, var(--colorSurfaceContainerLow));
 }
-
 .stitch-suggestion.warning {
   border-color: color-mix(in srgb, var(--colorWarning) 40%, var(--colorOutlineVariant));
   background: color-mix(in srgb, var(--colorWarning) 10%, var(--colorSurfaceContainerLow));
 }
-
 .stitch-suggestion.critical {
   border-color: color-mix(in srgb, var(--colorDanger) 38%, var(--colorOutlineVariant));
   background: color-mix(in srgb, var(--colorDanger) 9%, var(--colorSurfaceContainerLow));
-}
-
-.metric-info-content {
-  margin-top: 8px;
-  padding: 12px 14px;
-  background: color-mix(in srgb, var(--colorPrimary) 5%, var(--colorSurface));
-  border: 1px solid color-mix(in srgb, var(--colorPrimary) 22%, var(--colorBorder));
-  border-radius: 10px;
-  display: grid;
-  gap: 6px;
-}
-
-.metric-info-row {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 8px;
-  align-items: start;
-  font: var(--typBodySm);
-  color: var(--colorTextSecondary);
-  line-height: 1.5;
 }
 
 .metric-info-label {
@@ -5521,6 +5603,34 @@ input:-webkit-autofill {
   font-weight: 600;
   color: var(--colorText);
 }
+.medical-term {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+.medical-term-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid #2ecc71;
+  border-radius: 50%;
+  background: var(--colorBgSecondary);
+  cursor: pointer;
+  padding: 0;
+  color: var(--colorTextSecondary);
+  transition: background 0.15s, color 0.15s;
+}
+.medical-term-info:hover {
+  background: #2ecc71;
+  color: #fff;
+}
+.medical-term-info .material-symbols-outlined {
+  font-size: 14px;
+  line-height: 1;
+}
 .metric-code-badge-cell .medical-term {
   margin-left: 0;
 }
@@ -5530,6 +5640,25 @@ input:-webkit-autofill {
 }
 .metric-code-badge-cell .medical-term-info .material-symbols-outlined {
   font-size: 11px;
+}
+
+.medical-term-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  margin-top: 4px;
+  padding: 8px 12px;
+  background: var(--colorSurface);
+  border: 1px solid #2ecc71;
+  border-radius: var(--radiusSm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  font: var(--typLabelSm);
+  color: var(--colorText);
+  white-space: normal;
+  max-width: 280px;
+  line-height: 1.4;
+  pointer-events: auto;
 }
 
 /* ===== Page heading actions (right side buttons) ===== */

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDateID } from '../../utils/dateFormat'
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
 type DaySummary = { day: string; sessionCount: number }
@@ -91,7 +92,7 @@ export function MonthlyDashboard() {
           {daily.map((day) => (
             <div key={day.day} className="monthly-bar-item">
               <span className="monthly-bar" style={{ height: `${Math.max(18, Math.min(100, day.sessionCount * 24))}%` }} />
-              <small>{day.day.slice(5)}</small>
+              <small>{formatDateID(day.day)}</small>
             </div>
           ))}
         </div>

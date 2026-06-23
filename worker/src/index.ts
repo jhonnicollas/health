@@ -2901,11 +2901,16 @@ app.post('/api/ai/recommendation', async (c) => {
       last7DaysCount: last7Days.length
     }
 
-    const prompt = `Anda adalah asisten kesehatan yang aman. Berikan rekomendasi gaya hidup umum berdasarkan data berikut. JANGAN mendiagnosa penyakit, JANGAN meresepkan obat, JANGAN mengubah dosis obat. Hanya berikan edukasi gaya hidup umum seperti pola makan, hidrasi, istirahat, dan aktivitas ringan.
+    const prompt = `Anda analis kesehatan senior. Analisis data berikut dan beri interpretasi SPESIFIK:
 
 Data: ${JSON.stringify(summary)}
 
-Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
+WAJIB:
+- Beri skor kesehatan (1-10) berdasarkan data
+- Sebut kondisi jika indikasi jelas (misal: hipertensi, underweight, dll)
+- Rekomendasi konkret berdasarkan data aktual
+- Jangan bermain aman, langsung pada data
+- MAKSIMAL 3 kalimat dalam Bahasa Indonesia`
 
     let recommendationText = 'Rekomendasi tidak tersedia saat ini. Jaga pola makan seimbang, istirahat cukup, dan hidrasi yang baik.'
     let safetyStatus: 'safe' | 'filtered' | 'fallback' = 'fallback'
@@ -2914,7 +2919,7 @@ Berikan rekomendasi singkat 2-3 kalimat dalam Bahasa Indonesia.`
     const aiResult = await callConfiguredTextAi(c, [
       {
         role: 'system',
-        content: 'Anda adalah asisten kesehatan yang aman. Dilarang mendiagnosis, meresepkan obat, mengubah dosis, atau menentukan keparahan medis final. Berikan edukasi gaya hidup umum dalam Bahasa Indonesia.'
+        content: 'Anda analis kesehatan senior. Bersikap spesifik dan berani berdasarkan data. Beri skor dan interpretasi langsung dalam Bahasa Indonesia.'
       },
       { role: 'user', content: prompt }
     ], 300)
@@ -3025,7 +3030,7 @@ app.post('/api/ai/assistant', async (c) => {
       {
         role: 'system',
         content:
-          'Anda adalah asisten kesehatan yang aman. Dilarang mendiagnosis, mengubah dosis obat, meresepkan obat, atau menyatakan keparahan medis final. Gunakan bahasa Indonesia yang ramah, singkat, dan senior-friendly. Selalu sebutkan bahwa keputusan medis final mengikuti rule engine dan dokter.'
+          'Anda analis kesehatan senior. Bersikap spesifik, langsung, dan berdasarkan data. Beri skor, interpretasi, dan rekomendasi konkret dalam Bahasa Indonesia.'
       },
       {
         role: 'user',
@@ -3329,18 +3334,22 @@ app.post('/api/ai/report-analysis', async (c) => {
     }
     const context = (body?.context || '').slice(0, 2000)
 
-    const prompt = `Anda adalah asisten kesehatan untuk aplikasi HL Health Companion. Berikan ANALISIS SINGKAT (maks 200 kata) dalam Bahasa Indonesia untuk data laporan ${reportType} berikut:
+    const prompt = `Anda adalah asisten analis kesehatan senior untuk aplikasi HL Health Companion. Analisis data laporan ${reportType} berikut secara SPESIFIK, DETAIL, DAN BERANI:
 
 ${context}
 
 WAJIB:
-- Tidak mendiagnosis penyakit
-- Tidak menyarankan perubahan dosis obat
-- Hanya memberi edukasi dan pola umum
-- Akhiri dengan disclaimer: "Hasil ini bukan diagnosis dokter."`
+- Beri skor kesehatan (1-10) untuk setiap metrik berdasarkan data yang ada
+- Beri kesimpulan jelas: apakah kondisi pasien baik, perlu waspada, atau perlu tindakan
+- Sebut nilai aktual, tren, dan interpretasi spesifik
+- Langsung sebut nama kondisi jika indikasi jelas dari data (misal: "hipertensi tahap 1", "underweight", "demam")
+- Rekomendasi konkret berdasarkan data, bukan saran umum
+- Jangan bermain aman dengan disclaimer berulang
+- JANGAN GUNAKAN frasa "konsultasi dengan dokter" sebagai kalimat penutup
+- MAKSIMAL 250 kata`
 
     const messages: AiChatMessage[] = [
-      { role: 'system', content: 'Anda adalah asisten kesehatan edukatif. Tidak mendiagnosis, tidak memberi dosis obat.' },
+      { role: 'system', content: 'Anda analis kesehatan senior. Bersikap spesifik, berani, dan langsung pada data. Beri skor dan interpretasi nyata.' },
       { role: 'user', content: prompt }
     ]
 

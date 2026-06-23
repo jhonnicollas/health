@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { formatDateTimeID } from '../../utils/dateFormat'
+import { formatDateTimeID, formatDateID } from '../../utils/dateFormat'
 
 type MonitorValue = {
   metricCode: string
@@ -116,13 +116,13 @@ export function CaregiverDashboardPage() {
 
       {monitor ? (
         <section className="monitor-detail">
-          <div className="page-heading compact">
-            <div>
-              <p className="eyebrow">Monitor</p>
-              <h3>Detail for {monitor.date}</h3>
+            <div className="page-heading compact">
+              <div>
+                <p className="eyebrow">Monitor</p>
+                <h3>Detail for {formatDateID(monitor.date)}</h3>
+              </div>
+              <span className="status-chip">{monitor.values.length} values</span>
             </div>
-            <span className="status-chip">{monitor.values.length} values</span>
-          </div>
           {monitor.values.length === 0 ? <p>No values.</p> : (
             <ul className="value-list">
               {monitor.values.map((v, idx) => (
