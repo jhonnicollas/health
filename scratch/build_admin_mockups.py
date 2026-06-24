@@ -162,7 +162,7 @@ def generate_html(filename, title, active_nav, page_header, content):
 </body>
 </html>"""
 
-    with open(f"c:/codex/health/docs/sprint5/Frontend/{filename}", "w", encoding="utf-8") as f:
+    with open(f"c:/codex/health/docs_sprint5/Frontend/{filename}", "w", encoding="utf-8") as f:
         f.write(html)
     print(f"Generated {filename}")
 
