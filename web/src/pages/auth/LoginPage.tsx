@@ -124,6 +124,9 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
             />
           </label>
 
+          <a href="/api/auth/google" className="btn-secondary" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
+            <span className="material-symbols-outlined">login</span>Login dengan Google
+          </a>
           <button disabled={submitting} type="submit">
             {submitting ? 'Memeriksa...' : 'Login'}
           </button>
