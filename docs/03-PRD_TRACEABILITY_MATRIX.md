@@ -8,7 +8,7 @@
 |-------|----------|
 | Worker (API) | `worker/src/index.ts`, `worker/src/routes-extra.ts` |
 | Frontend | `web/src/App.tsx`, `web/src/pages/*`, `web/src/components/*` |
-| DB Schema | `docs/schema.sql` |
+| DB Schema | `docs/07-schema.sql` |
 | Tests | `worker/test/register.test.mjs` |
 | API Routes | All under `/api/*` |
 
@@ -255,7 +255,7 @@
 | Aspect | Details |
 |--------|---------|
 | **Sub-features** | Schema alignment, Backend refactor, Frontend type updates |
-| **Docs** | `INTEGER_ID_MIGRATION_PLAN.md`, `migrations/INTEGER_IDS_V2.sql` |
+| **Docs** | `migrations/INTEGER_IDS_V2.sql` |
 | **Status** | ✅ Backend + Frontend done · Production migration pending |
 
 ### 23 — Enterprise UI (EP-P2.x, EP-P3.x)
@@ -297,7 +297,7 @@
 | US-1.5.2 | Save Final Attachment ke R2 | `web/src/components/measurement/DynamicMetricForm.tsx` + R2 | POST `/api/measurements/attachments/upload` | ✅ |
 | US-1.5.3 | Audit Log Submit | `worker/src/index.ts` `measurementSubmit` log | n/a | ✅ |
 | US-1.6.2 | Dashboard Hari Ini | `worker/src/index.ts` + `web/src/pages/dashboard/TodayDashboard.tsx` | GET `/api/dashboard/today` | ✅ Fixed timezone, `hasData: true` |
-| US-2.1.1 | Metric Rules Engine | `docs/seed.sql` HL_metricRules + `worker/src/index.ts` `evaluateRule` | n/a | ✅ |
+| US-2.1.1 | Metric Rules Engine | `docs/08-seed.sql` HL_metricRules + `worker/src/index.ts` `evaluateRule` | n/a | ✅ |
 | US-2.2.1 | Popup Setelah Validasi | `web/src/components/measurement/DynamicMetricForm.tsx` `SuggestionPreview` + `interpretation-modal` | n/a (live, client-side) | ✅ |
 | US-2.2.2 | Popup Multi Metric | `worker/src/index.ts` submit returns `interpretations[]` | POST `/api/measurements/submit` | ✅ |
 | US-2.3.1 | Generate AI Recommendation | `worker/src/index.ts` `/api/ai/report-analysis` | POST `/api/ai/report-analysis` | ✅ 3-model fallback |

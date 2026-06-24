@@ -369,23 +369,27 @@ function validateOnboardingInput(input: OnboardingInput) {
 
 function validateProfileUpdateInput(input: ProfileUpdateInput) {
   const details: Array<{ field: string; message: string }> = []
-  const heightCm = typeof input.heightCm === 'number' ? input.heightCm : Number(input.heightCm)
-  const timezone = typeof input.timezone === 'string' ? input.timezone.trim() : ''
+  const hasHeightCm = input.heightCm !== undefined && input.heightCm !== null
+  const heightCm = hasHeightCm ? (typeof input.heightCm === 'number' ? input.heightCm : Number(input.heightCm)) : undefined
+  const hasTimezone = input.timezone !== undefined && input.timezone !== null && input.timezone !== ''
+  const timezone = hasTimezone ? (typeof input.timezone === 'string' ? input.timezone.trim() : '') : undefined
   const theme = typeof input.theme === 'string' ? input.theme : undefined
   const accessibilityMode =
     typeof input.accessibilityMode === 'string' ? input.accessibilityMode : undefined
 
-  if (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250) {
+  if (hasHeightCm && (!Number.isFinite(heightCm!) || heightCm! < 50 || heightCm! > 250)) {
     details.push({ field: 'heightCm', message: 'Tinggi badan harus antara 50 dan 250 cm.' })
   }
 
-  if (!timezone || timezone.length > 80) {
-    details.push({ field: 'timezone', message: 'Timezone wajib diisi.' })
-  } else {
-    try {
-      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date())
-    } catch {
-      details.push({ field: 'timezone', message: 'Timezone wajib valid.' })
+  if (hasTimezone) {
+    if (timezone!.length > 80) {
+      details.push({ field: 'timezone', message: 'Timezone terlalu panjang.' })
+    } else {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date())
+      } catch {
+        details.push({ field: 'timezone', message: 'Timezone wajib valid.' })
+      }
     }
   }
 
@@ -1543,6 +1547,8 @@ app.put('/api/profile', async (c) => {
       return jsonResponse(c, result)
     }
 
+    const nextHeightCm = validation.data.heightCm ?? existingProfile.heightCm
+    const nextTimezone = validation.data.timezone ?? existingProfile.timezone
     const nextTheme = validation.data.theme ?? existingProfile.theme
     const nextAccessibilityMode =
       validation.data.accessibilityMode ?? existingProfile.accessibilityMode
@@ -1553,8 +1559,8 @@ app.put('/api/profile', async (c) => {
          SET heightCm = ?, timezone = ?, theme = ?, accessibilityMode = ?, updatedAt = CURRENT_TIMESTAMP
          WHERE userId = ?`
       ).bind(
-        validation.data.heightCm,
-        validation.data.timezone,
+        nextHeightCm,
+        nextTimezone,
         nextTheme,
         nextAccessibilityMode,
         user.id
@@ -1569,10 +1575,10 @@ app.put('/api/profile', async (c) => {
         JSON.stringify({
           changedFields: ['heightCm', 'timezone', 'theme', 'accessibilityMode'].filter((field) => {
             if (field === 'heightCm') {
-              return validation.data.heightCm !== existingProfile.heightCm
+              return nextHeightCm !== existingProfile.heightCm
             }
             if (field === 'timezone') {
-              return validation.data.timezone !== existingProfile.timezone
+              return nextTimezone !== existingProfile.timezone
             }
             if (field === 'theme') {
               return nextTheme !== existingProfile.theme
@@ -1835,6 +1841,11 @@ app.post('/api/measurements/validate', async (c) => {
     const errors: Array<{ field: string; message: string; code: string }> = []
     let systolicValue: number | null = null
     let diastolicValue: number | null = null
+    const valuesWithRules: Array<Record<string, unknown>> = []
+
+    const profile = await c.env.DB.prepare('SELECT sex, birthDate FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ sex: string; birthDate: string }>()
+    const sex = profile?.sex || 'all'
+    const ageYears = profile?.birthDate ? calculateAgeYears(profile.birthDate) : 30
 
     for (const raw of body.metrics as Array<Record<string, unknown>>) {
       const metricCode = String(raw.metricCode || '')
@@ -1857,6 +1868,23 @@ app.post('/api/measurements/validate', async (c) => {
       }
       if (metricCode === 'systolic') systolicValue = finalValue
       if (metricCode === 'diastolic') diastolicValue = finalValue
+
+      if (finalValue >= 0 || range) {
+        const rule = await evaluateRule(c, metricCode, finalValue, sex, ageYears)
+        valuesWithRules.push({
+          metricCode,
+          finalValue,
+          unit: raw.unit || (range?.unit || ''),
+          status: rule.status,
+          severity: rule.severity,
+          emergencyLevel: rule.emergencyLevel,
+          popupTitle: rule.popupTitle,
+          popupMessage: rule.popupMessage,
+          recommendation: rule.recommendation,
+          sourceLabel: rule.sourceLabel,
+          ruleId: rule.ruleId
+        })
+      }
     }
 
     if (systolicValue !== null && diastolicValue !== null) {
@@ -1875,8 +1903,8 @@ app.post('/api/measurements/validate', async (c) => {
       }
     }
 
-    void userId
-    return jsonResponse(c, success({ valid: errors.length === 0, errors }, 200, startedAt))
+    const hasEmergency = valuesWithRules.some((v) => v.emergencyLevel === 'emergency')
+    return jsonResponse(c, success({ valid: errors.length === 0, hasEmergency, errors, results: valuesWithRules }, 200, startedAt))
   } catch (error) {
     console.error('validate endpoint error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Validasi gagal diproses.', 500, [], startedAt))
@@ -3692,9 +3720,18 @@ app.post('/api/emergency/contacts', async (c) => {
     const contactRelation = body.contactRelation || body.relationship || null
     if (!contactName || !contactPhone) return jsonResponse(c, failure('VALIDATION_ERROR', 'name dan phone wajib.', 400, [], startedAt))
     const contactId = await (async () => {
-      const encryptedName = await encryptSensitive(c, contactName)
-      const encryptedPhone = await encryptSensitive(c, contactPhone)
-      const encryptedTelegramChatId = await encryptSensitive(c, body.telegramChatId)
+      let encryptedName: string = contactName
+      let encryptedPhone: string = contactPhone
+      let encryptedTelegramChatId: string | null = body.telegramChatId || null
+      try {
+        const encN = await encryptSensitive(c, contactName)
+        const encP = await encryptSensitive(c, contactPhone)
+        if (encN) encryptedName = encN
+        if (encP) encryptedPhone = encP
+        if (body.telegramChatId) { const encT = await encryptSensitive(c, body.telegramChatId); if (encT) encryptedTelegramChatId = encT }
+      } catch (encErr) {
+        console.warn('emergency contact encrypt fallback to plaintext:', encErr)
+      }
       const consentGiven = body.canReceiveAlert || body.consentGiven ? 1 : 0
       return insertAndGetId(c.env.DB.prepare(
         `INSERT INTO HL_emergencyContacts (userId, contactName, contactRelation, contactPhone, telegramChatId, consentGiven, enabled, createdAt, updatedAt)
@@ -3768,13 +3805,16 @@ app.post('/api/reminders', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const body = await c.req.json() as { metricCode?: string; time: string; daysOfWeek?: string; label?: string }
-    if (!body.time) return jsonResponse(c, failure('VALIDATION_ERROR', 'time wajib.', 400, [], startedAt))
+    const body = await c.req.json() as { metricCode?: string; time?: string; scheduleTime?: string; daysOfWeek?: string; label?: string }
+    const scheduleTime = body.scheduleTime || body.time || ''
+    if (!scheduleTime) return jsonResponse(c, failure('VALIDATION_ERROR', 'scheduleTime wajib.', 400, [], startedAt))
     const reminderType = body.metricCode || 'general'
+    const profile = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ timezone: string }>()
+    const userTimezone = profile?.timezone || 'Asia/Jakarta'
     const remId = await insertAndGetId(c.env.DB.prepare(
       `INSERT INTO HL_reminderSettings (userId, reminderType, scheduleTime, timezone, payloadJson, enabled, createdAt, updatedAt)
-       VALUES (?, ?, ?, 'Asia/Jakarta', ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).bind(userId, reminderType, body.time, JSON.stringify({ label: body.label || null, daysOfWeek: body.daysOfWeek || '1,2,3,4,5,6,7' })))
+       VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(userId, reminderType, scheduleTime, userTimezone, JSON.stringify({ label: body.label || null, daysOfWeek: body.daysOfWeek || '1,2,3,4,5,6,7' })))
     return jsonResponse(c, success({ reminderId: remId }, 201, startedAt))
   } catch (error) {
     console.error('reminder create error:', error)
@@ -3886,6 +3926,14 @@ app.post('/api/privacy/deleteAccount', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { confirmEmail?: string }
+    if (!body.confirmEmail || typeof body.confirmEmail !== 'string') {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'confirmEmail wajib diisi.', 400, [{ field: 'confirmEmail', message: 'Masukkan email Anda untuk konfirmasi.' }], startedAt))
+    }
+    const user = await c.env.DB.prepare('SELECT email FROM HL_users WHERE id = ? AND active = 1').bind(userId).first<{ email: string }>()
+    if (!user || user.email !== body.confirmEmail.trim().toLowerCase()) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Email konfirmasi tidak cocok.', 400, [{ field: 'confirmEmail', message: 'Email tidak cocok dengan akun Anda.' }], startedAt))
+    }
     await c.env.DB.batch([
       c.env.DB.prepare(`INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'accountDelete', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`).bind(userId, userId, JSON.stringify({ requestedAt: new Date().toISOString() })),
       c.env.DB.prepare(`UPDATE HL_users SET active = 0 WHERE id = ?`).bind(userId),
@@ -3907,6 +3955,14 @@ app.post('/api/account/delete', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { confirmEmail?: string }
+    if (!body.confirmEmail || typeof body.confirmEmail !== 'string') {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'confirmEmail wajib diisi.', 400, [{ field: 'confirmEmail', message: 'Masukkan email Anda untuk konfirmasi.' }], startedAt))
+    }
+    const user = await c.env.DB.prepare('SELECT email FROM HL_users WHERE id = ? AND active = 1').bind(userId).first<{ email: string }>()
+    if (!user || user.email !== body.confirmEmail.trim().toLowerCase()) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Email konfirmasi tidak cocok.', 400, [{ field: 'confirmEmail', message: 'Email tidak cocok dengan akun Anda.' }], startedAt))
+    }
     await c.env.DB.batch([
       c.env.DB.prepare(`INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'accountDelete', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`).bind(userId, userId, JSON.stringify({ requestedAt: new Date().toISOString() })),
       c.env.DB.prepare(`UPDATE HL_users SET active = 0 WHERE id = ?`).bind(userId),
@@ -4853,6 +4909,58 @@ app.get('/api/medications/logs', async (c) => {
   } catch (error) {
     console.error('medication logs error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat log obat.', 500, [], startedAt))
+  }
+})
+
+// Alias routes matching API contract paths
+app.get('/api/medication-logs', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const from = c.req.query('from') || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const to = c.req.query('to') || new Date().toISOString()
+    const rows = await c.env.DB.prepare(
+      'SELECT ml.id, ml.medicationId, m.medicationName, ml.takenAt, ml.status, ml.note FROM HL_medicationLogs ml JOIN HL_medications m ON m.id = ml.medicationId WHERE ml.userId = ? AND ml.takenAt >= ? AND ml.takenAt <= ? ORDER BY ml.takenAt DESC LIMIT 100'
+    ).bind(userId, from, to).all<{
+      id: number
+      medicationId: number
+      medicationName: string
+      takenAt: string
+      status: string
+      note: string | null
+    }>()
+    const logs = await Promise.all((rows.results || []).map(async (row) => ({
+      ...row,
+      note: row.note ? await decryptSensitive(c, row.note).catch(() => row.note) : null
+    })))
+    return jsonResponse(c, success({ logs }, 200, startedAt))
+  } catch (error) {
+    console.error('medication-logs alias error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat log obat.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/medication-logs', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { medicationId?: number | string; status?: string; takenAt?: string; note?: string }
+    const medId = body.medicationId
+    if (!medId) return jsonResponse(c, failure('VALIDATION_ERROR', 'medicationId wajib.', 400, [], startedAt))
+    if (!['taken', 'skipped', 'missed', 'unknown'].includes(body.status || '')) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Status harus taken, skipped, missed, atau unknown.', 400, [], startedAt))
+    }
+    const med = await c.env.DB.prepare('SELECT id FROM HL_medications WHERE id = ? AND userId = ?').bind(medId, userId).first()
+    if (!med) return jsonResponse(c, failure('NOT_FOUND', 'Obat tidak ditemukan.', 404, [], startedAt))
+    let encryptedNote = body.note || null
+    try { if (body.note) encryptedNote = await encryptSensitive(c, body.note) } catch {}
+    const logId = await insertAndGetId(c.env.DB.prepare('INSERT INTO HL_medicationLogs (userId, medicationId, takenAt, status, note, createdAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(userId, medId, body.takenAt || new Date().toISOString(), body.status, encryptedNote))
+    return jsonResponse(c, success({ logId }, 201, startedAt))
+  } catch (error) {
+    console.error('medication-logs POST alias error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal log obat.', 500, [], startedAt))
   }
 })
 

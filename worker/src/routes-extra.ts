@@ -544,7 +544,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     try {
       const userId = await getCurrentSession(c)
       if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const body = await c.req.json() as { status?: 'completed' | 'cancelled' }
+      const body = await c.req.json().catch(() => ({})) as { status?: 'completed' | 'cancelled' }
       const active = await c.env.DB.prepare("SELECT id, startedAt, targetHours FROM HL_fastingSessions WHERE userId = ? AND status = 'active'").bind(userId).first<{ id: string; startedAt: string; targetHours: number }>()
       if (!active) return jsonResponse(c, failure('NOT_FOUND', 'Tidak ada sesi aktif.', 404, [], startedAt), 404)
       const endedAt = nowIso()

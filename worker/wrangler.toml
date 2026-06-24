@@ -1,4 +1,4 @@
-name = "hl-health-companion"
+name = "hl-health-companion-api"
 main = "src/index.ts"
 compatibility_date = "2026-06-20"
 workers_dev = true

@@ -135,8 +135,8 @@ curl -X PUT "https://hl-health-companion.pages.dev/api/admin/configs/aiTextApiKe
 
 ### Backend (worker)
 - `worker/src/index.ts` — Added `/api/measurements/last` and `/api/measurements/last/save` endpoints
-- `docs/schema.sql` — Added `HL_lastMeasurements` table definition
-- `docs/seed.sql` — Moved waistCircumference from manualInput to bodyScale
+- `docs/07-schema.sql` — Added `HL_lastMeasurements` table definition
+- `docs/08-seed.sql` — Moved waistCircumference from manualInput to bodyScale
 
 ### Frontend (web)
 - `web/src/App.tsx` — Made Weekly/Monthly/Reminders/Medications/etc visible in nav

@@ -982,8 +982,8 @@ Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
   - FK integrity checks pass with no orphan rows.
 
 ### [x] EP-P1.2A Schema/Seed Integer Alignment
-- **Deskripsi**: Align `docs/schema.sql`, `docs/seed.sql`, and `docs/seed-rules.generated.sql` with owner request that UUID/TEXT table IDs become integer autoincrement IDs before backend refactor.
-- **Files**: `docs/schema.sql`, `docs/seed.sql`, `docs/seed-rules.generated.sql`, `docs/rules-seeder.js.txt`.
+- **Deskripsi**: Align `docs/07-schema.sql`, `docs/08-seed.sql`, and `docs/09-seed-rules.generated.sql` with owner request that UUID/TEXT table IDs become integer autoincrement IDs before backend refactor.
+- **Files**: `docs/07-schema.sql`, `docs/08-seed.sql`, `docs/09-seed-rules.generated.sql`, `docs/10-rules-seeder.js.txt`.
 - **Acceptance Criteria**:
   - Surrogate table `id` columns use `INTEGER PRIMARY KEY AUTOINCREMENT`.
   - Internal FK ID columns such as `userId`, `profileId`, `sessionId`, `ruleId`, `medicationId`, and `reportId` use `INTEGER`.
@@ -1192,7 +1192,7 @@ Source plan: `docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md`.
   - Drop and recreate HL_* production D1 tables using approved schema + seed.
   - Run production UAT across auth, onboarding, measurement submit, dashboard, history, medication, fasting, family, notifications, AI, settings, reports, and logout.
 - **Acceptance Criteria**:
-  - `docs/schema.sql`, `docs/seed.sql`, and `docs/seed-rules.generated.sql` apply cleanly to a fresh D1/SQLite database.
+  - `docs/07-schema.sql`, `docs/08-seed.sql`, and `docs/09-seed-rules.generated.sql` apply cleanly to a fresh D1/SQLite database.
   - No CRUD regression caused by integer `id`/FK columns.
   - Production D1 is rebuilt from schema + seed.
   - Worker and Pages are deployed.

@@ -5176,3 +5176,46 @@ Final state of audit + fixes:
 - 21 implemented-not-documented endpoints still need contract docs
 - Path mismatches still need fixing: PUT /api/family/:id → /api/family/members/:id/permissions
 - Enum gaps: theme includes highContrast which is accessibilityMode; deviceCode missing gm242b
+
+## 2026-06-24 09:46 UTC — Agent: StressTest
+
+### Task
+- Task ID: STRESS-TEST-E2E
+- Sprint: Production Stress Test
+- Status: Completed
+
+### Files Read
+- AGENTS.md, docs/04-ARCHITECTURE.md, docs/05-api-contract.md, docs/07-schema.sql, docs/11-TASKS.md, HANDOFF.md, WORK_LOG.md
+- worker/src/index.ts (5007 lines), worker/src/routes-extra.ts
+
+### Files Changed
+- worker/src/index.ts — 6 bug fixes
+- worker/src/routes-extra.ts — 1 bug fix
+- worker/wrangler.toml — worker name fix
+
+### What Changed
+1. **CRITICAL: POST /api/privacy/deleteAccount** — Added confirmEmail validation (email must match logged-in user's email). Same fix applied to alias POST /api/account/delete.
+2. **POST /api/emergency/contacts** — encryptSensitive now graceful fallback to plaintext when ENCRYPTION_KEY unavailable instead of crashing.
+3. **POST /api/measurements/validate** — Now returns full rule evaluation results (status, severity, emergencyLevel, popupTitle, popupMessage, recommendation, sourceLabel, ruleId) per metric, not just valid/errors.
+4. **PUT /api/profile** — Partial updates now work. heightCm and timezone only validated when provided. UPDATE query uses existing values for missing fields.
+5. **POST /api/reminders** — Accepts both `scheduleTime` (API contract) and `time` (legacy). Reads user timezone from profile instead of hardcoding Asia/Jakarta.
+6. **POST /api/medication-logs** + **GET /api/medication-logs** — Added alias routes matching API contract paths (original routes at /api/medications/:id/log and /api/medications/logs still work).
+7. **POST /api/fasting/stop** — Fixed crash when request body is empty (c.req.json() now has .catch fallback).
+
+### Validation
+- worker typecheck: PASS
+- worker tests: 29/29 PASS
+- web typecheck: PASS
+- web build: PASS
+- Production E2E: all 26 endpoints tested, 26/26 PASS
+- Deployed: Worker Version 37c66736-8ba8-45c6-99af-5948d7972c9b
+
+### Documentation Updated
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- wrangler.toml name changed from hl-health-companion to hl-health-companion-api to match production URL
+- Queue consumer binding failed on deploy (non-blocking, queue producer still works)
+- 3 API contract gaps remain: POST /api/measurements/drafts, GET /api/measurements/:id detail, signed URL endpoint
+- AI uses deterministic-fallback (aiTextApiKey empty in production D1)
