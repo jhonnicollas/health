@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import './EmergencyModal.css'
 
 export type EmergencyModalProps = {
@@ -9,6 +10,7 @@ export type EmergencyModalProps = {
 }
 
 export function EmergencyModal({ open, title, message, recommendation, onAcknowledge }: EmergencyModalProps) {
+  const [checked, setChecked] = useState(false)
   if (!open) return null
   return (
     <div className="emergency-modal-overlay" role="alertdialog" aria-modal="true">
@@ -19,7 +21,11 @@ export function EmergencyModal({ open, title, message, recommendation, onAcknowl
         {recommendation && (
           <p className="emergency-modal-recommendation">💡 {recommendation}</p>
         )}
-        <button type="button" className="emergency-modal-button" onClick={onAcknowledge}>
+        <label className="emergency-modal-checkbox">
+          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+          <span>Saya mengerti bahwa ini bukan diagnosis dan perlu verifikasi ulang.</span>
+        </label>
+        <button type="button" className="emergency-modal-button" disabled={!checked} onClick={() => { setChecked(false); onAcknowledge() }}>
           Saya Mengerti
         </button>
       </div>

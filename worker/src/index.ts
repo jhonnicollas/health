@@ -2766,10 +2766,9 @@ app.get('/api/dashboard/today', async (c) => {
 
 // AI Recommendation Endpoint
 const FORBIDDEN_PHRASES = [
-  'diagnosa', 'diagnosis', 'anda menderita', 'anda pasti', 'pasti sakit',
   'resep obat', 'dosis', 'mg per hari', 'minum obat', 'berhenti minum',
-  'anda harus operasi', 'anda terjangkit', 'penyakit anda', 'anda divonis',
-  'you have', 'you are diagnosed', 'prescription', 'take this medication',
+  'anda harus operasi', 'anda terjangkit',
+  'prescription', 'take this medication',
   'stop taking', 'increase dose', 'decrease dose'
 ]
 
@@ -2784,6 +2783,18 @@ function filterUnsafeContent(text: string): { safe: boolean; filtered: string } 
     }
   }
   return { safe: true, filtered: text }
+}
+
+function extractPatternScore(text: string): number {
+  const match = text.match(/Clinical Confidence Score[:\s]*(\d+)/i) ||
+                text.match(/skor[:\s]*(\d+)\s*\/\s*100/i) ||
+                text.match(/skor[:\s]*(\d+)\s*dari\s*100/i) ||
+                text.match(/confidence[:\s]*(\d+)/i)
+  if (match) {
+    const score = parseInt(match[1], 10)
+    if (score >= 1 && score <= 100) return score
+  }
+  return 0
 }
 
 type AiChatMessage = {
@@ -3030,7 +3041,7 @@ app.post('/api/ai/assistant', async (c) => {
       {
         role: 'system',
         content:
-          'Anda analis kesehatan senior. Bersikap spesifik, langsung, dan berdasarkan data. Beri skor, interpretasi, dan rekomendasi konkret dalam Bahasa Indonesia.'
+          'Anda adalah seorang Dokter Senior dan Spesialis Medis untuk aplikasi HL Health Companion. Anda memiliki akses ke seluruh data historis dan metrik kesehatan pengguna. Lakukan analisa mendalam terhadap kondisi pasien berdasarkan data yang diberikan. Berikan "Clinical Confidence Score" (1-100) terhadap analisa Anda. Berikan rekomendasi medis, peringatan, dan insight layaknya dokter spesialis. WAJIB akhiri respons Anda dengan teks berikut tanpa diubah: \n"[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."'
       },
       {
         role: 'user',
@@ -3039,9 +3050,32 @@ app.post('/api/ai/assistant', async (c) => {
     ], 220)
     if (aiResult) {
       const filtered = filterUnsafeContent(aiResult.text)
-      reply = filtered.filtered
+      let assistantReply = filtered.filtered
+      const disclaimerText = `${aiResult.model} is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini.`
+      if (!assistantReply.includes(disclaimerText)) {
+        assistantReply += '\n\n' + disclaimerText
+      }
+      const patternScore = extractPatternScore(assistantReply)
+      reply = assistantReply
       model = aiResult.model
       usedFallback = false
+
+      return jsonResponse(
+        c,
+        success(
+          {
+            reply,
+            patternScore,
+            disclaimer: disclaimerText,
+            model,
+            usedFallback,
+            vitals,
+            profile: profile || null
+          },
+          200,
+          startedAt
+        )
+      )
     }
 
     return jsonResponse(
@@ -3049,6 +3083,8 @@ app.post('/api/ai/assistant', async (c) => {
       success(
         {
           reply,
+          patternScore: 0,
+          disclaimer: 'fallback is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya.',
           model,
           usedFallback,
           vitals,
@@ -3334,32 +3370,37 @@ app.post('/api/ai/report-analysis', async (c) => {
     }
     const context = (body?.context || '').slice(0, 2000)
 
-    const prompt = `Anda adalah asisten analis kesehatan senior untuk aplikasi HL Health Companion. Analisis data laporan ${reportType} berikut secara SPESIFIK, DETAIL, DAN BERANI:
+    const prompt = `Anda adalah seorang Dokter Senior dan Spesialis Medis untuk aplikasi HL Health Companion. Anda memiliki akses ke seluruh data historis dan metrik kesehatan pengguna.
+1. Lakukan ANALISA MENDALAM dan AGRESIF terhadap kondisi pasien berdasarkan data laporan berikut.
+2. Berikan "Clinical Confidence Score" (1-100) terhadap analisa Anda beserta justifikasi singkat.
+3. Berikan rekomendasi medis, peringatan, dan insight layaknya dokter spesialis yang sedang mendiagnosis pasien.
 
+Data laporan ${reportType}:
 ${context}
 
-WAJIB:
-- Beri skor kesehatan (1-10) untuk setiap metrik berdasarkan data yang ada
-- Beri kesimpulan jelas: apakah kondisi pasien baik, perlu waspada, atau perlu tindakan
-- Sebut nilai aktual, tren, dan interpretasi spesifik
-- Langsung sebut nama kondisi jika indikasi jelas dari data (misal: "hipertensi tahap 1", "underweight", "demam")
-- Rekomendasi konkret berdasarkan data, bukan saran umum
-- Jangan bermain aman dengan disclaimer berulang
-- JANGAN GUNAKAN frasa "konsultasi dengan dokter" sebagai kalimat penutup
-- MAKSIMAL 250 kata`
+WAJIB sertakan teks ini tepat di akhir respons Anda TANPA DIUBAH sedikit pun:
+"[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."`
 
     const messages: AiChatMessage[] = [
-      { role: 'system', content: 'Anda analis kesehatan senior. Bersikap spesifik, berani, dan langsung pada data. Beri skor dan interpretasi nyata.' },
+      { role: 'system', content: 'Anda adalah Dokter Senior dan Spesialis Medis. Analisa pasien secara mendalam, berikan Clinical Confidence Score, dan akhiri dengan disclaimer tanggung jawab medis.' },
       { role: 'user', content: prompt }
     ]
 
     const aiResult = await callConfiguredTextAi(c, messages, 400)
     if (aiResult) {
-      return jsonResponse(c, success({ analysis: aiResult.text, model: aiResult.model, usedFallback: false }, 200, startedAt))
+      let analysis = aiResult.text
+      const disclaimerText = `${aiResult.model} is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini.`
+      if (!analysis.includes(disclaimerText)) {
+        analysis += '\n\n' + disclaimerText
+      }
+      const patternScore = extractPatternScore(analysis)
+      return jsonResponse(c, success({ analysis, patternScore, model: aiResult.model, disclaimer: disclaimerText, usedFallback: false }, 200, startedAt))
     }
     return jsonResponse(c, success({
       analysis: 'AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda.',
+      patternScore: 0,
       model: 'fallback',
+      disclaimer: 'fallback is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya.',
       usedFallback: true
     }, 200, startedAt))
   } catch (error) {
@@ -4081,41 +4122,91 @@ app.post('/api/measurements/extract', async (c) => {
     let confidence = 0
     let modelName = configuredVisionModel
 
+    // Check if using custom endpoint for vision
+    const useCustomVision = await getSystemConfigString(c, 'aiVisionUseCustomEndpoint')
+    const customVisionEndpoint = useCustomVision === 'true' ? await getSystemConfigString(c, 'aiTextEndpoint') : null
+    const customVisionApiKey = customVisionEndpoint ? await getSystemConfigString(c, 'aiTextApiKey') : null
+    const customVisionModels = customVisionEndpoint ? await getSystemConfigString(c, 'aiTextModels') : null
+    let customVisionModel = ''
+    if (customVisionModels) {
+      try { const parsed = JSON.parse(customVisionModels); customVisionModel = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : '' } catch { /* ignore */ }
+    }
+
     try {
       // Convert file to base64 for AI Vision
       const arrayBuffer = await file.arrayBuffer()
       const base64Image = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
 
-      // Call Workers AI Vision with timeout
+      // Call AI Vision with timeout
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), aiTimeout)
 
       try {
-        const aiResponse = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/models/${modelName}/inference`,
-          {
+        let aiResponse: Response | null = null
+
+        if (customVisionEndpoint && customVisionModel) {
+          // Use custom OpenAI-compatible endpoint (vision via chat completions)
+          const endpoint = customVisionEndpoint.replace(/\/+$/, '')
+          aiResponse = await fetch(`${endpoint}/chat/completions`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              ...(customVisionApiKey ? { 'Authorization': `Bearer ${customVisionApiKey}` } : {})
             },
             body: JSON.stringify({
-              image: `data:${file.type};base64,${base64Image}`,
-              prompt: `Extract health measurements from this device image. Device: ${deviceCode}, Group: ${metricGroup}. Return JSON with metric codes and values.`
+              model: customVisionModel,
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'text', text: `Extract health measurements from this device image. Device: ${deviceCode}, Group: ${metricGroup}. Return ONLY a JSON object with metric codes as keys and their numeric values. Example: {"spo2":98,"heartRate":72}` },
+                  { type: 'image_url', image_url: { url: `data:${file.type};base64,${base64Image}` } }
+                ]
+              }],
+              max_tokens: 500
             }),
             signal: controller.signal
-          }
-        )
+          })
+          modelName = customVisionModel
+        } else {
+          // Use Cloudflare Workers AI Vision
+          aiResponse = await fetch(
+            `https://api.cloudflare.com/client/v4/accounts/${c.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/models/${modelName}/inference`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${c.env.CLOUDFLARE_API_TOKEN}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                image: `data:${file.type};base64,${base64Image}`,
+                prompt: `Extract health measurements from this device image. Device: ${deviceCode}, Group: ${metricGroup}. Return JSON with metric codes and values.`
+              }),
+              signal: controller.signal
+            }
+          )
+        }
 
         clearTimeout(timeoutId)
 
-        if (aiResponse.ok) {
+        if (aiResponse && aiResponse.ok) {
           const aiData = await aiResponse.json() as any
           rawResponse = JSON.stringify(aiData)
 
-          // Parse AI response for metrics
+          // Parse AI response - handle both Workers AI and OpenAI/chat format
+          let aiResult: any = null
           if (aiData.success && aiData.result) {
-            parsedJson = JSON.stringify(aiData.result)
+            // Cloudflare Workers AI format
+            aiResult = aiData.result
+          } else if (aiData.choices && aiData.choices[0] && aiData.choices[0].message) {
+            // OpenAI chat completions format
+            const content = aiData.choices[0].message.content
+            if (content) {
+              try { aiResult = JSON.parse(content) } catch { aiResult = content }
+            }
+          }
+
+          if (aiResult) {
+            parsedJson = JSON.stringify(aiResult)
             aiSuccess = true
 
             // Per US-1.3.3: AI tidak boleh menebak metric yang tidak dipilih
@@ -4311,7 +4402,8 @@ const PROTECTED_SYSTEM_CONFIG_KEYS = new Set([
   'ocrRateLimitMax',
   'ocrRateLimitWindowMin',
   'telegramBotToken',
-  'telegramBotActive'
+  'telegramBotActive',
+  'aiVisionUseCustomEndpoint'
 ])
 
 function isValidSystemConfigKey(configKey: string) {

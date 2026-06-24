@@ -14,6 +14,7 @@ createRoot(document.getElementById('root')!).render(
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
+    caches.keys().then(keys => Promise.all(keys.filter(k => k.includes('hl-') || k.includes('health')).map(k => caches.delete(k)))).catch(() => {})
   })
 }
 

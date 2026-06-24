@@ -273,9 +273,24 @@ const ALL_AUTOFILL_METRICS = new Set([
 
 function InfoChip({ info }: { info: typeof METRIC_EDU[string] }) {
   const [show, setShow] = useState(false)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!show) return
+    function handleClick(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node) && btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setShow(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [show])
+
   return (
     <span className="info-chip-inline">
       <button
+        ref={btnRef}
         type="button"
         className="info-chip-btn"
         onClick={(e) => { e.preventDefault(); setShow(!show) }}
@@ -284,7 +299,7 @@ function InfoChip({ info }: { info: typeof METRIC_EDU[string] }) {
         <span className="material-symbols-outlined">help</span>
       </button>
       {show ? (
-        <div className="info-chip-popup" onClick={() => setShow(false)}>
+        <div ref={popupRef} className="info-chip-popup">
           <div className="info-chip-content">
             <div className="metric-info-row">
               <span className="metric-info-label">Tujuan:</span>
@@ -334,6 +349,19 @@ const PREP_TIPS: Record<string, { title: string; tips: string[] }> = {
       'Diam — jangan bergerak saat pengukuran',
       'Tunggu 10-15 detik sampai angka berhenti berubah',
       'Hindari sinar matahari langsung ke sensor'
+    ]
+  },
+  gcu: {
+    title: 'Persiapan Tes GCU 3-in-1',
+    tips: [
+      'Cuci tangan sebelum memegang alat tes',
+      'Gunakan strip tes baru — jangan pakai strip bekas atau kedaluwarsa',
+      'Pastikan kode chip pada alat cocok dengan kode pada botol strip',
+      'Khusus gula darah puasa: puasa 8–12 jam sebelum tes',
+      'Khusus gula darah 2 jam PP: catat waktu mulai makan, ukur tepat 2 jam setelahnya',
+      'Kolesterol dan asam urat tidak perlu puasa',
+      'Gunakan lanset baru untuk setiap tusukan',
+      'Usap tetes darah pertama dengan kapas, gunakan tetes kedua'
     ]
   },
   thermometer: {
@@ -524,6 +552,16 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
       }
     }))
   }, [])
+
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>, nextId: string | null) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (nextId) {
+        const next = document.getElementById(nextId) as HTMLInputElement | null
+        if (next) next.focus()
+      }
+    }
+  }
 
   function handleValueChange(metricCode: string, raw: string, physicalMax: number | null | undefined) {
     const maxDigits = physicalMax != null ? String(Math.ceil(physicalMax)).length + 3 : 8
@@ -801,7 +839,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                     <span className="material-symbols-outlined">{icon}</span>
                   </div>
                   <h3 className="stitch-device-title">{group.device.deviceName}</h3>
-                  {['bloodPressure', 'oximeter', 'thermometer'].includes(group.device.deviceType || '') ? <PrepButton deviceType={group.device.deviceType || ''} /> : null}
+                  {['bloodPressure', 'oximeter', 'thermometer', 'gcu'].includes(group.device.deviceType || '') ? <PrepButton deviceType={group.device.deviceType || ''} /> : null}
                 </div>
                 <div className="stitch-card-header-right">
                   {aiStatus ? (
@@ -871,7 +909,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                                     <InfoChip info={METRIC_EDU.systolic} />
                                   </label>
                                   <div className="stitch-input-wrap">
-                                    <input id="input-systolic" className={`stitch-metric-input ${sysEntry.error ? 'has-error' : ''} ${autoFilled.has('systolic') ? 'is-autofilled' : ''}`} inputMode="decimal" min={sysMetric.physicalMin ?? ''} max={sysMetric.physicalMax ?? ''} step="1" placeholder="120" type="number" value={sysEntry.final} onChange={(e) => handleValueChange('systolic', e.target.value, sysMetric.physicalMax)} onFocus={(e) => e.target.select()} />
+                                    <input id="input-systolic" className={`stitch-metric-input ${sysEntry.error ? 'has-error' : ''} ${autoFilled.has('systolic') ? 'is-autofilled' : ''}`} inputMode="decimal" min={sysMetric.physicalMin ?? ''} max={sysMetric.physicalMax ?? ''} step="1" placeholder="120" type="number" value={sysEntry.final} onChange={(e) => handleValueChange('systolic', e.target.value, sysMetric.physicalMax)} onFocus={(e) => e.target.select()} onKeyDown={(e) => handleInputKeyDown(e, 'input-diastolic')} />
                                     <span className="stitch-input-unit">mmHg</span>
                                   </div>
                                   {sysEntry.error ? <span className="stitch-field-error">{sysEntry.error}</span> : null}
@@ -887,7 +925,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                                     <InfoChip info={METRIC_EDU.diastolic} />
                                   </label>
                                   <div className="stitch-input-wrap">
-                                    <input id="input-diastolic" className={`stitch-metric-input ${diaEntry.error ? 'has-error' : ''} ${autoFilled.has('diastolic') ? 'is-autofilled' : ''}`} inputMode="decimal" min={diaMetric.physicalMin ?? ''} max={diaMetric.physicalMax ?? ''} step="1" placeholder="80" type="number" value={diaEntry.final} onChange={(e) => handleValueChange('diastolic', e.target.value, diaMetric.physicalMax)} onFocus={(e) => e.target.select()} />
+                                    <input id="input-diastolic" className={`stitch-metric-input ${diaEntry.error ? 'has-error' : ''} ${autoFilled.has('diastolic') ? 'is-autofilled' : ''}`} inputMode="decimal" min={diaMetric.physicalMin ?? ''} max={diaMetric.physicalMax ?? ''} step="1" placeholder="80" type="number" value={diaEntry.final} onChange={(e) => handleValueChange('diastolic', e.target.value, diaMetric.physicalMax)} onFocus={(e) => e.target.select()} onKeyDown={(e) => handleInputKeyDown(e, 'input-bloodPressurePulse')} />
                                     <span className="stitch-input-unit">mmHg</span>
                                   </div>
                                   {diaEntry.error ? <span className="stitch-field-error">{diaEntry.error}</span> : null}
@@ -910,7 +948,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                               <InfoChip info={METRIC_EDU.bloodPressurePulse} />
                             </label>
                             <div className="stitch-input-wrap">
-                              <input id="input-bloodPressurePulse" className={`stitch-metric-input ${pulseEntry.error ? 'has-error' : ''} ${autoFilled.has('bloodPressurePulse') ? 'is-autofilled' : ''}`} inputMode="decimal" min={pulseMetric.physicalMin ?? ''} max={pulseMetric.physicalMax ?? ''} step="1" placeholder="72" type="number" value={pulseEntry.final} onChange={(e) => handleValueChange('bloodPressurePulse', e.target.value, pulseMetric.physicalMax)} onFocus={(e) => e.target.select()} />
+                              <input id="input-bloodPressurePulse" className={`stitch-metric-input ${pulseEntry.error ? 'has-error' : ''} ${autoFilled.has('bloodPressurePulse') ? 'is-autofilled' : ''}`} inputMode="decimal" min={pulseMetric.physicalMin ?? ''} max={pulseMetric.physicalMax ?? ''} step="1" placeholder="72" type="number" value={pulseEntry.final} onChange={(e) => handleValueChange('bloodPressurePulse', e.target.value, pulseMetric.physicalMax)} onFocus={(e) => e.target.select()} onKeyDown={(e) => handleInputKeyDown(e, null)} />
                               <span className="stitch-input-unit">{pulseMetric.unit}</span>
                             </div>
                             {pulseEntry.error ? <span className="stitch-field-error">{pulseEntry.error}</span> : null}
@@ -944,7 +982,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                     </>
                   ) : null}
 
-                  {!isBpGroup ? group.selections.map((selection) => {
+                  {!isBpGroup ? group.selections.map((selection, selIdx) => {
                     const metric = selection.metric
                     const entry = values[metric.metricCode] ?? { raw: '', final: '', confidence: null }
                     const isBmi = metric.metricCode === 'bmi'
@@ -996,6 +1034,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                             value={entry.final}
                             onChange={(e) => handleValueChange(metric.metricCode, e.target.value, metric.physicalMax)}
                             onFocus={(e) => e.target.select()}
+                            onKeyDown={(e) => { const next = group.selections[selIdx + 1]; handleInputKeyDown(e, next ? `input-${next.metric.metricCode}` : null) }}
                           />
                           <span className="stitch-input-unit">{metric.unit}</span>
                         </div>

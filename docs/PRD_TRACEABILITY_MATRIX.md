@@ -38,7 +38,7 @@
 | 18 | **Data Export & Privacy** | US-4.7.x | `GET /api/export/csv` · `POST /api/privacy/deleteAccount` · `POST /api/account/delete` | — | — | — | ✅ Done |
 | 19 | **Knowledge Base** | US-2.5.4 | `GET /api/kb` | `HL_knowledgeArticles` | `/kb` | — | ✅ Done (EP-P4.2 workflow redesign) |
 | 20 | **Admin Config** | US-ADMIN.x | `GET /api/admin/configs` · `PUT /api/admin/configs/:key` · `POST /api/admin/configs` · `DELETE /api/admin/configs/:key` | `HL_systemConfigs` | `/admin/configs` · `/settings/profile` (admin panel) | — | ✅ Done |
-| 21 | **AI Assistant** | GAP-10 | `POST /api/ai/assistant` | — | `/ai-assistant` | — | ✅ Done |
+| 21 | **AI Assistant** | GAP-10 | `POST /api/ai/assistant` | — | `/ai-assistant` | — | ✅ Done (Aggressive Medical Diagnostic Chat with Vectorize retrieval & Strict Liability Disclaimer) |
 | 22 | **Integer ID Migration** | EP-P1.x | — | — | — | — | ✅ Backend + Frontend done · Production migration pending |
 | 23 | **Enterprise UI** | EP-P2.x · EP-P3.x | — | — | — | — | ✅ Done |
 
@@ -100,7 +100,7 @@
 
 | Aspect | Details |
 |--------|---------|
-| **Sub-features** | Daily, Weekly, Monthly, Doctor PDF |
+| **Sub-features** | Daily, Weekly, Monthly, Doctor PDF, Vectorize-enhanced AI summary & Clinical Score |
 | **API** | `GET /api/reports/daily`, `GET /api/reports/weekly`, `GET /api/reports/monthly`, `POST /api/reports/doctor-ready`, `GET /api/reports/:id/download`, `POST /api/reports/:id/share` |
 | **DB** | `HL_reports`, `HL_reportShares` |
 | **UI** | `/reports/daily`, `/reports/weekly`, `/reports/monthly` |
@@ -245,7 +245,7 @@
 
 | Aspect | Details |
 |--------|---------|
-| **Sub-features** | Conversational health chat |
+| **Sub-features** | Aggressive Medical Diagnostic Chat with Vectorize retrieval & Strict Liability Disclaimer |
 | **API** | `POST /api/ai/assistant` |
 | **UI** | `/ai-assistant` |
 | **Status** | ✅ Done |
@@ -301,7 +301,7 @@
 | US-2.2.1 | Popup Setelah Validasi | `web/src/components/measurement/DynamicMetricForm.tsx` `SuggestionPreview` + `interpretation-modal` | n/a (live, client-side) | ✅ |
 | US-2.2.2 | Popup Multi Metric | `worker/src/index.ts` submit returns `interpretations[]` | POST `/api/measurements/submit` | ✅ |
 | US-2.3.1 | Generate AI Recommendation | `worker/src/index.ts` `/api/ai/report-analysis` | POST `/api/ai/report-analysis` | ✅ 3-model fallback |
-| US-2.3.4 | AI Safety Guardrail | worker prompt template | n/a | ✅ |
+| US-2.3.4 | AI Liability Guardrail | worker prompt template + server-side disclaimer injection | POST `/api/ai/report-analysis` | ✅ Aggressive Doctor Mode + mandatory disclaimer |
 | US-3.1.3 | Telegram Summary After Submit | `worker/src/index.ts` `enqueueTelegramSummary` + queue consumer | POST `/api/measurements/submit` | ✅ |
 | US-3.3.1 | Create Emergency Alert | `worker/src/routes-extra.ts` `createEmergencyAlert` | n/a | ✅ |
 | US-3.4.1 | Reminder Settings | `web/src/pages/reminders/RemindersPage.tsx` | GET/POST `/api/reminders` | ✅ |

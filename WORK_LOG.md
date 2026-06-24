@@ -4965,3 +4965,52 @@ Final state of audit + fixes:
 - AI endpoints are operational with deterministic safe fallback.
 - Real 9router LLM calls currently return `401 API key required for remote API access` because `HL_systemConfigs.aiTextApiKey` is empty. Enter a valid 9router API key in Settings/Admin Config to enable non-fallback AI responses.
 - Production D1 backup exists locally under `.tmp-d1-backups/`; do not commit it.
+
+## 2026-06-24 04:30 UTC — Agent: mimo-v2.5-pro
+
+### Task
+- Task ID: DOC-UPDATE-AGGRESSIVE-AI
+- Sprint: Documentation and Code Update — Aggressive Doctor Mode AI
+- Status: Completed
+
+### Files Read
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- docs/api-contract.md
+- docs/PRD_TRACEABILITY_MATRIX.md
+- HANDOFF.md
+- WORK_LOG.md
+- worker/src/index.ts
+
+### Files Changed
+- docs/PRD.docx.md
+- docs/PRD_UserStory.docx.md
+- docs/api-contract.md
+- docs/PRD_TRACEABILITY_MATRIX.md
+- worker/src/index.ts
+
+### What Changed
+- **PRD.docx.md**: Added Cloudflare Vectorize to section 4.2 stack. Replaced safe AI prompt in section 8 with "Aggressive Doctor Mode" (Dokter Senior dan Spesialis Medis persona, Clinical Confidence Score 1-100, liability disclaimer injection). Updated section 12.4 device prompt templates with mandatory disclaimer. Removed "Memberi diagnosis final" from Out of Scope (section 23), added note allowing diagnosis with liability disclaimer.
+- **PRD_UserStory.docx.md**: Updated US-2.3.1 acceptance criteria: Vectorize query, Clinical Confidence Score, model, disclaimer. Renamed US-2.3.4 from "AI Safety Guardrail" to "AI Liability Guardrail": aggressive doctor persona, server-side disclaimer injection, Clinical Score mandate.
+- **api-contract.md**: Updated section 16.8 response schema: added patternScore, model, disclaimer, usedFallback. Removed safety guardrails (forbids diagnosis) → replaced with liability guardrails (aggressive doctor mode, server-side disclaimer inject).
+- **PRD_TRACEABILITY_MATRIX.md**: Updated AI Assistant (GAP-10) to "Aggressive Medical Diagnostic Chat with Vectorize retrieval & Strict Liability Disclaimer". Updated Reports (US-2.5.x) with "Vectorize-enhanced AI summary & Clinical Score". Updated US-2.3.4 reference.
+- **worker/src/index.ts**: Changed report-analysis and AI assistant prompts from safe mode to aggressive doctor mode. Added `extractPatternScore` helper. Removed diagnosis-related terms from FORBIDDEN_PHRASES (kept medication/resep). Added server-side disclaimer injection for both endpoints. Added patternScore and disclaimer to both response payloads.
+
+### Validation
+- worker typecheck ✅
+- web typecheck ✅
+- wrangler deploy ✅ (version a665c4f4-6c8a-48bb-b806-0774933e59be)
+
+### Documentation Updated
+- PRD.docx.md
+- PRD_UserStory.docx.md
+- api-contract.md
+- PRD_TRACEABILITY_MATRIX.md
+- WORK_LOG.md
+- HANDOFF.md
+
+### Next Agent Notes
+- Production D1 `HL_systemConfigs.aiTextApiKey` still empty — AI endpoints fall back to deterministic safe fallback despite code now supporting aggressive doctor mode.
+- `filterUnsafeContent` still blocks medication-related phrases (resep obat, dosis, etc.) as required by Out of Scope.
+- Vectorize integration is documented but not yet coded (no Vectorize binding or embedding pipeline exists). Documented as Sprint 5 scope.
+- `extractPatternScore` uses regex to parse Clinical Confidence Score from AI text. May need refinement based on actual AI output format.

@@ -8,6 +8,7 @@ import { HistoryPage } from './pages/measurement/HistoryPage'
 import { AiAssistantPage } from './pages/ai/AiAssistantPage'
 import { TrackerPage } from './pages/tracker/TrackerPage'
 import { SeniorAppShell } from './components/SeniorAppShell'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { TodayDashboard } from './pages/dashboard/TodayDashboard'
 import { WeeklyDashboard } from './pages/dashboard/WeeklyDashboard'
 import { MonthlyDashboard } from './pages/dashboard/MonthlyDashboard'
@@ -378,7 +379,7 @@ function AppRoutes() {
 }
 
 function App() {
-  return <AuthProvider><AppRoutes /></AuthProvider>
+  return <ErrorBoundary><AuthProvider><AppRoutes /></AuthProvider></ErrorBoundary>
 }
 
 export default App

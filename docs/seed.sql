@@ -25,7 +25,8 @@ VALUES
 ('ocrRateLimitMax', '10', 'number', 'Maximum AI vision extraction requests per user per OCR rate-limit window'),
 ('ocrRateLimitWindowMin', '5', 'number', 'OCR rate-limit window in minutes'),
 ('telegramBotToken', '', 'string', 'Telegram bot token managed from system config; leave empty until regenerated in BotFather'),
-('telegramBotActive', 'true', 'boolean', 'Global toggle to enable/disable Telegram bot notifications');
+('telegramBotActive', 'true', 'boolean', 'Global toggle to enable/disable Telegram bot notifications'),
+('aiVisionUseCustomEndpoint', 'false', 'boolean', 'When true, uses aiTextEndpoint for vision extraction instead of Cloudflare Workers AI');
 
 -- Devices
 

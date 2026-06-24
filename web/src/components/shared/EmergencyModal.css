@@ -62,3 +62,28 @@
 .emergency-modal-button:hover {
   background: var(--colorStatusCritical);
 }
+
+.emergency-modal-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 1rem 0 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--colorTextSecondary);
+}
+
+.emergency-modal-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--colorStatusEmergency);
+}
+
+.emergency-modal-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--colorBorder);
+}

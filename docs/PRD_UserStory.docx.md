@@ -682,10 +682,15 @@ Sebagai user, saya ingin mendapat saran singkat setelah submit.
 
     Given submit berhasil
     When data hari ini tersimpan
-    Then sistem membuat summary data untuk AI
+    Then sistem melakukan query ke Cloudflare Vectorize untuk menarik seluruh riwayat kesehatan user sebagai konteks
+
+    Given Vectorize mengembalikan dokumen relevan
+    Then dokumen tersebut dijadikan konteks tambahan dalam prompt AI
 
     Given AI berhasil memberi rekomendasi
-    Then rekomendasi disimpan di HL_aiRecommendations
+    Then rekomendasi wajib menyertakan Clinical Confidence Score (1-100)
+    And rekomendasi wajib menyertakan nama model AI
+    And rekomendasi wajib menyertakan teks disclaimer tanggung jawab
 
     Given AI gagal
     Then aplikasi tetap menampilkan rule-based recommendation
@@ -695,8 +700,9 @@ Sebagai user, saya ingin mendapat saran singkat setelah submit.
     ✅ New endpoint POST /api/ai/report-analysis (extends beyond submit, available on all report pages)
     ✅ 3-model fallback to 9router (openrouter/poolside/laguna-m.1, oc/deepseek-v4-flash, oc/mimo-v2.5)
     ✅ Endpoint: https://9router.krpmerch.biz.id/v1
-    ✅ Safety guardrail: prompt forbids diagnosis/medication, response ends with "Hasil ini bukan diagnosis dokter."
-    ✅ Static safe fallback if all models fail or apiTextApiKey empty
+    ⬜ Vectorize query integration — in progress
+    ⬜ Clinical Confidence Score — pending
+    ⬜ Disclaimer injection — pending
     ✅ Daily/Weekly/Monthly reports each have "Analisa dengan AI" button
 
 **Data terkait**
@@ -739,22 +745,24 @@ Sebagai user, saya ingin tahu tren angka hari ini dibanding 7 hari terakhir.
 
     HL_measurementValues
 
-### US-2.3.4 — AI Safety Guardrail
+### US-2.3.4 — AI Liability Guardrail
 
-Sebagai product owner, saya ingin AI tidak memberi diagnosis atau resep obat.
+Sebagai product owner, saya ingin setiap rekomendasi AI memiliki persona dokter senior dan klausa pelepasan tanggung jawab yang ketat.
 
 **Acceptance Criteria**
 
     Given AI recommendation dibuat
     When prompt dikirim
-    Then prompt harus mengandung instruksi:
-    bukan dokter
-    jangan diagnosis
-    jangan resep obat
-    gunakan data yang diberikan saja
+    Then prompt harus menggunakan persona "Dokter Senior / Dokter Spesialis"
+    And prompt wajib memberikan instruksi pemberian Clinical Confidence Score (1-100)
 
-    Given response AI mengandung diagnosis keras atau resep obat
-    Then sistem menolak response dan memakai fallback rule-based text
+    Given response AI diterima oleh server
+    When disclaimer teks "[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini." tidak ditemukan di response
+    Then server wajib menyisipkan teks disclaimer tersebut di akhir response secara otomatis sebelum dikembalikan ke client
+
+    Given disclaimer sudah ada di response AI
+    When server memvalidasi
+    Then server tidak perlu melakukan inject ulang
 
 **Data terkait**
 

@@ -71,7 +71,7 @@ export function SelectMetricPage() {
   const { profile } = useAuth()
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDeviceCodes, setSelectedDeviceCodes] = useState<string[]>([])
-  const [sinocareMode, setSinocareMode] = useState<string | null>(null)
+  const [sinocareModes, setSinocareModes] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [todaySessions, setTodaySessions] = useState<TodaySession[]>([])
@@ -112,7 +112,7 @@ export function SelectMetricPage() {
     for (const device of devices) {
       if (!selectedDeviceCodes.includes(device.deviceCode)) continue
       for (const metric of device.metrics) {
-        if (device.deviceType === 'gcu' && sinocareMode && metric.metricCode !== sinocareMode) continue
+        if (device.deviceType === 'gcu' && sinocareModes.size > 0 && !sinocareModes.has(metric.metricCode)) continue
         result.push({
           id: `${device.deviceCode}:${metric.metricCode}`,
           device: { deviceCode: device.deviceCode, deviceName: device.deviceName, deviceType: device.deviceType },
@@ -128,7 +128,7 @@ export function SelectMetricPage() {
       }
     }
     return result
-  }, [devices, selectedDeviceCodes, sinocareMode])
+  }, [devices, selectedDeviceCodes, sinocareModes])
 
   const ageInfo = useMemo(() => {
     if (!birthDate) return null
@@ -162,6 +162,13 @@ export function SelectMetricPage() {
   }
 
   const sinocareDevice = devices.find((d) => d.deviceType === 'gcu' && selectedDeviceCodes.includes(d.deviceCode))
+  function toggleSinocareMode(code: string) {
+    setSinocareModes(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code); else next.add(code)
+      return next
+    })
+  }
 
   return (
     <section className="measurement-panel" aria-labelledby="device-select-title">
@@ -226,8 +233,8 @@ export function SelectMetricPage() {
             {sinocareDevice.metrics.map((metric) => (
               <button
                 key={metric.metricCode}
-                className={`sinocare-mode-btn ${sinocareMode === metric.metricCode ? 'selected' : ''}`}
-                onClick={() => setSinocareMode(metric.metricCode)}
+                className={`sinocare-mode-btn ${sinocareModes.has(metric.metricCode) ? 'selected' : ''}`}
+                onClick={() => toggleSinocareMode(metric.metricCode)}
                 type="button"
               >
                 {metric.metricName}
@@ -250,7 +257,7 @@ export function SelectMetricPage() {
             ) : null}
             <button
               className="btn-secondary"
-              onClick={() => { setSelectedDeviceCodes([]); setSinocareMode(null) }}
+              onClick={() => { setSelectedDeviceCodes([]); setSinocareModes(new Set()) }}
               type="button"
               style={{ marginLeft: 'auto', padding: '8px 16px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', background: 'var(--colorSurface)', cursor: 'pointer', fontSize: 14 }}
             >
@@ -261,7 +268,7 @@ export function SelectMetricPage() {
 
           <DynamicMetricForm
             selectedMetrics={selectedMetrics}
-            onClearSelection={() => { setSelectedDeviceCodes([]); setSinocareMode(null) }}
+            onClearSelection={() => { setSelectedDeviceCodes([]); setSinocareModes(new Set()) }}
             onSubmitted={() => { void fetchTodaySessions().then(setTodaySessions) }}
           />
         </>

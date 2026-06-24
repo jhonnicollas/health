@@ -95,7 +95,10 @@ TypeScript
 ```text
 Cloudflare Workers AI Vision Model
 Cloudflare Workers AI Text LLM
+Cloudflare Vectorize — Vector Database (Sprint 5)
 ```
+
+Vectorize digunakan untuk menyimpan embeddings riwayat metrik, gejala harian, dan medical rules pengguna. Worker melakukan query similarity ke Vectorize sebelum memanggil AI Text LLM untuk memberikan konteks historis yang relevan (misal pola "lonjakan tensi saat sleepDuration < 5 jam").
 
 ### 4.3 Database
 
@@ -486,9 +489,7 @@ Membangun interpretasi angka, rules medis dari CSV, popup edukatif, AI recommend
 
 ### AI Recommendation Logic
 
-AI tidak membaca data mentah langsung dari seluruh DB.
-
-Worker harus membuat summary ringkas:
+Worker wajib melakukan Vectorize similarity query untuk mengambil riwayat metrik dan gejala yang relevan sebagai konteks AI, kemudian membangun summary ringkas:
 
 ```text
 {
@@ -506,6 +507,12 @@ Worker harus membuat summary ringkas:
     "systolicAverage": 135,
     "sleepAverage": 6.2
   },
+  "vectorizeContext": {
+    "documents": [
+      { "id": "vec-xxx", "score": 0.89, "text": "Pasien riwayat hipertensi tahap 2, tensi sering tinggi saat kurang tidur" },
+      { "id": "vec-yyy", "score": 0.72, "text": "Gula darah puasa cenderung normal, kolesterol borderline" }
+    ]
+  },
   "ruleStatuses": [
     {
       "metricCode": "systolic",
@@ -516,16 +523,28 @@ Worker harus membuat summary ringkas:
 }
 ```
 
-Prompt AI harus aman:
+Prompt AI (Aggressive Doctor Mode):
 
 ```text
-Anda adalah asisten edukasi kesehatan, bukan dokter.
-Gunakan hanya data dan status yang diberikan.
-Jangan diagnosis.
-Jangan resepkan obat.
-Berikan saran gaya hidup ringan, aman, dan mudah dilakukan.
-Jika ada severity critical atau emergency, sarankan cek ulang dan hubungi tenaga medis.
+Anda adalah seorang Dokter Senior dan Spesialis Medis. Anda memiliki akses ke seluruh data historis dan metrik kesehatan pengguna.
+1. Lakukan analisa mendalam dan agresif terhadap kondisi pasien berdasarkan data yang diberikan.
+2. Berikan "Clinical Confidence Score" (1-100) terhadap analisa Anda.
+3. Berikan rekomendasi medis, peringatan, dan insight layaknya dokter spesialis yang sedang mendiagnosis pasien.
+
+WAJIB sertakan teks ini tepat di akhir respons Anda tanpa diubah sedikit pun:
+"[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."
 ```
+
+Server-side enforcement:
+> Jika *response* AI tidak mengandung teks disclaimer di atas, *server* wajib menyisipkannya secara otomatis di akhir respons sebelum dikembalikan ke *client*. Hal ini memastikan setiap respons AI yang ditampilkan ke pengguna tetap memiliki klausa pelepasan tanggung jawab medis.
+
+### Clinical Confidence Score
+
+Setiap respons AI wajib menyertakan `patternScore` berupa angka 1–100 beserta justifikasi singkat. Score ini ditentukan sendiri oleh AI berdasarkan:
+- Konsistensi data historis (semakin konsisten semakin tinggi)
+- Jumlah data yang tersedia (semakin banyak semakin tinggi)
+- Kekuatan korelasi yang terdeteksi
+- Ketersediaan data pembanding (3 hari / 7 hari / lebih)
 
 ### Comparison Rules
 
@@ -1685,6 +1704,7 @@ Required keys:
 spo2, heartRate, confidence, needsManualReview.
 If unsure, set value null and needsManualReview true.
 Do not provide medical advice.
+Append disclaimer: "[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."
 ```
 
 #### Blood Pressure Monitor
@@ -1696,6 +1716,7 @@ Required keys:
 systolic, diastolic, bloodPressurePulse, confidence, needsManualReview.
 If unsure, set value null and needsManualReview true.
 Do not provide medical advice.
+Append disclaimer: "[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."
 ```
 
 #### Sinocare GCU
@@ -1706,6 +1727,7 @@ Selected metric can be glucoseFasting, glucosePostMeal, cholesterolTotal, or uri
 Return JSON only.
 If unsure, set value null and needsManualReview true.
 Do not infer unselected metrics.
+Append disclaimer: "[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."
 ```
 
 ## 13. Attachment Processing
@@ -2147,13 +2169,14 @@ Export data tersedia
 Untuk menjaga keamanan produk, aplikasi tidak boleh:
 
 ```text
-Memberi diagnosis final
 Meresepkan obat
 Mengubah dosis obat
 Mengklaim menggantikan dokter
 Mengirim emergency alert tanpa consent
 Menyimpan original image tanpa persetujuan eksplisit
 ```
+
+> **Catatan:** AI diperbolehkan memberikan analisis mendalam dan diagnosis potensial berdasarkan data yang diberikan, sepanjang setiap output menyertakan peringatan pelepasan tanggung jawab medis yang jelas. Lihat bagian **Clinical Disclaimer Enforcement** pada Sprint 2 untuk detail implementasi server-side disclaimer.
 
 ## 24. Product Success Metric
 

@@ -360,20 +360,47 @@ Commands Run So Far: worker npm test (pass before import fix), web build (failed
 Known Issues: docs/schema.sql has invalid inline INDEX in HL_lastMeasurements; must fix before clean D1 rebuild.
 Next Recommended Task: validate schema/seed locally, audit CRUD integer-ID compatibility, run full tests, reset production D1, deploy, and UAT.
 ```
-## Current Status — 2026-06-23 05:25 UTC
+## Current Status — 2026-06-24 04:30 UTC
 
 ```text
 Project: HL Health Companion
-Sprint: Production Regression / D1 Reset
-Current Task: CRUD-REGRESSION-D1-RESET-UAT
-Current State: COMPLETED AND DEPLOYED
-Last Completed: CRUD-REGRESSION-D1-RESET-UAT
-Production Worker: 4761730f-285e-4a67-8105-1ae0ffc2f171
-Production Pages: https://2d0ceb3d.hl-health-companion.pages.dev
-Stable Pages URL: https://hl-health-companion.pages.dev
-D1 State: Reset from scratch; 39 HL_* tables, 6 devices, 15 metrics, 80 metric rules, 13 system configs.
-Files Changed: docs/schema.sql, docs/seed.sql, docs/seed-rules.generated.sql, docs/TASKS.md, WORK_LOG.md, HANDOFF.md, worker/src/index.ts, worker/src/routes-extra.ts, web/src/App.tsx, web/src/components/MedicalTerm.tsx, web/src/components/measurement/DynamicMetricForm.tsx, web/src/pages/alerts/AlertsPage.tsx, web/src/pages/measurement/SelectMetricPage.tsx, web/src/utils/dateFormat.ts, web/src/App.css
-Commands Run: local D1 schema/seed validation, worker npm test, web lint, web build, D1 export backup, remote D1 drop/recreate/seed, wrangler deploy, wrangler pages deploy, production UAT.
-Known Issues: Real 9router LLM calls return 401 until HL_systemConfigs.aiTextApiKey is filled; AI endpoints fall back safely and do not 500.
-Next Recommended Task: Enter valid 9router API key through Settings/Admin Config, then rerun AI assistant/report-analysis UAT for non-fallback model response.
+Sprint: Documentation + Code Update — Aggressive Doctor Mode AI
+Current Task: DOC-UPDATE-AGGRESSIVE-AI
+Current State: DEPLOYED AND VERIFIED
+Last Completed: Documentation update + code revert from safe to aggressive doctor mode
+Production Worker: a665c4f4-6c8a-48bb-b806-0774933e59be
+Worker URL:        https://hl-health-companion.indiehomesungairaya.workers.dev
+Commit:            976b59b (latest)
 ```
+
+### What Changed
+
+**Documentation**
+- PRD section 4.2: +Cloudflare Vectorize
+- PRD section 8: Safe AI prompt → Aggressive Doctor Mode (Dokter Senior persona, Clinical Confidence Score, liability disclaimer)
+- PRD section 12.4: Device prompts + mandatory disclaimer
+- PRD section 23: Removed "Memberi diagnosis final" from out of scope; added note allowing diagnosis with liability disclaimer
+- User Stories US-2.3.1: +Vectorize query + Clinical Score
+- User Stories US-2.3.4: Renamed "AI Safety Guardrail" → "AI Liability Guardrail"; aggressive persona + server-side disclaimer injection
+- api-contract section 16.8: +patternScore, model, disclaimer, usedFallback; replaced safety guardrails with liability guardrails
+- Traceability matrix: updated AI Assistant + Reports entries
+
+**Code (worker/src/index.ts)**
+- Report-analysis + AI assistant prompts: safe mode → aggressive doctor mode
+- Added `extractPatternScore()` regex helper (parses "Clinical Confidence Score: N" from AI text)
+- FORBIDDEN_PHRASES: removed diagnosis-related terms, kept medication/prescription blocks
+- Server-side disclaimer injection: if AI response lacks liability disclaimer, server appends it automatically
+- Both endpoints now return `patternScore`, `disclaimer`, `model`, `usedFallback`
+
+### Validation
+- worker typecheck ✅
+- web typecheck ✅
+- wrangler deploy ✅
+
+### Known Issues
+- `HL_systemConfigs.aiTextApiKey` still empty — AI endpoints use deterministic fallback text (aggressive doctor mode prompt defined but no real model responds yet)
+- Vectorize integration documented only — no binding or embedding pipeline implemented (Sprint 5 scope)
+- `extractPatternScore` regex may need tuning based on actual AI output format
+
+### Next Recommended Task
+Set a valid 9router API key in Settings/Admin Config → verify aggressive doctor mode AI responses in production (patternScore, disclaimer injection)

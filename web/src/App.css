@@ -563,6 +563,7 @@
 
 .app-content {
   width: 100%;
+  overflow-x: auto;
 }
 
 .app-bottom-nav {
@@ -850,6 +851,7 @@ button.danger {
 
 .measurement-step-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-bottom: 4px;
@@ -4028,7 +4030,7 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
 .stitch-measurement-form {
   max-width: none;
   width: 100%;
-  padding: 24px 16px;
+  padding: 8px 0;
 }
 
 /* Age Banner */
@@ -4084,6 +4086,7 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   border-radius: 20px;
   overflow: hidden;
   box-shadow: var(--shadowLg);
+  position: relative;
 }
 
 .stitch-device-card:hover {
@@ -4098,6 +4101,7 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   padding: 20px 24px;
   border-bottom: 2px solid var(--colorBorder);
   background: linear-gradient(to right, var(--colorSurface) 0%, var(--colorSurfaceContainerLow) 100%);
+  border-left: 4px solid var(--colorPrimary);
 }
 
 .stitch-card-header-left {
@@ -4337,30 +4341,32 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   left: 0;
   z-index: 100;
   margin-top: 6px;
-  padding: 12px 14px;
+  padding: 16px 18px;
   background: var(--colorSurface);
   border: 1.5px solid #f39c12;
-  border-radius: var(--radiusSm);
+  border-radius: var(--radiusMd);
   box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  font: var(--typLabelSm);
+  font: var(--typBodyMd);
   color: var(--colorText);
   white-space: normal;
-  max-width: 300px;
-  line-height: 1.5;
+  max-width: 400px;
+  width: max-content;
+  line-height: 1.6;
   pointer-events: auto;
 }
 .stitch-prep-popup ul {
-  margin: 4px 0 0 0;
-  padding-left: 16px;
+  margin: 8px 0 0 0;
+  padding-left: 20px;
 }
 .stitch-prep-popup li {
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 .stitch-prep-popup-title {
   font-weight: 700;
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: #f39c12;
+  font-size: 1.1em;
 }
 
 .stitch-ai-progress span {
@@ -5014,21 +5020,22 @@ html[data-accessibility="senior"] .consent-toggle-row label { font-size: 1rem; m
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--colorOutlineVariant) 40%, transparent);
-  color: var(--colorTextSecondary);
+  border: 2px solid #3b82f6;
+  background: transparent;
+  color: #3b82f6;
   font-size: 13px;
   line-height: 1;
   transition: background 0.12s;
 }
 .info-chip-btn:hover {
-  background: var(--colorPrimary);
-  color: var(--colorPrimaryText);
+  background: #3b82f6;
+  color: #fff;
 }
 .info-chip-btn .material-symbols-outlined {
-  font-size: 13px;
+  font-size: 14px;
   font-variation-settings: 'wght' 500;
 }
 .info-chip-popup {
@@ -5613,22 +5620,22 @@ input:-webkit-autofill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: 1.5px solid #2ecc71;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #3b82f6;
   border-radius: 50%;
   background: var(--colorBgSecondary);
   cursor: pointer;
   padding: 0;
-  color: var(--colorTextSecondary);
+  color: #3b82f6;
   transition: background 0.15s, color 0.15s;
 }
 .medical-term-info:hover {
-  background: #2ecc71;
+  background: #3b82f6;
   color: #fff;
 }
 .medical-term-info .material-symbols-outlined {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
 }
 .metric-code-badge-cell .medical-term {
@@ -5650,7 +5657,7 @@ input:-webkit-autofill {
   margin-top: 4px;
   padding: 8px 12px;
   background: var(--colorSurface);
-  border: 1px solid #2ecc71;
+  border: 2px solid #3b82f6;
   border-radius: var(--radiusSm);
   box-shadow: 0 4px 12px rgba(0,0,0,0.12);
   font: var(--typLabelSm);

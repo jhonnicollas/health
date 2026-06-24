@@ -1973,7 +1973,7 @@ PDF stream if token is valid and not expired.
 POST /api/ai/report-analysis
 ```
 
-Sends the report context to the configured text AI service (9router) and returns a short, safe narrative analysis. Falls back to a deterministic message if all AI models fail or no API key is configured.
+Sends the report context (plus Vectorize similarity results if available) to the configured text AI service (9router) and returns an aggressive medical diagnostic analysis with a mandatory liability disclaimer. Falls back to a deterministic message if all AI models fail or no API key is configured.
 
 ### Request
 
@@ -1990,8 +1990,10 @@ Sends the report context to the configured text AI service (9router) and returns
 {
   "success": true,
   "data": {
-    "analysis": "Data tekanan darah Anda hari ini masuk kategori krisis. Disarankan istirahat total...",
+    "analysis": "Data tekanan darah Anda hari ini menunjukkan krisis hipertensi dengan sistolik 185 mmHg...",
+    "patternScore": 95,
     "model": "oc/deepseek-v4-flash-free",
+    "disclaimer": "oc/deepseek-v4-flash-free is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini.",
     "usedFallback": false
   }
 }
@@ -2001,6 +2003,16 @@ If `usedFallback: true`, the analysis is the safe fallback text:
 
 > "AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda."
 
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `analysis` | string | Narasi hasil analisa AI (aggressive doctor mode) |
+| `patternScore` | number (1-100) | Clinical Confidence Score: konsistensi data historis, jumlah data, korelasi |
+| `model` | string | Nama model AI yang digunakan |
+| `disclaimer` | string | Teks pelepasan tanggung jawab medis. Jika tidak ada di response AI, server wajib inject otomatis |
+| `usedFallback` | boolean | Apakah menggunakan fallback karena semua model gagal |
+
 ### Models Tried (in order)
 
 1. `oc/deepseek-v4-flash-free`
@@ -2009,10 +2021,13 @@ If `usedFallback: true`, the analysis is the safe fallback text:
 
 Endpoint is `https://9router.krpmerch.biz.id/v1` (configurable via `HL_systemConfigs.aiTextEndpoint`).
 
-### Safety Guardrails
+### Liability Guardrails
 
-- System prompt forbids diagnosis, medication dosage, and severity classification.
-- Response is forced to end with: "Hasil ini bukan diagnosis dokter."
+- System prompt uses "Dokter Senior dan Spesialis Medis" persona (Aggressive Doctor Mode).
+- Prompt mandates Clinical Confidence Score (1-100) in every response.
+- Server **injects** the liability disclaimer at the end of the response if the AI fails to include it.
+- AI is allowed to diagnose and give medical recommendations, but **must** include the disclaimer and Clinical Score.
+- Analysis output is stored in `HL_aiRecommendations` with all fields documented above.
 
 ---
 
