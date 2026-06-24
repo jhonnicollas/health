@@ -510,3 +510,35 @@ Rules:
 cd worker && CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=79dea2845a4b62ea5229c8676dea02c0 npx wrangler deploy
 cd web && CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=79dea2845a4b62ea5229c8676dea02c0 npx wrangler pages deploy dist --project-name hl-health-companion --commit-dirty=true
 ```
+
+## 2026-06-25 02:05 UTC — Agent: Codex
+
+### Task
+- Task ID: PRODUCTION DEPLOY
+- Sprint: Sprint 5
+- Status: Completed
+
+### What Changed
+- Deployed Worker: hl-health-companion-api → https://hl-health-companion-api.indiehomesungairaya.workers.dev
+- Deployed Pages: hl-health-companion → https://a1b65712.hl-health-companion.pages.dev
+- Set Worker secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+
+### Validation
+- Worker API returns proper JSON responses (unauthenticated as expected)
+- Pages frontend returns HTTP 200
+
+## 2026-06-25 02:05 UTC — Agent: Codex
+
+### Task
+- Task ID: PRODUCTION DEPLOY
+- Sprint: Sprint 5
+- Status: Completed
+
+### What Changed
+- Deployed Worker to Cloudflare
+- Deployed Pages frontend to Cloudflare
+- Set Worker secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+
+### Validation
+- Worker API returns proper JSON responses
+- Pages frontend returns HTTP 200
