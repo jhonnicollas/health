@@ -783,7 +783,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
         ...(body.dataShareConsent !== undefined ? [{ type: 'dataShareConsent', val: body.dataShareConsent }] : [])
       ]
       for (const ct of consentTypes) {
-        await c.env.DB.prepare("INSERT INTO HL_userConsents (userId, consentType, consentValue, createdAt, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(userId, consentType) DO UPDATE SET consentValue = excluded.consentValue, updatedAt = CURRENT_TIMESTAMP").bind(userId, ct.type, ct.val ? 1 : 0).run()
+        await c.env.DB.prepare("INSERT INTO HL_userConsents (userId, consentType, consentValue, createdAt, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(userId, ct.type, ct.val ? 1 : 0).run()
       }
       return jsonResponse(c, success({ updated: true }, 200, startedAt), 200)
     } catch (e) {
