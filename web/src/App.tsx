@@ -12,6 +12,10 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { TodayDashboard } from './pages/dashboard/TodayDashboard'
 import { WeeklyDashboard } from './pages/dashboard/WeeklyDashboard'
 import { MonthlyDashboard } from './pages/dashboard/MonthlyDashboard'
+import { DailyHealthHubPage } from "./pages/dashboard/DailyHealthHubPage"
+import { SymptomPage } from "./pages/symptoms/SymptomPage"
+import { HydrationPage } from "./pages/hydration/HydrationPage"
+import { CyclePage } from "./pages/cycle/CyclePage"
 import { SelectMetricPage } from './pages/measurement/SelectMetricPage'
 import { DailyReportPage } from './pages/reports/DailyReportPage'
 import { WeeklyReportPage } from './pages/reports/WeeklyReportPage'
@@ -54,6 +58,10 @@ const NAV_GROUPS: (NavGroup | NavLink)[] = [
   ]},
   { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', icon: 'smart_toy' },
   { path: '/alerts', label: 'Notifications & Alerts', shortLabel: 'Alerts', icon: 'notifications', badge: '3' },
+  { path: "/cycle", label: "Cycle", shortLabel: "Cycle", icon: "cycle" },
+  { path: "/hydration", label: "Hydration", shortLabel: "Hydrate", icon: "water_drop" },
+  { path: "/symptoms", label: "Symptoms", shortLabel: "Symptoms", icon: "sick" },
+  { path: "/daily-health", label: "Daily Health", shortLabel: "Health", icon: "monitoring" },
   { label: 'Health', icon: 'favorite', shortLabel: 'Health', children: [
     { path: '/tracker', label: 'Fasting & Medication', shortLabel: 'Track', icon: 'timer' },
     { path: '/fasting', label: 'Fasting Timer', shortLabel: 'Fast', icon: 'timer' },
@@ -119,6 +127,10 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
     case '/alerts': return <AlertsPage />
     case '/patterns': return <PatternsPage />
     case '/kb': return <KnowledgeBasePage />
+    case '/daily-health': return <DailyHealthHubPage />
+    case '/symptoms': return <SymptomPage />
+    case '/hydration': return <HydrationPage />
+    case '/cycle': return <CyclePage />
     case '/settings/profile': return <ProfileSettingsPage />
     case '/settings/delete': return <ProfileDeletePage />
     case '/admin': return <AdminPage />
