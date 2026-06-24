@@ -6,6 +6,7 @@ type Article = {
   category?: string
   title: string
   body: string
+  contentMarkdown?: string
 }
 
 type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
@@ -127,7 +128,7 @@ export function KnowledgeBasePage() {
     [articles, category]
   )
   const selectedArticle = articles.find(article => article.id === selectedId) ?? visibleArticles[0] ?? null
-  const displayArticle = fullArticle && selectedArticle && fullArticle.slug === selectedArticle.slug ? { ...selectedArticle, body: (fullArticle as any).body || (fullArticle as any).contentMarkdown || selectedArticle.body } : selectedArticle
+  const displayArticle = fullArticle && selectedArticle && fullArticle.slug === selectedArticle.slug ? { ...selectedArticle, body: fullArticle.body || fullArticle.contentMarkdown || selectedArticle.body } : selectedArticle
   const sections = displayArticle ? parseArticle(displayArticle.body) : []
 
   return (

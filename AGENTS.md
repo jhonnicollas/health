@@ -1,527 +1,291 @@
-# AGENTS.md — HL Health Companion Multi-Agent Rules
+# AGENTS.md — Sprint 5 Compact AI-Agent Rules
 
-## 1. Purpose
-
-This file is the main operating rulebook for every AI coding agent working on **HL Health Companion**.
-
-The project is a Cloudflare-first health logging web app. It uses:
-
-- Cloudflare Workers
-- Hono.js
-- Cloudflare Workers AI Vision Model
-- Cloudflare Workers AI Text LLM
-- Cloudflare D1 binding `DB`
-- Cloudflare R2 binding `LOGS`
-- Cloudflare Queues
-- Cloudflare Cron Triggers
-- Wrangler
-- React SPA / PWA frontend
-
-Every agent must prioritize resume-safe work. Any sprint may be interrupted, so every task must leave enough logs and checklist updates for the next agent to continue.
+Product: HL Health Companion  
+Scope: Sprint 5 Foundation + 5A + 5B + 5C + 5D + 5E  
+Mode: compact, resume-safe, vibe-coding safe  
+Status: use this file as the runtime rulebook for coding agents.
 
 ---
 
-## 2. Mandatory Project Context Files
+## 0. Compact Context Rule
 
-Before starting any task, every agent must read these files in this order:
+Do not paste whole PRD/API/SQL/Test docs into the model context. Read only:
 
-1. `docs/01-PRD.docx.md` or exported PRD markdown, if available
-2. `docs/02-PRD_UserStory.docx.md` or exported user story markdown, if available
-3. `docs/04-ARCHITECTURE.md`
-4. `docs/05-api-contract.md`
-5. `docs/07-schema.sql`
-6. `docs/08-seed.sql`
-7. `docs/06-design-system.md`
-8. `docs/11-TASKS.md`
-9. `WORK_LOG.md`
-10. `HANDOFF.md`
+1. this `AGENTS.md`;
+2. `HANDOFF.md`;
+3. latest 3–5 entries in `WORK_LOG.md`;
+4. current task section from `docs_sprint5/08.TASK_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL.md`;
+5. directly relevant endpoint section from `docs_sprint5/07.API_CONTRACT_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.md`;
+6. directly relevant schema/table from `docs_sprint5/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql` and seed code from `docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql`.
 
-If a file does not exist yet, the agent must create it only when the current task requires it.
+All Sprint 5 final docs are in the `docs_sprint5/` folder.
+
+If unsure, search the repo/docs. Do not invent tables, endpoints, fields, permissions, or feature codes.
 
 ---
 
-## 3. Non-Negotiable Product Rules
+## 1. Source of Truth Order
 
-### 3.1 Rule First, AI Assisted
-
-Medical status must never be decided freely by AI.
-
-Required flow:
+When documents conflict, use this order:
 
 ```text
-finalValue
-→ HL_metricRules rules engine
-→ status, severity, popup, emergencyLevel
-→ AI only generates safe explanation, summary, or trend insight
+1. docs_sprint5/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql = table names, columns, constraints, indexes.
+2. docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql = role, permission, plan, feature, config codes.
+3. docs_sprint5/07.API_CONTRACT_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.md = endpoint path, method, auth guard, response envelope, table usage.
+4. docs_sprint5/02.PRD_USER_STORIES_SPRINT5_FULL_FINAL_REVISED_AI_SPRINT6_READY.md = product behavior, UX behavior, acceptance criteria, safety behavior.
+5. docs_sprint5/08.TASK_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL.md = task order, dependency, owner, validation.
+6. docs_sprint5/05-ARCHITECTURE_REVISED_AI_SPRINT6_READY.md = architecture reference.
+7. docs_sprint5/09.TEST_PLAN + docs_sprint5/11.TDD_PLAN + docs_sprint5/10.STRESS_TEST_PLAN = validation strategy.
+8. AGENTS/HANDOFF/WORK_LOG = execution and resume state only.
 ```
+
+If conflict still exists, stop. Mark task `BLOCKED` in `HANDOFF.md` and append `WORK_LOG.md` with exact conflict.
+
+---
+
+## 2. Mandatory Hard Boundaries
+
+```text
+- Sprint 5 non-metric safety events use HL_safetyEvents, not HL_alerts.
+- HL_alerts stays only for existing Sprint 1–4 measurement-centric alerts.
+- Education progress uses HL_userEducationProgress, not HL_educationViews.
+- No plaintext secret in D1, seed, frontend bundle, API response, log, test snapshot, or audit metadata.
+- Real secrets live in Cloudflare Secrets/Env. D1 may store only configured/masked/envVarName/secretRef metadata.
+- Admin/security-sensitive mutations write existing HL_auditLogs using: userId, action, entityType, entityId, metadataJson.
+- All auth, admin permission, entitlement, quota, family permission, cycle eligibility, webhook, cron, red flag, disclaimer checks are server-side.
+- Sprint 1–4 behavior must remain backward compatible.
+```
+
+Forbidden names unless explicitly found in final docs:
+
+```text
+HL_educationViews
+HL_userPreferences for education progress
+actorId/targetType/targetId in HL_auditLogs
+plaintext Google/OAuth/Telegram/AI/Billing/Internal secrets
+```
+
+---
+
+## 3. Medical and Privacy Safety
 
 AI must not:
 
-- diagnose disease
-- prescribe medicine
-- change medication dosage
-- replace doctor advice
-- claim certainty from correlations
+```text
+- decide emergency;
+- diagnose definitively;
+- prescribe medicine;
+- change medication dosage;
+- claim it replaces doctors;
+- be the only source of medical severity/guardrail.
+```
 
-### 3.2 Manual Override Is Mandatory
-
-Every extracted AI value must be editable before submit.
-
-Required fields in final measurement value:
+Required deterministic rules:
 
 ```text
-rawAiValue
-finalValue
-confidence
-manualOverride
-status
-severity
-ruleId
+- Measurement status/severity comes from existing HL_metricRules flow.
+- Symptom red flag is deterministic server-side.
+- Overhydration is warning only, not diagnosis.
+- Cycle contraception guardrail is blocking UI, not toast-only.
+- AI medical output must include server-side disclaimer.
 ```
 
-If `finalValue` differs from `rawAiValue`, set:
+Sensitive data:
 
 ```text
-manualOverride = 1
+symptom detail, red flag detail, cycle, pregnancy, lactation, menopause, AI memory, doctor report detail, caregiver access, support/admin sensitive access
 ```
 
-### 3.3 Original Image Must Not Be Stored
+Access requires owner OR explicit family permission OR restricted admin permission + audit.
 
-Original images are never stored in R2.
+---
 
-Allowed storage:
+## 4. Execution Protocol
+
+Run Sprint 5 autonomously until the full Sprint 5 release gate is complete.
 
 ```text
-final compressed watermarked attachment only
+1 phase → 1 task → 1 implementation slice → 1 test run → 1 WORK_LOG entry → 1 HANDOFF update → next task
 ```
 
-R2 path pattern:
+Do not batch tasks inside one implementation slice. Complete exactly one task cycle at a time, then immediately continue to the next READY task from the task plan unless the current task is BLOCKED or the entire Sprint 5 program is DONE.
+
+Phase order:
 
 ```text
-HL/users/{userId}/measurements/{sessionId}/{metricCode}-{attachmentId}.webp
+Foundation → 5A → 5B → 5C → 5D → 5E → Cross-Phase Release Gate
 ```
 
-### 3.4 AI Vision Must Not Block User
+Parallel work is allowed only after Foundation backend guards are complete and dependencies are satisfied.
 
-AI Vision must target completion within a configurable timeout limit (from DB).
-
-Required behavior:
+Autonomous continuation rules:
 
 ```text
-AI success <= timeout limit → fill text box
-AI timeout > timeout limit → show manual input
-AI failed → show manual input
-No automatic AI retry by default
-```
-
-### 3.5 Use Existing Cloudflare Resources Only
-
-Do not create a new database or bucket.
-
-Required D1:
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "multi_Ai_db"
-database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"
-```
-
-Required R2:
-
-```toml
-[[r2_buckets]]
-binding = "LOGS"
-bucket_name = "multi-apps-ai-bucket"
-```
-
-### 3.6 Naming Rules
-
-Database tables:
-
-```text
-Must start with HL_
-No underscore after HL_
-```
-
-Valid:
-
-```text
-HL_users
-HL_userProfiles
-HL_measurementSessions
-HL_measurementValues
-```
-
-Invalid:
-
-```text
-HL_user_profiles
-measurement_sessions
-users
-```
-
-Fields:
-
-```text
-camelCase only
-```
-
-Valid:
-
-```text
-userId
-createdAt
-manualOverride
-finalValue
-```
-
-Invalid:
-
-```text
-user_id
-created_at
-manual_override
-final_value
+- After each DONE task, update HANDOFF.md to the next task and continue execution immediately.
+- After each DONE phase, run that phase's required tests/UAT checks, update WORK_LOG.md and HANDOFF.md, then continue to the next phase.
+- After 5E is DONE, execute the Cross-Phase Release Gate: full regression, TDD plan checks, UAT plan checks, stress test plan checks, documentation update, and only then deployment if the gate explicitly requires it.
+- Stop only for BLOCKED conflict/missing dependency/unavailable secret/environment failure, or after Sprint 5 Cross-Phase Release Gate is fully DONE.
 ```
 
 ---
 
-## 4. Multi-Agent Work Protocol
-
-### 4.1 One Agent, One Task
-
-TASKS.md is the absolute single source of truth for execution.
-Jangan pernah melompat task, jalankan task harus berurutan. Do not attempt to do all sprints or multiple tasks at once. Use Auto-Sequential mode to do one task per cycle.
-Each agent must work on exactly one checklist task at a time. Only proceed to the next task if the current one has fully passed validation and documentation updates.
+## 5. Agent Start Checklist
 
 Before editing code:
 
-1. Open `TASKS.md`.
-2. Pick one unchecked task.
-3. Change it to `[-] In Progress`.
-4. Add an entry to `WORK_LOG.md`.
-5. Update `HANDOFF.md` with the current task.
-
-Task states:
-
 ```text
-[ ] Not Started
-[-] In Progress
-[x] Done
-[!] Blocked
-[~] Needs Review
+[ ] Read HANDOFF.md first.
+[ ] Read latest 3–5 WORK_LOG.md entries.
+[ ] Identify current/next task ID from HANDOFF.md.
+[ ] Open only that task in docs_sprint5/08.TASK_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL.md.
+[ ] Open related API endpoint section if backend/API task.
+[ ] Open related SQL table/seed rows if DB/service task.
+[ ] Confirm dependencies are done.
+[ ] Write or identify failing test first when task is code-related.
+[ ] Update HANDOFF.md status to IN_PROGRESS before major edits.
 ```
 
-### 4.2 Do Not Overwrite Other Agents
+Do not start another task until the current one is fully validated or blocked. Once validated and marked DONE, continue immediately to the next task without waiting for user instruction.
 
-Before editing any file:
+---
 
-1. Read the file.
-2. Identify the exact section to change.
-3. Modify only the section required by the current task.
-4. Do not reformat unrelated sections.
-5. Do not delete another agent's log or comments.
+## 6. TDD Rule
 
-### 4.3 Always Update Documentation After Each Task
-
-After completing any task, update all relevant docs:
-
-- `TASKS.md`
-- `WORK_LOG.md`
-- `HANDOFF.md`
-- `api-contract.md`, if endpoint behavior changed
-- `ARCHITECTURE.md`, if flow/component changed
-- `design-system.md`, if UI component or theme changed
-- `schema.sql`, if database changed
-- `seed.sql`, if seed data changed
-- README, if setup or command changed
-
-If no documentation update is needed, still add this line to `WORK_LOG.md`:
+For every code task:
 
 ```text
-Documentation reviewed; no changes required.
+RED: write/identify failing test for the task.
+GREEN: implement smallest passing change.
+REFACTOR: clean only touched area.
+SECURITY: add/confirm negative auth/privacy/secret test.
+LOG: update WORK_LOG and HANDOFF.
+NEXT: continue to the next READY task, next phase, or Cross-Phase Release Gate.
 ```
 
-### 4.4 Completion Definition
+No test placeholder may be marked pass unless it actually runs or is explicitly documented as manual-only.
 
-A task is not done (cannot be marked `[x]`) until all are strictly true:
+End-of-phase and final-gate validation must include the applicable files in:
 
 ```text
-Implementation complete
-Validation or tests run (typecheck/build/test)
-No unrelated changes
-Docs updated (api-contract, architecture, schema, UI)
-TASKS.md updated (change [-] to [x])
-WORK_LOG.md updated (append entry)
-HANDOFF.md updated
-Known issues documented
+docs_sprint5/09.TEST_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_READY.md
+docs_sprint5/10.STRESS_TEST_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_READY.md
+docs_sprint5/11.TDD_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL_READY.md
 ```
 
 ---
 
-## 5. Branching and Commit Rules
+## 7. Validation Commands
 
-Recommended branch naming:
+Run relevant commands before marking done.
 
-```text
-sprint-{number}/{taskId}-{shortName}
+Backend/API:
+
+```bash
+cd worker
+npx tsc -p tsconfig.json
+npm test
 ```
 
-Example:
+Frontend:
 
-```text
-sprint-1/US-1.3.4-ai-timeout
+```bash
+cd web
+npx tsc -b
+npx eslint .
+npx vite build
 ```
 
-Recommended commit format:
+D1 migration/local validation:
 
-```text
-{taskId}: {short summary}
+```bash
+wrangler d1 execute multi_Ai_db --local --file=07-schema.sql
+wrangler d1 execute multi_Ai_db --local --file=08-seed.sql
+wrangler d1 execute multi_Ai_db --local --file=docs_sprint5/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+wrangler d1 execute multi_Ai_db --local --file=docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+wrangler d1 execute multi_Ai_db --local --command="PRAGMA foreign_key_check;"
 ```
 
-Example:
-
-```text
-US-1.3.4: enforce AI extraction timeout fallback
-```
-
-Each commit should include:
-
-- code change
-- tests or validation evidence
-- documentation update
+If a command cannot run, write exact reason in `WORK_LOG.md` and `HANDOFF.md`.
 
 ---
 
-## 6. Logging Rules
+## 8. Done / Blocked Rules
 
-Every agent must append to `WORK_LOG.md`.
+A task is DONE only if:
 
-Required log format:
-
-```markdown
-## YYYY-MM-DD HH:mm UTC — Agent: {agentName}
-
-### Task
-- Task ID: {taskId}
-- Sprint: {sprintNumber}
-- Status: Started | Completed | Blocked | Needs Review
-
-### Files Read
-- path/to/file
-
-### Files Changed
-- path/to/file
-
-### What Changed
-- Bullet summary
-
-### Validation
-- Command run or manual verification
-
-### Documentation Updated
-- TASKS.md
-- HANDOFF.md
-- api-contract.md if relevant
-
-### Next Agent Notes
-- What to continue next
-- Known issue if any
+```text
+[ ] implementation complete;
+[ ] tests/validation run or documented manual validation completed;
+[ ] no unrelated refactor;
+[ ] no secret leaked;
+[ ] no unsupported table/endpoint invented;
+[ ] Sprint 1–4 regression risk checked;
+[ ] WORK_LOG.md appended;
+[ ] HANDOFF.md updated with next task.
 ```
 
-No agent may delete previous log entries.
+Mark BLOCKED when:
+
+```text
+- source docs conflict;
+- required table/column/permission/endpoint is missing;
+- secret/config is unavailable;
+- dependency task is incomplete;
+- validation cannot run for environment reason.
+```
+
+Blocked entry must include exact blocker, evidence, and safest next action.
 
 ---
 
-## 7. Handoff Rules
-
-At the end of every task or interruption, update `HANDOFF.md`.
-
-Required handoff content:
+## 9. File Editing Discipline
 
 ```text
-Current sprint
-Current task
-Current status
-Last completed task
-Files changed
-Commands run
-Known issues
-Next recommended task
+- Read before edit.
+- Modify only files needed by current task.
+- Do not reformat unrelated files.
+- Do not delete prior logs.
+- Do not move or rename docs unless task requires it.
+- Do not create new D1 database/R2 bucket.
+- Do not deploy production unless the current task/release gate explicitly says deploy.
 ```
 
-If the task is interrupted, write exactly where to resume.
-HANDOFF.md is the primary resume point. If the handoff says the project is ready for implementation and the next task is US-1.1.1, the next agent must strictly start from US-1.1.1. Do not jump to other tasks.
+Large refactor rule: checkpoint `HANDOFF.md` before starting any risky refactor.
 
 ---
 
-## 8. Testing and Validation Rules
+## 10. Compact WORK_LOG Policy
 
-### 8.1 Minimum Validation Per Task Type
-
-Backend/API task:
+To avoid context-limit problems:
 
 ```text
-Every backend task must run typecheck, build, and test
-Run relevant tests from TEST_PLAN.md (especially medical features like rule engine, AI timeout, manual override, idempotency, emergency consent)
-Run unit/integration test if available
-Verify API contract payload manually
-Confirm D1 table/field naming rule
+- WORK_LOG.md contains Sprint 5 entries only.
+- Keep each entry under 25 lines.
+- Put long debug output in separate files under docs/logs/ if needed.
+- HANDOFF.md is the single resume pointer.
+- Agents should read only latest WORK_LOG entries, not the entire history.
 ```
 
-Database task:
-
-```text
-Run schema migration locally or against dev D1
-Run seed validation
-Confirm no new database was created
-Confirm all table names use HL_ prefix
-Confirm fields are camelCase
-```
-
-Frontend task:
-
-```text
-Run lint/typecheck/build
-Test mobile viewport
-Test senior/high contrast mode if UI touched
-Confirm form validation behavior
-```
-
-AI task:
-
-```text
-Confirm timeout according to configured limit
-Confirm fallback manual input
-Confirm rawAiValue and finalValue handling
-Confirm no original image is stored
-```
-
-Notification task:
-
-```text
-Confirm submit does not wait more than allowed
-Confirm notification failure does not roll back measurement
-Confirm HL_notifications is logged
-```
-
-### 8.2 Never Skip Safety Validation
-
-For medical, emergency, or AI recommendation flows, always verify:
-
-```text
-No diagnosis language
-No medication dosage instruction
-No emergency alert without rule-based severity
-No caregiver access without permission
-```
+If old pre-Sprint-5 logs exist, archive them outside the active context. Do not paste old logs into prompts.
 
 ---
 
-## 9. API Rules
+## 11. Safe Agent Prompts
 
-1. All API routes must be defined in `api-contract.md`.
-2. If a new endpoint is added, update `api-contract.md` in the same task.
-3. Use consistent JSON response envelope.
-4. Never expose raw stack traces to client.
-5. Never return private R2 key unless endpoint is authenticated and authorized.
-6. Signed URL or streamed download must verify ownership/role first.
-
-Standard success response:
-
-```json
-{
-  "success": true,
-  "data": {},
-  "meta": {}
-}
-```
-
-Standard error response:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Readable message",
-    "details": {}
-  }
-}
-```
-
----
-
-## 10. Cloudflare Free-Tier Efficiency Rules
-
-1. Do not store original image.
-2. Compress image in browser before upload.
-3. Store only final watermarked file.
-4. AI Vision only runs when user explicitly clicks automatic extraction.
-5. No automatic retries for AI Vision by default.
-6. OCR is not queued by default.
-7. Generate PDF only on demand.
-8. Use D1 batch writes when possible.
-9. Keep AI recommendation input as summarized JSON, not full history.
-10. Use indexes defined in `schema.sql`.
-
----
-
-## 11. Sprint Priority Rules
-
-**Deployment & UAT Rules:** Setelah selesai sprint WAJIB DEPLOY KE production dan lakukan testing, full uat di production.
-- Cloudflare Account ID: 79dea2845a4b62ea5229c8676dea02c0
-- Cloudflare Token: <CLOUDFLARE_TOKEN>
-
-Do not jump to later sprint task if current sprint has P0 blocker.
-
-Priority order:
+First run prompt:
 
 ```text
-P0 = required for core safety or data integrity
-P1 = required for feature completeness
-P2 = enhancement or polish
+Implement HL Health Companion Sprint 5. Read AGENTS.md, HANDOFF.md, latest WORK_LOG.md, and only the current task section from docs_sprint5/08.TASK_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL.md. Start with the task shown in HANDOFF.md only. Complete exactly one task cycle at a time. Follow TDD, run validation, update WORK_LOG.md and HANDOFF.md, then continue to the next READY task/phase automatically until Sprint 5 Cross-Phase Release Gate is DONE or a real BLOCKED condition occurs.
 ```
 
-**Sprint Gates:** Sprint 1 must not be considered complete until auth, onboarding, measurement capture, AI timeout, manual override, submit D1, R2 evidence, Telegram, and dashboard today have passed all critical tests from TEST_PLAN.md.
-
-**Prioritize Safe Build Order within Sprint 1:** apply schema/seed -> verify bindings -> auth/register/login/session -> onboarding -> metric catalog -> validate endpoint -> AI extract -> submit -> R2 upload -> Telegram -> dashboard.
-
-If a P1/P2 task reveals missing P0 infrastructure, stop and create/update the P0 task before continuing.
-
----
-
-## 12. Forbidden Actions
-
-Agents must not:
-
-- create a new D1 database
-- create a new R2 bucket
-- store raw base64 images in D1
-- store original unwatermarked images in R2
-- skip manual override
-- let AI decide medical severity
-- generate medication dosage advice
-- send emergency alert without consent/permission
-- delete previous work logs
-- mark a task done without docs update
-- rename existing schema tables without migration plan
-- change naming convention away from `HL_` + camelCase
-- invent or create new tables carelessly. Wajib cek konsistensi nama table di schema.sql sebelum coding. Gunakan tabel yang sudah ada (seperti HL_systemConfigs, HL_userProfiles) jika fungsinya sama.
-
----
-
-## 13. Recommended Task Start Prompt for Agents
-
-Use this prompt when assigning a task to an AI agent:
+Resume prompt:
 
 ```text
-You are working on HL Health Companion.
-Read AGENTS.md first, then TASKS.md, WORK_LOG.md, HANDOFF.md, PRD.docx.md, User Stories, ARCHITECTURE.md, api-contract.md, schema.sql, seed.sql, and design-system.md.
-Pick only the specified task.
-Do not work on unrelated files.
-Use TASKS.md as the absolute single source of truth. Before coding, mark the task as In Progress [-] in TASKS.md and append a Started entry in WORK_LOG.md.
-After coding, run validation, update docs, change to Done [x] in TASKS.md, append Completed or Blocked entry in WORK_LOG.md, and update HANDOFF.md. Do not work on multiple tasks at once.
-Never store original images. Never let AI decide medical status. Use existing Cloudflare D1 DB and R2 bucket only.
+Continue HL Health Companion Sprint 5 from HANDOFF.md. Identify the current/next task, read only relevant final docs, complete one task cycle, run validation, update WORK_LOG.md and HANDOFF.md, then continue sequentially to the next READY task/phase automatically until Sprint 5 Cross-Phase Release Gate is DONE or a real BLOCKED condition occurs.
+```
+
+Failure prompt:
+
+```text
+Audit the current failed task only. Read HANDOFF.md, latest WORK_LOG.md, the current task section, related API/SQL sections, and test output. Fix the smallest cause, rerun validation, update logs, then continue sequentially if the task becomes DONE. Stop only if the task remains BLOCKED with exact evidence.
 ```

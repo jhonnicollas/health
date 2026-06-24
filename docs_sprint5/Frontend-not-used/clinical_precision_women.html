@@ -1,0 +1,386 @@
+<!DOCTYPE html><html lang="id"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Log Hari Ini &amp; Peringatan Keamanan</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#000000",
+                        "surface-container-low": "#f6f3f5",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "background": "#fcf8fa",
+                        "inverse-primary": "#bec6e0",
+                        "secondary-container": "#d0e1fb",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#98805d",
+                        "surface-bright": "#fcf8fa",
+                        "surface-container": "#f0edef",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#505f76",
+                        "outline": "#76777d",
+                        "on-tertiary-fixed": "#271901",
+                        "error-container": "#ffdad6",
+                        "surface-variant": "#e4e2e4",
+                        "on-tertiary-fixed-variant": "#574425",
+                        "surface-tint": "#565e74",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface-dim": "#dcd9db",
+                        "primary-container": "#131b2e",
+                        "tertiary": "#000000",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#c6c6cd",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#fcdeb5",
+                        "surface-container-highest": "#e4e2e4",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-secondary-fixed": "#0b1c30",
+                        "surface": "#fcf8fa",
+                        "on-primary-fixed": "#131b2e",
+                        "primary-fixed": "#dae2fd",
+                        "secondary-fixed": "#d3e4fe",
+                        "inverse-surface": "#303032",
+                        "on-surface-variant": "#45464d",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "on-background": "#1b1b1d",
+                        "inverse-on-surface": "#f3f0f2",
+                        "tertiary-container": "#271901",
+                        "surface-container-high": "#eae7e9",
+                        "on-surface": "#1b1b1d",
+                        "on-error-container": "#93000a",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-container": "#54647a",
+                        "on-primary-container": "#7c839b",
+                        "tertiary-fixed-dim": "#dec29a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "container-padding": "24px",
+                        "stack-lg": "32px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "data-mono": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "data-mono": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom scrollbar for clinical feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #c6c6cd;
+            border-radius: 9999px;
+        }
+        
+        /* Toggle Switch Styles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #000000;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #000000;
+        }
+        .toggle-checkbox {
+            right: 0;
+            z-index: 1;
+            border-color: #c6c6cd;
+            transition: all 0.3s;
+        }
+        .toggle-label {
+            background-color: #c6c6cd;
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] font-body-lg text-on-surface antialiased flex flex-col h-screen overflow-hidden">
+<!-- App Bar (Hidden on Mobile) -->
+<header class="hidden lg:flex fixed top-0 left-64 right-0 z-40 justify-end items-center px-6 h-16 bg-surface dark:bg-inverse-surface border-b border-outline-variant shadow-sm transition-transform active:scale-95 duration-150">
+<div class="flex items-center gap-4">
+<span class="font-data-mono text-sm text-on-surface-variant font-medium">Minggu, 21 Juni 2026 19:28:00</span>
+<div class="flex items-center gap-1 border-r border-outline-variant pr-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors p-1.5 rounded-full" data-icon="light_mode">light_mode</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors p-1.5 rounded-full" data-icon="wb_twilight">wb_twilight</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors p-1.5 rounded-full" data-icon="dark_mode">dark_mode</span>
+</div>
+<div class="flex items-center gap-1 border-r border-outline-variant pr-4">
+<div class="relative cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors p-1.5 rounded-full">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="notifications">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full"></span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors p-1.5 rounded-full" data-icon="help">help</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors p-1.5 rounded-full" data-icon="menu_book">menu_book</span>
+</div>
+<div class="flex items-center gap-2 pl-2 cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors p-1.5 rounded-lg">
+<span class="material-symbols-outlined text-primary dark:text-inverse-primary" data-icon="account_circle" style="font-size: 28px;">account_circle</span>
+<span class="font-body-sm font-semibold text-primary dark:text-inverse-primary">Dr. Julianne Smith</span>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden relative">
+<!-- Side Nav (Hidden on Mobile) -->
+<nav class="hidden lg:flex flex-col fixed left-0 top-0 h-full w-64 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant z-50 transition-all duration-200 ease-in-out">
+<div class="p-6">
+<div class="flex items-center gap-3">
+<div class="bg-primary text-on-primary w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xl">H</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">HealthSync Pro</h1>
+<p class="font-label-md text-sm text-on-surface-variant">Enterprise Health</p>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto py-2 flex flex-col gap-1">
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-sm text-body-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-body-sm text-body-sm font-medium">New Measurement</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-primary bg-primary-container/10 border-l-4 border-primary font-bold hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="history" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-body-sm text-body-sm">History</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-body-sm text-body-sm font-medium">AI Assistant</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="family_restroom">family_restroom</span>
+<span class="font-body-sm text-body-sm font-medium">Family Link</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-body-sm text-body-sm font-medium">Reports</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-sm text-body-sm font-medium">Settings</span>
+</a>
+</div>
+<div class="p-4 flex flex-col gap-2 border-t border-outline-variant">
+<button class="w-full bg-error text-on-error font-label-caps text-label-caps py-3 rounded-lg mb-2 shadow-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-sm" data-icon="emergency">emergency</span>
+            Emergency Support
+        </button>
+<a class="flex items-center gap-4 px-4 py-2 text-on-surface-variant hover:bg-surface-container transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="help">help</span>
+<span class="font-body-sm text-body-sm">Help Center</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-2 text-on-surface-variant hover:bg-surface-container transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="logout">logout</span>
+<span class="font-body-sm text-body-sm">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area (Background underlying the modal) -->
+<main class="flex-1 w-full lg:ml-64 h-full bg-[#F8FAFC] relative overflow-hidden flex flex-col items-center pt-8 md:pt-24">
+<!-- Simulated background content to give context -->
+<div class="w-full max-w-3xl px-container-padding opacity-20 blur-sm pointer-events-none">
+<div class="h-8 w-48 bg-outline-variant rounded mb-8"></div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl h-64 mb-6"></div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl h-32"></div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl h-32"></div>
+</div>
+</div>
+<!-- THE DAILY LOG BOTTOM SHEET / MODAL -->
+<div class="absolute inset-x-0 bottom-0 md:inset-auto md:top-[55%] md:-translate-y-1/2 w-full md:max-w-lg md:mx-auto bg-surface-container-lowest rounded-t-2xl md:rounded-2xl border border-outline-variant shadow-[0_4px_20px_rgba(0,0,0,0.05)] z-20 flex flex-col h-[870px] md:h-auto md:max-h-[870px]">
+<!-- Modal Header -->
+<div class="sticky top-0 z-10 bg-surface-container-lowest rounded-t-2xl px-6 py-4 border-b border-surface-container-high flex justify-between items-center">
+<h1 class="font-headline-md text-headline-md text-on-surface">Log Hari Ini - 14 Juni 2026</h1>
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<!-- Modal Body (Scrollable) -->
+<div class="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-stack-lg">
+<!-- Menstruation Toggle -->
+<div class="flex justify-between items-center border-b border-surface-container-high pb-4">
+<div>
+<p class="font-data-mono text-data-mono text-on-surface">Darah haid keluar hari ini</p>
+</div>
+<div class="relative inline-block w-12 h-6 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" id="toggle_menstruation" name="toggle_menstruation" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-primary cursor-pointer" for="toggle_menstruation"></label>
+</div>
+</div>
+<!-- Flow Selection -->
+<div class="flex flex-col gap-stack-sm">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Volume Darah</h3>
+<div class="flex gap-3 mt-2">
+<button class="flex-1 py-2 px-4 rounded-lg border border-outline-variant text-on-surface font-body-sm text-body-sm text-center bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+                                Bercak
+                            </button>
+<button class="flex-1 py-2 px-4 rounded-lg border border-primary text-on-primary font-body-sm text-body-sm text-center bg-primary font-medium shadow-sm transition-colors relative overflow-hidden">
+<span class="relative z-10">Sedang</span>
+</button>
+<button class="flex-1 py-2 px-4 rounded-lg border border-outline-variant text-on-surface font-body-sm text-body-sm text-center bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+                                Deras
+                            </button>
+</div>
+</div>
+<!-- Symptoms -->
+<div class="flex flex-col gap-stack-sm border-t border-surface-container-high pt-6">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Gejala Fisik</h3>
+<div class="flex flex-wrap gap-2 mt-2">
+<button class="px-4 py-2 rounded-full border border-primary bg-primary-container text-on-primary-container font-data-mono text-data-mono flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
+                                Kram perut
+                            </button>
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface font-data-mono text-data-mono hover:bg-surface-container-low transition-colors">
+                                Sakit kepala
+                            </button>
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface font-data-mono text-data-mono hover:bg-surface-container-low transition-colors">
+                                Payudara nyeri
+                            </button>
+<button class="px-4 py-2 rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface font-data-mono text-data-mono hover:bg-surface-container-low transition-colors">
+                                Mual
+                            </button>
+</div>
+</div>
+<!-- Mood -->
+<div class="flex flex-col gap-stack-sm border-t border-surface-container-high pt-6">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Suasana Hati</h3>
+<div class="flex justify-between mt-2 max-w-sm mx-auto w-full">
+<button class="w-12 h-12 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-2xl hover:bg-surface-container-low transition-colors">😫</button>
+<button class="w-12 h-12 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-2xl hover:bg-surface-container-low transition-colors">😢</button>
+<button class="w-12 h-12 rounded-full border border-primary bg-secondary-container flex items-center justify-center text-2xl relative shadow-sm">😐</button>
+<button class="w-12 h-12 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-2xl hover:bg-surface-container-low transition-colors">🙂</button>
+<button class="w-12 h-12 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-2xl hover:bg-surface-container-low transition-colors">😁</button>
+</div>
+</div>
+<!-- Sexual Activity -->
+<div class="flex flex-col gap-stack-sm border-t border-surface-container-high pt-6 pb-6">
+<div class="flex justify-between items-center mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="favorite">favorite</span>
+<p class="font-data-mono text-data-mono text-on-surface">Berhubungan Seksual</p>
+</div>
+<div class="relative inline-block w-12 h-6 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" id="toggle_sex" name="toggle_sex" type="checkbox">
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-primary cursor-pointer" for="toggle_sex"></label>
+</div>
+</div>
+<!-- Sub Toggle (Indented) -->
+<div class="flex justify-between items-center pl-8 mt-2 bg-surface-container p-3 rounded-lg">
+<p class="font-body-sm text-body-sm text-on-surface">Tanpa Pengaman</p>
+<div class="relative inline-block w-10 h-5 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-outline-variant" id="toggle_unprotected" name="toggle_unprotected" type="checkbox">
+<label class="toggle-label block overflow-hidden h-5 rounded-full bg-outline-variant cursor-pointer" for="toggle_unprotected"></label>
+</div>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="sticky bottom-0 z-10 bg-surface-container-lowest border-t border-surface-container-high p-4">
+<button class="w-full bg-primary text-on-primary font-headline-md text-headline-md py-3 rounded-lg shadow-sm hover:opacity-90 transition-opacity">Simpan Log</button>
+</div>
+</div>
+<!-- MEDICAL GUARDRAIL OVERLAY -->
+<div class="absolute inset-0 z-50 bg-[#1b1b1d] bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4">
+<div class="bg-surface-container-lowest w-full max-w-sm rounded-xl border border-outline-variant shadow-[0_4px_20px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col">
+<div class="bg-error-container p-6 flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-[48px] text-error mb-4" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+<h2 class="font-headline-md text-headline-md font-bold text-on-error-container mb-2">Peringatan Kontrasepsi Alami</h2>
+</div>
+<div class="p-6 text-center">
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-8 leading-relaxed">
+                            Metode kalender tidak memberikan perlindungan 100% terhadap kehamilan. Selalu gunakan kontrasepsi tambahan (kondom) jika ingin mencegah kehamilan.
+                        </p>
+<button class="w-full bg-primary text-on-primary font-data-mono text-data-mono py-3 rounded-lg shadow-sm hover:opacity-90 transition-opacity border border-primary">
+                            [ Saya Mengerti ]
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Bottom Nav Bar (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full z-10 flex lg:hidden justify-around items-center px-4 py-3 pb-safe bg-surface border-t border-outline-variant shadow-sm rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant tap-highlight-transparent active:scale-95 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant tap-highlight-transparent active:scale-95 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="event_note">event_note</span>
+<span class="font-label-caps text-label-caps">Cycle</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary font-bold tap-highlight-transparent active:scale-95 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="edit_note" style="font-variation-settings: 'FILL' 1;">edit_note</span>
+<span class="font-label-caps text-label-caps">Logs</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant tap-highlight-transparent active:scale-95 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-caps text-label-caps">Profile</span>
+</a>
+</nav>
+<script>
+        // Simple script to handle toggles for visual demonstration
+        document.addEventListener('DOMContentLoaded', () => {
+            const sexToggle = document.getElementById('toggle_sex');
+            const unprotectedToggle = document.getElementById('toggle_unprotected');
+            const guardrailOverlay = document.querySelector('.bg-opacity-80.backdrop-blur-sm');
+            const dismissButton = document.querySelector('.bg-primary.text-on-primary.font-data-mono');
+
+            // Handle Guardrail dismissal
+            if(dismissButton && guardrailOverlay) {
+                dismissButton.addEventListener('click', () => {
+                    guardrailOverlay.style.display = 'none';
+                });
+            }
+
+            // Unprotected toggle visual logic
+            if(unprotectedToggle) {
+                unprotectedToggle.addEventListener('change', (e) => {
+                    const label = e.target.nextElementSibling;
+                    if(e.target.checked) {
+                        e.target.style.borderColor = '#000000';
+                        label.style.backgroundColor = '#000000';
+                        // Could re-trigger warning here if needed
+                    } else {
+                        e.target.style.borderColor = '#c6c6cd';
+                        label.style.backgroundColor = '#c6c6cd';
+                    }
+                });
+            }
+        });
+    </script>
+</body></html>

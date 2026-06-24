@@ -15,7 +15,7 @@ export async function onRequest(context) {
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     init.body = req.body
-    // @ts-ignore
+    // @ts-expect-error Cloudflare fetch supports duplex for streamed request bodies.
     init.duplex = 'half'
   }
 

@@ -11,6 +11,10 @@ import {
   formatIdShortDateTime,
   type ExtraEnv
 } from './routes-extra.js'
+import { AuditService } from './services/audit.js'
+import { ConfigService, isSensitiveConfigKey } from './services/config.js'
+import { EntitlementService, QuotaService } from './services/entitlements.js'
+import { RbacService } from './services/rbac.js'
 
 export interface Env {
   CLOUDFLARE_ACCOUNT_ID?: string
@@ -18,6 +22,7 @@ export interface Env {
   TELEGRAM_BOT_TOKEN?: string
   ENCRYPTION_KEY?: string
   ADMIN_EMAILS?: string
+  INTERNAL_API_SECRET?: string
   DB: D1Database
   LOGS: R2Bucket
   TELEGRAM_QUEUE?: Queue
@@ -31,6 +36,7 @@ type ApiErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
+  | 'QUOTA_EXCEEDED'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
 
@@ -4445,6 +4451,34 @@ function isAdminUser(c: Context<{ Bindings: Env }>, user: UserRow): boolean {
   return adminEmails.includes(user.email.toLowerCase())
 }
 
+async function requireAdminPermission(c: Context<{ Bindings: Env }>, user: UserRow, permissionCode: string, startedAt: number) {
+  if (await RbacService.hasPermission(c.env.DB, user.id, permissionCode)) return null
+  return jsonResponse(c, failure('FORBIDDEN', 'Permission admin diperlukan.', 403, [{ permissionCode }], startedAt))
+}
+
+async function getAdminUserRoles(db: D1Database, userId: number): Promise<string[]> {
+  return (await RbacService.getUserRoles(db, userId)).map((role) => role.roleCode)
+}
+
+async function getAdminSubscriptionSummary(db: D1Database, userId: number) {
+  const row = await db.prepare(
+    `SELECT planCode, status, currentPeriodEnd
+     FROM HL_subscriptions
+     WHERE userId = ?
+     ORDER BY COALESCE(currentPeriodEnd, '9999-12-31') DESC, id DESC
+     LIMIT 1`
+  ).bind(userId).first<{ planCode: string; status: string; currentPeriodEnd: string | null }>()
+  return row ?? { planCode: 'free', status: 'active', currentPeriodEnd: null }
+}
+
+async function getAdminUserSummary(db: D1Database, userId: number) {
+  const [roles, subscription] = await Promise.all([
+    getAdminUserRoles(db, userId),
+    getAdminSubscriptionSummary(db, userId)
+  ])
+  return { roles, subscription }
+}
+
 const PROTECTED_SYSTEM_CONFIG_KEYS = new Set([
   'aiExtractTimeoutMs',
   'aiVisionModel',
@@ -4467,28 +4501,591 @@ function isValidSystemConfigKey(configKey: string) {
 }
 
 function isSensitiveSystemConfigKey(configKey: string) {
-  const lowered = configKey.toLowerCase()
-  return lowered.includes('token') || lowered.includes('secret') || lowered.includes('apikey') || lowered.includes('apiKey'.toLowerCase())
+  return isSensitiveConfigKey(configKey)
 }
 
 function systemConfigAuditMetadata(configKey: string, extra: Record<string, unknown> = {}) {
-  return JSON.stringify({
+  return {
     configKey,
     sensitive: isSensitiveSystemConfigKey(configKey),
     ...extra
-  })
+  }
 }
+
+app.get('/api/admin/me', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.access', startedAt)
+    if (denied) return denied
+    const [roles, permissions] = await Promise.all([
+      getAdminUserRoles(c.env.DB, user.id),
+      RbacService.getUserPermissions(c.env.DB, user.id)
+    ])
+    return jsonResponse(c, success({
+      userId: user.id,
+      email: user.email,
+      roles,
+      permissions,
+      canAccessAdmin: true
+    }, 200, startedAt))
+  } catch (error) {
+    console.error('admin me error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat konteks admin.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/admin/users', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.users.read', startedAt)
+    if (denied) return denied
+
+    const q = (c.req.query('q') || '').trim().toLowerCase()
+    const status = c.req.query('status')
+    const roleCode = c.req.query('roleCode')
+    const planCode = c.req.query('planCode')
+    const limit = Math.min(Math.max(Number(c.req.query('limit') || 50), 1), 100)
+    const rows = await c.env.DB.prepare(
+      `SELECT id, email, displayName, active, createdAt
+       FROM HL_users
+       ORDER BY createdAt DESC, id DESC
+       LIMIT 200`
+    ).all<{ id: number; email: string; displayName: string; active: number; createdAt: string }>()
+
+    const enriched = await Promise.all((rows.results || []).map(async (row) => {
+      const summary = await getAdminUserSummary(c.env.DB, row.id)
+      return {
+        userId: row.id,
+        email: row.email,
+        displayName: row.displayName,
+        active: row.active === 1,
+        roles: summary.roles,
+        subscription: summary.subscription,
+        createdAt: row.createdAt
+      }
+    }))
+
+    const filtered = enriched
+      .filter((row) => !q || row.email.toLowerCase().includes(q) || row.displayName.toLowerCase().includes(q))
+      .filter((row) => !status || (status === 'active' ? row.active : status === 'disabled' ? !row.active : true))
+      .filter((row) => !roleCode || row.roles.includes(roleCode))
+      .filter((row) => !planCode || row.subscription.planCode === planCode)
+      .slice(0, limit)
+
+    return jsonResponse(c, success(filtered, 200, startedAt))
+  } catch (error) {
+    console.error('admin users list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat user admin.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/admin/users/:userId', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const admin = await getAuthenticatedUser(c)
+    if (!admin) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, admin, 'admin.users.read', startedAt)
+    if (denied) return denied
+    const userId = Number(c.req.param('userId'))
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'userId tidak valid.', 400, [], startedAt))
+    }
+
+    const row = await c.env.DB.prepare(
+      `SELECT u.id, u.email, u.displayName, u.active, u.createdAt, p.sex, p.birthDate
+       FROM HL_users u
+       LEFT JOIN HL_userProfiles p ON p.userId = u.id
+       WHERE u.id = ?
+       LIMIT 1`
+    ).bind(userId).first<{ id: number; email: string; displayName: string; active: number; createdAt: string; sex: string | null; birthDate: string | null }>()
+    if (!row) return jsonResponse(c, failure('NOT_FOUND', 'User tidak ditemukan.', 404, [], startedAt))
+    const summary = await getAdminUserSummary(c.env.DB, userId)
+    return jsonResponse(c, success({
+      userId: row.id,
+      email: row.email,
+      displayName: row.displayName,
+      active: row.active === 1,
+      createdAt: row.createdAt,
+      profile: {
+        sex: row.sex,
+        birthDate: row.birthDate
+      },
+      roles: summary.roles,
+      subscription: summary.subscription,
+      supportViewNotice: 'Sensitive health detail is hidden unless admin.sensitiveHealth.read is explicitly granted and audited.'
+    }, 200, startedAt))
+  } catch (error) {
+    console.error('admin user detail error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat detail user.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/admin/users/:userId/status', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const admin = await getAuthenticatedUser(c)
+    if (!admin) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, admin, 'admin.users.update', startedAt)
+    if (denied) return denied
+    const userId = Number(c.req.param('userId'))
+    const body = await c.req.json() as { active?: boolean; reason?: string }
+    if (!Number.isInteger(userId) || userId <= 0 || typeof body.active !== 'boolean') {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Input status user tidak valid.', 400, [], startedAt))
+    }
+    const existing = await c.env.DB.prepare('SELECT id, active FROM HL_users WHERE id = ? LIMIT 1').bind(userId).first<{ id: number; active: number }>()
+    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'User tidak ditemukan.', 404, [], startedAt))
+    await c.env.DB.prepare('UPDATE HL_users SET active = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(body.active ? 1 : 0, userId).run()
+    await AuditService.write(c.env.DB, {
+      userId: admin.id,
+      action: 'admin.users.status.update',
+      entityType: 'HL_users',
+      entityId: userId,
+      metadataJson: { userId, active: body.active, previousActive: existing.active === 1, reason: body.reason }
+    })
+    return jsonResponse(c, success({ userId, active: body.active, updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin user status error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update status user.', 500, [], startedAt))
+  }
+})
+
+function isValidRoleCode(roleCode: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9]*$/.test(roleCode) && roleCode.length <= 80
+}
+
+app.get('/api/admin/roles', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.roles.read', startedAt)
+    if (denied) return denied
+    const rows = await c.env.DB.prepare(
+      `SELECT r.roleCode, r.roleName, r.description, r.systemRole, r.active, COUNT(rp.permissionCode) AS permissionCount
+       FROM HL_roles r
+       LEFT JOIN HL_rolePermissions rp ON rp.roleCode = r.roleCode
+       GROUP BY r.roleCode, r.roleName, r.description, r.systemRole, r.active
+       ORDER BY r.systemRole DESC, r.roleCode`
+    ).all<{ roleCode: string; roleName: string; description: string | null; systemRole: number; active: number; permissionCount: number }>()
+    return jsonResponse(c, success((rows.results || []).map((row) => ({
+      roleCode: row.roleCode,
+      roleName: row.roleName,
+      description: row.description,
+      systemRole: row.systemRole === 1,
+      active: row.active === 1,
+      permissionCount: row.permissionCount
+    })), 200, startedAt))
+  } catch (error) {
+    console.error('admin roles list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat role.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/admin/roles', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.roles.manage', startedAt)
+    if (denied) return denied
+    const body = await c.req.json() as { roleCode?: string; roleName?: string; description?: string }
+    const roleCode = (body.roleCode || '').trim()
+    const roleName = (body.roleName || '').trim()
+    if (!isValidRoleCode(roleCode) || roleName.length < 2) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Role tidak valid.', 400, [], startedAt))
+    }
+    await c.env.DB.prepare(
+      'INSERT INTO HL_roles (roleCode, roleName, description, systemRole, active, createdAt, updatedAt) VALUES (?, ?, ?, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+    ).bind(roleCode, roleName, body.description || null).run()
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'admin.roles.create',
+      entityType: 'HL_roles',
+      entityId: roleCode,
+      metadataJson: { roleCode, roleName }
+    })
+    return jsonResponse(c, success({ roleCode, created: true }, 201, startedAt))
+  } catch (error) {
+    console.error('admin role create error:', error)
+    return jsonResponse(c, failure('VALIDATION_ERROR', 'Role gagal dibuat atau sudah ada.', 400, [], startedAt))
+  }
+})
+
+app.put('/api/admin/roles/:roleCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.roles.manage', startedAt)
+    if (denied) return denied
+    const roleCode = c.req.param('roleCode')
+    const body = await c.req.json() as { roleName?: string; description?: string; active?: boolean }
+    const existing = await c.env.DB.prepare('SELECT roleCode FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
+    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Role tidak ditemukan.', 404, [], startedAt))
+    await c.env.DB.prepare(
+      'UPDATE HL_roles SET roleName = COALESCE(?, roleName), description = COALESCE(?, description), active = COALESCE(?, active), updatedAt = CURRENT_TIMESTAMP WHERE roleCode = ?'
+    ).bind(body.roleName || null, body.description ?? null, typeof body.active === 'boolean' ? (body.active ? 1 : 0) : null, roleCode).run()
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'admin.roles.update',
+      entityType: 'HL_roles',
+      entityId: roleCode,
+      metadataJson: { roleCode, updated: true }
+    })
+    return jsonResponse(c, success({ roleCode, updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin role update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update role.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/admin/permissions', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.roles.read', startedAt)
+    if (denied) return denied
+    const rows = await c.env.DB.prepare(
+      'SELECT permissionCode, permissionName, category, description, active FROM HL_permissions ORDER BY category, permissionCode'
+    ).all<{ permissionCode: string; permissionName: string; category: string; description: string | null; active: number }>()
+    return jsonResponse(c, success((rows.results || []).map((row) => ({ ...row, active: row.active === 1 })), 200, startedAt))
+  } catch (error) {
+    console.error('admin permissions list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat permission.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/admin/roles/:roleCode/permissions', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.roles.manage', startedAt)
+    if (denied) return denied
+    const roleCode = c.req.param('roleCode')
+    const body = await c.req.json() as { permissionCodes?: string[] }
+    const permissionCodes = Array.isArray(body.permissionCodes) ? [...new Set(body.permissionCodes)] : []
+    const role = await c.env.DB.prepare('SELECT roleCode FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
+    if (!role) return jsonResponse(c, failure('NOT_FOUND', 'Role tidak ditemukan.', 404, [], startedAt))
+    if (permissionCodes.length > 0) {
+      const placeholders = permissionCodes.map(() => '?').join(',')
+      const rows = await c.env.DB.prepare(`SELECT permissionCode FROM HL_permissions WHERE active = 1 AND permissionCode IN (${placeholders})`).bind(...permissionCodes).all<{ permissionCode: string }>()
+      if ((rows.results || []).length !== permissionCodes.length) {
+        return jsonResponse(c, failure('VALIDATION_ERROR', 'Permission tidak valid.', 400, [], startedAt))
+      }
+    }
+    await c.env.DB.prepare('DELETE FROM HL_rolePermissions WHERE roleCode = ?').bind(roleCode).run()
+    for (const permissionCode of permissionCodes) {
+      await c.env.DB.prepare('INSERT OR IGNORE INTO HL_rolePermissions (roleCode, permissionCode, createdAt) VALUES (?, ?, CURRENT_TIMESTAMP)').bind(roleCode, permissionCode).run()
+    }
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'admin.roles.permissions.update',
+      entityType: 'HL_roles',
+      entityId: roleCode,
+      metadataJson: { roleCode, permissionCount: permissionCodes.length }
+    })
+    return jsonResponse(c, success({ roleCode, permissionCount: permissionCodes.length, updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin role permissions update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update permission role.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/admin/users/:userId/roles', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.users.update', startedAt)
+    if (denied) return denied
+    const userId = Number(c.req.param('userId'))
+    const body = await c.req.json() as { roleCode?: string }
+    const roleCode = (body.roleCode || '').trim()
+    if (!Number.isInteger(userId) || userId <= 0 || !isValidRoleCode(roleCode)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Input role user tidak valid.', 400, [], startedAt))
+    }
+    await c.env.DB.prepare(
+      `INSERT INTO HL_userRoles (userId, roleCode, assignedBy, assignedAt, active)
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)
+       ON CONFLICT(userId, roleCode) DO UPDATE SET active = 1, revokedAt = NULL, assignedBy = excluded.assignedBy, assignedAt = CURRENT_TIMESTAMP`
+    ).bind(userId, roleCode, user.id).run()
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'admin.users.role.assign',
+      entityType: 'HL_userRoles',
+      entityId: `${userId}:${roleCode}`,
+      metadataJson: { userId, roleCode }
+    })
+    return jsonResponse(c, success({ userId, roleCode, assigned: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin user role assign error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal assign role.', 500, [], startedAt))
+  }
+})
+
+app.delete('/api/admin/users/:userId/roles/:roleCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.users.update', startedAt)
+    if (denied) return denied
+    const userId = Number(c.req.param('userId'))
+    const roleCode = c.req.param('roleCode')
+    if (!Number.isInteger(userId) || userId <= 0 || !isValidRoleCode(roleCode)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Input role user tidak valid.', 400, [], startedAt))
+    }
+    await c.env.DB.prepare('UPDATE HL_userRoles SET active = 0, revokedAt = CURRENT_TIMESTAMP WHERE userId = ? AND roleCode = ?').bind(userId, roleCode).run()
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'admin.users.role.revoke',
+      entityType: 'HL_userRoles',
+      entityId: `${userId}:${roleCode}`,
+      metadataJson: { userId, roleCode }
+    })
+    return jsonResponse(c, success({ userId, roleCode, revoked: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin user role revoke error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal revoke role.', 500, [], startedAt))
+  }
+})
+
+function isValidPlanCode(planCode: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9]*$/.test(planCode) && planCode.length <= 80
+}
+
+function requireInternalSecret(c: Context<{ Bindings: Env }>, startedAt: number) {
+  const expected = c.env.INTERNAL_API_SECRET
+  const header = c.req.header('x-internal-secret') || c.req.header('authorization')?.replace(/^Bearer\s+/i, '')
+  if (!expected || header !== expected) {
+    return jsonResponse(c, failure('FORBIDDEN', 'Internal secret diperlukan.', 403, [], startedAt))
+  }
+  return null
+}
+
+app.get('/api/admin/plans', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.read', startedAt)
+    if (denied) return denied
+    const includeInactive = c.req.query('includeInactive') === 'true'
+    const rows = await c.env.DB.prepare(
+      `SELECT p.planCode, p.planName, p.billingInterval, p.durationDays, p.priceAmount, p.currency, p.trialDays, p.description, p.active, p.sortOrder, COUNT(pf.featureCode) AS featureCount
+       FROM HL_plans p
+       LEFT JOIN HL_planFeatures pf ON pf.planCode = p.planCode
+       WHERE (? = 1 OR p.active = 1)
+       GROUP BY p.planCode, p.planName, p.billingInterval, p.durationDays, p.priceAmount, p.currency, p.trialDays, p.description, p.active, p.sortOrder
+       ORDER BY p.sortOrder, p.planCode`
+    ).bind(includeInactive ? 1 : 0).all<any>()
+    return jsonResponse(c, success((rows.results || []).map((row) => ({ ...row, active: row.active === 1 })), 200, startedAt))
+  } catch (error) {
+    console.error('admin plans list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat plan.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/admin/plans', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.manage', startedAt)
+    if (denied) return denied
+    const body = await c.req.json() as any
+    const planCode = (body.planCode || '').trim()
+    if (!isValidPlanCode(planCode) || !body.planName || !['free', 'monthly', 'quarterly', 'yearly', 'manual'].includes(body.billingInterval)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'Plan tidak valid.', 400, [], startedAt))
+    }
+    await c.env.DB.prepare(
+      `INSERT INTO HL_plans (planCode, planName, billingInterval, durationDays, priceAmount, currency, trialDays, description, active, sortOrder, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(planCode, body.planName, body.billingInterval, body.durationDays ?? null, body.priceAmount ?? 0, body.currency || 'IDR', body.trialDays ?? 0, body.description || null, body.active === false ? 0 : 1, body.sortOrder ?? 0).run()
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.plans.create', entityType: 'HL_plans', entityId: planCode, metadataJson: { planCode } })
+    return jsonResponse(c, success({ planCode, created: true }, 201, startedAt))
+  } catch (error) {
+    console.error('admin plan create error:', error)
+    return jsonResponse(c, failure('VALIDATION_ERROR', 'Plan gagal dibuat atau sudah ada.', 400, [], startedAt))
+  }
+})
+
+app.put('/api/admin/plans/:planCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.manage', startedAt)
+    if (denied) return denied
+    const planCode = c.req.param('planCode')
+    const body = await c.req.json() as any
+    await c.env.DB.prepare(
+      `UPDATE HL_plans SET planName = COALESCE(?, planName), durationDays = COALESCE(?, durationDays), priceAmount = COALESCE(?, priceAmount), currency = COALESCE(?, currency), trialDays = COALESCE(?, trialDays), description = COALESCE(?, description), active = COALESCE(?, active), sortOrder = COALESCE(?, sortOrder), updatedAt = CURRENT_TIMESTAMP WHERE planCode = ?`
+    ).bind(body.planName ?? null, body.durationDays ?? null, body.priceAmount ?? null, body.currency ?? null, body.trialDays ?? null, body.description ?? null, typeof body.active === 'boolean' ? (body.active ? 1 : 0) : null, body.sortOrder ?? null, planCode).run()
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.plans.update', entityType: 'HL_plans', entityId: planCode, metadataJson: { planCode, updated: true } })
+    return jsonResponse(c, success({ planCode, updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin plan update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update plan.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/admin/plans/:planCode/features', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.read', startedAt)
+    if (denied) return denied
+    const planCode = c.req.param('planCode')
+    const rows = await c.env.DB.prepare('SELECT featureCode, enabled, quotaLimit, quotaWindow, metadataJson FROM HL_planFeatures WHERE planCode = ? ORDER BY featureCode').bind(planCode).all<any>()
+    return jsonResponse(c, success({
+      planCode,
+      features: (rows.results || []).map((row) => ({ featureCode: row.featureCode, enabled: row.enabled === 1, quotaLimit: row.quotaLimit, quotaWindow: row.quotaWindow, metadata: row.metadataJson ? JSON.parse(row.metadataJson) : null }))
+    }, 200, startedAt))
+  } catch (error) {
+    console.error('admin plan features get error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat fitur plan.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/admin/plans/:planCode/features', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.manage', startedAt)
+    if (denied) return denied
+    const planCode = c.req.param('planCode')
+    const body = await c.req.json() as { features?: Array<{ featureCode?: string; enabled?: boolean; quotaLimit?: number | null; quotaWindow?: string | null; metadata?: unknown }> }
+    const features = Array.isArray(body.features) ? body.features : []
+    await c.env.DB.prepare('DELETE FROM HL_planFeatures WHERE planCode = ?').bind(planCode).run()
+    for (const feature of features) {
+      if (!feature.featureCode) continue
+      await c.env.DB.prepare(
+        `INSERT OR IGNORE INTO HL_planFeatures (planCode, featureCode, enabled, quotaLimit, quotaWindow, metadataJson, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(planCode, feature.featureCode, feature.enabled === false ? 0 : 1, feature.quotaLimit ?? null, feature.quotaWindow ?? null, feature.metadata ? JSON.stringify(feature.metadata) : null).run()
+    }
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.plans.features.update', entityType: 'HL_plans', entityId: planCode, metadataJson: { planCode, featureCount: features.length } })
+    return jsonResponse(c, success({ planCode, featureCount: features.length, updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin plan features update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update fitur plan.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/admin/subscriptions', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.read', startedAt)
+    if (denied) return denied
+    const rows = await c.env.DB.prepare(
+      `SELECT s.id, s.userId, u.email, s.planCode, s.status, s.provider, s.currentPeriodStart, s.currentPeriodEnd
+       FROM HL_subscriptions s
+       LEFT JOIN HL_users u ON u.id = s.userId
+       ORDER BY s.id DESC LIMIT 100`
+    ).all<any>()
+    return jsonResponse(c, success(rows.results || [], 200, startedAt))
+  } catch (error) {
+    console.error('admin subscriptions list error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat subscription.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/admin/users/:userId/subscriptions', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.manage', startedAt)
+    if (denied) return denied
+    const userId = Number(c.req.param('userId'))
+    const body = await c.req.json() as any
+    const subId = await insertAndGetId(c.env.DB.prepare(
+      `INSERT INTO HL_subscriptions (userId, planCode, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd, provider, metadataJson, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(userId, body.planCode, body.status || 'active', body.currentPeriodStart || null, body.currentPeriodEnd || null, body.provider || 'manual', body.metadata ? JSON.stringify(body.metadata) : null))
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.subscriptions.create', entityType: 'HL_subscriptions', entityId: subId, metadataJson: { userId, planCode: body.planCode } })
+    return jsonResponse(c, success({ subscriptionId: subId, userId, planCode: body.planCode, status: body.status || 'active' }, 201, startedAt))
+  } catch (error) {
+    console.error('admin subscription create error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal membuat subscription.', 500, [], startedAt))
+  }
+})
+
+app.put('/api/admin/subscriptions/:subscriptionId', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.manage', startedAt)
+    if (denied) return denied
+    const subscriptionId = Number(c.req.param('subscriptionId'))
+    const body = await c.req.json() as any
+    await c.env.DB.prepare(
+      `UPDATE HL_subscriptions SET planCode = COALESCE(?, planCode), status = COALESCE(?, status), currentPeriodStart = COALESCE(?, currentPeriodStart), currentPeriodEnd = COALESCE(?, currentPeriodEnd), cancelAtPeriodEnd = COALESCE(?, cancelAtPeriodEnd), metadataJson = COALESCE(?, metadataJson), updatedAt = CURRENT_TIMESTAMP WHERE id = ?`
+    ).bind(body.planCode ?? null, body.status ?? null, body.currentPeriodStart ?? null, body.currentPeriodEnd ?? null, typeof body.cancelAtPeriodEnd === 'boolean' ? (body.cancelAtPeriodEnd ? 1 : 0) : null, body.metadata ? JSON.stringify(body.metadata) : null, subscriptionId).run()
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.subscriptions.update', entityType: 'HL_subscriptions', entityId: subscriptionId, metadataJson: { subscriptionId, updated: true } })
+    return jsonResponse(c, success({ subscriptionId, updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin subscription update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update subscription.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/me/entitlements', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const plan = await EntitlementService.getActivePlan(c.env.DB, userId)
+    const rows = await c.env.DB.prepare('SELECT featureCode, enabled, quotaLimit, quotaWindow, metadataJson FROM HL_planFeatures WHERE planCode = ? ORDER BY featureCode').bind(plan.planCode).all<any>()
+    const features: Record<string, unknown> = {}
+    for (const row of rows.results || []) {
+      const quota = row.enabled === 1 ? await QuotaService.requireQuota(c.env.DB, userId, row.featureCode) : null
+      features[row.featureCode] = { enabled: row.enabled === 1, quotaLimit: row.quotaLimit, quotaWindow: row.quotaWindow, usedCount: quota?.usedCount ?? 0, remaining: row.enabled === 1 ? quota?.remaining : 0, resetAt: quota?.resetAt ?? null, metadata: row.metadataJson ? JSON.parse(row.metadataJson) : null }
+    }
+    return jsonResponse(c, success({ planCode: plan.planCode, subscriptionStatus: 'active', features }, 200, startedAt))
+  } catch (error) {
+    console.error('me entitlements error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat entitlement.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/internal/usage/consume', async (c) => {
+  const startedAt = Date.now()
+  const denied = requireInternalSecret(c, startedAt)
+  if (denied) return denied
+  try {
+    const body = await c.req.json() as { userId?: number; featureCode?: string; amount?: number }
+    if (!body.userId || !body.featureCode) return jsonResponse(c, failure('VALIDATION_ERROR', 'userId dan featureCode wajib.', 400, [], startedAt))
+    const result = await QuotaService.consumeQuota(c.env.DB, body.userId, body.featureCode, body.amount ?? 1)
+    if (!result.allowed) return jsonResponse(c, failure('QUOTA_EXCEEDED', 'Quota fitur habis.', 429, [result], startedAt))
+    return jsonResponse(c, success(result, 200, startedAt))
+  } catch (error) {
+    console.error('usage consume error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal consume quota.', 500, [], startedAt))
+  }
+})
 
 app.get('/api/admin/configs', async (c) => {
   const startedAt = Date.now()
   try {
     const user = await getAuthenticatedUser(c)
     if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
-    const rows = await c.env.DB.prepare(
-      'SELECT configKey, configValue, dataType, description, updatedAt FROM HL_systemConfigs ORDER BY configKey'
-    ).all()
-    return jsonResponse(c, success({ configs: rows.results || [] }, 200, startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.config.read', startedAt)
+    if (denied) return denied
+    const configs = await ConfigService.list(c.env.DB, c.env as unknown as Record<string, unknown>)
+    return jsonResponse(c, success({ configs }, 200, startedAt))
   } catch (error) {
     console.error('admin configs list error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat konfigurasi.', 500, [], startedAt))
@@ -4500,24 +5097,33 @@ app.put('/api/admin/configs/:configKey', async (c) => {
   try {
     const user = await getAuthenticatedUser(c)
     if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.config.update', startedAt)
+    if (denied) return denied
     const configKey = c.req.param('configKey')
-    const body = await c.req.json() as { configValue?: string }
-    if (!body.configValue && body.configValue !== '0' && body.configValue !== '') {
+    const body = await c.req.json() as { configValue?: string; configured?: boolean; envVarName?: string; reason?: string }
+    if (body.configValue === undefined && body.configured === undefined && body.envVarName === undefined) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'configValue wajib.', 400, [], startedAt))
     }
     if (!isValidSystemConfigKey(configKey)) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'configKey tidak valid.', 400, [], startedAt))
     }
-    const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
-    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
-    await c.env.DB.prepare('UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = ?').bind(body.configValue, configKey).run()
+    const updated = await ConfigService.update(c.env.DB, c.env as unknown as Record<string, unknown>, configKey, body)
     invalidateSystemConfigCache(c.env.DB, configKey)
-    await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'configUpdate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(user.id, configKey, systemConfigAuditMetadata(configKey, { updated: true })).run()
-    return jsonResponse(c, success({ updated: true, cacheInvalidated: true }, 200, startedAt))
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'configUpdate',
+      entityType: 'HL_systemConfigs',
+      entityId: configKey,
+      metadataJson: systemConfigAuditMetadata(configKey, { updated: true, reason: body.reason })
+    })
+    return jsonResponse(c, success({ configKey, updated: true, cacheInvalidated: true, secretValueReturned: false, config: updated }, 200, startedAt))
   } catch (error) {
+    if (error instanceof Error && error.message === 'CONFIG_NOT_FOUND') {
+      return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
+    }
+    if (error instanceof Error && error.message === 'INVALID_ENV_VAR_NAME') {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'envVarName tidak valid.', 400, [], startedAt))
+    }
     console.error('admin config update error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update konfigurasi.', 500, [], startedAt))
   }
@@ -4528,7 +5134,8 @@ app.post('/api/admin/configs', async (c) => {
   try {
     const user = await getAuthenticatedUser(c)
     if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.config.update', startedAt)
+    if (denied) return denied
     const body = await c.req.json() as { configKey?: string; configValue?: string; dataType?: string; description?: string }
     const configKey = (body.configKey || '').trim()
     const dataType = (body.dataType || 'string').trim()
@@ -4543,14 +5150,21 @@ app.post('/api/admin/configs', async (c) => {
     }
     const existing = await c.env.DB.prepare('SELECT configKey FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).first()
     if (existing) return jsonResponse(c, failure('VALIDATION_ERROR', 'configKey sudah ada.', 400, [], startedAt))
-    await c.env.DB.prepare(
-      'INSERT INTO HL_systemConfigs (configKey, configValue, dataType, description, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)'
-    ).bind(configKey, body.configValue, dataType, body.description || null).run()
+    const created = await ConfigService.create(c.env.DB, c.env as unknown as Record<string, unknown>, {
+      configKey,
+      configValue: body.configValue,
+      dataType,
+      description: body.description || null
+    })
     invalidateSystemConfigCache(c.env.DB, configKey)
-    await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'configCreate', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(user.id, configKey, systemConfigAuditMetadata(configKey, { dataType, created: true })).run()
-    return jsonResponse(c, success({ created: true, configKey, cacheInvalidated: true }, 201, startedAt))
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'configCreate',
+      entityType: 'HL_systemConfigs',
+      entityId: configKey,
+      metadataJson: systemConfigAuditMetadata(configKey, { dataType, created: true })
+    })
+    return jsonResponse(c, success({ created: true, configKey, cacheInvalidated: true, secretValueReturned: false, config: created }, 201, startedAt))
   } catch (error) {
     console.error('admin config create error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal membuat konfigurasi.', 500, [], startedAt))
@@ -4562,7 +5176,8 @@ app.delete('/api/admin/configs/:configKey', async (c) => {
   try {
     const user = await getAuthenticatedUser(c)
     if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    if (!isAdminUser(c, user)) return jsonResponse(c, failure('FORBIDDEN', 'Akses admin diperlukan.', 403, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.config.update', startedAt)
+    if (denied) return denied
     const configKey = c.req.param('configKey')
     if (!isValidSystemConfigKey(configKey)) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'configKey tidak valid.', 400, [], startedAt))
@@ -4574,9 +5189,13 @@ app.delete('/api/admin/configs/:configKey', async (c) => {
     if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Konfigurasi tidak ditemukan.', 404, [], startedAt))
     await c.env.DB.prepare('DELETE FROM HL_systemConfigs WHERE configKey = ?').bind(configKey).run()
     invalidateSystemConfigCache(c.env.DB, configKey)
-    await c.env.DB.prepare(
-      "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'configDelete', 'HL_systemConfigs', ?, ?, CURRENT_TIMESTAMP)"
-    ).bind(user.id, configKey, systemConfigAuditMetadata(configKey, { deleted: true })).run()
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'configDelete',
+      entityType: 'HL_systemConfigs',
+      entityId: configKey,
+      metadataJson: systemConfigAuditMetadata(configKey, { deleted: true })
+    })
     return jsonResponse(c, success({ deleted: true, cacheInvalidated: true }, 200, startedAt))
   } catch (error) {
     console.error('admin config delete error:', error)

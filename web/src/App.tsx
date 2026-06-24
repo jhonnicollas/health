@@ -262,7 +262,15 @@ function AppRoutes() {
                 const isExpanded = expandedGroups.has(item.label)
                 return (
                   <div key={item.label} className={`nav-group ${item.children.some(c => c.path === appPath) ? 'has-active' : ''}`}>
-                    <button className={`nav-group-toggle ${isExpanded ? 'expanded' : ''}`} onClick={() => setExpandedGroups(prev => { const n = new Set(prev); n.has(item.label) ? n.delete(item.label) : n.add(item.label); return n })} type="button">
+                    <button className={`nav-group-toggle ${isExpanded ? 'expanded' : ''}`} onClick={() => setExpandedGroups(prev => {
+                      const n = new Set(prev)
+                      if (n.has(item.label)) {
+                        n.delete(item.label)
+                      } else {
+                        n.add(item.label)
+                      }
+                      return n
+                    })} type="button">
                       <Icon name={item.icon} className="nav-icon" />
                       {!sidebarCollapsed && <span>{item.label}</span>}
                       {!sidebarCollapsed && <Icon name="expand_more" className="nav-group-chevron" />}

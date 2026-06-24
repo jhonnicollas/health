@@ -8,7 +8,7 @@ Cloudflare-first health logging PWA — record vitals via photo, extract values 
 |---|---|
 | Runtime | Cloudflare Workers (TypeScript) |
 | API | Hono.js |
-| Database | Cloudflare D1 (`DB` → `multi_Ai_db`, 38 tables) |
+| Database | Cloudflare D1 (`DB` → `multi_Ai_db`, 68 HL tables after Sprint 5 migration) |
 | Storage | Cloudflare R2 (`LOGS` → `multi-apps-ai-bucket`) |
 | AI Vision | `@cf/meta/llama-3.2-11b-vision-instruct` (configurable via `HL_systemConfigs`) |
 | AI Text | 9router OpenAI-compatible endpoint, 3-model fallback (`deepseek-v4-flash-free`, `mimo-v2.5-free`, `poolside/laguna-m.1:free`) |
@@ -17,13 +17,13 @@ Cloudflare-first health logging PWA — record vitals via photo, extract values 
 | Frontend | React 19 + Vite 8 + TypeScript 6 (vanilla CSS) |
 | Auth | HTTP-only cookie sessions (`hlSession`) |
 | PWA | Service worker + manifest, installable on mobile |
-| **Auth** | HTTP-only cookie sessions (`hlSession`) |
 
 ## Project Structure
 
 ```
 hl-health-companion/
 ├── docs/                        # PRD, architecture, api-contract, schema, tasks, test-plan
+├── docs_sprint5/                # Sprint 5 planning: PRD, schema, seed, API contract, task plan, test plans
 ├── web/                         # React SPA frontend
 │   ├── src/
 │   │   ├── pages/               # 19 page groups (auth, dashboard, measurement, reports, etc.)
@@ -46,7 +46,7 @@ hl-health-companion/
 
 ## Sprint Status
 
-All **4 Sprints** complete — 151 user stories + gap remediations + enterprise production fixes.
+All **4 Sprints** complete — 151 user stories + gap remediations + enterprise production fixes. Sprint 5 now in progress.
 
 | Sprint | Scope | Status |
 |---|---|---|
@@ -54,6 +54,7 @@ All **4 Sprints** complete — 151 user stories + gap remediations + enterprise 
 | Sprint 2 | Health Intelligence: rules engine, popup, AI recommendation, comparison, weekly/monthly dashboards, reports, KB | ✅ |
 | Sprint 3 | Family & Alerts: Telegram link, emergency alerts, family/caregiver RBAC, reminders, browser push, medication | ✅ |
 | Sprint 4 | Advanced: Doctor Ready PDF, fasting timer, gamification, pattern detection, senior mode, PWA, export, privacy | ✅ |
+| Sprint 5 | Commercial Foundation, OAuth, Education, Symptom, Hydration, AI Infrastructure, Cycle Tracking, Telegram | 🚧 In Progress |
 
 ## Cloudflare Bindings
 
@@ -96,7 +97,20 @@ Pages proxies `/api/*` to Worker via `functions/api/[[path]].ts`.
 
 ## Database
 
-38 tables with `HL_` prefix, camelCase fields. Key tables:
+68 tables with `HL_` prefix, camelCase fields. Key tables:
+
+Apply local D1 schema and seed in this order:
+
+```bash
+cd worker
+npx wrangler d1 execute multi_Ai_db --local --file ../docs/07-schema.sql
+npx wrangler d1 execute multi_Ai_db --local --file ../docs/08-seed.sql
+npx wrangler d1 execute multi_Ai_db --local --file ../docs_sprint5/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+npx wrangler d1 execute multi_Ai_db --local --file ../docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+npx wrangler d1 execute multi_Ai_db --local --command "PRAGMA foreign_key_check;"
+```
+
+**Sprint 1–4 (38 tables):**
 
 - `HL_users` / `HL_sessions` / `HL_userProfiles` — auth & profiles
 - `HL_devices` / `HL_metricCatalog` / `HL_deviceMetrics` — device-metric catalog
@@ -115,7 +129,35 @@ Pages proxies `/api/*` to Worker via `functions/api/[[path]].ts`.
 - `HL_systemConfigs` — DB-backed config (no hardcoding)
 - `HL_auditLogs` / `HL_apiRateLimits` — audit & rate limiting
 
-## API Routes (~80 endpoints)
+**Sprint 5 Foundation (11 tables):**
+
+- `HL_roles` / `HL_permissions` / `HL_rolePermissions` / `HL_userRoles` — RBAC
+- `HL_plans` / `HL_planFeatures` / `HL_subscriptions` / `HL_paymentEvents` — billing & subscriptions
+- `HL_usageCounters` / `HL_featureFlags` / `HL_configMetadata` — usage & config
+
+**Sprint 5A — OAuth / Education / Symptoms (6 tables):**
+
+- `HL_oauthAccounts` / `HL_oauthStates` — Google OAuth
+- `HL_educationCards` / `HL_userEducationProgress` — education content & progress
+- `HL_symptomLogs` / `HL_safetyEvents` — symptom logging & safety
+
+**Sprint 5B — Hydration (3 tables):**
+
+- `HL_hydrationSettings` / `HL_hydrationTargets` / `HL_waterIntakeLogs` — water intake tracking
+
+**Sprint 5C — AI Infrastructure (4 tables):**
+
+- `HL_vectorDocuments` / `HL_aiContextQueries` / `HL_aiRecommendationContexts` / `HL_aiMemoryJobs` — AI context & memory
+
+**Sprint 5D — Cycle Tracking (4 tables):**
+
+- `HL_cycleSettings` / `HL_cycleLogs` / `HL_cycleGuardrailAcknowledgements` / `HL_familyPermissions` — cycle tracking & family permissions
+
+**Sprint 5E — Telegram Hydration (1 table):**
+
+- `HL_telegramCallbackEvents` — Telegram webhook callbacks
+
+## API Routes (~155 endpoints)
 
 **Auth**: register, login, logout, me, forgot-password, forgot-password
 **Profile**: get, update, onboarding, UI settings
@@ -138,6 +180,21 @@ Pages proxies `/api/*` to Worker via `functions/api/[[path]].ts`.
 **Export**: CSV
 **Privacy**: delete account
 
+### Sprint 5 Routes
+
+**Admin RBAC**: roles, permissions, user roles CRUD
+**Admin Billing**: plans, features, subscriptions, payment webhooks
+**Admin Config**: system config, AI config, feature flags
+**Admin Master Data**: metric catalog, metric rules, education cards, knowledge articles
+**Admin Audit**: audit logs, safety events
+**OAuth**: Google login/register/link/unlink
+**Education**: cards, progress, first-time guidance
+**Symptoms**: log, history, red flag detection
+**Hydration**: today, logs, history, settings
+**AI Clinical Infra**: context query, memory status/rebuild/delete
+**Cycle**: access check, settings, calendar, logs, guardrails, family permissions
+**Telegram Hydration**: webhook, cron reminders
+
 ## Critical Rules
 
 1. **Rule First, AI Assisted** — `HL_metricRules` determines severity, not AI.
@@ -147,6 +204,13 @@ Pages proxies `/api/*` to Worker via `functions/api/[[path]].ts`.
 5. **Naming** — Tables start with `HL_` (no underscore after); fields use camelCase.
 6. **No New DB/Bucket** — Use existing `multi_Ai_db` and `multi-apps-ai-bucket`.
 7. **Sensitive Data Encryption** — AES-GCM via `ENCRYPTION_KEY` secret for Telegram chat IDs, emergency contacts, medication notes.
+
+### Sprint 5 Rules
+
+8. **Safety Events** — Sprint 5 non-metric safety events use `HL_safetyEvents`, not `HL_alerts`.
+9. **AI Clinical Copilot Deferred** — Sprint 5C builds infrastructure only; the AI Clinical Copilot feature ships in Sprint 6.
+10. **Audit Logs Required** — All admin mutations must write to `HL_auditLogs`.
+11. **No Plaintext Secrets** — No secrets in D1, API responses, logs, or frontend bundle. Secrets live in Cloudflare Secrets/Env only.
 
 ## Account
 

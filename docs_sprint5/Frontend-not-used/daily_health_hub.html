@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Health Hub — HealthSync Pro</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            "primary": "#000000",
+            "on-primary": "#ffffff",
+            "primary-container": "#131b2e",
+            "on-primary-container": "#7c839b",
+            "primary-fixed": "#dae2fd",
+            "primary-fixed-dim": "#bec6e0",
+            "on-primary-fixed": "#131b2e",
+            "on-primary-fixed-variant": "#3f465c",
+            "secondary": "#505f76",
+            "on-secondary": "#ffffff",
+            "secondary-container": "#d0e1fb",
+            "on-secondary-container": "#54647a",
+            "secondary-fixed": "#d3e4fe",
+            "secondary-fixed-dim": "#b7c8e1",
+            "on-secondary-fixed": "#0b1c30",
+            "on-secondary-fixed-variant": "#38485d",
+            "tertiary": "#000000",
+            "on-tertiary": "#ffffff",
+            "tertiary-container": "#271901",
+            "on-tertiary-container": "#98805d",
+            "tertiary-fixed": "#fcdeb5",
+            "tertiary-fixed-dim": "#dec29a",
+            "on-tertiary-fixed": "#271901",
+            "on-tertiary-fixed-variant": "#574425",
+            "background": "#fcf8fa",
+            "on-background": "#1b1b1d",
+            "surface": "#fcf8fa",
+            "surface-dim": "#dcd9db",
+            "surface-bright": "#fcf8fa",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#f6f3f5",
+            "surface-container": "#f0edef",
+            "surface-container-high": "#eae7e9",
+            "surface-container-highest": "#e4e2e4",
+            "on-surface": "#1b1b1d",
+            "on-surface-variant": "#45464d",
+            "surface-variant": "#e4e2e4",
+            "surface-tint": "#565e74",
+            "inverse-surface": "#303032",
+            "inverse-on-surface": "#f3f0f2",
+            "inverse-primary": "#bec6e0",
+            "outline": "#76777d",
+            "outline-variant": "#c6c6cd",
+            "error": "#ba1a1a",
+            "on-error": "#ffffff",
+            "error-container": "#ffdad6",
+            "on-error-container": "#93000a",
+            "semantic-period-red": "#ba1a1a",
+            "semantic-fertile-blue": "#0369a1",
+            "semantic-fertile-purple": "#7c3aed",
+            "semantic-safe-green": "#10b981",
+            "semantic-warning-amber": "#f59e0b",
+            "medical-blue": "#0061FF",
+            "normal-green": "#10B981",
+            "warning-amber": "#F59E0B",
+            "critical-red": "#EF4444"
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      user-select: none;
+    }
+    /* Active nav item */
+    .nav-active {
+      border-left: 4px solid #000000;
+      background-color: rgba(19,27,46,0.08);
+      color: #000000;
+      font-weight: 700;
+    }
+    /* Hydration ring fill animation */
+    @keyframes ring-fill {
+      from { stroke-dashoffset: 238.76; }
+      to   { stroke-dashoffset: 78.79; }
+    }
+    .ring-anim {
+      animation: ring-fill 1.4s cubic-bezier(.4,0,.2,1) forwards;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+    /* Card hover lift */
+    .bento-card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+    .bento-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px -10px rgba(0,0,0,0.12); }
+    /* Timeline pulse */
+    @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+    .dot-pulse { animation: pulse-dot 2s ease-in-out infinite; }
+    /* Modal backdrop blur */
+    .modal-backdrop { backdrop-filter: blur(3px); }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#c6c6cd; border-radius:4px; }
+    ::-webkit-scrollbar-thumb:hover { background:#76777d; }
+    /* VAS scale segments */
+    .vas-seg { height:6px; border-radius:3px; flex:1; }
+  </style>
+</head>
+
+<body class="bg-background text-on-surface flex min-h-screen">
+
+<!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+<nav class="hidden lg:flex flex-col fixed left-0 top-0 h-full w-[280px] z-50 bg-surface-container-low border-r border-outline-variant overflow-y-auto">
+
+  <!-- Brand -->
+  <div class="p-6 border-b border-outline-variant flex-shrink-0">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center flex-shrink-0">
+        <span class="material-symbols-outlined text-inverse-primary text-[20px]" style="font-variation-settings:'FILL' 1">health_and_safety</span>
+      </div>
+      <div>
+        <h1 class="text-[17px] font-bold text-on-surface leading-tight">HealthSync Pro</h1>
+        <p class="text-[11px] text-on-surface-variant">Enterprise Health</p>
+      </div>
+    </div>
+    <button class="w-full bg-primary text-on-primary hover:bg-primary/80 py-2.5 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200">
+      <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1">add_circle</span>
+      Ukuran Baru
+    </button>
+  </div>
+
+  <!-- Nav links -->
+  <div class="flex-1 py-3">
+    <nav class="px-3 space-y-0.5">
+
+      <p class="px-3 pt-2 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Utama</p>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">dashboard</span>
+        Dashboard
+      </a>
+
+      <!-- ACTIVE -->
+      <a href="#" class="nav-active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all">
+        <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">today</span>
+        Today / Daily Hub
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">date_range</span>
+        Weekly
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">calendar_month</span>
+        Monthly
+      </a>
+
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Pencatatan</p>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">add_circle</span>
+        Measurement Baru
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">history</span>
+        History
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">sick</span>
+        Daily Symptom Log
+        <span class="ml-auto text-[10px] bg-warning-amber/20 text-warning-amber font-bold px-1.5 py-0.5 rounded-full">NEW</span>
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">water_drop</span>
+        Hydration Tracker
+        <span class="ml-auto text-[10px] bg-warning-amber/20 text-warning-amber font-bold px-1.5 py-0.5 rounded-full">NEW</span>
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">cycle</span>
+        Cycle Tracking
+      </a>
+
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">AI &amp; Insights</p>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">smart_toy</span>
+        AI Assistant
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">psychology</span>
+        AI Memory
+        <span class="ml-auto text-[10px] bg-warning-amber/20 text-warning-amber font-bold px-1.5 py-0.5 rounded-full">NEW</span>
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">insights</span>
+        Patterns
+      </a>
+
+      <!-- Reports collapsible -->
+      <div>
+        <button id="reportsToggle" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+          <span class="material-symbols-outlined text-[20px]">assessment</span>
+          Reports
+          <span class="material-symbols-outlined text-[16px] ml-auto" id="reportsIcon">expand_more</span>
+        </button>
+        <div id="reportsSubmenu" class="hidden ml-8 mt-0.5 space-y-0.5">
+          <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">Harian</a>
+          <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">Mingguan</a>
+          <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">Bulanan</a>
+          <a href="#" class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">Untuk Dokter</a>
+        </div>
+      </div>
+
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Lainnya</p>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">notifications</span>
+        Notifikasi
+        <span class="ml-auto bg-critical-red text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">3</span>
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">family_restroom</span>
+        Family / Caregiver
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">medication</span>
+        Medication
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">timer</span>
+        Fasting
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">alarm</span>
+        Reminders
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">settings</span>
+        Settings
+      </a>
+
+      <!-- ADMIN AREA -->
+      <p class="px-3 pt-5 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[13px]">admin_panel_settings</span>
+        Admin Area
+      </p>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">dashboard_customize</span>
+        Admin Dashboard
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+        Users
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">security</span>
+        Roles &amp; Permissions
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">workspace_premium</span>
+        Plans &amp; Features
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">subscriptions</span>
+        Subscriptions
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">school</span>
+        Education Cards
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">model_training</span>
+        AI Configuration
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">tune</span>
+        System Config
+      </a>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+        <span class="material-symbols-outlined text-[20px]">fact_check</span>
+        Audit Logs
+      </a>
+
+    </nav>
+  </div>
+
+  <!-- Sidebar Footer -->
+  <div class="p-4 border-t border-outline-variant space-y-0.5 flex-shrink-0">
+    <button class="w-full bg-error text-on-error hover:bg-error/90 py-2.5 px-3 rounded-lg text-sm font-semibold flex items-center gap-3 mb-2 transition-all">
+      <span class="material-symbols-outlined text-[18px]">emergency</span>
+      Emergency Support
+    </button>
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+      <span class="material-symbols-outlined text-[20px]">help_outline</span>
+      Bantuan
+    </a>
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-error hover:bg-error-container/30 transition-all">
+      <span class="material-symbols-outlined text-[20px]">logout</span>
+      Keluar
+    </a>
+  </div>
+</nav>
+
+<!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
+<main class="flex-1 lg:ml-[280px] flex flex-col min-h-screen">
+
+  <!-- ── TOP BAR ─────────────────────────────────── -->
+  <header class="sticky top-0 z-40 flex items-center justify-between h-16 px-6 bg-surface border-b border-outline-variant">
+    <div class="hidden lg:flex items-center bg-surface-container-low rounded-full px-4 py-2 border border-outline-variant w-80">
+      <span class="material-symbols-outlined text-on-surface-variant mr-2 text-[18px]">search</span>
+      <input class="bg-transparent border-none outline-none w-full text-sm text-on-surface placeholder-on-surface-variant" placeholder="Cari riwayat, data kesehatan..." />
+    </div>
+    <div class="lg:hidden flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center">
+        <span class="material-symbols-outlined text-inverse-primary text-[18px]" style="font-variation-settings:'FILL' 1">health_and_safety</span>
+      </div>
+      <span class="font-bold text-on-surface">HealthSync Pro</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="hidden xl:flex flex-col items-end text-right">
+        <span class="text-[11px] font-semibold text-on-surface">Selasa, 24 Jun 2026</span>
+        <span class="text-[11px] text-on-surface-variant">21:31 WIB</span>
+      </div>
+      <button class="relative p-2 rounded-full hover:bg-surface-container text-on-surface-variant transition-colors">
+        <span class="material-symbols-outlined text-[22px]">notifications</span>
+        <span class="absolute top-1 right-1 w-2 h-2 bg-critical-red rounded-full"></span>
+      </button>
+      <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-sm font-bold text-inverse-primary">A</div>
+    </div>
+  </header>
+
+  <!-- ── PAGE CONTENT ───────────────────────────────── -->
+  <div class="flex-1 p-4 lg:p-6 bg-background pb-24 lg:pb-8">
+
+    <!-- ┌──────────────────────────────────────────────┐ -->
+    <!-- │  1. PAGE HEADER                              │ -->
+    <!-- └──────────────────────────────────────────────┘ -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-on-surface tracking-tight">Halo, Andi 👋</h1>
+        <p class="text-sm text-on-surface-variant mt-0.5">Selasa, 24 Juni 2026 — Berikut ringkasan kesehatan hari ini.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-yellow-50 to-amber-50 border border-warning-amber/35 text-warning-amber text-xs font-bold">
+          ⭐ Premium
+        </span>
+        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all">
+          <span class="material-symbols-outlined text-[16px]">settings</span>
+          Settings
+        </button>
+      </div>
+    </div>
+
+    <!-- ┌──────────────────────────────────────────────┐ -->
+    <!-- │  2. STATUS SUMMARY BANNER                    │ -->
+    <!-- └──────────────────────────────────────────────┘ -->
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl mb-6 overflow-hidden">
+      <!-- Green status bar -->
+      <div class="flex items-center gap-3 px-5 py-3 border-l-4 border-normal-green" style="background-color:rgba(16,185,129,0.06);">
+        <div class="w-2 h-2 rounded-full bg-normal-green dot-pulse flex-shrink-0"></div>
+        <span class="text-sm font-bold text-on-surface">Status Hari Ini:</span>
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase border" style="background:rgba(16,185,129,0.12);color:#10B981;border-color:rgba(16,185,129,0.3);">
+          <span class="material-symbols-outlined text-[13px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          NORMAL
+        </span>
+        <span class="ml-auto text-xs text-on-surface-variant hidden sm:block">Terakhir: 14:15 WIB</span>
+      </div>
+
+      <!-- 3 mini metrics -->
+      <div class="grid grid-cols-3 divide-x divide-outline-variant">
+        <!-- Tekanan Darah -->
+        <div class="flex flex-col items-center justify-center py-4 px-3 gap-1">
+          <div class="flex items-center gap-1 text-on-surface-variant mb-1">
+            <span class="material-symbols-outlined text-[15px]" style="font-variation-settings:'FILL' 1">favorite</span>
+            <span class="text-[11px] font-medium hidden sm:block">Tekanan Darah</span>
+            <span class="text-[11px] font-medium sm:hidden">TD</span>
+          </div>
+          <p class="text-[17px] font-bold text-on-surface tracking-tight leading-none">120/80</p>
+          <p class="text-[10px] text-on-surface-variant mb-1">mmHg</p>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:rgba(16,185,129,0.12);color:#10B981;">Normal</span>
+        </div>
+        <!-- SpO2 -->
+        <div class="flex flex-col items-center justify-center py-4 px-3 gap-1">
+          <div class="flex items-center gap-1 text-on-surface-variant mb-1">
+            <span class="material-symbols-outlined text-[15px]" style="font-variation-settings:'FILL' 1">air</span>
+            <span class="text-[11px] font-medium hidden sm:block">Saturasi O&#x2082;</span>
+            <span class="text-[11px] font-medium sm:hidden">SpO&#x2082;</span>
+          </div>
+          <p class="text-[17px] font-bold text-on-surface tracking-tight leading-none">98</p>
+          <p class="text-[10px] text-on-surface-variant mb-1">%</p>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:rgba(16,185,129,0.12);color:#10B981;">Normal</span>
+        </div>
+        <!-- Gula Darah -->
+        <div class="flex flex-col items-center justify-center py-4 px-3 gap-1">
+          <div class="flex items-center gap-1 text-on-surface-variant mb-1">
+            <span class="material-symbols-outlined text-[15px]" style="font-variation-settings:'FILL' 1">glucose</span>
+            <span class="text-[11px] font-medium hidden sm:block">Gula Darah</span>
+            <span class="text-[11px] font-medium sm:hidden">GDA</span>
+          </div>
+          <p class="text-[17px] font-bold text-on-surface tracking-tight leading-none">95</p>
+          <p class="text-[10px] text-on-surface-variant mb-1">mg/dL</p>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold" style="background:rgba(16,185,129,0.12);color:#10B981;">Normal</span>
+        </div>
+      </div>
+
+      <!-- Footer note -->
+      <div class="px-5 py-2.5 border-t border-outline-variant" style="background:rgba(16,185,129,0.05);">
+        <p class="text-xs font-medium text-center" style="color:#10B981;">Semua pengukuran dalam batas normal hari ini 👍</p>
+      </div>
+    </div>
+
+    <!-- ┌──────────────────────────────────────────────┐ -->
+    <!-- │  3. BENTO GRID 2×2                           │ -->
+    <!-- └──────────────────────────────────────────────┘ -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+      <!-- ╔═ CARD 1 — Keluhan Aktif ═╗ -->
+      <div class="bento-card bg-surface-container-lowest border border-outline-variant rounded-xl p-5 flex flex-col gap-3">
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(245,158,11,0.12);">
+              <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1;color:#F59E0B;">sick</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-on-surface">Keluhan Aktif</h3>
+              <p class="text-xs text-on-surface-variant">Sakit Kepala sejak 2 jam lalu</p>
+            </div>
+          </div>
+          <!-- VAS Badge -->
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border flex-shrink-0" style="background:rgba(245,158,11,0.12);color:#F59E0B;border-color:rgba(245,158,11,0.3);">
+            <span class="material-symbols-outlined text-[11px]" style="font-variation-settings:'FILL' 1">warning</span>
+            Skala 6 — Sedang
+          </span>
+        </div>
+
+        <!-- VAS Scale -->
+        <div>
+          <div class="flex justify-between text-[10px] text-on-surface-variant mb-2">
+            <span>Tidak Sakit (0)</span>
+            <span>Sangat Sakit (10)</span>
+          </div>
+          <!-- Segmented bar -->
+          <div class="flex gap-0.5 mb-2">
+            <div class="vas-seg" style="background:#10B981;"></div>
+            <div class="vas-seg" style="background:#10B981;"></div>
+            <div class="vas-seg" style="background:#10B981;"></div>
+            <div class="vas-seg" style="background:#34d399;"></div>
+            <div class="vas-seg" style="background:#F59E0B;opacity:0.7;"></div>
+            <div class="vas-seg" style="background:#F59E0B;"></div>
+            <div class="vas-seg" style="background:#e4e2e4;"></div>
+            <div class="vas-seg" style="background:#e4e2e4;"></div>
+            <div class="vas-seg" style="background:#e4e2e4;"></div>
+            <div class="vas-seg" style="background:#e4e2e4;"></div>
+          </div>
+          <!-- Dot indicator row -->
+          <div class="relative h-1">
+            <div class="absolute w-3 h-3 rounded-full bg-white border-2 shadow-sm -top-1" style="left:calc(55% - 6px);border-color:#F59E0B;"></div>
+          </div>
+        </div>
+
+        <!-- Meta info -->
+        <div class="flex items-center gap-3 text-xs text-on-surface-variant">
+          <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">schedule</span>Mulai: 12:15 WIB</span>
+          <div class="w-px h-3 bg-outline-variant"></div>
+          <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">location_on</span>Kepala bagian depan</span>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex items-center gap-2 pt-1 mt-auto">
+          <button class="flex-1 h-9 px-3 rounded-lg border border-outline-variant text-xs font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-[15px]">visibility</span>
+            Lihat Detail
+          </button>
+          <button class="flex-1 h-9 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 border" style="background:rgba(245,158,11,0.12);color:#F59E0B;border-color:rgba(245,158,11,0.3);" onmouseover="this.style.background='rgba(245,158,11,0.2)'" onmouseout="this.style.background='rgba(245,158,11,0.12)'">
+            <span class="material-symbols-outlined text-[15px]">add</span>
+            Tambah Keluhan
+          </button>
+        </div>
+      </div>
+
+      <!-- ╔═ CARD 2 — Hidrasi ═╗ -->
+      <div class="bento-card bg-surface-container-lowest border border-outline-variant rounded-xl p-5 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(3,105,161,0.1);">
+              <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1;color:#0369a1;">water_drop</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-on-surface">Hidrasi Hari Ini</h3>
+              <p class="text-xs text-on-surface-variant">Target berbasis berat badan 70kg</p>
+            </div>
+          </div>
+          <span id="hydPct" class="text-sm font-bold" style="color:#0369a1;">67%</span>
+        </div>
+
+        <!-- Ring + stats -->
+        <div class="flex items-center gap-5">
+          <!-- SVG ring -->
+          <div class="relative flex-shrink-0" style="width:96px;height:96px;">
+            <svg viewBox="0 0 100 100" style="width:100%;height:100%;">
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#e4e2e4" stroke-width="8"/>
+              <circle id="hydRing" cx="50" cy="50" r="38"
+                fill="none" stroke="#0369a1" stroke-width="8"
+                stroke-linecap="round"
+                stroke-dasharray="238.76"
+                stroke-dashoffset="238.76"
+                class="ring-anim"
+                style="transform:rotate(-90deg);transform-origin:50% 50%;"/>
+              <circle cx="50" cy="50" r="30" fill="#eff6ff"/>
+              <text id="hydMlText" x="50" y="46" text-anchor="middle" dominant-baseline="middle" style="font-size:11px;fill:#0369a1;font-weight:700;font-family:Inter,sans-serif;">1.400</text>
+              <text x="50" y="57" text-anchor="middle" dominant-baseline="middle" style="font-size:7px;fill:#76777d;font-family:Inter,sans-serif;">ml / 2.100</text>
+            </svg>
+          </div>
+          <!-- Stats -->
+          <div class="flex-1">
+            <p class="text-xl font-bold text-on-surface">1.400 <span class="text-sm font-normal text-on-surface-variant">ml</span></p>
+            <p class="text-xs text-on-surface-variant mb-2">dari target <span class="font-semibold text-on-surface">2.100 ml</span></p>
+            <div class="w-full h-2 rounded-full overflow-hidden" style="background:#e4e2e4;">
+              <div id="hydBar" class="h-full rounded-full" style="width:67%;background:#0369a1;transition:width 0.5s ease;"></div>
+            </div>
+            <p class="text-[10px] text-on-surface-variant mt-1.5">Sisa <span id="hydRem" class="font-semibold" style="color:#0369a1;">700 ml</span> lagi</p>
+          </div>
+        </div>
+
+        <!-- Quick add buttons -->
+        <div class="flex items-center gap-2">
+          <button onclick="addHydration(200)" class="h-9 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border" style="background:rgba(3,105,161,0.08);color:#0369a1;border-color:rgba(3,105,161,0.2);">
+            <span class="material-symbols-outlined text-[13px]">add</span>+200ml
+          </button>
+          <button onclick="addHydration(600)" class="h-9 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border" style="background:rgba(3,105,161,0.08);color:#0369a1;border-color:rgba(3,105,161,0.2);">
+            <span class="material-symbols-outlined text-[13px]">add</span>+600ml
+          </button>
+          <div class="flex-1 flex items-center gap-0 border border-outline-variant rounded-lg overflow-hidden h-9">
+            <input id="customMl" type="number" placeholder="ml" min="50" max="2000" step="50"
+              class="flex-1 min-w-0 bg-transparent px-2 text-xs outline-none text-on-surface" />
+            <button onclick="addCustomMl()" class="h-full px-2.5 text-white text-xs font-bold flex-shrink-0" style="background:#0369a1;">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ╔═ CARD 3 — AI Insight ═╗ -->
+      <div class="bento-card bg-surface-container-lowest border border-outline-variant rounded-xl p-5 flex flex-col gap-3 relative overflow-hidden">
+        <!-- Deco gradient blob -->
+        <div class="absolute top-0 right-0 w-36 h-36 rounded-full pointer-events-none" style="background:radial-gradient(circle,rgba(124,58,237,0.08),transparent 70%);transform:translate(30%,-30%);"></div>
+
+        <div class="flex items-start justify-between relative">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(124,58,237,0.1);">
+              <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1;color:#7c3aed;">smart_toy</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-on-surface">AI Insight</h3>
+              <p class="text-xs text-on-surface-variant">Analisis 7 hari terakhir</p>
+            </div>
+          </div>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border" style="background:rgba(245,158,11,0.12);color:#F59E0B;border-color:rgba(245,158,11,0.3);">⭐ Premium</span>
+        </div>
+
+        <!-- Insight bubble -->
+        <div class="flex-1 rounded-xl p-3.5 border" style="background:rgba(124,58,237,0.05);border-color:rgba(124,58,237,0.15);">
+          <div class="flex gap-2.5">
+            <span class="material-symbols-outlined text-[15px] flex-shrink-0 mt-0.5" style="font-variation-settings:'FILL' 1;color:#7c3aed;">auto_awesome</span>
+            <p class="text-sm text-on-surface leading-relaxed">
+              Berdasarkan pola <span class="font-semibold">7 hari terakhir</span>, tekanan darah Anda cenderung <span class="font-semibold" style="color:#F59E0B;">naik di sore hari</span>. Pastikan hidrasi cukup dan istirahat setelah makan siang.
+            </p>
+          </div>
+        </div>
+
+        <!-- Pattern tags -->
+        <div class="flex flex-wrap gap-1.5">
+          <span class="px-2 py-0.5 rounded-full text-[11px] text-on-surface-variant border border-outline-variant bg-surface-container">📈 TD naik 13:00–17:00</span>
+          <span class="px-2 py-0.5 rounded-full text-[11px] text-on-surface-variant border border-outline-variant bg-surface-container">💧 Hidrasi rendah sore</span>
+          <span class="px-2 py-0.5 rounded-full text-[11px] text-on-surface-variant border border-outline-variant bg-surface-container">😴 Tidur 6,5 jam rata-rata</span>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="flex items-start gap-2 px-3 py-2 rounded-lg border" style="background:rgba(245,158,11,0.07);border-color:rgba(245,158,11,0.2);">
+          <span class="text-[13px] mt-0.5">⚠️</span>
+          <p class="text-[11px] text-on-surface-variant leading-snug">Ini bukan diagnosis medis. Konsultasikan dengan dokter Anda untuk interpretasi klinis.</p>
+        </div>
+
+        <!-- CTA -->
+        <button class="h-9 w-full rounded-lg text-white text-xs font-semibold transition-all flex items-center justify-center gap-2" style="background:#7c3aed;" onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">
+          <span class="material-symbols-outlined text-[16px]">chat</span>
+          Tanya AI Assistant
+        </button>
+      </div>
+
+      <!-- ╔═ CARD 4 — Education Card ═╗ -->
+      <div class="bento-card bg-surface-container-lowest border border-outline-variant rounded-xl p-5 flex flex-col gap-3 relative overflow-hidden">
+        <!-- Deco -->
+        <div class="absolute bottom-0 right-0 w-32 h-32 rounded-full pointer-events-none" style="background:radial-gradient(circle,rgba(0,97,255,0.06),transparent 70%);transform:translate(30%,30%);"></div>
+
+        <div class="flex items-start justify-between relative">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(0,97,255,0.1);">
+              <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1;color:#0061FF;">school</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-on-surface">Kartu Edukasi</h3>
+              <p class="text-xs text-on-surface-variant">Kesehatan Jantung &amp; Pembuluh</p>
+            </div>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border" style="background:rgba(0,97,255,0.1);color:#0061FF;border-color:rgba(0,97,255,0.2);">Edukasi</span>
+        </div>
+
+        <!-- Topic -->
+        <div class="rounded-xl px-4 py-3 border" style="background:linear-gradient(135deg,rgba(0,97,255,0.08),rgba(0,97,255,0.04));border-color:rgba(0,97,255,0.15);">
+          <p class="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style="color:#0061FF;">Topik Hari Ini</p>
+          <h4 class="text-base font-bold text-on-surface">Tekanan Darah Tinggi</h4>
+        </div>
+
+        <!-- Body text -->
+        <div class="flex-1">
+          <p class="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[13px]">lightbulb</span>
+            Tahukah Anda?
+          </p>
+          <p class="text-sm text-on-surface leading-relaxed">
+            Hipertensi disebut <span class="font-semibold" style="color:#EF4444;">&ldquo;silent killer&rdquo;</span> karena sering tanpa gejala. Monitoring rutin membantu deteksi dini sebelum komplikasi serius terjadi.
+          </p>
+        </div>
+
+        <!-- Reference box -->
+        <div class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg border" style="background:rgba(16,185,129,0.07);border-color:rgba(16,185,129,0.25);">
+          <span class="material-symbols-outlined text-[18px] flex-shrink-0" style="font-variation-settings:'FILL' 1;color:#10B981;">check_circle</span>
+          <div>
+            <p class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wide">Angka Normal</p>
+            <p class="text-sm font-bold text-on-surface">&lt; 120/80 mmHg</p>
+          </div>
+          <div class="ml-auto text-right">
+            <p class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wide">Anda Saat Ini</p>
+            <p class="text-sm font-bold" style="color:#10B981;">120/80 ✓</p>
+          </div>
+        </div>
+
+        <!-- CTA -->
+        <button class="h-9 w-full rounded-lg border text-xs font-semibold transition-all flex items-center justify-center gap-2" style="border-color:rgba(0,97,255,0.3);color:#0061FF;" onmouseover="this.style.background='rgba(0,97,255,0.07)'" onmouseout="this.style.background='transparent'">
+          Baca Selengkapnya
+          <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+        </button>
+      </div>
+
+    </div><!-- /bento grid -->
+
+    <!-- ┌──────────────────────────────────────────────┐ -->
+    <!-- │  4. TODAY'S TIMELINE                         │ -->
+    <!-- └──────────────────────────────────────────────┘ -->
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 mb-6">
+      <div class="flex items-center justify-between mb-5">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[20px] text-on-surface-variant" style="font-variation-settings:'FILL' 1">timeline</span>
+          <h2 class="text-base font-bold text-on-surface">Aktivitas Hari Ini</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-on-surface-variant">6 aktivitas</span>
+          <span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+          <span class="text-xs text-on-surface-variant">Selasa, 24 Jun</span>
+        </div>
+      </div>
+
+      <div class="space-y-1">
+
+        <!-- 08:00 — Measurement — Normal (green) -->
+        <div class="flex gap-3 items-start">
+          <div class="flex flex-col items-center flex-shrink-0 pt-1">
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-white ring-2 flex-shrink-0" style="background:#10B981;ring-color:rgba(16,185,129,0.3);"></div>
+            <div class="w-0.5 flex-1 mt-1" style="background:#e4e2e4;min-height:32px;"></div>
+          </div>
+          <div class="flex-1 min-w-0 pb-4">
+            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+              <span class="text-[11px] font-bold text-on-surface-variant px-2 py-0.5 rounded-full" style="background:#f0edef;">08:00</span>
+              <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border" style="background:rgba(16,185,129,0.1);color:#10B981;border-color:rgba(16,185,129,0.25);">
+                <span class="material-symbols-outlined text-[11px]" style="font-variation-settings:'FILL' 1">monitor_heart</span>Pengukuran
+              </span>
+              <span class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:rgba(16,185,129,0.1);color:#10B981;">Normal</span>
+            </div>
+            <p class="text-sm font-semibold text-on-surface">Tekanan Darah</p>
+            <p class="text-xs text-on-surface-variant">120/80 mmHg &middot; Pagi hari sebelum makan</p>
+          </div>
+        </div>
+
+        <!-- 09:30 — Hydration (blue) -->
+        <div class="flex gap-3 items-start">
+          <div class="flex flex-col items-center flex-shrink-0 pt-1">
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-white flex-shrink-0" style="background:#0369a1;"></div>
+            <div class="w-0.5 flex-1 mt-1" style="background:#e4e2e4;min-height:32px;"></div>
+          </div>
+          <div class="flex-1 min-w-0 pb-4">
+            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+              <span class="text-[11px] font-bold text-on-surface-variant px-2 py-0.5 rounded-full" style="background:#f0edef;">09:30</span>
+              <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border" style="background:rgba(3,105,161,0.1);color:#0369a1;border-color:rgba(3,105,161,0.25);">
+                <span class="material-symbols-outlined text-[11px]" style="font-variation-settings:'FILL' 1">water_drop</span>Hidrasi
+              </span>
+              <span class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:rgba(3,105,161,0.1);color:#0369a1;">+200ml</span>
+            </div>
+            <p class="text-sm font-semibold text-on-surface">+200ml air putih</p>
+            <p class="text-xs text-on-surface-variant">Total hari ini: <span class="font-semibold">600ml</span></p>
+          </div>
+        </div>
+
+        <!-- 11:15 — Medication (teal) -->
+        <div class="flex gap-3 items-start">
+          <div class="flex flex-col items-center flex-shrink-0 pt-1">
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-white flex-shrink-0" style="background:#0d9488;"></div>
+            <div class="w-0.5 flex-1 mt-1" style="background:#e4e2e4;min-height:32px;"></div>
+          </div>
+          <div class="flex-1 min-w-0 pb-4">
+            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+              <span class="text-[11px] font-bold text-on-surface-variant px-2 py-0.5 rounded-full" style="background:#f0edef;">11:15</span>
+              <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border" style="background:rgba(13,148,136,0.1);color:#0d9488;border-color:rgba(13,148,136,0.25);">
+                <span class="material-symbols-outlined text-[11px]" style="font-variation-settings:'FILL' 1">medication</span>Obat
+              </span>
+              <span class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:rgba(16,185,129,0.1);color:#10B981;">&#x2705; Diminum</span>
+            </div>
+            <p class="text-sm font-semibold text-on-surface">Amlodipine 5mg</p>
+            <p class="text-xs text-on-surface-variant">Obat tekanan darah rutin &middot; Jadwal pagi</p>
+          </div>
+        </div>
+
+        <!-- 13:00 — Hydration (blue) -->
+        <div class="flex gap-3 items-start">
+          <div class="flex flex-col items-center flex-shrink-0 pt-1">
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-white flex-shrink-0" style="background:#0369a1;"></div>
+            <div class="w-0.5 flex-1 mt-1" style="background:#e4e2e4;min-height:32px;"></div>
+          </div>
+          <div class="flex-1 min-w-0 pb-4">
+            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+              <span class="text-[11px] font-bold text-on-surface-variant px-2 py-0.5 rounded-full" style="background:#f0edef;">13:00</span>
+              <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border" style="background:rgba(3,105,161,0.1);color:#0369a1;border-color:rgba(3,105,161,0.25);">
+                <span class="material-symbols-outlined text-[11px]" style="font-variation-settings:'FILL' 1">water_drop</span>Hidrasi
+              </span>
+              <span class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:rgba(3,105,161,0.1);color:#0369a1;">+600ml</span>
+            </div>
+            <p class="text-sm font-semibold text-on-surface">+600ml air putih</p>
+            <p class="text-xs text-on-surface-variant">Total hari ini: <span class="font-semibold">1.200ml</span></p>
+          </div>
+        </div>
+
+        <!-- 14:00 — Measurement Elevated (amber) -->
+        <div class="flex gap-3 items-start">
+          <div class="flex flex-col items-center flex-shrink-0 pt-1">
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-white flex-shrink-0" style="background:#F59E0B;"></div>
+            <div class="w-0.5 flex-1 mt-1" style="background:#e4e2e4;min-height:32px;"></div>
+          </div>
+          <div class="flex-1 min-w-0 pb-4">
+            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+              <span class="text-[11px] font-bold text-on-surface-variant px-2 py-0.5 rounded-full" style="background:#f0edef;">14:00</span>
+              <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border" style="background:rgba(245,158,11,0.1);color:#F59E0B;border-color:rgba(245,158,11,0.25);">
+                <span class="material-symbols-outlined text-[11px]" style="font-variation-settings:'FILL' 1">monitor_heart</span>Pengukuran
+              </span>
+              <span class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:rgba(245,158,11,0.12);color:#F59E0B;">⚠ Elevated</span>
+            </div>
+            <p class="text-sm font-semibold text-on-surface">Tekanan Darah</p>
+            <p class="text-xs text-on-surface-variant">135/88 mmHg &middot; Siang hari setelah makan siang</p>
+          </div>
+        </div>
+
+        <!-- 14:15 — Symptom (amber + pulse) — LAST ITEM -->
+        <div class="flex gap-3 items-start">
+          <div class="flex flex-col items-center flex-shrink-0 pt-1">
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-white dot-pulse flex-shrink-0" style="background:#F59E0B;"></div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+              <span class="text-[11px] font-bold text-on-surface-variant px-2 py-0.5 rounded-full" style="background:#f0edef;">14:15</span>
+              <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border" style="background:rgba(245,158,11,0.1);color:#F59E0B;border-color:rgba(245,158,11,0.25);">
+                <span class="material-symbols-outlined text-[11px]" style="font-variation-settings:'FILL' 1">sick</span>Keluhan
+              </span>
+              <span class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold" style="background:rgba(245,158,11,0.12);color:#F59E0B;">Sedang</span>
+            </div>
+            <p class="text-sm font-semibold text-on-surface">Sakit Kepala</p>
+            <p class="text-xs text-on-surface-variant">Skala 6/10 &middot; Kepala bagian depan &middot; <span class="font-medium" style="color:#F59E0B;">Aktif</span></p>
+          </div>
+        </div>
+
+      </div><!-- /timeline items -->
+
+      <div class="mt-5 pt-4 border-t border-outline-variant">
+        <button class="w-full h-9 rounded-lg border border-outline-variant text-xs font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-[15px]">history</span>
+          Lihat Semua Aktivitas Hari Ini
+        </button>
+      </div>
+    </div>
+
+    <!-- ┌──────────────────────────────────────────────┐ -->
+    <!-- │  5. QUICK ACTIONS ROW                        │ -->
+    <!-- └──────────────────────────────────────────────┘ -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+      <!-- Ukur Sekarang -->
+      <button class="group flex flex-col items-center justify-center gap-2.5 p-4 rounded-xl bg-primary text-on-primary transition-all min-h-[100px]" onmouseover="this.style.background='rgba(0,0,0,0.82)'" onmouseout="this.style.background='#000000'">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center transition-all" style="background:rgba(255,255,255,0.12);">
+          <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1">monitor_heart</span>
+        </div>
+        <span class="text-sm font-semibold leading-tight text-center">Ukur Sekarang</span>
+      </button>
+
+      <!-- Catat Keluhan -->
+      <button class="group flex flex-col items-center justify-center gap-2.5 p-4 rounded-xl bg-surface-container-lowest border border-outline-variant text-on-surface transition-all min-h-[100px]" onmouseover="this.style.borderColor='rgba(245,158,11,0.4)'" onmouseout="this.style.borderColor='#c6c6cd'">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center transition-all" style="background:rgba(245,158,11,0.1);">
+          <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1;color:#F59E0B;">sick</span>
+        </div>
+        <span class="text-sm font-semibold leading-tight text-center">Catat Keluhan</span>
+      </button>
+
+      <!-- Minum Air -->
+      <button class="group flex flex-col items-center justify-center gap-2.5 p-4 rounded-xl bg-surface-container-lowest border border-outline-variant text-on-surface transition-all min-h-[100px]" onmouseover="this.style.borderColor='rgba(3,105,161,0.4)'" onmouseout="this.style.borderColor='#c6c6cd'">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center transition-all" style="background:rgba(3,105,161,0.1);">
+          <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1;color:#0369a1;">water_drop</span>
+        </div>
+        <span class="text-sm font-semibold leading-tight text-center">Minum Air</span>
+      </button>
+
+      <!-- Lihat Report -->
+      <button class="group flex flex-col items-center justify-center gap-2.5 p-4 rounded-xl bg-surface-container-lowest border border-outline-variant text-on-surface transition-all min-h-[100px]" onmouseover="this.style.borderColor='rgba(0,97,255,0.4)'" onmouseout="this.style.borderColor='#c6c6cd'">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center transition-all" style="background:rgba(0,97,255,0.1);">
+          <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1;color:#0061FF;">assessment</span>
+        </div>
+        <span class="text-sm font-semibold leading-tight text-center">Lihat Report</span>
+      </button>
+
+    </div><!-- /quick actions -->
+
+  </div><!-- /page content -->
+</main>
+
+<!-- ═══════════════════ MOBILE BOTTOM NAV ═══════════════════ -->
+<nav class="lg:hidden fixed bottom-0 left-0 w-full h-16 z-50 flex justify-around items-center bg-surface border-t border-outline-variant px-2">
+  <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1 text-on-surface-variant hover:text-on-surface transition-colors">
+    <span class="material-symbols-outlined text-[22px]">dashboard</span>
+    <span class="text-[9px] font-medium">Home</span>
+  </a>
+  <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1 transition-colors" style="color:#000000;">
+    <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1">today</span>
+    <span class="text-[9px] font-bold">Hari Ini</span>
+  </a>
+  <a href="#" class="flex flex-col items-center gap-0.5">
+    <div class="w-11 h-11 rounded-full bg-primary flex items-center justify-center -mt-5 shadow-lg border-2 border-surface">
+      <span class="material-symbols-outlined text-on-primary text-[20px]" style="font-variation-settings:'FILL' 1">add</span>
+    </div>
+    <span class="text-[9px] font-medium text-on-surface-variant mt-0.5">Ukur</span>
+  </a>
+  <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1 text-on-surface-variant hover:text-on-surface transition-colors relative">
+    <span class="material-symbols-outlined text-[22px]">notifications</span>
+    <span class="absolute top-0.5 right-2.5 w-2 h-2 rounded-full" style="background:#EF4444;"></span>
+    <span class="text-[9px] font-medium">Notif</span>
+  </a>
+  <a href="#" class="flex flex-col items-center gap-0.5 px-3 py-1 text-on-surface-variant hover:text-on-surface transition-colors">
+    <span class="material-symbols-outlined text-[22px]">person</span>
+    <span class="text-[9px] font-medium">Profil</span>
+  </a>
+</nav>
+
+<!-- ═══════════════════ MODAL: PROACTIVE SYMPTOM PROMPT ═══════════════════ -->
+<div id="symptomModal" class="modal-backdrop fixed inset-0 z-[100] flex items-center justify-center p-4" style="background:rgba(27,27,29,0.58);">
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-outline-variant overflow-hidden" style="max-height:90vh;overflow-y:auto;">
+
+    <!-- Modal header -->
+    <div class="flex items-center justify-between px-5 pt-5 pb-4 border-b border-outline-variant" style="background:rgba(245,158,11,0.05);">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background:rgba(245,158,11,0.18);">
+          <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1;color:#F59E0B;">warning</span>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-on-surface">Perhatian</h3>
+          <p class="text-[11px] text-on-surface-variant">Pemantauan proaktif otomatis</p>
+        </div>
+      </div>
+      <button onclick="closeModal()" class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
+        <span class="material-symbols-outlined text-[18px]">close</span>
+      </button>
+    </div>
+
+    <!-- Modal body -->
+    <div class="px-5 py-5">
+
+      <!-- Measurement highlight -->
+      <div class="flex items-center gap-3 p-3.5 rounded-xl border mb-4" style="background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.25);">
+        <span class="material-symbols-outlined text-[30px] flex-shrink-0" style="font-variation-settings:'FILL' 1;color:#F59E0B;">monitor_heart</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-[11px] text-on-surface-variant font-medium">Tekanan Darah terakhir &mdash; 14:00 WIB</p>
+          <p class="text-xl font-bold text-on-surface tracking-tight leading-tight">135<span class="text-on-surface-variant font-normal">/</span>88 <span class="text-sm font-normal text-on-surface-variant">mmHg</span></p>
+        </div>
+        <span class="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold border" style="background:rgba(245,158,11,0.15);color:#F59E0B;border-color:rgba(245,158,11,0.3);">&#x26A0; Di atas normal</span>
+      </div>
+
+      <!-- Question text -->
+      <p class="text-sm text-on-surface leading-relaxed mb-4">
+        Tekanan darah Anda berada di atas normal (<span class="font-semibold" style="color:#F59E0B;">135/88</span>). Apakah Anda merasakan <span class="font-semibold">keluhan fisik</span> saat ini?
+      </p>
+
+      <!-- Quick symptom chips -->
+      <div class="mb-5">
+        <p class="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Keluhan umum yang sering terkait:</p>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="selectChip(this)" class="chip px-3 py-1.5 rounded-full border border-outline-variant text-xs text-on-surface-variant hover:bg-surface-container transition-all">&#x1F635; Sakit Kepala</button>
+          <button onclick="selectChip(this)" class="chip px-3 py-1.5 rounded-full border border-outline-variant text-xs text-on-surface-variant hover:bg-surface-container transition-all">&#x1FAC1; Sesak Napas</button>
+          <button onclick="selectChip(this)" class="chip px-3 py-1.5 rounded-full border border-outline-variant text-xs text-on-surface-variant hover:bg-surface-container transition-all">&#x1F635;&#x200D;&#x1F4AB; Pusing</button>
+          <button onclick="selectChip(this)" class="chip px-3 py-1.5 rounded-full border border-outline-variant text-xs text-on-surface-variant hover:bg-surface-container transition-all">&#x1F493; Jantung Berdebar</button>
+          <button onclick="selectChip(this)" class="chip px-3 py-1.5 rounded-full border border-outline-variant text-xs text-on-surface-variant hover:bg-surface-container transition-all">&#x1F976; Tengkuk Kaku</button>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex flex-col gap-2.5">
+        <!-- Primary -->
+        <button onclick="closeModal()" class="w-full h-11 rounded-xl text-white text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm" style="background:#F59E0B;" onmouseover="this.style.background='#d97706'" onmouseout="this.style.background='#F59E0B'">
+          <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1">sick</span>
+          Ya, Catat Keluhan Sekarang
+        </button>
+        <!-- Secondary -->
+        <button onclick="closeModal()" class="w-full h-11 rounded-xl border-2 border-outline-variant text-sm font-semibold text-on-surface hover:bg-surface-container transition-all flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">check</span>
+          Tidak Ada Keluhan
+        </button>
+        <!-- Text link -->
+        <button onclick="closeModal()" class="w-full h-10 text-sm font-medium transition-all flex items-center justify-center gap-1.5 hover:underline" style="color:#0061FF;">
+          <span class="material-symbols-outlined text-[16px]">info</span>
+          Lihat Arti Angka Ini
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal footer disclaimer -->
+    <div class="px-5 py-3 border-t border-outline-variant" style="background:#f6f3f5;">
+      <p class="text-[10px] text-on-surface-variant text-center leading-snug">
+        &#x1F514; Peringatan dibuat berdasarkan ambang batas klinis, bukan diagnosis. Konsultasikan dengan dokter jika keluhan berlanjut.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════ TOAST CONTAINER ═══════════════════ -->
+<div id="toastContainer" class="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-2 pointer-events-none"></div>
+
+<!-- ═══════════════════ SCRIPTS ═══════════════════ -->
+<script>
+  // ── Modal ──────────────────────────────────────────────
+  function closeModal() {
+    const m = document.getElementById('symptomModal');
+    m.style.opacity = '0';
+    m.style.transition = 'opacity 0.22s ease';
+    setTimeout(() => m.style.display = 'none', 230);
+  }
+  document.getElementById('symptomModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Symptom chip toggle
+  function selectChip(el) {
+    el.classList.toggle('selected');
+    const sel = el.classList.contains('selected');
+    el.style.background = sel ? 'rgba(245,158,11,0.15)' : '';
+    el.style.borderColor = sel ? 'rgba(245,158,11,0.5)' : '';
+    el.style.color = sel ? '#d97706' : '';
+    el.style.fontWeight = sel ? '600' : '';
+  }
+
+  // ── Hydration ──────────────────────────────────────────
+  let currentMl = 1400;
+  const TARGET_ML = 2100;
+  const CIRCUMFERENCE = 238.76; // 2*pi*38
+
+  function refreshHydrationUI() {
+    const pct = Math.min(currentMl / TARGET_ML, 1);
+    const offset = CIRCUMFERENCE * (1 - pct);
+
+    // Ring
+    const ring = document.getElementById('hydRing');
+    if (ring) ring.style.strokeDashoffset = offset.toFixed(2);
+
+    // SVG text
+    const txt = document.getElementById('hydMlText');
+    if (txt) txt.textContent = currentMl.toLocaleString('id-ID');
+
+    // Percentage
+    const pctEl = document.getElementById('hydPct');
+    if (pctEl) pctEl.textContent = Math.round(pct * 100) + '%';
+
+    // Bar
+    const bar = document.getElementById('hydBar');
+    if (bar) bar.style.width = Math.round(pct * 100) + '%';
+
+    // Remaining
+    const rem = document.getElementById('hydRem');
+    const remaining = Math.max(TARGET_ML - currentMl, 0);
+    if (rem) rem.textContent = remaining.toLocaleString('id-ID') + ' ml';
+  }
+
+  function addHydration(ml) {
+    if (currentMl >= TARGET_ML) { showToast('Target hidrasi sudah tercapai! 🎉'); return; }
+    currentMl = Math.min(currentMl + ml, TARGET_ML);
+    refreshHydrationUI();
+    showToast('+' + ml + 'ml ditambahkan — Total: ' + currentMl.toLocaleString('id-ID') + 'ml');
+  }
+
+  function addCustomMl() {
+    const inp = document.getElementById('customMl');
+    const val = parseInt(inp.value);
+    if (!val || val <= 0) { showToast('Masukkan jumlah ml yang valid', 'warn'); return; }
+    addHydration(val);
+    inp.value = '';
+  }
+
+  // Enter key for custom input
+  document.getElementById('customMl').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addCustomMl();
+  });
+
+  // ── Toast ──────────────────────────────────────────────
+  function showToast(msg, type) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    const isWarn = type === 'warn';
+    toast.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:0 4px 20px -4px rgba(0,0,0,0.25);pointer-events:auto;white-space:nowrap;transition:all 0.3s ease;opacity:0;transform:translateY(6px);';
+    toast.style.background = isWarn ? '#fef3c7' : '#303032';
+    toast.style.color = isWarn ? '#92400e' : '#f3f0f2';
+    toast.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:\' FILL\' 1;">' + (isWarn ? 'warning' : 'check_circle') + '</span>' + msg;
+    container.appendChild(toast);
+    requestAnimationFrame(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+    });
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(4px)';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  // ── Reports submenu toggle ──────────────────────────────
+  const reportsToggle = document.getElementById('reportsToggle');
+  const reportsSubmenu = document.getElementById('reportsSubmenu');
+  const reportsIcon = document.getElementById('reportsIcon');
+  if (reportsToggle && reportsSubmenu) {
+    reportsToggle.addEventListener('click', () => {
+      const open = !reportsSubmenu.classList.contains('hidden');
+      reportsSubmenu.classList.toggle('hidden', open);
+      if (reportsIcon) reportsIcon.textContent = open ? 'expand_more' : 'expand_less';
+    });
+  }
+
+  // ── Init ring with animation ────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    // Start ring at 0, then animate to 67%
+    const ring = document.getElementById('hydRing');
+    if (ring) {
+      ring.style.strokeDashoffset = CIRCUMFERENCE.toFixed(2);
+      setTimeout(() => {
+        ring.style.transition = 'stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1)';
+        ring.style.strokeDashoffset = (CIRCUMFERENCE * 0.33).toFixed(2);
+      }, 400);
+    }
+  });
+</script>
+
+</body>
+</html>

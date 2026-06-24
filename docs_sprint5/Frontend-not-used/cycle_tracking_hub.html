@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cycle Tracking — HealthSync Pro</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            "primary": "#000000",
+            "on-primary": "#ffffff",
+            "primary-container": "#131b2e",
+            "on-primary-container": "#7c839b",
+            "primary-fixed": "#dae2fd",
+            "primary-fixed-dim": "#bec6e0",
+            "on-primary-fixed": "#131b2e",
+            "on-primary-fixed-variant": "#3f465c",
+            "secondary": "#505f76",
+            "on-secondary": "#ffffff",
+            "secondary-container": "#d0e1fb",
+            "on-secondary-container": "#54647a",
+            "secondary-fixed": "#d3e4fe",
+            "secondary-fixed-dim": "#b7c8e1",
+            "on-secondary-fixed": "#0b1c30",
+            "on-secondary-fixed-variant": "#38485d",
+            "tertiary": "#000000",
+            "on-tertiary": "#ffffff",
+            "tertiary-container": "#271901",
+            "on-tertiary-container": "#98805d",
+            "tertiary-fixed": "#fcdeb5",
+            "tertiary-fixed-dim": "#dec29a",
+            "on-tertiary-fixed": "#271901",
+            "on-tertiary-fixed-variant": "#574425",
+            "background": "#fcf8fa",
+            "on-background": "#1b1b1d",
+            "surface": "#fcf8fa",
+            "surface-dim": "#dcd9db",
+            "surface-bright": "#fcf8fa",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#f6f3f5",
+            "surface-container": "#f0edef",
+            "surface-container-high": "#eae7e9",
+            "surface-container-highest": "#e4e2e4",
+            "on-surface": "#1b1b1d",
+            "on-surface-variant": "#45464d",
+            "surface-variant": "#e4e2e4",
+            "surface-tint": "#565e74",
+            "inverse-surface": "#303032",
+            "inverse-on-surface": "#f3f0f2",
+            "inverse-primary": "#bec6e0",
+            "outline": "#76777d",
+            "outline-variant": "#c6c6cd",
+            "error": "#ba1a1a",
+            "on-error": "#ffffff",
+            "error-container": "#ffdad6",
+            "on-error-container": "#93000a",
+            "semantic-period-red": "#ba1a1a",
+            "semantic-fertile-blue": "#0369a1",
+            "semantic-fertile-purple": "#7c3aed",
+            "semantic-safe-green": "#10b981",
+            "semantic-warning-amber": "#f59e0b",
+            "medical-blue": "#0061FF",
+            "normal-green": "#10B981",
+            "warning-amber": "#F59E0B",
+            "critical-red": "#EF4444"
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    .filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    .day-period { background: rgba(186,26,26,0.13); }
+    .day-fertile { background: rgba(124,58,237,0.11); }
+    .day-ovulation { background: rgba(3,105,161,0.16); }
+    .day-outside { background: rgba(16,185,129,0.09); }
+    .day-next-period { background: rgba(156,163,175,0.15); }
+    .day-today { outline: 2.5px solid #0369a1; outline-offset: -2px; border-radius: 8px; }
+    .dot-period { background: #ba1a1a; }
+    .dot-fertile { background: #7c3aed; }
+    .dot-ovulation { background: #0369a1; }
+    .dot-outside { background: #10b981; }
+    .dot-next { background: #9ca3af; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #c6c6cd; border-radius: 2px; }
+    .mood-chip { cursor: pointer; border: 2px solid transparent; border-radius: 9999px; padding: 4px 8px; transition: all .15s; font-size: 1.35rem; line-height: 1; }
+    .mood-chip:hover { border-color: #0369a1; transform: scale(1.12); }
+    .mood-chip.selected { border-color: #0369a1; background: rgba(3,105,161,0.1); }
+    .symptom-chip { cursor: pointer; border: 1.5px solid #c6c6cd; border-radius: 9999px; padding: 4px 14px; font-size: 12px; font-weight: 500; color: #45464d; transition: all .15s; }
+    .symptom-chip:hover { border-color: #7c3aed; color: #7c3aed; background: rgba(124,58,237,0.07); }
+    .symptom-chip.selected { border-color: #7c3aed; color: #7c3aed; background: rgba(124,58,237,0.09); }
+    .sub-item { padding-left: 2.25rem; }
+    .hist-bar { height: 18px; border-radius: 3px; }
+    .toggle-track { width: 44px; height: 24px; border-radius: 9999px; background: #c6c6cd; position: relative; cursor: pointer; transition: background .2s; }
+    .toggle-track.on { background: #10b981; }
+    .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+    .toggle-track.on .toggle-thumb { transform: translateX(20px); }
+    #unprotectedTrack { width: 44px; height: 24px; border-radius: 9999px; background: #c6c6cd; position: relative; cursor: pointer; transition: background .2s; }
+    #unprotectedTrack.on { background: #ba1a1a; }
+    #unprotectedThumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+    #unprotectedTrack.on #unprotectedThumb { transform: translateX(20px); }
+    .cal-day { border-radius: 8px; padding: 4px 2px; min-height: 58px; position: relative; cursor: pointer; transition: box-shadow .15s; }
+    .cal-day:hover { box-shadow: 0 0 0 1.5px #0369a1; }
+    .cal-day.selected-day { box-shadow: 0 0 0 2px #0369a1; }
+    #guardrailModal { display: flex; }
+  </style>
+</head>
+<body class="bg-background text-on-surface flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <nav class="hidden lg:flex flex-col fixed left-0 top-0 h-full w-[280px] z-50 bg-surface-container-low border-r border-outline-variant overflow-hidden">
+    <div class="p-5 border-b border-outline-variant flex-shrink-0">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined filled text-inverse-primary text-[22px]">health_and_safety</span>
+        </div>
+        <div>
+          <h1 class="text-[17px] font-bold text-on-surface leading-tight">HealthSync Pro</h1>
+          <p class="text-[11px] text-on-surface-variant">Enterprise Health</p>
+        </div>
+      </div>
+      <button class="w-full bg-primary text-on-primary hover:bg-primary/80 py-2.5 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200">
+        <span class="material-symbols-outlined filled text-[18px]">add_circle</span>Ukuran Baru
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto py-3">
+      <nav class="px-3 space-y-0.5">
+        <p class="px-3 pt-2 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Utama</p>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">dashboard</span>Dashboard</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">today</span>Today / Daily Hub</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">date_range</span>Weekly</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">calendar_month</span>Monthly</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">add_circle</span>Measurement Baru</a>
+        <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Kesehatan</p>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">history</span>History</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">sick</span>Daily Symptom Log</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">water_drop</span>Hydration Tracker</a>
+        <!-- ACTIVE -->
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-primary bg-primary-container/10 border-l-4 border-primary transition-all"><span class="material-symbols-outlined text-[20px]">cycle</span>Cycle Tracking</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">medication</span>Medication</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">timer</span>Fasting</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">insights</span>Patterns</a>
+        <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">AI &amp; Laporan</p>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">smart_toy</span>AI Assistant</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">psychology</span>AI Memory</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">assessment</span>Reports</a>
+        <a href="#" class="sub-item flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[17px]">chevron_right</span>Harian</a>
+        <a href="#" class="sub-item flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[17px]">chevron_right</span>Mingguan</a>
+        <a href="#" class="sub-item flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[17px]">chevron_right</span>Bulanan</a>
+        <a href="#" class="sub-item flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[17px]">chevron_right</span>Dokter</a>
+        <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Lainnya</p>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">alarm</span>Reminders</a>
+        <a href="#" class="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">notifications</span>Notifikasi<span class="ml-auto text-[10px] font-bold bg-critical-red text-white rounded-full px-1.5 py-0.5">3</span></a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">family_restroom</span>Family / Caregiver</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">settings</span>Settings</a>
+        <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider border-t border-outline-variant mt-2">Admin Area</p>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>Admin Dashboard</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">manage_accounts</span>Users</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">security</span>Roles &amp; Permissions</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">workspace_premium</span>Plans &amp; Features</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">subscriptions</span>Subscriptions</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">school</span>Education Cards</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">model_training</span>AI Configuration</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">tune</span>System Config</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">fact_check</span>Audit Logs</a>
+      </nav>
+    </div>
+    <div class="p-4 border-t border-outline-variant space-y-1 flex-shrink-0">
+      <button class="w-full bg-error text-on-error hover:bg-error/90 py-2.5 px-3 rounded-lg text-sm font-semibold flex items-center gap-3 transition-all"><span class="material-symbols-outlined text-[18px]">emergency</span>Emergency Support</button>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">help_outline</span>Bantuan &amp; FAQ</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">logout</span>Keluar</a>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="flex-1 lg:ml-[280px] flex flex-col min-h-screen">
+
+    <!-- TOP BAR -->
+    <header class="sticky top-0 z-40 flex items-center justify-between h-16 px-6 bg-surface border-b border-outline-variant">
+      <div class="hidden lg:flex items-center bg-surface-container-low rounded-full px-4 py-2 border border-outline-variant w-80">
+        <span class="material-symbols-outlined text-on-surface-variant mr-2 text-[18px]">search</span>
+        <input class="bg-transparent border-none outline-none w-full text-sm text-on-surface placeholder-on-surface-variant" placeholder="Cari riwayat, data kesehatan..." />
+      </div>
+      <div class="lg:hidden flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center">
+          <span class="material-symbols-outlined filled text-inverse-primary text-[18px]">health_and_safety</span>
+        </div>
+        <span class="font-bold text-on-surface">HealthSync Pro</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden xl:flex flex-col items-end text-right">
+          <span class="text-[11px] font-semibold text-on-surface">Selasa, 24 Jun 2026</span>
+          <span class="text-[11px] text-on-surface-variant">21:34 WIB</span>
+        </div>
+        <button class="relative p-2 rounded-full hover:bg-surface-container text-on-surface-variant transition-colors">
+          <span class="material-symbols-outlined text-[22px]">notifications</span>
+          <span class="absolute top-1 right-1 w-2 h-2 bg-critical-red rounded-full"></span>
+        </button>
+        <div class="w-8 h-8 rounded-full bg-semantic-fertile-purple/20 flex items-center justify-center text-sm font-bold text-semantic-fertile-purple border-2 border-semantic-fertile-purple/30">S</div>
+      </div>
+    </header>
+
+    <!-- PAGE CONTENT -->
+    <div class="flex-1 p-6 bg-background pb-24 lg:pb-6">
+
+      <!-- PAGE HEADER -->
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <h2 class="text-2xl font-bold text-on-surface">Cycle Tracking</h2>
+            <span class="material-symbols-outlined text-[20px] text-semantic-fertile-purple" title="Data Pribadi">lock</span>
+            <span class="text-[11px] font-semibold bg-semantic-fertile-purple/10 text-semantic-fertile-purple border border-semantic-fertile-purple/25 rounded-full px-2 py-0.5 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[13px] filled">female</span>Usia 15–48
+            </span>
+          </div>
+          <p class="text-sm text-on-surface-variant flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[15px] text-semantic-fertile-purple">shield</span>
+            Data ini bersifat pribadi dan hanya dapat dilihat oleh Anda
+          </p>
+        </div>
+        <button onclick="document.getElementById('settingsPanel').classList.toggle('hidden')" class="flex items-center gap-2 border border-outline-variant bg-surface-container-lowest rounded-lg px-4 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container transition-all flex-shrink-0">
+          <span class="material-symbols-outlined text-[18px]">settings</span>Pengaturan Siklus
+        </button>
+      </div>
+
+      <!-- CYCLE SUMMARY CARDS -->
+      <div class="grid grid-cols-3 gap-4 mb-5">
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-full bg-[#0369a1]/10 flex items-center justify-center mb-2">
+            <span class="material-symbols-outlined text-[#0369a1] text-[20px]">calendar_today</span>
+          </div>
+          <p class="text-[11px] text-on-surface-variant uppercase tracking-wide font-semibold mb-0.5">Hari ke</p>
+          <p class="text-3xl font-bold text-[#0369a1] leading-none">14</p>
+          <p class="text-[11px] text-[#0369a1] font-medium mt-1 bg-[#0369a1]/10 rounded-full px-2 py-0.5">Fase Ovulasi</p>
+        </div>
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-full bg-[#7c3aed]/10 flex items-center justify-center mb-2">
+            <span class="material-symbols-outlined text-[#7c3aed] text-[20px]">cycle</span>
+          </div>
+          <p class="text-[11px] text-on-surface-variant uppercase tracking-wide font-semibold mb-0.5">Panjang Siklus</p>
+          <p class="text-3xl font-bold text-on-surface leading-none">28</p>
+          <p class="text-[11px] text-on-surface-variant font-medium mt-1">hari (rata-rata)</p>
+        </div>
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col items-center text-center">
+          <div class="w-10 h-10 rounded-full bg-[#ba1a1a]/10 flex items-center justify-center mb-2">
+            <span class="material-symbols-outlined text-[#ba1a1a] text-[20px]">event_upcoming</span>
+          </div>
+          <p class="text-[11px] text-on-surface-variant uppercase tracking-wide font-semibold mb-0.5">Haid Berikutnya</p>
+          <p class="text-xl font-bold text-[#ba1a1a] leading-none mt-1">~10 Jul</p>
+          <p class="text-[11px] text-on-surface-variant font-medium mt-1">2026 (estimasi)</p>
+        </div>
+      </div>
+
+      <!-- PHASE STATUS BANNER -->
+      <div class="bg-[#0369a1]/8 border border-[#0369a1]/25 rounded-xl p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="flex items-center gap-3 flex-1">
+          <div class="w-12 h-12 rounded-full bg-[#0369a1]/15 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-[#0369a1] text-[26px] filled">female</span>
+          </div>
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-[#0369a1] mb-0.5">Status Hari Ini — 24 Juni 2026</p>
+            <p class="text-base font-bold text-[#0369a1]">Puncak Masa Subur</p>
+            <p class="text-sm text-on-surface-variant mt-0.5 leading-snug">Hari ini diprediksi sebagai puncak masa subur berdasarkan data siklus Anda.</p>
+          </div>
+        </div>
+        <button onclick="openGuardrail()" class="flex items-center gap-2 bg-[#f59e0b]/15 border border-[#f59e0b]/40 text-[#92400e] hover:bg-[#f59e0b]/25 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all flex-shrink-0 whitespace-nowrap">
+          <span class="material-symbols-outlined text-[#f59e0b] text-[18px] filled">warning</span>
+          Lihat Peringatan Kontrasepsi
+        </button>
+      </div>
+
+      <!-- 2-COL: Calendar + Day Detail -->
+      <div class="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5 mb-5">
+
+        <!-- MONTHLY CALENDAR -->
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-outline-variant">
+            <button class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant transition-colors"><span class="material-symbols-outlined text-[20px]">chevron_left</span></button>
+            <div class="text-center">
+              <p class="text-base font-bold text-on-surface">Juni 2026</p>
+              <p class="text-[11px] text-on-surface-variant">Siklus aktif · Hari ke-14</p>
+            </div>
+            <button class="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant transition-colors"><span class="material-symbols-outlined text-[20px]">chevron_right</span></button>
+          </div>
+
+          <!-- Day headers -->
+          <div class="grid grid-cols-7 text-center border-b border-outline-variant bg-surface-container-low/40">
+            <div class="py-2.5 text-[11px] font-bold text-on-surface-variant">Sen</div>
+            <div class="py-2.5 text-[11px] font-bold text-on-surface-variant">Sel</div>
+            <div class="py-2.5 text-[11px] font-bold text-on-surface-variant">Rab</div>
+            <div class="py-2.5 text-[11px] font-bold text-on-surface-variant">Kam</div>
+            <div class="py-2.5 text-[11px] font-bold text-on-surface-variant">Jum</div>
+            <div class="py-2.5 text-[11px] font-bold text-on-surface-variant">Sab</div>
+            <div class="py-2.5 text-[11px] font-bold text-on-surface-variant">Min</div>
+          </div>
+
+          <!-- Calendar grid June 2026 (starts Monday) -->
+          <div class="grid grid-cols-7 gap-1 p-2">
+
+            <!-- Row 1: 1-7 Jun -->
+            <div class="cal-day day-period text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#ba1a1a]">1</span>
+              <div class="w-2 h-2 rounded-full dot-period mt-1"></div>
+              <span class="text-[8px] text-[#ba1a1a] font-medium mt-0.5 leading-tight">Haid</span>
+            </div>
+            <div class="cal-day day-period text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#ba1a1a]">2</span>
+              <div class="w-2 h-2 rounded-full dot-period mt-1"></div>
+              <span class="text-[8px] text-[#ba1a1a] font-medium mt-0.5 leading-tight">Haid</span>
+            </div>
+            <div class="cal-day day-period text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#ba1a1a]">3</span>
+              <div class="w-2 h-2 rounded-full dot-period mt-1"></div>
+              <span class="text-[8px] text-[#ba1a1a] font-medium mt-0.5 leading-tight">Haid</span>
+            </div>
+            <div class="cal-day day-period text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#ba1a1a]">4</span>
+              <div class="w-2 h-2 rounded-full dot-period mt-1"></div>
+              <span class="text-[8px] text-[#ba1a1a] font-medium mt-0.5 leading-tight">Haid</span>
+            </div>
+            <div class="cal-day text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-on-surface-variant">5</span>
+              <div class="w-2 h-2 rounded-full mt-1" style="background:#d1d5db"></div>
+              <span class="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-on-surface-variant">6</span>
+              <div class="w-2 h-2 rounded-full mt-1" style="background:#d1d5db"></div>
+              <span class="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-on-surface-variant">7</span>
+              <div class="w-2 h-2 rounded-full mt-1" style="background:#d1d5db"></div>
+              <span class="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+
+            <!-- Row 2: 8-14 Jun -->
+            <div class="cal-day text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-on-surface-variant">8</span>
+              <div class="w-2 h-2 rounded-full mt-1" style="background:#d1d5db"></div>
+              <span class="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-on-surface-variant">9</span>
+              <div class="w-2 h-2 rounded-full mt-1" style="background:#d1d5db"></div>
+              <span class="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day day-fertile text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#7c3aed]">10</span>
+              <div class="w-2 h-2 rounded-full dot-fertile mt-1"></div>
+              <span class="text-[8px] text-[#7c3aed] font-medium mt-0.5 leading-tight">Subur</span>
+            </div>
+            <div class="cal-day day-fertile text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#7c3aed]">11</span>
+              <div class="w-2 h-2 rounded-full dot-fertile mt-1"></div>
+              <span class="text-[8px] text-[#7c3aed] font-medium mt-0.5 leading-tight">Subur</span>
+            </div>
+            <div class="cal-day day-fertile text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#7c3aed]">12</span>
+              <div class="w-2 h-2 rounded-full dot-fertile mt-1"></div>
+              <span class="text-[8px] text-[#7c3aed] font-medium mt-0.5 leading-tight">Subur</span>
+            </div>
+            <div class="cal-day day-fertile text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#7c3aed]">13</span>
+              <div class="w-2 h-2 rounded-full dot-fertile mt-1"></div>
+              <span class="text-[8px] text-[#7c3aed] font-medium mt-0.5 leading-tight">Subur</span>
+            </div>
+            <div class="cal-day day-fertile text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#7c3aed]">14</span>
+              <div class="w-2 h-2 rounded-full dot-fertile mt-1"></div>
+              <span class="text-[8px] text-[#7c3aed] font-medium mt-0.5 leading-tight">Subur</span>
+            </div>
+
+            <!-- Row 3: 15-21 Jun -->
+            <div class="cal-day day-fertile text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#7c3aed]">15</span>
+              <div class="w-2 h-2 rounded-full dot-fertile mt-1"></div>
+              <span class="text-[8px] text-[#7c3aed] font-medium mt-0.5 leading-tight">Subur</span>
+            </div>
+            <div class="cal-day day-fertile text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-semibold text-[#7c3aed]">16</span>
+              <div class="w-2 h-2 rounded-full dot-fertile mt-1"></div>
+              <span class="text-[8px] text-[#7c3aed] font-medium mt-0.5 leading-tight">Subur</span>
+            </div>
+            <!-- 17: Ovulation PEAK -->
+            <div class="cal-day day-ovulation text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-bold text-[#0369a1]">17</span>
+              <div class="w-2.5 h-2.5 rounded-full dot-ovulation mt-1 ring-2 ring-[#0369a1]/30"></div>
+              <span class="text-[8px] text-[#0369a1] font-bold mt-0.5 leading-tight">Puncak</span>
+            </div>
+            <!-- 18: Ovulation PEAK -->
+            <div class="cal-day day-ovulation text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-bold text-[#0369a1]">18</span>
+              <div class="w-2.5 h-2.5 rounded-full dot-ovulation mt-1 ring-2 ring-[#0369a1]/30"></div>
+              <span class="text-[8px] text-[#0369a1] font-bold mt-0.5 leading-tight">Puncak</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">19</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">20</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">21</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+
+            <!-- Row 4: 22-28 Jun -->
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">22</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">23</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <!-- 24: TODAY -->
+            <div class="cal-day day-outside day-today selected-day text-center flex flex-col items-center justify-start pt-1.5" id="today-cell">
+              <span class="text-sm font-bold text-[#0369a1]">24</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-bold mt-0.5 leading-tight">Hari Ini</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">25</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">26</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">27</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day day-outside text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-[#10b981]">28</span>
+              <div class="w-2 h-2 rounded-full dot-outside mt-1"></div>
+              <span class="text-[8px] text-[#10b981] font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+
+            <!-- Row 5: 29-30 + pads -->
+            <div class="cal-day day-next-period text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-on-surface-variant">29</span>
+              <div class="w-2 h-2 rounded-full dot-next mt-1"></div>
+              <span class="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-tight">Pred. Haid</span>
+            </div>
+            <div class="cal-day text-center flex flex-col items-center justify-start pt-1.5">
+              <span class="text-sm font-medium text-on-surface-variant">30</span>
+              <div class="w-2 h-2 rounded-full mt-1" style="background:#d1d5db"></div>
+              <span class="text-[8px] text-on-surface-variant font-medium mt-0.5 leading-tight">Di Luar</span>
+            </div>
+            <div class="cal-day"></div>
+            <div class="cal-day"></div>
+            <div class="cal-day"></div>
+            <div class="cal-day"></div>
+            <div class="cal-day"></div>
+          </div>
+
+          <!-- LEGEND -->
+          <div class="px-5 py-4 border-t border-outline-variant bg-surface-container-low/50">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-3">Keterangan</p>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+              <div class="flex items-center gap-1.5">
+                <div class="w-3 h-3 rounded-full" style="background:#ba1a1a"></div>
+                <span class="text-[12px] font-medium text-on-surface">Haid</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div class="w-3 h-3 rounded-full" style="background:#7c3aed"></div>
+                <span class="text-[12px] font-medium text-on-surface">Potensi Masa Subur</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div class="w-3 h-3 rounded-full" style="background:#0369a1"></div>
+                <span class="text-[12px] font-medium text-on-surface">Puncak Ovulasi</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div class="w-3 h-3 rounded-full" style="background:#10b981"></div>
+                <!-- MUST NOT say 'Masa Aman' -->
+                <span class="text-[12px] font-medium text-on-surface">Di Luar Prediksi Masa Subur</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div class="w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center" style="border-color:#0369a1">
+                  <div class="w-2 h-2 rounded" style="background:#10b981"></div>
+                </div>
+                <span class="text-[12px] font-medium text-on-surface">Hari Ini</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div class="w-3 h-3 rounded-full" style="background:#9ca3af"></div>
+                <span class="text-[12px] font-medium text-on-surface">Prediksi Haid Berikutnya</span>
+              </div>
+            </div>
+            <p class="text-[10px] text-on-surface-variant mt-3 flex items-start gap-1">
+              <span class="material-symbols-outlined text-[13px] flex-shrink-0 text-[#f59e0b] mt-0.5">info</span>
+              Prediksi bersifat estimasi. Siklus dapat bervariasi karena kondisi kesehatan dan gaya hidup.
+            </p>
+          </div>
+        </div>
+
+        <!-- DAY DETAIL PANEL -->
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+          <div class="px-5 py-4 border-b border-outline-variant bg-surface-container-low/60">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Detail Hari</p>
+                <p class="text-lg font-bold text-on-surface mt-0.5">24 Juni 2026</p>
+              </div>
+              <span class="text-[10px] font-bold rounded-full px-2.5 py-1 flex items-center gap-1 flex-shrink-0" style="background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.25)">
+                <span class="material-symbols-outlined text-[12px]">check_circle</span>
+                Di Luar Prediksi Masa Subur
+              </span>
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto p-5 space-y-5">
+
+            <!-- Flow haid: N/A -->
+            <div class="opacity-40 pointer-events-none select-none">
+              <p class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mb-2">Intensitas Haid</p>
+              <div class="flex flex-wrap gap-2">
+                <button class="text-[12px] border border-outline-variant rounded-full px-3 py-1 text-on-surface-variant">Ringan</button>
+                <button class="text-[12px] border border-outline-variant rounded-full px-3 py-1 text-on-surface-variant">Sedang</button>
+                <button class="text-[12px] border border-outline-variant rounded-full px-3 py-1 text-on-surface-variant">Deras</button>
+              </div>
+              <p class="text-[11px] text-on-surface-variant mt-1.5 italic">Tidak berlaku — bukan hari haid</p>
+            </div>
+
+            <!-- Mood selector -->
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mb-2">Suasana Hati</p>
+              <div class="flex gap-1.5 flex-wrap">
+                <button class="mood-chip" title="Sangat Sedih" onclick="selectMood(this)">😔</button>
+                <button class="mood-chip" title="Sedih" onclick="selectMood(this)">😕</button>
+                <button class="mood-chip" title="Netral" onclick="selectMood(this)">😐</button>
+                <button class="mood-chip selected" title="Senang" onclick="selectMood(this)">🙂</button>
+                <button class="mood-chip" title="Sangat Senang" onclick="selectMood(this)">😄</button>
+              </div>
+            </div>
+
+            <!-- Gejala fisik -->
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mb-2">Gejala Fisik</p>
+              <div class="flex flex-wrap gap-2">
+                <button class="symptom-chip" onclick="toggleSymptom(this)">Kram</button>
+                <button class="symptom-chip" onclick="toggleSymptom(this)">Kembung</button>
+                <button class="symptom-chip" onclick="toggleSymptom(this)">Payudara Nyeri</button>
+                <button class="symptom-chip" onclick="toggleSymptom(this)">Sakit Kepala</button>
+                <button class="symptom-chip" onclick="toggleSymptom(this)">Jerawat</button>
+                <button class="symptom-chip" onclick="toggleSymptom(this)">Lelah</button>
+                <button class="symptom-chip selected" onclick="toggleSymptom(this)">Tidak Ada</button>
+              </div>
+            </div>
+
+            <!-- Catatan -->
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mb-2">Catatan Pribadi</p>
+              <textarea rows="3" class="w-full border border-outline-variant rounded-lg px-3 py-2.5 text-sm text-on-surface bg-surface focus:outline-none focus:ring-2 resize-none placeholder-on-surface-variant/50" placeholder="Tulis catatan hari ini..." style="outline-color:#0369a1"></textarea>
+            </div>
+
+            <!-- Unprotected toggle -->
+            <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4">
+              <div class="flex items-center justify-between">
+                <div class="flex-1 pr-4">
+                  <p class="text-sm font-semibold text-on-surface">Hubungan Tidak Terlindungi</p>
+                  <p class="text-[11px] text-on-surface-variant mt-0.5">Aktifkan untuk menampilkan peringatan kontrasepsi</p>
+                </div>
+                <div id="unprotectedTrack" onclick="toggleUnprotected()" class="flex-shrink-0">
+                  <div id="unprotectedThumb"></div>
+                </div>
+              </div>
+              <div id="unprotectedWarning" class="hidden mt-3 rounded-lg p-3 flex items-start gap-2" style="background:rgba(186,26,26,0.07); border:1px solid rgba(186,26,26,0.25)">
+                <span class="material-symbols-outlined text-[18px] flex-shrink-0 mt-0.5 filled" style="color:#ba1a1a">warning</span>
+                <p class="text-[12px] font-medium" style="color:#ba1a1a">Metode kalender tidak memberikan perlindungan 100%. <button onclick="openGuardrail()" class="underline font-bold">Baca peringatan lengkap →</button></p>
+              </div>
+            </div>
+
+            <!-- Save -->
+            <button class="w-full bg-primary text-on-primary hover:bg-primary/85 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
+              <span class="material-symbols-outlined text-[18px] filled">save</span>Simpan Catatan Hari Ini
+            </button>
+
+          </div>
+        </div>
+
+      </div><!-- /2col -->
+
+      <!-- 3-MONTH HISTORY CHART -->
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 mb-5">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <p class="text-base font-bold text-on-surface">Riwayat 3 Siklus Terakhir</p>
+            <p class="text-[12px] text-on-surface-variant mt-0.5">Apr – Jun 2026 · Rata-rata: 28 hari</p>
+          </div>
+          <button class="text-[12px] font-semibold flex items-center gap-1 hover:underline" style="color:#0369a1">
+            <span class="material-symbols-outlined text-[15px]">open_in_new</span>Lihat Semua
+          </button>
+        </div>
+
+        <!-- Bar legend -->
+        <div class="flex items-center gap-4 pb-3 mb-4 border-b border-outline-variant flex-wrap">
+          <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm" style="background:#ba1a1a"></div><span class="text-[11px] text-on-surface-variant">Haid</span></div>
+          <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm" style="background:#7c3aed"></div><span class="text-[11px] text-on-surface-variant">Masa Subur</span></div>
+          <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm" style="background:#0369a1"></div><span class="text-[11px] text-on-surface-variant">Puncak Ovulasi</span></div>
+          <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm" style="background:rgba(16,185,129,0.45)"></div><span class="text-[11px] text-on-surface-variant">Di Luar Prediksi Masa Subur</span></div>
+        </div>
+
+        <div class="space-y-6">
+
+          <!-- April 2026: 29 hari -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div><span class="text-sm font-semibold text-on-surface">April 2026</span><span class="text-[11px] text-on-surface-variant ml-2">Dimulai 3 Apr</span></div>
+              <span class="text-[11px] font-bold text-on-surface bg-surface-container rounded-full px-2 py-0.5">29 hari</span>
+            </div>
+            <div class="flex h-[22px] rounded-lg overflow-hidden w-full gap-px">
+              <div class="hist-bar" style="width:17.2%;background:#ba1a1a" title="Haid: 5 hari"></div>
+              <div class="hist-bar" style="width:13.8%;background:rgba(16,185,129,0.4)" title="Di Luar: 4 hari"></div>
+              <div class="hist-bar" style="width:24.1%;background:#7c3aed" title="Masa Subur: 7 hari"></div>
+              <div class="hist-bar" style="width:6.9%;background:#0369a1" title="Puncak: 2 hari"></div>
+              <div class="hist-bar flex-1" style="background:rgba(16,185,129,0.4)" title="Di Luar: sisa siklus"></div>
+            </div>
+            <div class="flex justify-between mt-1"><span class="text-[10px] text-on-surface-variant">3 Apr</span><span class="text-[10px] text-on-surface-variant">1 Mei</span></div>
+          </div>
+
+          <!-- Mei 2026: 27 hari -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div><span class="text-sm font-semibold text-on-surface">Mei 2026</span><span class="text-[11px] text-on-surface-variant ml-2">Dimulai 2 Mei</span></div>
+              <span class="text-[11px] font-bold text-on-surface bg-surface-container rounded-full px-2 py-0.5">27 hari</span>
+            </div>
+            <div class="flex h-[22px] rounded-lg overflow-hidden w-full gap-px">
+              <div class="hist-bar" style="width:14.8%;background:#ba1a1a" title="Haid: 4 hari"></div>
+              <div class="hist-bar" style="width:18.5%;background:rgba(16,185,129,0.4)" title="Di Luar: 5 hari"></div>
+              <div class="hist-bar" style="width:25.9%;background:#7c3aed" title="Masa Subur: 7 hari"></div>
+              <div class="hist-bar" style="width:7.4%;background:#0369a1" title="Puncak: 2 hari"></div>
+              <div class="hist-bar flex-1" style="background:rgba(16,185,129,0.4)" title="Di Luar: sisa siklus"></div>
+            </div>
+            <div class="flex justify-between mt-1"><span class="text-[10px] text-on-surface-variant">2 Mei</span><span class="text-[10px] text-on-surface-variant">28 Mei</span></div>
+          </div>
+
+          <!-- Juni 2026: 28 hari (sedang berjalan) -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold text-on-surface">Juni 2026</span>
+                <span class="text-[10px] font-bold rounded-full px-2 py-0.5" style="background:rgba(3,105,161,0.1);color:#0369a1;border:1px solid rgba(3,105,161,0.25)">Berjalan</span>
+              </div>
+              <span class="text-[11px] font-bold text-on-surface bg-surface-container rounded-full px-2 py-0.5">28 hari (est.)</span>
+            </div>
+            <div class="flex h-[22px] rounded-lg overflow-hidden w-full gap-px">
+              <div class="hist-bar" style="width:14.3%;background:#ba1a1a" title="Haid: 4 hari (1-4 Jun)"></div>
+              <div class="hist-bar" style="width:17.9%;background:rgba(16,185,129,0.4)" title="Di Luar: 5 hari (5-9 Jun)"></div>
+              <div class="hist-bar" style="width:25%;background:#7c3aed" title="Masa Subur: 7 hari (10-16 Jun)"></div>
+              <div class="hist-bar" style="width:7.1%;background:#0369a1" title="Puncak: 2 hari (17-18 Jun)"></div>
+              <div class="hist-bar" style="width:21.4%;background:rgba(16,185,129,0.6)" title="Di Luar (tercatat): 6 hari (19-24 Jun)"></div>
+              <div class="hist-bar flex-1" style="background: repeating-linear-gradient(45deg,rgba(16,185,129,0.25) 0px,rgba(16,185,129,0.25) 4px,transparent 4px,transparent 8px)" title="Estimasi sisa siklus"></div>
+            </div>
+            <div class="flex justify-between mt-1"><span class="text-[10px] text-on-surface-variant">1 Jun</span><span class="text-[10px] italic" style="color:#0369a1">~28 Jun (est.)</span></div>
+          </div>
+
+          <!-- Trend mini bars -->
+          <div class="pt-4 border-t border-outline-variant">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant mb-4">Tren Panjang Siklus</p>
+            <div class="flex items-end gap-5">
+              <div class="flex flex-col items-center gap-1.5">
+                <span class="text-[12px] font-bold text-on-surface">29</span>
+                <div class="w-12 rounded-t-sm" style="height:58px;background:rgba(124,58,237,0.3)"></div>
+                <span class="text-[10px] text-on-surface-variant">Apr</span>
+              </div>
+              <div class="flex flex-col items-center gap-1.5">
+                <span class="text-[12px] font-bold text-on-surface">27</span>
+                <div class="w-12 rounded-t-sm" style="height:54px;background:rgba(124,58,237,0.3)"></div>
+                <span class="text-[10px] text-on-surface-variant">Mei</span>
+              </div>
+              <div class="flex flex-col items-center gap-1.5 relative">
+                <span class="text-[12px] font-bold" style="color:#0369a1">28*</span>
+                <div class="w-12 rounded-t-sm border-2 border-dashed" style="height:56px;background:rgba(3,105,161,0.2);border-color:#0369a1"></div>
+                <span class="text-[10px] font-semibold" style="color:#0369a1">Jun</span>
+              </div>
+              <div class="flex-1 pl-5 border-l border-outline-variant">
+                <p class="text-[11px] text-on-surface-variant mb-1">Rata-rata panjang siklus</p>
+                <p class="text-xl font-bold text-on-surface">28 <span class="text-[13px] font-normal text-on-surface-variant">hari</span></p>
+                <p class="text-[11px] text-on-surface-variant mt-0.5">Variasi: ±1 hari</p>
+                <div class="flex items-center gap-1 mt-2">
+                  <span class="material-symbols-outlined text-[14px]" style="color:#10b981">trending_flat</span>
+                  <span class="text-[11px] font-semibold" style="color:#10b981">Siklus teratur</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRIVACY SETTINGS CARD -->
+      <div id="settingsPanel" class="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 mb-5">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center">
+            <span class="material-symbols-outlined text-on-surface text-[20px] filled">lock</span>
+          </div>
+          <div>
+            <p class="text-base font-bold text-on-surface">Privasi Data Siklus</p>
+            <p class="text-[12px] text-on-surface-variant">Kelola akses dan ekspor data siklus Anda</p>
+          </div>
+        </div>
+        <div class="space-y-3">
+
+          <!-- Caregiver toggle -->
+          <div class="flex items-start justify-between gap-4 p-4 bg-surface-container-low rounded-xl border border-outline-variant">
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-on-surface">Izinkan caregiver melihat data siklus</p>
+              <p class="text-[11px] text-on-surface-variant mt-0.5 leading-relaxed">Caregiver tidak dapat mengakses data siklus tanpa izin eksplisit dari Anda.</p>
+              <div class="mt-2.5 rounded-lg p-2.5 flex items-center gap-2" style="background:rgba(186,26,26,0.06);border:1px solid rgba(186,26,26,0.2)">
+                <span class="material-symbols-outlined text-[14px] flex-shrink-0" style="color:#ba1a1a">shield</span>
+                <p class="text-[11px] font-semibold" style="color:#ba1a1a">Caregiver TIDAK dapat mengakses data siklus tanpa izin eksplisit dari Anda.</p>
+              </div>
+            </div>
+            <div class="toggle-track flex-shrink-0 mt-1" id="caregiverToggle" onclick="toggleCaregiverAccess()">
+              <div class="toggle-thumb"></div>
+            </div>
+          </div>
+
+          <!-- Doctor sync toggle -->
+          <div class="flex items-start justify-between gap-4 p-4 bg-surface-container-low rounded-xl border border-outline-variant">
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-on-surface">Bagikan ringkasan ke dokter</p>
+              <p class="text-[11px] text-on-surface-variant mt-0.5">Hanya ringkasan anonim dikirim ke dokter terkait via laporan terenkripsi.</p>
+            </div>
+            <div class="toggle-track on flex-shrink-0 mt-1" id="doctorToggle" onclick="toggleDoctorShare()">
+              <div class="toggle-thumb"></div>
+            </div>
+          </div>
+
+          <!-- Export -->
+          <div class="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-outline-variant">
+            <div>
+              <p class="text-sm font-semibold text-on-surface">Ekspor Data Siklus</p>
+              <p class="text-[11px] text-on-surface-variant">Unduh data siklus dalam format PDF atau CSV terenkripsi</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="border border-outline-variant text-on-surface-variant hover:bg-surface-container text-[12px] font-semibold px-3 py-2 rounded-lg transition-all flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">download</span>PDF</button>
+              <button class="border border-outline-variant text-on-surface-variant hover:bg-surface-container text-[12px] font-semibold px-3 py-2 rounded-lg transition-all flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">download</span>CSV</button>
+            </div>
+          </div>
+
+          <!-- Delete -->
+          <div class="flex items-center justify-between p-4 rounded-xl border" style="background:rgba(186,26,26,0.04);border-color:rgba(186,26,26,0.2)">
+            <div>
+              <p class="text-sm font-semibold" style="color:#ba1a1a">Hapus Semua Data Siklus</p>
+              <p class="text-[11px]" style="color:rgba(186,26,26,0.7)">Tindakan ini tidak dapat dibatalkan. Data akan dihapus permanen.</p>
+            </div>
+            <button class="border text-[12px] font-semibold px-3 py-2 rounded-lg transition-all flex items-center gap-1 hover:bg-red-50" style="color:#ba1a1a;border-color:rgba(186,26,26,0.3)"><span class="material-symbols-outlined text-[14px]">delete_forever</span>Hapus</button>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /page content -->
+  </main>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       CONTRACEPTION GUARDRAIL MODAL
+       NOT auto-dismissible. Must click the CTA button.
+  ════════════════════════════════════════════════════════════════════ -->
+  <div id="guardrailModal" class="fixed inset-0 z-[9999] flex items-center justify-center p-4" style="background:rgba(0,0,0,0.55);backdrop-filter:blur(3px)">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" style="border:2px solid rgba(245,158,11,0.5)">
+
+      <!-- Modal header banner -->
+      <div class="px-6 py-4 flex items-center gap-3 border-b" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3)">
+        <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#f59e0b">
+          <span class="material-symbols-outlined text-white text-[24px] filled">warning</span>
+        </div>
+        <div>
+          <p class="text-base font-bold text-on-surface">Peringatan Penting</p>
+          <p class="text-[11px] text-on-surface-variant">Bacalah seluruh informasi ini dengan seksama sebelum melanjutkan</p>
+        </div>
+      </div>
+
+      <!-- Modal body -->
+      <div class="px-6 py-5 space-y-4">
+
+        <!-- Medical warning box -->
+        <div class="rounded-xl p-4" style="background:rgba(186,26,26,0.06);border:1.5px solid rgba(186,26,26,0.22)">
+          <p class="text-[13px] text-on-surface leading-relaxed font-medium">
+            Metode kalender <strong>tidak memberikan perlindungan 100%</strong> terhadap kehamilan. Sperma dapat bertahan hidup hingga <strong>5 hari</strong>. Prediksi masa subur bisa meleset karena:
+          </p>
+          <ul class="mt-2.5 space-y-1.5">
+            <li class="flex items-center gap-2 text-[12px] text-on-surface"><span class="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style="background:#ba1a1a"></span>Stres dan gangguan emosional</li>
+            <li class="flex items-center gap-2 text-[12px] text-on-surface"><span class="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style="background:#ba1a1a"></span>Sakit atau infeksi</li>
+            <li class="flex items-center gap-2 text-[12px] text-on-surface"><span class="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style="background:#ba1a1a"></span>Konsumsi obat-obatan tertentu</li>
+            <li class="flex items-center gap-2 text-[12px] text-on-surface"><span class="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style="background:#ba1a1a"></span>Perubahan pola tidur</li>
+            <li class="flex items-center gap-2 text-[12px] text-on-surface"><span class="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style="background:#ba1a1a"></span>Menyusui</li>
+            <li class="flex items-center gap-2 text-[12px] text-on-surface"><span class="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style="background:#ba1a1a"></span>Siklus yang tidak teratur</li>
+          </ul>
+          <p class="text-[13px] text-on-surface font-semibold mt-3 pt-2.5 border-t" style="border-color:rgba(186,26,26,0.2)">
+            Selalu gunakan kontrasepsi tambahan bila ingin mencegah kehamilan.
+          </p>
+        </div>
+
+        <!-- Legal disclaimer -->
+        <div class="rounded-xl p-4 bg-surface-container-low border border-outline-variant">
+          <div class="flex items-start gap-2">
+            <span class="material-symbols-outlined text-on-surface-variant text-[18px] flex-shrink-0 mt-0.5">info</span>
+            <p class="text-[12px] text-on-surface-variant leading-relaxed">
+              <strong class="text-on-surface">Disclaimer:</strong> Fitur ini bukan alat kontrasepsi. Aplikasi ini <strong class="text-on-surface">tidak bertanggung jawab</strong> atas keputusan reproduksi yang dibuat berdasarkan fitur pelacakan siklus ini. Konsultasikan selalu dengan tenaga medis profesional.
+            </p>
+          </div>
+        </div>
+
+        <!-- External resources -->
+        <div class="space-y-2">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Informasi Tambahan</p>
+          <a href="#" class="flex items-center gap-2 text-[12px] font-medium hover:underline" style="color:#0369a1">
+            <span class="material-symbols-outlined text-[15px]">open_in_new</span>Panduan Kontrasepsi — WHO (who.int)
+          </a>
+          <a href="#" class="flex items-center gap-2 text-[12px] font-medium hover:underline" style="color:#0369a1">
+            <span class="material-symbols-outlined text-[15px]">open_in_new</span>Hubungi dokter kandungan Anda
+          </a>
+        </div>
+      </div>
+
+      <!-- CTA — must be clicked to dismiss -->
+      <div class="px-6 pb-6">
+        <button onclick="closeGuardrail()" class="w-full bg-primary text-on-primary hover:bg-primary/85 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all">
+          <span class="material-symbols-outlined text-[18px] filled">check_circle</span>
+          Saya Memahami Peringatan Ini
+        </button>
+        <p class="text-[10px] text-on-surface-variant text-center mt-2">Tombol di atas harus ditekan untuk menutup peringatan ini</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MOBILE BOTTOM NAV -->
+  <nav class="lg:hidden fixed bottom-0 left-0 w-full h-16 z-50 flex justify-around items-center bg-surface border-t border-outline-variant">
+    <a href="#" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+      <span class="material-symbols-outlined text-[22px]">dashboard</span>
+      <span class="text-[9px] font-medium">Beranda</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+      <span class="material-symbols-outlined text-[22px]">today</span>
+      <span class="text-[9px] font-medium">Hari Ini</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-0.5" style="color:#000">
+      <span class="material-symbols-outlined text-[22px] filled">cycle</span>
+      <span class="text-[9px] font-bold">Siklus</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+      <span class="material-symbols-outlined text-[22px]">smart_toy</span>
+      <span class="text-[9px] font-medium">AI</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-0.5 text-on-surface-variant">
+      <span class="material-symbols-outlined text-[22px]">settings</span>
+      <span class="text-[9px] font-medium">Setelan</span>
+    </a>
+  </nav>
+
+  <script>
+    function selectMood(el) {
+      document.querySelectorAll('.mood-chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+    function toggleSymptom(el) {
+      el.classList.toggle('selected');
+    }
+    function toggleUnprotected() {
+      const track = document.getElementById('unprotectedTrack');
+      const warning = document.getElementById('unprotectedWarning');
+      track.classList.toggle('on');
+      if (track.classList.contains('on')) {
+        warning.classList.remove('hidden');
+        openGuardrail();
+      } else {
+        warning.classList.add('hidden');
+      }
+    }
+    function openGuardrail() {
+      document.getElementById('guardrailModal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+    function closeGuardrail() {
+      document.getElementById('guardrailModal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    function toggleCaregiverAccess() {
+      document.getElementById('caregiverToggle').classList.toggle('on');
+    }
+    function toggleDoctorShare() {
+      document.getElementById('doctorToggle').classList.toggle('on');
+    }
+    document.querySelectorAll('.cal-day').forEach(day => {
+      day.addEventListener('click', function () {
+        document.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected-day'));
+        this.classList.add('selected-day');
+      });
+    });
+  </script>
+</body>
+</html>

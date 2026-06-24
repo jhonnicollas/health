@@ -37,6 +37,24 @@ class D1MockStatement {
       return configValue ? { configValue } : null
     }
 
+    if (this.sql.includes('FROM HL_configMetadata')) {
+      const configKey = this.params[0]
+      return this.db.configMetadata[configKey] ?? null
+    }
+
+    if (this.sql.includes('FROM HL_systemConfigs') && this.sql.includes('configValue')) {
+      const configKey = this.params[0]
+      const configValue = this.db.systemConfigs[configKey]
+      if (configValue === undefined) return null
+      return {
+        configKey,
+        configValue,
+        dataType: this.db.systemConfigMeta[configKey]?.dataType ?? 'string',
+        description: this.db.systemConfigMeta[configKey]?.description ?? null,
+        updatedAt: 'CURRENT_TIMESTAMP'
+      }
+    }
+
     if (this.sql.includes('SELECT configKey FROM HL_systemConfigs')) {
       const configKey = this.params[0]
       return this.db.systemConfigs[configKey] !== undefined ? { configKey } : null
@@ -138,6 +156,77 @@ class D1MockStatement {
       return recommendation ? { summaryText: recommendation.summaryText } : null
     }
 
+    if (this.sql.includes('FROM HL_subscriptions')) {
+      const userId = this.params[0]
+      if (this.sql.includes('JOIN HL_plans')) {
+        const subscription = this.db.subscriptions.find((row) => row.userId === userId && ['active', 'trialing'].includes(row.status))
+        return subscription ? this.db.plans.find((plan) => plan.planCode === subscription.planCode && plan.active === 1) ?? null : null
+      }
+      return this.db.subscriptions
+        .filter((row) => row.userId === userId)
+        .sort((left, right) => (right.currentPeriodEnd ?? '').localeCompare(left.currentPeriodEnd ?? ''))[0] ?? null
+    }
+
+    if (this.sql.includes("WHERE planCode = 'free'")) {
+      return this.db.plans.find((plan) => plan.planCode === 'free' && plan.active === 1) ?? null
+    }
+
+    if (this.sql.includes('FROM HL_planFeatures') && this.sql.includes('featureCode = ?')) {
+      const [planCode, featureCode] = this.params
+      return this.db.planFeatures.find((row) => row.planCode === planCode && row.featureCode === featureCode) ?? null
+    }
+
+    if (this.sql.includes('FROM HL_usageCounters')) {
+      const [userId, featureCode, usageWindow] = this.params
+      const row = this.db.usageCounters.find((item) => item.userId === userId && item.featureCode === featureCode && item.usageWindow === usageWindow)
+      return row ? { usedCount: row.usedCount } : null
+    }
+
+    if (this.sql.includes('FROM HL_users u') && this.sql.includes('LEFT JOIN HL_userProfiles')) {
+      const userId = this.params[0]
+      const user = this.db.users.find((row) => row.id === userId)
+      if (!user) return null
+      const profile = this.db.profiles.find((row) => row.userId === userId)
+      return {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        active: user.active,
+        createdAt: user.createdAt ?? 'CURRENT_TIMESTAMP',
+        sex: profile?.sex ?? null,
+        birthDate: profile?.birthDate ?? null
+      }
+    }
+
+    if (this.sql.includes('SELECT id, active FROM HL_users')) {
+      const userId = this.params[0]
+      const user = this.db.users.find((row) => row.id === userId)
+      return user ? { id: user.id, active: user.active } : null
+    }
+
+    if (this.sql.includes('SELECT roleCode FROM HL_roles')) {
+      const roleCode = this.params[0]
+      const role = this.db.roles.find((row) => row.roleCode === roleCode)
+      return role ? { roleCode: role.roleCode } : null
+    }
+
+    if (this.sql.includes('FROM HL_userRoles') && this.sql.includes('HL_permissions')) {
+      const [userId, permissionCode] = this.params
+      const activeRoleCodes = new Set(
+        this.db.userRoles
+          .filter((row) => row.userId === userId && row.active === 1 && row.revokedAt === null)
+          .filter((row) => this.db.roles.some((role) => role.roleCode === row.roleCode && role.active === 1))
+          .map((row) => row.roleCode)
+      )
+      const allowed = this.db.rolePermissions
+        .filter((row) => activeRoleCodes.has(row.roleCode))
+        .some((row) =>
+          row.permissionCode === permissionCode &&
+          this.db.permissions.some((permission) => permission.permissionCode === row.permissionCode && permission.active === 1)
+        )
+      return allowed ? { permissionCode } : null
+    }
+
     return null
   }
 
@@ -147,6 +236,111 @@ class D1MockStatement {
   }
 
   async all() {
+    if (this.sql.includes('FROM HL_userRoles') && this.sql.includes('SELECT r.roleCode')) {
+      const userId = this.params[0]
+      const rows = this.db.userRoles
+        .filter((row) => row.userId === userId && row.active === 1 && row.revokedAt === null)
+        .map((row) => this.db.roles.find((role) => role.roleCode === row.roleCode && role.active === 1))
+        .filter(Boolean)
+        .map((role) => ({ roleCode: role.roleCode, roleName: role.roleName, systemRole: role.systemRole }))
+      return { results: rows }
+    }
+
+    if (this.sql.includes('FROM HL_userRoles') && this.sql.includes('SELECT DISTINCT p.permissionCode')) {
+      const userId = this.params[0]
+      const activeRoleCodes = new Set(
+        this.db.userRoles
+          .filter((row) => row.userId === userId && row.active === 1 && row.revokedAt === null)
+          .filter((row) => this.db.roles.some((role) => role.roleCode === row.roleCode && role.active === 1))
+          .map((row) => row.roleCode)
+      )
+      const rows = this.db.rolePermissions
+        .filter((row) => activeRoleCodes.has(row.roleCode))
+        .map((row) => this.db.permissions.find((permission) => permission.permissionCode === row.permissionCode && permission.active === 1))
+        .filter(Boolean)
+        .map((permission) => ({ permissionCode: permission.permissionCode, category: permission.category }))
+      return { results: rows }
+    }
+
+    if (this.sql.includes('FROM HL_users') && this.sql.includes('ORDER BY createdAt')) {
+      return {
+        results: this.db.users
+          .slice()
+          .sort((left, right) => (right.createdAt ?? '').localeCompare(left.createdAt ?? '') || right.id - left.id)
+          .map((user) => ({
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+            active: user.active,
+            createdAt: user.createdAt ?? 'CURRENT_TIMESTAMP'
+          }))
+      }
+    }
+
+    if (this.sql.includes('FROM HL_plans p')) {
+      const includeInactive = this.params[0] === 1
+      return {
+        results: this.db.plans
+          .filter((plan) => includeInactive || plan.active === 1)
+          .map((plan) => ({
+            ...plan,
+            featureCount: this.db.planFeatures.filter((feature) => feature.planCode === plan.planCode).length
+          }))
+      }
+    }
+
+    if (this.sql.includes('FROM HL_planFeatures') && this.sql.includes('WHERE planCode = ?')) {
+      const planCode = this.params[0]
+      return { results: this.db.planFeatures.filter((row) => row.planCode === planCode) }
+    }
+
+    if (this.sql.includes('FROM HL_subscriptions s')) {
+      return {
+        results: this.db.subscriptions.map((sub) => ({
+          ...sub,
+          email: this.db.users.find((user) => user.id === sub.userId)?.email ?? null
+        }))
+      }
+    }
+
+    if (this.sql.includes('FROM HL_roles r') && this.sql.includes('LEFT JOIN HL_rolePermissions')) {
+      return {
+        results: this.db.roles.map((role) => ({
+          roleCode: role.roleCode,
+          roleName: role.roleName,
+          description: role.description ?? null,
+          systemRole: role.systemRole,
+          active: role.active,
+          permissionCount: this.db.rolePermissions.filter((row) => row.roleCode === role.roleCode).length
+        }))
+      }
+    }
+
+    if (this.sql.includes('FROM HL_permissions') && this.sql.includes('ORDER BY category')) {
+      return {
+        results: this.db.permissions.map((permission) => ({
+          permissionCode: permission.permissionCode,
+          permissionName: permission.permissionName ?? permission.permissionCode,
+          category: permission.category,
+          description: permission.description ?? null,
+          active: permission.active
+        }))
+      }
+    }
+
+    if (this.sql.includes('FROM HL_permissions') && this.sql.includes('permissionCode IN')) {
+      const codes = this.params
+      return {
+        results: this.db.permissions
+          .filter((permission) => permission.active === 1 && codes.includes(permission.permissionCode))
+          .map((permission) => ({ permissionCode: permission.permissionCode }))
+      }
+    }
+
+    if (this.sql.includes('FROM HL_configMetadata')) {
+      return { results: Object.values(this.db.configMetadata) }
+    }
+
     if (this.sql.includes('FROM HL_systemConfigs')) {
       return {
         results: Object.entries(this.db.systemConfigs)
@@ -260,6 +454,21 @@ class D1Mock {
     this.users = []
     this.sessions = []
     this.auditLogs = []
+    this.roles = []
+    this.permissions = []
+    this.rolePermissions = []
+    this.userRoles = []
+    this.plans = [
+      { planCode: 'free', planName: 'Free', billingInterval: 'free', durationDays: null, priceAmount: 0, currency: 'IDR', trialDays: 0, description: 'Free', active: 1, sortOrder: 10 },
+      { planCode: 'premiumMonthly', planName: 'Premium Monthly', billingInterval: 'monthly', durationDays: 30, priceAmount: 49000, currency: 'IDR', trialDays: 0, description: 'Premium', active: 1, sortOrder: 20 }
+    ]
+    this.planFeatures = [
+      { planCode: 'free', featureCode: 'feature.aiAssistant.use', enabled: 1, quotaLimit: 3, quotaWindow: 'month', metadataJson: null },
+      { planCode: 'premiumMonthly', featureCode: 'feature.aiAssistant.use', enabled: 1, quotaLimit: 100, quotaWindow: 'month', metadataJson: null },
+      { planCode: 'premiumMonthly', featureCode: 'feature.vectorMemory.use', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null }
+    ]
+    this.subscriptions = []
+    this.usageCounters = []
     this.profiles = []
     this.consents = []
     this.rateLimits = []
@@ -618,6 +827,20 @@ class D1Mock {
       ocrRateLimitWindowMin: { dataType: 'number', description: 'OCR window' },
       telegramBotToken: { dataType: 'string', description: 'Telegram token' }
     }
+    this.configMetadata = {
+      telegramBotToken: {
+        configKey: 'telegramBotToken',
+        category: 'telegram',
+        isSecret: 1,
+        storageMode: 'env',
+        envVarName: 'TELEGRAM_BOT_TOKEN',
+        masked: 1,
+        readPolicy: 'admin.config.read',
+        writePolicy: 'admin.config.update',
+        description: 'Telegram token',
+        active: 1
+      }
+    }
     this.failSelect = options.failSelect ?? false
   }
 
@@ -730,6 +953,138 @@ class D1Mock {
       const [configKey] = statement.params
       delete this.systemConfigs[configKey]
       delete this.systemConfigMeta[configKey]
+    }
+
+    if (statement.sql.includes('UPDATE HL_users SET active')) {
+      const [active, userId] = statement.params
+      const user = this.users.find((row) => row.id === userId)
+      if (user) user.active = active
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_roles')) {
+      const [roleCode, roleName, description] = statement.params
+      if (this.roles.some((role) => role.roleCode === roleCode)) {
+        throw new Error('UNIQUE constraint failed: HL_roles.roleCode')
+      }
+      this.roles.push({ roleCode, roleName, description, systemRole: 0, active: 1 })
+    }
+
+    if (statement.sql.includes('UPDATE HL_roles SET')) {
+      const [roleName, description, active, roleCode] = statement.params
+      const role = this.roles.find((row) => row.roleCode === roleCode)
+      if (role) {
+        if (roleName !== null) role.roleName = roleName
+        if (description !== null) role.description = description
+        if (active !== null) role.active = active
+      }
+    }
+
+    if (statement.sql.includes('DELETE FROM HL_rolePermissions')) {
+      const [roleCode] = statement.params
+      this.rolePermissions = this.rolePermissions.filter((row) => row.roleCode !== roleCode)
+    }
+
+    if (statement.sql.includes('INSERT OR IGNORE INTO HL_rolePermissions')) {
+      const [roleCode, permissionCode] = statement.params
+      if (!this.rolePermissions.some((row) => row.roleCode === roleCode && row.permissionCode === permissionCode)) {
+        this.rolePermissions.push({ roleCode, permissionCode })
+      }
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_userRoles')) {
+      const [userId, roleCode, assignedBy] = statement.params
+      const existing = this.userRoles.find((row) => row.userId === userId && row.roleCode === roleCode)
+      if (existing) {
+        existing.active = 1
+        existing.revokedAt = null
+        existing.assignedBy = assignedBy
+      } else {
+        this.userRoles.push({ userId, roleCode, assignedBy, active: 1, revokedAt: null })
+      }
+    }
+
+    if (statement.sql.includes('UPDATE HL_userRoles SET active = 0')) {
+      const [userId, roleCode] = statement.params
+      const row = this.userRoles.find((item) => item.userId === userId && item.roleCode === roleCode)
+      if (row) {
+        row.active = 0
+        row.revokedAt = 'CURRENT_TIMESTAMP'
+      }
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_plans')) {
+      const [planCode, planName, billingInterval, durationDays, priceAmount, currency, trialDays, description, active, sortOrder] = statement.params
+      if (this.plans.some((plan) => plan.planCode === planCode)) throw new Error('UNIQUE constraint failed: HL_plans.planCode')
+      this.plans.push({ planCode, planName, billingInterval, durationDays, priceAmount, currency, trialDays, description, active, sortOrder })
+    }
+
+    if (statement.sql.includes('UPDATE HL_plans SET')) {
+      const [planName, durationDays, priceAmount, currency, trialDays, description, active, sortOrder, planCode] = statement.params
+      const plan = this.plans.find((row) => row.planCode === planCode)
+      if (plan) {
+        if (planName !== null) plan.planName = planName
+        if (durationDays !== null) plan.durationDays = durationDays
+        if (priceAmount !== null) plan.priceAmount = priceAmount
+        if (currency !== null) plan.currency = currency
+        if (trialDays !== null) plan.trialDays = trialDays
+        if (description !== null) plan.description = description
+        if (active !== null) plan.active = active
+        if (sortOrder !== null) plan.sortOrder = sortOrder
+      }
+    }
+
+    if (statement.sql.includes('DELETE FROM HL_planFeatures')) {
+      const [planCode] = statement.params
+      this.planFeatures = this.planFeatures.filter((row) => row.planCode !== planCode)
+    }
+
+    if (statement.sql.includes('INSERT OR IGNORE INTO HL_planFeatures')) {
+      const [planCode, featureCode, enabled, quotaLimit, quotaWindow, metadataJson] = statement.params
+      if (!this.planFeatures.some((row) => row.planCode === planCode && row.featureCode === featureCode)) {
+        this.planFeatures.push({ planCode, featureCode, enabled, quotaLimit, quotaWindow, metadataJson })
+      }
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_subscriptions')) {
+      const [userId, planCode, status, currentPeriodStart, currentPeriodEnd, provider, metadataJson] = statement.params
+      const id = ++this.lastInsertId
+      this.subscriptions.push({ id, userId, planCode, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd: 0, provider, metadataJson })
+    }
+
+    if (statement.sql.includes('UPDATE HL_subscriptions SET')) {
+      const [planCode, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd, metadataJson, id] = statement.params
+      const sub = this.subscriptions.find((row) => row.id === id)
+      if (sub) {
+        if (planCode !== null) sub.planCode = planCode
+        if (status !== null) sub.status = status
+        if (currentPeriodStart !== null) sub.currentPeriodStart = currentPeriodStart
+        if (currentPeriodEnd !== null) sub.currentPeriodEnd = currentPeriodEnd
+        if (cancelAtPeriodEnd !== null) sub.cancelAtPeriodEnd = cancelAtPeriodEnd
+        if (metadataJson !== null) sub.metadataJson = metadataJson
+      }
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_usageCounters')) {
+      const [userId, featureCode, usageWindow, amount, quotaLimitSnapshot, resetAt] = statement.params
+      const row = this.usageCounters.find((item) => item.userId === userId && item.featureCode === featureCode && item.usageWindow === usageWindow)
+      if (row) row.usedCount += amount
+      else this.usageCounters.push({ userId, featureCode, usageWindow, usedCount: amount, quotaLimitSnapshot, resetAt })
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_configMetadata')) {
+      const [configKey, envVarName] = statement.params
+      this.configMetadata[configKey] = {
+        configKey,
+        category: 'security',
+        isSecret: 1,
+        storageMode: 'env',
+        envVarName,
+        masked: 1,
+        readPolicy: 'admin.config.read',
+        writePolicy: 'admin.config.update',
+        description: 'Secret config reference',
+        active: 1
+      }
     }
 
     if (statement.sql.includes('UPDATE HL_users SET lastLoginAt')) {
@@ -864,6 +1219,21 @@ function env(db = new D1Mock()) {
   return {
     DB: db,
     LOGS: {}
+  }
+}
+
+function grantAdminPermission(db, userId, permissionCode) {
+  if (!db.roles.some((role) => role.roleCode === 'admin')) {
+    db.roles.push({ roleCode: 'admin', roleName: 'Admin', systemRole: 1, active: 1 })
+  }
+  if (!db.permissions.some((permission) => permission.permissionCode === permissionCode)) {
+    db.permissions.push({ permissionCode, category: permissionCode.split('.').slice(0, 2).join('.'), active: 1 })
+  }
+  if (!db.rolePermissions.some((row) => row.roleCode === 'admin' && row.permissionCode === permissionCode)) {
+    db.rolePermissions.push({ roleCode: 'admin', permissionCode })
+  }
+  if (!db.userRoles.some((row) => row.userId === userId && row.roleCode === 'admin')) {
+    db.userRoles.push({ userId, roleCode: 'admin', active: 1, revokedAt: null })
   }
 }
 
@@ -1943,6 +2313,7 @@ test('admin system config supports create update delete and masks sensitive audi
     expiresAt: new Date(Date.now() + 60000).toISOString(),
     revokedAt: null
   })
+  grantAdminPermission(db, 2, 'admin.config.update')
 
   const adminEnv = { ...env(db), ADMIN_EMAILS: 'admin@example.com' }
 
@@ -1988,7 +2359,9 @@ test('admin system config supports create update delete and masks sensitive audi
 
   assert.equal(updateResponse.status, 200)
   assert.equal(updateBody.data.updated, true)
-  assert.equal(db.systemConfigs.telegramBotToken, 'super-secret-token')
+  assert.equal(updateBody.data.secretValueReturned, false)
+  assert.equal(updateBody.data.config.configValue, '')
+  assert.equal(db.systemConfigs.telegramBotToken, 'configured')
   const updateAudit = db.auditLogs.length > 0 ? db.auditLogs[db.auditLogs.length - 1] : null
   assert.ok(updateAudit, 'audit log should exist after config update')
   assert.equal(updateAudit.action, 'configUpdate')
@@ -2026,6 +2399,393 @@ test('admin system config supports create update delete and masks sensitive audi
   assert.equal(deleteBody.data.deleted, true)
   assert.equal(db.systemConfigs.featureDoctorExportEnabled, undefined)
   assert.equal(db.auditLogs.at(-1).action, 'configDelete')
+})
+
+test('GET /api/admin/configs requires RBAC admin permission', async () => {
+  const db = new D1Mock()
+  const token = 'plain-user-session'
+  db.users.push({
+    id: 3,
+    email: 'plain@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Plain User',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 3,
+    userId: 3,
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+
+  const response = await app.request(
+    '/api/admin/configs',
+    {
+      headers: {
+        Cookie: `hlSession=${token}`
+      }
+    },
+    env(db)
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 403)
+  assert.equal(body.error.code, 'FORBIDDEN')
+  assert.equal(body.error.details[0].permissionCode, 'admin.config.read')
+})
+
+test('admin user APIs return context, safe detail, and audit status update', async () => {
+  const db = new D1Mock()
+  const token = 'admin-user-session'
+  db.users.push({
+    id: 10,
+    email: 'admin@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Admin',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    lastLoginAt: null
+  })
+  db.users.push({
+    id: 11,
+    email: 'patient@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Patient',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    createdAt: '2026-06-02T00:00:00.000Z',
+    lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 10,
+    userId: 10,
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+  db.profiles.push({
+    id: 11,
+    userId: 11,
+    sex: 'female',
+    birthDate: '1992-01-01',
+    heightCm: 160,
+    timezone: 'Asia/Jakarta',
+    accessibilityMode: 'normal',
+    theme: 'light',
+    emergencyConsent: 0,
+    aiConsent: 1,
+    dataShareConsent: 0,
+    isPregnant: 1,
+    isLactating: 1
+  })
+  db.subscriptions.push({
+    userId: 11,
+    planCode: 'premiumMonthly',
+    status: 'active',
+    currentPeriodEnd: '2026-07-01T00:00:00.000Z'
+  })
+  grantAdminPermission(db, 10, 'admin.access')
+  grantAdminPermission(db, 10, 'admin.users.read')
+  grantAdminPermission(db, 10, 'admin.users.update')
+
+  const apiEnv = env(db)
+  const headers = { Cookie: `hlSession=${token}` }
+  const meResponse = await app.request('/api/admin/me', { headers }, apiEnv)
+  const meBody = await meResponse.json()
+  assert.equal(meResponse.status, 200)
+  assert.equal(meBody.data.canAccessAdmin, true)
+  assert.ok(meBody.data.permissions.includes('admin.users.read'))
+
+  const listResponse = await app.request('/api/admin/users?q=patient', { headers }, apiEnv)
+  const listBody = await listResponse.json()
+  assert.equal(listResponse.status, 200)
+  assert.equal(listBody.data.length, 1)
+  assert.equal(listBody.data[0].userId, 11)
+  assert.equal(listBody.data[0].subscription.planCode, 'premiumMonthly')
+
+  const detailResponse = await app.request('/api/admin/users/11', { headers }, apiEnv)
+  const detailBody = await detailResponse.json()
+  assert.equal(detailResponse.status, 200)
+  assert.equal(detailBody.data.profile.sex, 'female')
+  assert.equal(detailBody.data.profile.birthDate, '1992-01-01')
+  assert.equal(JSON.stringify(detailBody.data).includes('isPregnant'), false)
+  assert.equal(JSON.stringify(detailBody.data).includes('symptom'), false)
+  assert.match(detailBody.data.supportViewNotice, /Sensitive health detail is hidden/)
+
+  const updateResponse = await app.request(
+    '/api/admin/users/11/status',
+    {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: false, reason: 'Manual review' })
+    },
+    apiEnv
+  )
+  const updateBody = await updateResponse.json()
+  assert.equal(updateResponse.status, 200)
+  assert.equal(updateBody.data.updated, true)
+  assert.equal(db.users.find((user) => user.id === 11).active, 0)
+  assert.equal(db.auditLogs.at(-1).action, 'admin.users.status.update')
+})
+
+test('admin role APIs create update set permissions assign and revoke', async () => {
+  const db = new D1Mock()
+  const token = 'roles-admin-session'
+  db.users.push({
+    id: 20,
+    email: 'roles-admin@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Roles Admin',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    lastLoginAt: null
+  })
+  db.users.push({
+    id: 21,
+    email: 'operator@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Operator',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    createdAt: '2026-06-02T00:00:00.000Z',
+    lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 20,
+    userId: 20,
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+  grantAdminPermission(db, 20, 'admin.roles.read')
+  grantAdminPermission(db, 20, 'admin.roles.manage')
+  grantAdminPermission(db, 20, 'admin.users.update')
+  grantAdminPermission(db, 20, 'admin.config.read')
+
+  const apiEnv = env(db)
+  const headers = { Cookie: `hlSession=${token}` }
+
+  const createResponse = await app.request(
+    '/api/admin/roles',
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleCode: 'clinicOperator', roleName: 'Clinic Operator', description: 'Ops role' })
+    },
+    apiEnv
+  )
+  const createBody = await createResponse.json()
+  assert.equal(createResponse.status, 201)
+  assert.equal(createBody.data.created, true)
+  assert.ok(db.roles.some((role) => role.roleCode === 'clinicOperator' && role.systemRole === 0))
+
+  const permissionsResponse = await app.request('/api/admin/permissions', { headers }, apiEnv)
+  const permissionsBody = await permissionsResponse.json()
+  assert.equal(permissionsResponse.status, 200)
+  assert.ok(permissionsBody.data.some((permission) => permission.permissionCode === 'admin.config.read'))
+
+  const setResponse = await app.request(
+    '/api/admin/roles/clinicOperator/permissions',
+    {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ permissionCodes: ['admin.config.read'] })
+    },
+    apiEnv
+  )
+  const setBody = await setResponse.json()
+  assert.equal(setResponse.status, 200)
+  assert.equal(setBody.data.permissionCount, 1)
+  assert.deepEqual(db.rolePermissions.filter((row) => row.roleCode === 'clinicOperator').map((row) => row.permissionCode), ['admin.config.read'])
+
+  const updateResponse = await app.request(
+    '/api/admin/roles/clinicOperator',
+    {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleName: 'Clinic Operator Updated', active: true })
+    },
+    apiEnv
+  )
+  assert.equal(updateResponse.status, 200)
+  assert.equal(db.roles.find((role) => role.roleCode === 'clinicOperator').roleName, 'Clinic Operator Updated')
+
+  const assignResponse = await app.request(
+    '/api/admin/users/21/roles',
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleCode: 'clinicOperator' })
+    },
+    apiEnv
+  )
+  assert.equal(assignResponse.status, 200)
+  assert.ok(db.userRoles.some((row) => row.userId === 21 && row.roleCode === 'clinicOperator' && row.active === 1))
+
+  const revokeResponse = await app.request(
+    '/api/admin/users/21/roles/clinicOperator',
+    {
+      method: 'DELETE',
+      headers
+    },
+    apiEnv
+  )
+  assert.equal(revokeResponse.status, 200)
+  assert.equal(db.userRoles.find((row) => row.userId === 21 && row.roleCode === 'clinicOperator').active, 0)
+  assert.equal(db.auditLogs.at(-1).action, 'admin.users.role.revoke')
+})
+
+test('admin billing APIs and entitlement quota flow work', async () => {
+  const db = new D1Mock()
+  const token = 'billing-admin-session'
+  db.users.push({
+    id: 30,
+    email: 'billing-admin@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Billing Admin',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    lastLoginAt: null
+  })
+  db.users.push({
+    id: 31,
+    email: 'paid@example.com',
+    passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Paid User',
+    telegramEnabled: 0,
+    browserPushEnabled: 0,
+    active: 1,
+    authProvider: 'local',
+    createdAt: '2026-06-02T00:00:00.000Z',
+    lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 30,
+    userId: 30,
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+  grantAdminPermission(db, 30, 'admin.billing.read')
+  grantAdminPermission(db, 30, 'admin.billing.manage')
+
+  const apiEnv = { ...env(db), INTERNAL_API_SECRET: 'internal-secret' }
+  const headers = { Cookie: `hlSession=${token}` }
+
+  const createPlanResponse = await app.request(
+    '/api/admin/plans',
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planCode: 'premiumYearly',
+        planName: 'Premium Yearly',
+        billingInterval: 'yearly',
+        durationDays: 365,
+        priceAmount: 399000,
+        currency: 'IDR',
+        active: true,
+        sortOrder: 40
+      })
+    },
+    apiEnv
+  )
+  assert.equal(createPlanResponse.status, 201)
+  assert.ok(db.plans.some((plan) => plan.planCode === 'premiumYearly'))
+
+  const featuresResponse = await app.request(
+    '/api/admin/plans/premiumYearly/features',
+    {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        features: [
+          { featureCode: 'feature.aiAssistant.use', enabled: true, quotaLimit: 10, quotaWindow: 'month' },
+          { featureCode: 'feature.vectorMemory.use', enabled: true, quotaLimit: null, quotaWindow: null }
+        ]
+      })
+    },
+    apiEnv
+  )
+  const featuresBody = await featuresResponse.json()
+  assert.equal(featuresResponse.status, 200)
+  assert.equal(featuresBody.data.featureCount, 2)
+
+  const createSubResponse = await app.request(
+    '/api/admin/users/31/subscriptions',
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planCode: 'premiumYearly',
+        status: 'active',
+        currentPeriodStart: '2026-06-24T00:00:00.000Z',
+        currentPeriodEnd: '2027-06-24T00:00:00.000Z',
+        provider: 'manual'
+      })
+    },
+    apiEnv
+  )
+  const createSubBody = await createSubResponse.json()
+  assert.equal(createSubResponse.status, 201)
+  assert.equal(createSubBody.data.planCode, 'premiumYearly')
+
+  const listPlansResponse = await app.request('/api/admin/plans', { headers }, apiEnv)
+  const listPlansBody = await listPlansResponse.json()
+  assert.equal(listPlansResponse.status, 200)
+  assert.ok(listPlansBody.data.some((plan) => plan.planCode === 'premiumYearly' && plan.active === true))
+
+  const userToken = 'paid-user-session'
+  db.sessions.push({
+    id: 31,
+    userId: 31,
+    sessionTokenHash: await sha256Token(userToken),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
+  const entitlementsResponse = await app.request('/api/me/entitlements', { headers: { Cookie: `hlSession=${userToken}` } }, apiEnv)
+  const entitlementsBody = await entitlementsResponse.json()
+  assert.equal(entitlementsResponse.status, 200)
+  assert.equal(entitlementsBody.data.planCode, 'premiumYearly')
+  assert.equal(entitlementsBody.data.features['feature.aiAssistant.use'].quotaLimit, 10)
+
+  const consumeResponse = await app.request(
+    '/api/internal/usage/consume',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': 'internal-secret' },
+      body: JSON.stringify({ userId: 31, featureCode: 'feature.aiAssistant.use', amount: 1 })
+    },
+    apiEnv
+  )
+  const consumeBody = await consumeResponse.json()
+  assert.equal(consumeResponse.status, 200)
+  assert.equal(consumeBody.data.allowed, true)
+  assert.equal(db.usageCounters[0].usedCount, 1)
+  assert.equal(db.auditLogs.at(-1).action, 'admin.subscriptions.create')
 })
 
 test('GET /api/measurements/last returns data as array (no double-wrap)', async () => {

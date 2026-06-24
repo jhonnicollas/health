@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<!--
+  MOCKUP_FILE_NAME: SPRINT5_FULL_MOCKUP_PRODUCTION_LAYOUT_AI_SPRINT6_READY.html
+  TASKPLAN_LINK_PATTERN: SPRINT5_FULL_MOCKUP_PRODUCTION_LAYOUT_AI_SPRINT6_READY.html#<anchor>
+  PURPOSE: Full Sprint 5 mockup using production-style layout tokens from provided HTML files.
+  SCOPE: Sprint 5 Foundation + 5A + 5B + 5C + 5D + 5E, with Sprint 6 AI Doctor-like Clinical Copilot readiness only.
+  SAFETY: No real token, API key, account ID, bot token, production credential, or real user PHI is included.
+-->
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sprint 5 Full Mockup — HL Health Companion</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          spacing: { 'sidebar-width': '280px' },
+          colors: {
+            "primary": "#000000",
+            "on-primary": "#ffffff",
+            "primary-container": "#131b2e",
+            "on-primary-container": "#7c839b",
+            "primary-fixed": "#dae2fd",
+            "primary-fixed-dim": "#bec6e0",
+            "on-primary-fixed": "#131b2e",
+            "on-primary-fixed-variant": "#3f465c",
+            "secondary": "#505f76",
+            "on-secondary": "#ffffff",
+            "secondary-container": "#d0e1fb",
+            "on-secondary-container": "#54647a",
+            "secondary-fixed": "#d3e4fe",
+            "secondary-fixed-dim": "#b7c8e1",
+            "on-secondary-fixed": "#0b1c30",
+            "on-secondary-fixed-variant": "#38485d",
+            "tertiary": "#000000",
+            "on-tertiary": "#ffffff",
+            "tertiary-container": "#271901",
+            "on-tertiary-container": "#98805d",
+            "tertiary-fixed": "#fcdeb5",
+            "tertiary-fixed-dim": "#dec29a",
+            "on-tertiary-fixed": "#271901",
+            "on-tertiary-fixed-variant": "#574425",
+            "background": "#fcf8fa",
+            "on-background": "#1b1b1d",
+            "surface": "#fcf8fa",
+            "surface-dim": "#dcd9db",
+            "surface-bright": "#fcf8fa",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#f6f3f5",
+            "surface-container": "#f0edef",
+            "surface-container-high": "#eae7e9",
+            "surface-container-highest": "#e4e2e4",
+            "on-surface": "#1b1b1d",
+            "on-surface-variant": "#45464d",
+            "surface-variant": "#e4e2e4",
+            "surface-tint": "#565e74",
+            "inverse-surface": "#303032",
+            "inverse-on-surface": "#f3f0f2",
+            "inverse-primary": "#bec6e0",
+            "outline": "#76777d",
+            "outline-variant": "#c6c6cd",
+            "error": "#ba1a1a",
+            "on-error": "#ffffff",
+            "error-container": "#ffdad6",
+            "on-error-container": "#93000a",
+            "semantic-period-red": "#ba1a1a",
+            "semantic-fertile-blue": "#0369a1",
+            "semantic-fertile-purple": "#7c3aed",
+            "semantic-safe-green": "#10b981",
+            "semantic-warning-amber": "#f59e0b",
+            "medical-blue": "#0061FF",
+            "normal-green": "#10B981",
+            "warning-amber": "#F59E0B",
+            "critical-red": "#EF4444"
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; user-select: none; }
+    .fill-icon, .filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #c6c6cd; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #76777d; }
+    .nav-active { border-left: 4px solid #000000; background-color: rgba(19,27,46,0.08); color: #000000; font-weight: 700; }
+    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: #c6c6cd; border-radius: 2px; }
+    .bento-card { transition: transform .18s ease, box-shadow .18s ease; }
+    .bento-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px -10px rgba(0,0,0,.12); }
+    .section-card { background:#fff; border:1px solid #c6c6cd; border-radius:16px; }
+    .soft-card { background:#f6f3f5; border:1px solid #c6c6cd; border-radius:14px; }
+    .pill { display:inline-flex; align-items:center; gap:.35rem; border-radius:9999px; padding:.25rem .6rem; font-size:.72rem; font-weight:700; border:1px solid #c6c6cd; }
+    .table-th { padding:.75rem; text-align:left; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#45464d; background:#f6f3f5; border-bottom:1px solid #c6c6cd; }
+    .table-td { padding:.75rem; font-size:.82rem; color:#1b1b1d; border-bottom:1px solid #e4e2e4; vertical-align:top; }
+    @keyframes ring-fill-small { from { stroke-dashoffset: 238.76; } to { stroke-dashoffset: 78.79; } }
+    @keyframes ring-fill-large { from { stroke-dashoffset: 565.49; } to { stroke-dashoffset: 186.61; } }
+    .ring-anim { animation: ring-fill-small 1.4s cubic-bezier(.4,0,.2,1) forwards; transform: rotate(-90deg); transform-origin: 50% 50%; }
+    .ring-animated { animation: ring-fill-large 1.6s cubic-bezier(.4,0,.2,1) forwards; }
+    @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+    .dot-pulse { animation: pulse-dot 2s ease-in-out infinite; }
+    @keyframes pulse-border { 0%,100% { border-color:#f59e0b; } 50% { border-color:#d97706; } }
+    .warning-pulse { animation: pulse-border 2s ease-in-out infinite; }
+    @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(186,26,26,.55); } 50% { box-shadow:0 0 0 18px rgba(186,26,26,0); } }
+    .pulse-emergency { animation: pulse-red 1.8s infinite; }
+    .modal-backdrop { backdrop-filter: blur(4px); }
+    .chip-selected { border-color:#000000 !important; background-color:rgba(19,27,46,.08) !important; color:#000000 !important; font-weight:700; }
+    .vas-slider { -webkit-appearance:none; appearance:none; width:100%; height:12px; border-radius:9999px; background:linear-gradient(to right,#10B981 0%,#10B981 30%,#F59E0B 45%,#F59E0B 70%,#EF4444 85%,#EF4444 100%); outline:none; cursor:pointer; }
+    .vas-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:28px; height:28px; border-radius:50%; background:#fff; border:3px solid #EF4444; box-shadow:0 2px 8px rgba(0,0,0,.25); cursor:pointer; }
+    .day-period { background: rgba(186,26,26,0.13); }
+    .day-fertile { background: rgba(124,58,237,0.11); }
+    .day-ovulation { background: rgba(3,105,161,0.16); }
+    .day-outside { background: rgba(16,185,129,0.09); }
+    .day-next-period { background: rgba(156,163,175,0.15); }
+    .day-today { outline: 2.5px solid #0369a1; outline-offset: -2px; border-radius:8px; }
+    .cal-day { border-radius:8px; padding:4px 2px; min-height:58px; position:relative; cursor:pointer; transition:box-shadow .15s; }
+    .cal-day:hover { box-shadow:0 0 0 1.5px #0369a1; }
+    .dot-period { background:#ba1a1a; }
+    .dot-fertile { background:#7c3aed; }
+    .dot-ovulation { background:#0369a1; }
+    .dot-next { background:#9ca3af; }
+    .toggle-input { display:none; }
+    .toggle-track { position:relative; display:inline-flex; align-items:center; width:44px; height:24px; border-radius:9999px; background:#c6c6cd; transition:background .2s; cursor:pointer; flex-shrink:0; }
+    .toggle-input:checked + .toggle-track { background:#10B981; }
+    .toggle-input:disabled + .toggle-track { background:#e4e2e4; cursor:not-allowed; opacity:.6; }
+    .toggle-thumb { position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.2); transition:left .2s; }
+    .toggle-input:checked + .toggle-track .toggle-thumb { left:22px; }
+    .rel-bar-track { height:6px; border-radius:3px; background:#e4e2e4; overflow:hidden; }
+    .rel-bar-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#10B981,#0369a1); }
+    .anchor-chip { scroll-margin-top: 86px; }
+    .mobile-bottom-nav { box-shadow: 0 -8px 24px -20px rgba(0,0,0,.35); }
+    @media print { nav, header, .no-print { display:none !important; } main { margin-left:0 !important; } .section-card { break-inside:avoid; } }
+  </style>
+</head>
+<body class="bg-background text-on-surface flex min-h-screen">
+
+<!-- ═══════════════════ SIDEBAR — production-style 280px shell ═══════════════════ -->
+<nav class="hidden lg:flex flex-col fixed left-0 top-0 h-full w-[280px] z-50 bg-surface-container-low border-r border-outline-variant">
+  <div class="p-6 border-b border-outline-variant flex-shrink-0">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center flex-shrink-0">
+        <span class="material-symbols-outlined fill-icon text-inverse-primary text-[20px]">health_and_safety</span>
+      </div>
+      <div>
+        <h1 class="text-[17px] font-bold text-on-surface leading-tight">HealthSync Pro</h1>
+        <p class="text-[11px] text-on-surface-variant">Sprint 5 Full Mockup</p>
+      </div>
+    </div>
+    <button class="w-full bg-primary text-on-primary hover:bg-primary/80 py-2.5 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200">
+      <span class="material-symbols-outlined fill-icon text-[18px]">add_circle</span>
+      Ukuran Baru
+    </button>
+  </div>
+
+  <div class="flex-1 overflow-y-auto py-3 sidebar-scroll">
+    <nav class="px-3 space-y-0.5">
+      <p class="px-3 pt-2 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Overview</p>
+      <a href="#s5-overview" class="nav-active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"><span class="material-symbols-outlined text-[20px] fill-icon">dashboard</span>Overview</a>
+      <a href="#coverage-matrix" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">fact_check</span>Coverage Matrix</a>
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">User App</p>
+      <a href="#daily-health-hub" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">today</span>Daily Health Hub</a>
+      <a href="#education-layer" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">school</span>Education Layer</a>
+      <a href="#symptom-logger" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">sick</span>Symptom Logger</a>
+      <a href="#red-flag-flow" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">emergency</span>Red Flag Flow</a>
+      <a href="#hydration-tracker" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">water_drop</span>Hydration Tracker</a>
+      <a href="#cycle-tracking" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">cycle</span>Cycle Tracking</a>
+      <a href="#telegram-hydration" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">send</span>Telegram Inline</a>
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">AI &amp; Sprint 6</p>
+      <a href="#ai-clinical-infra" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">psychology</span>AI Clinical Infra</a>
+      <a href="#context-package" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">hub</span>Context Package</a>
+      <a href="#sprint6-ready" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">rocket_launch</span>Sprint 6 Ready</a>
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Admin Area</p>
+      <a href="#foundation-admin" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">admin_panel_settings</span>Admin Core</a>
+      <a href="#admin-users-roles" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">manage_accounts</span>Users &amp; Roles</a>
+      <a href="#admin-plans" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">workspace_premium</span>Plans &amp; Quota</a>
+      <a href="#admin-ai-config" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">model_training</span>AI Config</a>
+      <a href="#admin-audit" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">fact_check</span>Audit Logs</a>
+      <p class="px-3 pt-4 pb-1 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Task Plan</p>
+      <a href="#taskplan-registry" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[20px]">link</span>Anchor Registry</a>
+    </nav>
+  </div>
+
+  <div class="p-4 border-t border-outline-variant space-y-1 flex-shrink-0">
+    <button onclick="openModal('emergencyModal')" class="w-full bg-error text-on-error hover:bg-error/90 py-2.5 px-3 rounded-lg text-sm font-semibold flex items-center gap-3 mb-2 transition-all">
+      <span class="material-symbols-outlined text-[18px] fill-icon">emergency</span>Emergency Support
+    </button>
+    <a href="#premium-upgrade" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[18px]">workspace_premium</span>Upgrade Premium</a>
+    <a href="#taskplan-registry" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all"><span class="material-symbols-outlined text-[18px]">description</span>Task Plan Link</a>
+  </div>
+</nav>
+
+<main class="flex-1 lg:ml-[280px] flex flex-col min-h-screen">
+  <header class="sticky top-0 z-40 flex items-center justify-between h-16 px-4 md:px-6 bg-surface border-b border-outline-variant">
+    <div class="hidden lg:flex items-center bg-surface-container-low rounded-full px-4 py-2 border border-outline-variant w-96">
+      <span class="material-symbols-outlined text-on-surface-variant mr-2 text-[18px]">search</span>
+      <input class="bg-transparent border-none outline-none w-full text-sm text-on-surface placeholder-on-surface-variant" placeholder="Cari fitur Sprint 5, task, mockup anchor..." />
+    </div>
+    <div class="lg:hidden flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center"><span class="material-symbols-outlined fill-icon text-inverse-primary text-[18px]">health_and_safety</span></div>
+      <span class="font-bold text-on-surface">Sprint 5 Mockup</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-warning-amber/35 bg-warning-amber/10 text-warning-amber text-xs font-bold"><span class="material-symbols-outlined text-[14px] fill-icon">construction</span>Mockup Only</span>
+      <span class="hidden xl:flex flex-col items-end text-right"><span class="text-[11px] font-semibold text-on-surface">Rabu, 24 Jun 2026</span><span class="text-[11px] text-on-surface-variant">AI Sprint 6 Ready</span></span>
+      <button class="relative p-2 rounded-full hover:bg-surface-container text-on-surface-variant transition-colors"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-1 right-1 w-2 h-2 bg-critical-red rounded-full"></span></button>
+      <div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-sm font-bold text-inverse-primary">A</div>
+    </div>
+  </header>
+
+  <div class="flex-1 p-4 lg:p-6 bg-background pb-24 lg:pb-8 space-y-6">
+
+    <!-- OVERVIEW -->
+    <section id="s5-overview" class="anchor-chip section-card overflow-hidden">
+      <div class="h-1.5 w-full" style="background:linear-gradient(90deg,#000 0%,#0061FF 35%,#7c3aed 70%,#10B981 100%);"></div>
+      <div class="p-5 md:p-6">
+        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+          <div class="max-w-3xl">
+            <p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em] mb-2">HL Health Companion · Sprint 5 Full Release Program</p>
+            <h1 class="text-2xl md:text-4xl font-black tracking-tight text-on-surface leading-tight">Full Production-Style Mockup</h1>
+            <p class="mt-2 text-sm md:text-base text-on-surface-variant leading-relaxed">Single HTML mockup untuk semua fitur Sprint 5: commercial/admin foundation, Daily Health Hub, education, symptom red flag, hydration, AI Clinical Infrastructure untuk Sprint 6, cycle tracking, Telegram inline hydration, premium gating, audit, dan registry anchor untuk Task Plan.</p>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2 min-w-[280px]">
+            <div class="soft-card p-3"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Mockup file</p><p class="text-xs font-black text-on-surface break-all mt-1">SPRINT5_FULL_MOCKUP_PRODUCTION_LAYOUT_AI_SPRINT6_READY.html</p></div>
+            <div class="soft-card p-3"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Task link</p><p class="text-xs font-black text-on-surface mt-1">#anchor-ready</p></div>
+            <div class="soft-card p-3"><p class="text-[10px] font-bold text-on-surface-variant uppercase">AI Doctor</p><p class="text-xs font-black text-error mt-1">Sprint 6 only</p></div>
+            <div class="soft-card p-3"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Sprint 5C</p><p class="text-xs font-black text-medical-blue mt-1">Infrastructure</p></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 mt-6">
+          <a href="#foundation-admin" class="bento-card soft-card p-4"><span class="material-symbols-outlined fill-icon text-[22px]">admin_panel_settings</span><p class="font-black mt-2">Foundation</p><p class="text-xs text-on-surface-variant">Admin, RBAC, plan, quota</p></a>
+          <a href="#daily-health-hub" class="bento-card soft-card p-4"><span class="material-symbols-outlined fill-icon text-[22px]">today</span><p class="font-black mt-2">5A Daily</p><p class="text-xs text-on-surface-variant">Hub, education, symptom</p></a>
+          <a href="#hydration-tracker" class="bento-card soft-card p-4"><span class="material-symbols-outlined fill-icon text-[22px] text-semantic-fertile-blue">water_drop</span><p class="font-black mt-2">5B Hydration</p><p class="text-xs text-on-surface-variant">Target, quick input, warning</p></a>
+          <a href="#ai-clinical-infra" class="bento-card soft-card p-4"><span class="material-symbols-outlined fill-icon text-[22px] text-medical-blue">psychology</span><p class="font-black mt-2">5C AI Infra</p><p class="text-xs text-on-surface-variant">Vectorize, memory, safety</p></a>
+          <a href="#cycle-tracking" class="bento-card soft-card p-4"><span class="material-symbols-outlined fill-icon text-[22px] text-semantic-fertile-purple">cycle</span><p class="font-black mt-2">5D Cycle</p><p class="text-xs text-on-surface-variant">Private, guardrail</p></a>
+          <a href="#telegram-hydration" class="bento-card soft-card p-4"><span class="material-symbols-outlined fill-icon text-[22px] text-normal-green">send</span><p class="font-black mt-2">5E Telegram</p><p class="text-xs text-on-surface-variant">Reminder, inline +200/+600</p></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- COVERAGE MATRIX -->
+    <section id="coverage-matrix" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+        <div><h2 class="text-xl font-black text-on-surface">Coverage Matrix — PRD to Mockup</h2><p class="text-sm text-on-surface-variant mt-1">Checklist ini sengaja dibuat di HTML agar agent bisa mengaitkan task ke anchor mockup.</p></div>
+        <span class="pill bg-normal-green/10 text-normal-green border-normal-green/30"><span class="material-symbols-outlined text-[14px] fill-icon">check_circle</span>Semua Sprint 5 phase ter-cover</span>
+      </div>
+      <div class="overflow-x-auto rounded-xl border border-outline-variant">
+        <table class="min-w-full bg-white">
+          <thead><tr><th class="table-th">Phase</th><th class="table-th">PRD Scope</th><th class="table-th">Mockup Anchor</th><th class="table-th">Coverage</th></tr></thead>
+          <tbody>
+            <tr><td class="table-td font-bold">Foundation</td><td class="table-td">Global RBAC, permission, subscription plan, entitlement, quota, admin shell, AI config, system config, audit.</td><td class="table-td"><code>#foundation-admin</code>, <code>#admin-users-roles</code>, <code>#admin-plans</code>, <code>#admin-ai-config</code>, <code>#admin-audit</code></td><td class="table-td"><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Covered</span></td></tr>
+            <tr><td class="table-td font-bold">5A</td><td class="table-td">Google OAuth, Daily Health Hub, education, proactive symptom prompt, symptom log, VAS, red flag, history.</td><td class="table-td"><code>#google-oauth</code>, <code>#daily-health-hub</code>, <code>#education-layer</code>, <code>#symptom-logger</code>, <code>#red-flag-flow</code></td><td class="table-td"><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Covered</span></td></tr>
+            <tr><td class="table-td font-bold">5B</td><td class="table-td">Dynamic target, widget, +200/+600, custom input, large input confirmation, overhydration warning, history.</td><td class="table-td"><code>#hydration-tracker</code></td><td class="table-td"><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Covered</span></td></tr>
+            <tr><td class="table-td font-bold">5C</td><td class="table-td">AI Clinical Infrastructure, Vectorize, memory lifecycle, context query, trace, disclaimer, safety runtime, Sprint 6 flag disabled.</td><td class="table-td"><code>#ai-clinical-infra</code>, <code>#ai-memory</code>, <code>#context-package</code>, <code>#sprint6-ready</code></td><td class="table-td"><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Covered</span></td></tr>
+            <tr><td class="table-td font-bold">5D</td><td class="table-td">Eligibility, private cycle data, calendar phase, daily log, pregnancy/menopause pause, contraception guardrail.</td><td class="table-td"><code>#cycle-tracking</code>, <code>#cycle-guardrail</code></td><td class="table-td"><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Covered</span></td></tr>
+            <tr><td class="table-td font-bold">5E</td><td class="table-td">Telegram reminder, inline button +200/+600, secret validation, duplicate callback, water log, message edit/failure.</td><td class="table-td"><code>#telegram-hydration</code></td><td class="table-td"><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Covered</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- FOUNDATION / ADMIN -->
+    <section id="foundation-admin" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex items-start justify-between gap-4 mb-5">
+        <div><p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">Sprint 5 Foundation</p><h2 class="text-2xl font-black text-on-surface">Commercial Foundation &amp; Admin Core</h2><p class="text-sm text-on-surface-variant mt-1">Admin shell production-style: user area terpisah, permission guard, subscription, plan, quota, config, audit.</p></div>
+        <span class="pill bg-primary-container/10 text-primary border-primary/20"><span class="material-symbols-outlined text-[14px] fill-icon">shield</span>Admin Access</span>
+      </div>
+      <div class="grid grid-cols-1 xl:grid-cols-[1.15fr_.85fr] gap-4">
+        <div id="admin-dashboard" class="anchor-chip soft-card p-5">
+          <div class="flex items-center justify-between mb-4"><div><h3 class="font-black text-lg">Admin Dashboard</h3><p class="text-xs text-on-surface-variant">Operational command center untuk Sprint 5.</p></div><span class="material-symbols-outlined fill-icon text-[28px]">dashboard_customize</span></div>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-white rounded-xl border border-outline-variant p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Users</p><p class="text-2xl font-black mt-1">1,284</p><p class="text-xs text-normal-green mt-1">+11% active</p></div>
+            <div class="bg-white rounded-xl border border-outline-variant p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Premium</p><p class="text-2xl font-black mt-1">312</p><p class="text-xs text-medical-blue mt-1">24% conversion</p></div>
+            <div class="bg-white rounded-xl border border-outline-variant p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">AI Calls</p><p class="text-2xl font-black mt-1">8.7k</p><p class="text-xs text-warning-amber mt-1">quota guarded</p></div>
+            <div class="bg-white rounded-xl border border-outline-variant p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Safety</p><p class="text-2xl font-black mt-1">18</p><p class="text-xs text-error mt-1">red flag events</p></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <button class="h-11 rounded-xl bg-primary text-on-primary text-sm font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined text-[18px] fill-icon">manage_accounts</span>Manage Users</button>
+            <button class="h-11 rounded-xl border border-outline-variant bg-white text-sm font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined text-[18px]">workspace_premium</span>Plan Editor</button>
+            <button class="h-11 rounded-xl border border-outline-variant bg-white text-sm font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined text-[18px]">fact_check</span>Audit Logs</button>
+          </div>
+        </div>
+
+        <div id="admin-users-roles" class="anchor-chip soft-card p-5">
+          <h3 class="font-black text-lg mb-1">Users, Roles &amp; Permissions</h3><p class="text-xs text-on-surface-variant mb-4">Global role terpisah dari family/caregiver permission.</p>
+          <div class="space-y-3">
+            <div class="bg-white rounded-xl border border-outline-variant p-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-primary-container text-inverse-primary flex items-center justify-center font-black">A</div><div class="flex-1"><p class="text-sm font-bold">Andi Wijaya</p><p class="text-xs text-on-surface-variant">user · premiumYearly</p></div><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Active</span></div>
+            <div class="bg-white rounded-xl border border-outline-variant p-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-medical-blue/10 text-medical-blue flex items-center justify-center font-black">S</div><div class="flex-1"><p class="text-sm font-bold">Sari Admin</p><p class="text-xs text-on-surface-variant">admin + aiConfigAdmin</p></div><span class="pill bg-medical-blue/10 text-medical-blue border-medical-blue/30">Admin</span></div>
+            <div class="bg-white rounded-xl border border-outline-variant p-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-warning-amber/10 text-warning-amber flex items-center justify-center font-black">M</div><div class="flex-1"><p class="text-sm font-bold">Medical Reviewer</p><p class="text-xs text-on-surface-variant">education + rule copy</p></div><span class="pill bg-warning-amber/10 text-warning-amber border-warning-amber/30">Reviewer</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+        <div id="admin-plans" class="anchor-chip soft-card p-5 xl:col-span-2">
+          <div class="flex items-center justify-between mb-3"><h3 class="font-black text-lg">Plans, Features, Entitlement &amp; Quota</h3><span class="pill bg-warning-amber/10 text-warning-amber border-warning-amber/30">Server-side guard</span></div>
+          <div class="overflow-x-auto rounded-xl border border-outline-variant bg-white">
+            <table class="min-w-full"><thead><tr><th class="table-th">Feature</th><th class="table-th">Free</th><th class="table-th">Monthly</th><th class="table-th">Yearly</th><th class="table-th">Family</th></tr></thead>
+              <tbody>
+                <tr><td class="table-td font-bold">AI Assistant safe mode</td><td class="table-td">5/mo</td><td class="table-td">100/mo</td><td class="table-td">300/mo</td><td class="table-td">500/mo</td></tr>
+                <tr><td class="table-td font-bold">AI Clinical Infrastructure / Memory</td><td class="table-td">Off</td><td class="table-td">On</td><td class="table-td">On</td><td class="table-td">On + family consent</td></tr>
+                <tr><td class="table-td font-bold">Doctor PDF</td><td class="table-td">1/mo</td><td class="table-td">10/mo</td><td class="table-td">Unlimited fair use</td><td class="table-td">Family quota</td></tr>
+                <tr><td class="table-td font-bold">Sprint 6 Clinical Copilot</td><td class="table-td text-error font-bold">Disabled</td><td class="table-td text-error font-bold">Disabled</td><td class="table-td text-error font-bold">Disabled</td><td class="table-td text-error font-bold">Disabled</td></tr>
+              </tbody></table>
+          </div>
+        </div>
+        <div class="soft-card p-5">
+          <h3 class="font-black text-lg mb-3">Premium Upgrade UX</h3>
+          <div class="bg-gradient-to-br from-yellow-50 to-amber-50 border border-warning-amber/30 rounded-xl p-4">
+            <p class="text-xs font-bold text-warning-amber uppercase tracking-wide">Premium</p><p class="text-2xl font-black mt-1">Rp49.000<span class="text-sm font-medium text-on-surface-variant">/bulan</span></p>
+            <ul class="mt-3 text-sm space-y-2"><li>✓ Advanced history</li><li>✓ AI Memory foundation</li><li>✓ Doctor report</li><li>✓ Telegram reminder</li></ul>
+            <button class="w-full h-11 mt-4 rounded-xl bg-primary text-on-primary font-bold">Upgrade</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-4">
+        <div id="admin-ai-config" class="anchor-chip soft-card p-5">
+          <h3 class="font-black text-lg mb-1">Admin AI Configuration</h3><p class="text-xs text-on-surface-variant mb-4">Secret write-only; tidak ada plaintext credential.</p>
+          <div class="space-y-3">
+            <label class="block"><span class="text-[11px] font-bold uppercase text-on-surface-variant">Default model</span><div class="mt-1 bg-white border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold">primary-text-model</div></label>
+            <label class="block"><span class="text-[11px] font-bold uppercase text-on-surface-variant">Fallback order</span><div class="mt-1 bg-white border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold">modelA → modelB → safe-template</div></label>
+            <label class="block"><span class="text-[11px] font-bold uppercase text-on-surface-variant">Secret status</span><div class="mt-1 bg-white border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold">Configured · value hidden</div></label>
+            <div class="flex items-center justify-between bg-white border border-outline-variant rounded-lg px-3 py-3"><span class="text-sm font-semibold">Sprint 6 Clinical Copilot</span><span class="pill bg-error-container text-error border-error/20">Default OFF</span></div>
+          </div>
+        </div>
+        <div id="admin-system-config" class="anchor-chip soft-card p-5">
+          <h3 class="font-black text-lg mb-1">System Config &amp; Feature Flags</h3><p class="text-xs text-on-surface-variant mb-4">Config non-secret dapat diubah tanpa deploy.</p>
+          <div class="space-y-3">
+            <div class="bg-white border border-outline-variant rounded-lg px-3 py-2"><p class="text-[11px] font-bold uppercase text-on-surface-variant">googleOAuthEnabled</p><p class="font-black text-normal-green">true</p></div>
+            <div class="bg-white border border-outline-variant rounded-lg px-3 py-2"><p class="text-[11px] font-bold uppercase text-on-surface-variant">aiClinicalCopilotRuntimeEnabled</p><p class="font-black text-error">false</p></div>
+            <div class="bg-white border border-outline-variant rounded-lg px-3 py-2"><p class="text-[11px] font-bold uppercase text-on-surface-variant">telegramInlineHydrationEnabled</p><p class="font-black text-warning-amber">staging-only</p></div>
+          </div>
+        </div>
+        <div id="admin-audit" class="anchor-chip soft-card p-5">
+          <h3 class="font-black text-lg mb-1">Audit Logs &amp; Safety Events</h3><p class="text-xs text-on-surface-variant mb-4">Filter: actor, target, action, severity, date.</p>
+          <div class="space-y-2 text-sm">
+            <div class="bg-white border border-outline-variant rounded-lg p-3"><p class="font-bold">AI config updated</p><p class="text-xs text-on-surface-variant">actor: aiConfigAdmin · secret hidden</p></div>
+            <div class="bg-white border border-outline-variant rounded-lg p-3"><p class="font-bold text-error">Red flag symptom event</p><p class="text-xs text-on-surface-variant">non-metric safety event · no AI decision</p></div>
+            <div class="bg-white border border-outline-variant rounded-lg p-3"><p class="font-bold">Telegram duplicate callback blocked</p><p class="text-xs text-on-surface-variant">idempotency key matched</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DAILY HEALTH HUB -->
+    <section id="daily-health-hub" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
+        <div><p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">Sprint 5A</p><h2 class="text-2xl font-black text-on-surface">Daily Health Hub</h2><p class="text-sm text-on-surface-variant mt-1">Dashboard Today production-style dengan bento cards, safety banner, hydration widget, education, dan symptom quick action.</p></div>
+        <div class="flex gap-2"><span class="pill bg-yellow-50 text-warning-amber border-warning-amber/35">⭐ Premium</span><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Status Normal</span></div>
+      </div>
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl mb-5 overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3 border-l-4 border-normal-green" style="background-color:rgba(16,185,129,.06);">
+          <div class="w-2 h-2 rounded-full bg-normal-green dot-pulse flex-shrink-0"></div><span class="text-sm font-bold">Status Hari Ini:</span><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">NORMAL</span><span class="ml-auto text-xs text-on-surface-variant hidden sm:block">Terakhir: 14:15 WIB</span>
+        </div>
+        <div class="grid grid-cols-3 divide-x divide-outline-variant">
+          <div class="text-center py-4 px-3"><p class="text-[11px] text-on-surface-variant mb-1">Tekanan Darah</p><p class="text-[17px] font-black">120/80</p><p class="text-[10px] text-on-surface-variant">mmHg</p><span class="pill mt-1 bg-normal-green/10 text-normal-green border-normal-green/30">Normal</span></div>
+          <div class="text-center py-4 px-3"><p class="text-[11px] text-on-surface-variant mb-1">SpO₂</p><p class="text-[17px] font-black">98</p><p class="text-[10px] text-on-surface-variant">%</p><span class="pill mt-1 bg-normal-green/10 text-normal-green border-normal-green/30">Normal</span></div>
+          <div class="text-center py-4 px-3"><p class="text-[11px] text-on-surface-variant mb-1">Gula Darah</p><p class="text-[17px] font-black">95</p><p class="text-[10px] text-on-surface-variant">mg/dL</p><span class="pill mt-1 bg-normal-green/10 text-normal-green border-normal-green/30">Normal</span></div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bento-card bg-white border border-outline-variant rounded-xl p-5">
+          <div class="flex items-start justify-between gap-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(245,158,11,.12);"><span class="material-symbols-outlined fill-icon text-[18px] text-warning-amber">sick</span></div><div><h3 class="text-sm font-bold">Keluhan Aktif</h3><p class="text-xs text-on-surface-variant">Sakit Kepala sejak 2 jam lalu</p></div></div><span class="pill bg-warning-amber/10 text-warning-amber border-warning-amber/30">Skala 6 · Sedang</span></div>
+          <div class="mt-4"><div class="flex justify-between text-[10px] text-on-surface-variant mb-2"><span>0</span><span>10</span></div><div class="flex gap-0.5"><div class="h-1.5 rounded flex-1 bg-normal-green"></div><div class="h-1.5 rounded flex-1 bg-normal-green"></div><div class="h-1.5 rounded flex-1 bg-normal-green"></div><div class="h-1.5 rounded flex-1 bg-warning-amber"></div><div class="h-1.5 rounded flex-1 bg-warning-amber"></div><div class="h-1.5 rounded flex-1 bg-warning-amber"></div><div class="h-1.5 rounded flex-1 bg-surface-variant"></div><div class="h-1.5 rounded flex-1 bg-surface-variant"></div><div class="h-1.5 rounded flex-1 bg-surface-variant"></div><div class="h-1.5 rounded flex-1 bg-surface-variant"></div></div></div>
+          <div class="flex items-center gap-2 pt-4"><button class="flex-1 h-9 rounded-lg border border-outline-variant text-xs font-bold">Lihat Detail</button><button class="flex-1 h-9 rounded-lg bg-warning-amber/10 border border-warning-amber/30 text-warning-amber text-xs font-bold">Tambah Keluhan</button></div>
+        </div>
+        <div class="bento-card bg-white border border-outline-variant rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg flex items-center justify-center bg-semantic-fertile-blue/10"><span class="material-symbols-outlined fill-icon text-[18px] text-semantic-fertile-blue">water_drop</span></div><div><h3 class="text-sm font-bold">Hidrasi Hari Ini</h3><p class="text-xs text-on-surface-variant">Target berbasis berat badan 70kg</p></div></div><span class="font-black text-semantic-fertile-blue">67%</span></div>
+          <div class="flex items-center gap-5"><div class="relative" style="width:96px;height:96px;"><svg viewBox="0 0 100 100" style="width:100%;height:100%;"><circle cx="50" cy="50" r="38" fill="none" stroke="#e4e2e4" stroke-width="8"/><circle cx="50" cy="50" r="38" fill="none" stroke="#0369a1" stroke-width="8" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76" class="ring-anim"/><circle cx="50" cy="50" r="30" fill="#eff6ff"/><text x="50" y="46" text-anchor="middle" dominant-baseline="middle" style="font-size:11px;fill:#0369a1;font-weight:700;font-family:Inter,sans-serif;">1.400</text><text x="50" y="57" text-anchor="middle" dominant-baseline="middle" style="font-size:7px;fill:#76777d;font-family:Inter,sans-serif;">ml / 2.100</text></svg></div><div class="flex-1"><p class="text-xl font-black">1.400 <span class="text-sm font-normal text-on-surface-variant">ml</span></p><p class="text-xs text-on-surface-variant mb-2">Sisa 700 ml lagi</p><div class="h-2 rounded-full bg-surface-variant overflow-hidden"><div class="h-full rounded-full bg-semantic-fertile-blue" style="width:67%"></div></div><div class="flex gap-2 mt-3"><button class="px-3 h-9 rounded-lg border text-xs font-bold text-semantic-fertile-blue">+200ml</button><button class="px-3 h-9 rounded-lg border text-xs font-bold text-semantic-fertile-blue">+600ml</button></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GOOGLE OAUTH + EDUCATION -->
+    <section id="google-oauth" class="anchor-chip grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="section-card p-5 md:p-6">
+        <p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">5A · Login</p><h2 class="text-xl font-black">Google OAuth</h2><p class="text-sm text-on-surface-variant mt-1 mb-4">Scope minimal: openid, email, profile. Email verified wajib. Existing password login tetap jalan.</p>
+        <div class="bg-white border border-outline-variant rounded-xl p-5 max-w-md"><h3 class="font-black text-lg">Masuk ke HealthSync Pro</h3><button class="w-full h-11 mt-4 rounded-xl border border-outline-variant bg-white font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined text-[18px]">account_circle</span>Lanjutkan dengan Google</button><div class="my-4 flex items-center gap-3"><div class="h-px bg-outline-variant flex-1"></div><span class="text-xs text-on-surface-variant">atau</span><div class="h-px bg-outline-variant flex-1"></div></div><input class="w-full h-11 rounded-xl border-outline-variant text-sm" placeholder="Email"/><input class="w-full h-11 rounded-xl border-outline-variant text-sm mt-2" placeholder="Password" type="password"/><button class="w-full h-11 mt-3 rounded-xl bg-primary text-on-primary font-bold">Masuk</button></div>
+      </div>
+      <div id="education-layer" class="anchor-chip section-card p-5 md:p-6">
+        <p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">5A · Education</p><h2 class="text-xl font-black">Education Layer</h2><p class="text-sm text-on-surface-variant mt-1 mb-4">Popup/bottom sheet edukasi untuk metric, symptom, hydration, cycle, AI, report, medication, fasting.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button onclick="openModal('educationModal')" class="text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:bg-surface-container transition"><div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined fill-icon text-medical-blue">help</span><span class="font-black">Apa artinya?</span></div><p class="text-xs text-on-surface-variant">Arti angka, tujuan ukur, manfaat catat, cara ukur benar.</p></button>
+          <button class="text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-4"><div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined fill-icon text-warning-amber">tips_and_updates</span><span class="font-black">First-time guidance</span></div><p class="text-xs text-on-surface-variant">Muncul sekali per topic, bisa dibuka manual.</p></button>
+          <button class="text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-4"><div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined fill-icon text-normal-green">assignment</span><span class="font-black">Doctor Report Help</span></div><p class="text-xs text-on-surface-variant">Membantu user memahami data yang akan dibawa ke dokter.</p></button>
+          <button class="text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-4"><div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined fill-icon text-error">emergency</span><span class="font-black">Kapan cari bantuan?</span></div><p class="text-xs text-on-surface-variant">Safety copy, bukan diagnosis, bukan resep.</p></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SYMPTOM LOGGER -->
+    <section id="symptom-logger" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5"><div><p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">5A · Daily Symptom Log</p><h2 class="text-2xl font-black">Catat Keluhan Harian</h2><p class="text-sm text-on-surface-variant mt-1">Quick chips, body area, VAS 1–10, mood, duration, description, linked measurement.</p></div><span class="pill bg-medical-blue/10 text-medical-blue border-medical-blue/30">Linked measurement optional</span></div>
+      <div class="max-w-4xl mx-auto space-y-4">
+        <div class="bg-white rounded-2xl border-2 p-4 shadow-sm" style="border-color:rgba(0,97,255,.35);background:linear-gradient(135deg,#fff 80%,rgba(0,97,255,.04) 100%);"><div class="flex items-start gap-3"><div class="w-10 h-10 rounded-xl flex items-center justify-center bg-medical-blue/10"><span class="material-symbols-outlined fill-icon text-medical-blue">monitor_heart</span></div><div><p class="text-[10px] font-bold uppercase tracking-widest text-medical-blue">Terhubung ke pengukuran</p><p class="text-base font-black">Tekanan Darah 135/88 mmHg</p><div class="flex gap-2 mt-1"><span class="pill bg-warning-amber/10 text-warning-amber border-warning-amber/30">Elevated</span><span class="pill">14:00 WIB</span></div></div></div></div>
+        <div class="bg-white rounded-2xl border border-outline-variant p-5"><div class="flex items-center justify-between mb-4"><div><h3 class="font-black">Pilih Keluhan</h3><p class="text-xs text-on-surface-variant">Pilih keluhan yang Anda rasakan sekarang.</p></div><span class="pill bg-primary text-on-primary border-primary">2 dipilih</span></div><div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5"><button class="chip-selected flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 text-[13px] min-h-[44px]">🤕 Sakit Kepala <span class="material-symbols-outlined fill-icon text-[16px] ml-auto">check_circle</span></button><button class="flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 border-outline-variant text-[13px] font-medium text-on-surface-variant min-h-[44px]">💔 Nyeri Dada</button><button class="flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 border-outline-variant text-[13px] font-medium text-on-surface-variant min-h-[44px]">😮‍💨 Sesak Napas</button><button class="flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 border-outline-variant text-[13px] font-medium text-on-surface-variant min-h-[44px]">🤢 Mual</button><button class="chip-selected flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 text-[13px] min-h-[44px]">😵‍💫 Kliyengan <span class="material-symbols-outlined fill-icon text-[16px] ml-auto">check_circle</span></button><button class="flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 border-outline-variant text-[13px] font-medium text-on-surface-variant min-h-[44px]">🧣 Tengkuk Berat</button><button class="flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 border-outline-variant text-[13px] font-medium text-on-surface-variant min-h-[44px]">👁️ Penglihatan Kabur</button><button class="flex items-center gap-2 px-3.5 py-3 rounded-xl border-2 border-outline-variant text-[13px] font-medium text-on-surface-variant min-h-[44px]">➕ Keluhan Lain</button></div></div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><div class="bg-white rounded-2xl border border-outline-variant p-5"><h3 class="font-black mb-1">Skala Nyeri VAS</h3><p class="text-xs text-on-surface-variant mb-4">Label tidak boleh hanya warna.</p><input type="range" value="6" min="1" max="10" class="vas-slider"><div class="flex justify-between text-xs text-on-surface-variant mt-3"><span>1 Ringan</span><span class="font-black text-warning-amber">6 Sedang</span><span>10 Berat</span></div></div><div class="bg-white rounded-2xl border border-outline-variant p-5"><h3 class="font-black mb-1">Detail</h3><div class="grid grid-cols-2 gap-2"><input class="rounded-xl border-outline-variant text-sm" value="21:32"/><input class="rounded-xl border-outline-variant text-sm" value="2 jam"/></div><textarea class="mt-3 w-full rounded-xl border-outline-variant text-sm" rows="4" placeholder="Catatan keluhan...">Sakit kepala bagian depan, terasa kliyengan setelah aktivitas.</textarea><button class="mt-3 w-full h-11 rounded-xl bg-primary text-on-primary font-bold">Simpan Keluhan</button></div></div>
+      </div>
+    </section>
+
+    <!-- RED FLAG + HISTORY -->
+    <section id="red-flag-flow" class="anchor-chip grid grid-cols-1 xl:grid-cols-[1fr_.85fr] gap-4">
+      <div class="section-card p-5 md:p-6 border-error/30">
+        <p class="text-[11px] font-extrabold text-error uppercase tracking-[0.18em]">5A · Safety</p><h2 class="text-2xl font-black">Red Flag Interceptor</h2><p class="text-sm text-on-surface-variant mt-1 mb-4">Deterministic backend flow: symptom tetap disimpan, safety event dibuat, Emergency Blocking UI tampil, AI tidak menentukan emergency.</p>
+        <div class="bg-error-container border-2 border-error rounded-2xl p-5"><div class="flex gap-4"><div class="w-12 h-12 rounded-full bg-error text-on-error flex items-center justify-center pulse-emergency"><span class="material-symbols-outlined fill-icon">emergency</span></div><div class="flex-1"><h3 class="text-lg font-black text-on-error-container">Emergency Blocking UI</h3><p class="text-sm text-on-error-container mt-1">Keluhan mengandung red flag: <strong>nyeri dada + sesak napas</strong>. Jangan menunggu analisis AI. Hubungi layanan medis atau caregiver.</p><div class="flex flex-wrap gap-2 mt-4"><button class="h-11 px-4 rounded-xl bg-error text-on-error font-bold">Hubungi Kontak Darurat</button><button class="h-11 px-4 rounded-xl border border-error text-error font-bold bg-white">Saya Mengerti</button></div></div></div></div>
+      </div>
+      <div id="history-integration" class="anchor-chip section-card p-5 md:p-6">
+        <p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">History Integration</p><h2 class="text-xl font-black">Unified Timeline</h2><p class="text-sm text-on-surface-variant mt-1 mb-4">Row type: measurement, symptom, hydration, cycle, safety event.</p>
+        <div class="space-y-3"><div class="bg-white border border-outline-variant rounded-xl p-3 flex gap-3"><span class="material-symbols-outlined text-medical-blue">monitor_heart</span><div><p class="font-bold text-sm">Measurement · BP 135/88</p><p class="text-xs text-on-surface-variant">14:00 · linked to symptom</p></div></div><div class="bg-white border border-outline-variant rounded-xl p-3 flex gap-3"><span class="material-symbols-outlined text-warning-amber">sick</span><div><p class="font-bold text-sm">Symptom · Sakit kepala</p><p class="text-xs text-on-surface-variant">VAS 6 · sedang</p></div></div><div class="bg-white border border-error rounded-xl p-3 flex gap-3"><span class="material-symbols-outlined fill-icon text-error">emergency</span><div><p class="font-bold text-sm text-error">Safety Event · Red flag</p><p class="text-xs text-on-surface-variant">non-metric safety event</p></div></div></div>
+      </div>
+    </section>
+
+    <!-- HYDRATION -->
+    <section id="hydration-tracker" class="anchor-chip section-card overflow-hidden">
+      <div class="h-1.5 w-full" style="background:linear-gradient(90deg,#0369a1 0%,#38bdf8 67%,#e0f2fe 100%);"></div>
+      <div class="p-5 md:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5"><div class="flex items-center gap-3"><div class="w-11 h-11 rounded-xl flex items-center justify-center bg-sky-100"><span class="material-symbols-outlined fill-icon text-[24px] text-semantic-fertile-blue">water_drop</span></div><div><p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">Sprint 5B</p><h2 class="text-2xl font-black">Hydration Tracker</h2><p class="text-sm text-on-surface-variant">Target dinamis, one-tap quick add, custom input, warning.</p></div></div><span class="pill bg-semantic-fertile-blue/10 text-semantic-fertile-blue border-semantic-fertile-blue/30">Target: 2.100ml</span></div>
+        <div class="relative flex items-start gap-3 rounded-xl px-4 py-3.5 border-2 warning-pulse mb-5" style="background:#fffbeb;border-color:#fbbf24;"><div class="w-9 h-9 rounded-lg flex items-center justify-center mt-.5 bg-amber-100"><span class="material-symbols-outlined fill-icon text-warning-amber">warning</span></div><div><p class="text-sm font-black text-amber-900">Peringatan Asupan Berlebih</p><p class="text-sm text-amber-900">Jika total asupan &gt;5.000ml, tampilkan warning card/badge, bukan emergency diagnosis.</p><p class="text-xs italic mt-1 text-amber-800">Ini peringatan input/kebiasaan, bukan diagnosis medis.</p></div></div>
+        <div class="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-6 items-center">
+          <div class="flex flex-col items-center gap-4"><div class="relative" style="width:220px;height:220px;"><svg width="220" height="220" viewBox="0 0 220 220" style="transform:rotate(-90deg);"><circle cx="110" cy="110" r="90" fill="none" stroke="#c6c6cd" stroke-width="14" stroke-linecap="round"/><circle cx="110" cy="110" r="90" fill="none" stroke="#0369a1" stroke-width="14" stroke-linecap="round" stroke-dasharray="565.49" stroke-dashoffset="186.61" class="ring-animated"/></svg><div class="absolute inset-0 flex flex-col items-center justify-center text-center"><span class="material-symbols-outlined fill-icon text-[30px] mb-1 text-semantic-fertile-blue">water_drop</span><p class="text-[32px] font-black leading-none text-semantic-fertile-blue">1.400</p><p class="text-sm font-bold text-semantic-fertile-blue">ml</p><p class="text-xs mt-1 text-on-surface-variant">dari 2.100 ml</p></div></div><div class="pill bg-semantic-fertile-blue text-white border-semantic-fertile-blue">67% Tercapai</div></div>
+          <div class="space-y-4"><div class="grid grid-cols-2 lg:grid-cols-4 gap-3"><div class="soft-card p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Sudah Diminum</p><p class="text-2xl font-black text-semantic-fertile-blue">1.400ml</p></div><div class="soft-card p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Sisa Target</p><p class="text-2xl font-black text-warning-amber">700ml</p></div><div class="soft-card p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Reason</p><p class="text-sm font-bold">70kg × 30ml</p></div><div class="soft-card p-4"><p class="text-[10px] font-bold text-on-surface-variant uppercase">Adjustment</p><p class="text-sm font-bold">+500ml jika demam</p></div></div><div class="grid grid-cols-3 gap-2.5"><button class="py-4 rounded-xl border-2 bg-sky-50 border-sky-200 font-black text-semantic-fertile-blue">+200 ml</button><button class="py-4 rounded-xl border-2 bg-sky-50 border-sky-200 font-black text-semantic-fertile-blue">+600 ml</button><button onclick="openModal('largeInputModal')" class="py-4 rounded-xl border-2 border-outline-variant bg-surface-container-low font-black">Custom</button></div><div class="overflow-x-auto rounded-xl border border-outline-variant bg-white"><table class="min-w-full"><thead><tr><th class="table-th">Time</th><th class="table-th">Amount</th><th class="table-th">Source</th></tr></thead><tbody><tr><td class="table-td">08:00</td><td class="table-td font-bold">300ml</td><td class="table-td">manual</td></tr><tr><td class="table-td">12:30</td><td class="table-td font-bold">600ml</td><td class="table-td">quick add</td></tr><tr><td class="table-td">19:00</td><td class="table-td font-bold">500ml</td><td class="table-td">Telegram</td></tr></tbody></table></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI CLINICAL INFRA -->
+    <section id="ai-clinical-infra" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5"><div><p class="text-[11px] font-extrabold text-medical-blue uppercase tracking-[0.18em]">Sprint 5C</p><h2 class="text-2xl font-black">AI Clinical Infrastructure &amp; Vectorize Foundation</h2><p class="text-sm text-on-surface-variant mt-1">Sprint 5C membangun engine room. AI dokter / clinical copilot tetap default disabled dan masuk Sprint 6.</p></div><span class="pill bg-error-container text-error border-error/20">No public AI doctor claim</span></div>
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div id="ai-memory" class="anchor-chip soft-card p-5"><h3 class="font-black text-lg mb-1">AI Memory Status</h3><p class="text-xs text-on-surface-variant mb-4">D1 source of truth; Vectorize hanya retrieval context.</p><div class="space-y-3"><div class="bg-white border border-outline-variant rounded-xl p-3 flex justify-between"><span class="font-bold text-sm">Namespace</span><span class="text-xs font-black text-normal-green">user-isolated</span></div><div class="bg-white border border-outline-variant rounded-xl p-3 flex justify-between"><span class="font-bold text-sm">Indexed docs</span><span class="text-xs font-black">1,248</span></div><div class="bg-white border border-outline-variant rounded-xl p-3 flex justify-between"><span class="font-bold text-sm">Last rebuild</span><span class="text-xs font-black">2 jam lalu</span></div><button class="w-full h-10 rounded-xl bg-primary text-on-primary text-sm font-bold">Rebuild Memory</button><button class="w-full h-10 rounded-xl border border-error text-error bg-white text-sm font-bold">Delete AI Memory</button></div></div>
+        <div class="soft-card p-5"><h3 class="font-black text-lg mb-1">Vectorize Source Types</h3><p class="text-xs text-on-surface-variant mb-4">Naratif/longitudinal, bukan pengganti SQL agregasi sederhana.</p><div class="flex flex-wrap gap-2"><span class="pill">measurement</span><span class="pill">symptom</span><span class="pill">safety event</span><span class="pill">hydration</span><span class="pill">cycle</span><span class="pill">medication</span><span class="pill">fasting</span><span class="pill">pattern</span><span class="pill">report</span><span class="pill">education</span><span class="pill bg-medical-blue/10 text-medical-blue border-medical-blue/30">doctor handoff placeholder</span><span class="pill bg-medical-blue/10 text-medical-blue border-medical-blue/30">clinical intake placeholder</span></div></div>
+        <div class="soft-card p-5"><h3 class="font-black text-lg mb-1">Safety Runtime</h3><p class="text-xs text-on-surface-variant mb-4">Server-side disclaimer + forbidden action block.</p><div class="space-y-2"><div class="bg-error-container border border-error/30 rounded-xl p-3"><p class="text-sm font-black text-error">Blocked</p><p class="text-xs text-on-error-container">diagnosis final, emergency authority, prescription, medication dosage instruction</p></div><div class="bg-white border border-outline-variant rounded-xl p-3"><p class="text-sm font-black">Allowed</p><p class="text-xs text-on-surface-variant">safe explanation, retrieval trace, report summarization, Sprint 6 preparation</p></div></div></div>
+      </div>
+      <div id="context-package" class="anchor-chip mt-4 soft-card p-5">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4"><div><h3 class="font-black text-lg">Structured Clinical Context Package</h3><p class="text-sm text-on-surface-variant">Format internal agar Sprint 6 tidak membaca data mentah secara acak.</p></div><span class="pill bg-medical-blue/10 text-medical-blue border-medical-blue/30">SQL + Rules + Vectorize + Privacy Filter</span></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div class="bg-white border border-outline-variant rounded-xl p-4"><p class="text-xs font-bold uppercase text-on-surface-variant">Measurement timeline</p><p class="text-sm mt-2">BP elevated 3× in 14 days, glucose normal, SpO₂ stable.</p></div>
+          <div class="bg-white border border-outline-variant rounded-xl p-4"><p class="text-xs font-bold uppercase text-on-surface-variant">Symptom timeline</p><p class="text-sm mt-2">Headache + dizziness appears after low sleep notes.</p></div>
+          <div class="bg-white border border-outline-variant rounded-xl p-4"><p class="text-xs font-bold uppercase text-on-surface-variant">Safety events</p><p class="text-sm mt-2">1 red flag event, deterministic rule only, caregiver consent checked.</p></div>
+          <div class="bg-white border border-outline-variant rounded-xl p-4"><p class="text-xs font-bold uppercase text-on-surface-variant">Data sufficiency</p><p class="text-sm mt-2">Score 72/100 · missing medication adherence data.</p></div>
+        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4"><div class="bg-white border border-outline-variant rounded-xl p-4"><h4 class="font-black mb-2">Context Trace Preview</h4><div class="space-y-2"><div class="rel-bar-track"><div class="rel-bar-fill" style="width:92%"></div></div><p class="text-xs text-on-surface-variant">measurement · 24 Jun · BP 135/88 · relevance 92%</p><div class="rel-bar-track"><div class="rel-bar-fill" style="width:76%"></div></div><p class="text-xs text-on-surface-variant">symptom · 24 Jun · headache + dizziness · relevance 76%</p></div></div><div class="bg-white border border-outline-variant rounded-xl p-4"><h4 class="font-black mb-2">Fallback State</h4><p class="text-sm text-on-surface-variant">Jika retrieval gagal, AI response harus downgrade ke safe template + data deterministic SQL/rules tanpa halusinasi.</p></div></div>
+      </div>
+      <div id="sprint6-ready" class="anchor-chip mt-4 rounded-2xl border-2 border-dashed border-medical-blue/40 bg-medical-blue/5 p-5">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"><div><p class="text-[11px] font-extrabold text-medical-blue uppercase tracking-[0.18em]">Sprint 6 Handoff</p><h3 class="text-xl font-black">AI Doctor-like Clinical Copilot — Ready but Disabled</h3><p class="text-sm text-on-surface-variant mt-1">Symptom interview, follow-up questions, differential possibility, risk explanation, doctor handoff, longitudinal reasoning, caregiver summary.</p></div><div class="flex items-center gap-3 bg-white border border-outline-variant rounded-xl p-3"><span class="font-bold text-sm">Runtime</span><span class="pill bg-error-container text-error border-error/20">OFF</span></div></div>
+      </div>
+    </section>
+
+    <!-- CYCLE -->
+    <section id="cycle-tracking" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5"><div><p class="text-[11px] font-extrabold text-semantic-fertile-purple uppercase tracking-[0.18em]">Sprint 5D</p><h2 class="text-2xl font-black">Cycle Tracking</h2><p class="text-sm text-on-surface-variant mt-1">Private by default, eligible user only, contraception guardrail blocking.</p></div><span class="pill bg-semantic-fertile-purple/10 text-semantic-fertile-purple border-semantic-fertile-purple/30"><span class="material-symbols-outlined text-[14px]">lock</span>Private</span></div>
+      <div class="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
+        <div class="bg-white border border-outline-variant rounded-xl overflow-hidden"><div class="flex items-center justify-between px-5 py-4 border-b border-outline-variant"><button class="p-1.5 rounded-lg hover:bg-surface-container"><span class="material-symbols-outlined">chevron_left</span></button><div class="text-center"><p class="font-black">Juni 2026</p><p class="text-xs text-on-surface-variant">Siklus aktif · Hari ke-14</p></div><button class="p-1.5 rounded-lg hover:bg-surface-container"><span class="material-symbols-outlined">chevron_right</span></button></div><div class="grid grid-cols-7 text-center border-b border-outline-variant bg-surface-container-low/40"><div class="py-2 text-[11px] font-bold">Sen</div><div class="py-2 text-[11px] font-bold">Sel</div><div class="py-2 text-[11px] font-bold">Rab</div><div class="py-2 text-[11px] font-bold">Kam</div><div class="py-2 text-[11px] font-bold">Jum</div><div class="py-2 text-[11px] font-bold">Sab</div><div class="py-2 text-[11px] font-bold">Min</div></div><div class="grid grid-cols-7 gap-1 p-2">
+          <div class="cal-day day-period text-center"><span class="text-sm font-bold text-error">1</span><div class="w-2 h-2 rounded-full dot-period mx-auto mt-1"></div><p class="text-[8px] text-error font-bold">Haid</p></div><div class="cal-day day-period text-center"><span class="text-sm font-bold text-error">2</span><div class="w-2 h-2 rounded-full dot-period mx-auto mt-1"></div><p class="text-[8px] text-error font-bold">Haid</p></div><div class="cal-day day-period text-center"><span class="text-sm font-bold text-error">3</span><div class="w-2 h-2 rounded-full dot-period mx-auto mt-1"></div><p class="text-[8px] text-error font-bold">Haid</p></div><div class="cal-day day-period text-center"><span class="text-sm font-bold text-error">4</span><div class="w-2 h-2 rounded-full dot-period mx-auto mt-1"></div><p class="text-[8px] text-error font-bold">Haid</p></div><div class="cal-day text-center"><span class="text-sm">5</span><p class="text-[8px] text-on-surface-variant mt-3">Luar</p></div><div class="cal-day text-center"><span class="text-sm">6</span><p class="text-[8px] text-on-surface-variant mt-3">Luar</p></div><div class="cal-day text-center"><span class="text-sm">7</span><p class="text-[8px] text-on-surface-variant mt-3">Luar</p></div>
+          <div class="cal-day text-center"><span class="text-sm">8</span><p class="text-[8px] text-on-surface-variant mt-3">Luar</p></div><div class="cal-day text-center"><span class="text-sm">9</span><p class="text-[8px] text-on-surface-variant mt-3">Luar</p></div><div class="cal-day day-fertile text-center"><span class="text-sm font-bold text-semantic-fertile-purple">10</span><div class="w-2 h-2 rounded-full dot-fertile mx-auto mt-1"></div><p class="text-[8px] text-semantic-fertile-purple font-bold">Subur</p></div><div class="cal-day day-fertile text-center"><span class="text-sm font-bold text-semantic-fertile-purple">11</span><div class="w-2 h-2 rounded-full dot-fertile mx-auto mt-1"></div><p class="text-[8px] text-semantic-fertile-purple font-bold">Subur</p></div><div class="cal-day day-fertile text-center"><span class="text-sm font-bold text-semantic-fertile-purple">12</span><div class="w-2 h-2 rounded-full dot-fertile mx-auto mt-1"></div><p class="text-[8px] text-semantic-fertile-purple font-bold">Subur</p></div><div class="cal-day day-fertile text-center"><span class="text-sm font-bold text-semantic-fertile-purple">13</span><div class="w-2 h-2 rounded-full dot-fertile mx-auto mt-1"></div><p class="text-[8px] text-semantic-fertile-purple font-bold">Subur</p></div><div class="cal-day day-today day-ovulation text-center"><span class="text-sm font-black text-semantic-fertile-blue">14</span><div class="w-2 h-2 rounded-full dot-ovulation mx-auto mt-1"></div><p class="text-[8px] text-semantic-fertile-blue font-bold">Ovulasi</p></div>
+          </div></div>
+        <div class="space-y-4"><div class="bg-semantic-fertile-blue/10 border border-semantic-fertile-blue/25 rounded-xl p-4"><p class="text-xs font-bold uppercase text-semantic-fertile-blue">Status Hari Ini</p><p class="text-lg font-black text-semantic-fertile-blue">Puncak Masa Subur</p><p class="text-sm text-on-surface-variant mt-1">Estimasi berdasarkan siklus, bukan alat kontrasepsi.</p><button onclick="openModal('cycleGuardrailModal')" class="mt-3 h-10 px-4 rounded-xl bg-warning-amber/15 border border-warning-amber/40 text-amber-900 font-bold text-sm">Lihat Peringatan Kontrasepsi</button></div><div class="bg-white border border-outline-variant rounded-xl p-4"><h3 class="font-black mb-3">Daily Cycle Log</h3><div class="flex flex-wrap gap-2 mb-3"><span class="pill">Mood 😊</span><span class="pill">Cramps ringan</span><span class="pill">Flow none</span></div><textarea class="w-full rounded-xl border-outline-variant text-sm" rows="3" placeholder="Catatan siklus..."></textarea><button class="mt-3 w-full h-10 rounded-xl bg-primary text-on-primary font-bold">Simpan Log</button></div><div id="cycle-guardrail" class="anchor-chip bg-error-container border border-error/20 rounded-xl p-4"><p class="font-black text-error">Guardrail Blocking</p><p class="text-sm text-on-error-container mt-1">Cycle prediction tidak boleh dipakai sebagai kontrasepsi. Pregnancy/menopause pause prediction.</p></div></div>
+      </div>
+    </section>
+
+    <!-- TELEGRAM -->
+    <section id="telegram-hydration" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5"><div><p class="text-[11px] font-extrabold text-normal-green uppercase tracking-[0.18em]">Sprint 5E</p><h2 class="text-2xl font-black">Telegram Inline Hydration UX</h2><p class="text-sm text-on-surface-variant mt-1">Reminder + quick add hidrasi via Telegram setelah 5B stabil.</p></div><span class="pill bg-normal-green/10 text-normal-green border-normal-green/30">Webhook guarded</span></div>
+      <div class="grid grid-cols-1 xl:grid-cols-[.9fr_1.1fr] gap-4">
+        <div class="soft-card p-5"><h3 class="font-black mb-4">Telegram Message Mock</h3><div class="bg-white border border-outline-variant rounded-2xl p-4"><p class="text-sm font-bold">💧 Reminder Hidrasi</p><p class="text-sm text-on-surface-variant mt-1">Target hari ini: 2.100ml. Saat ini: 1.400ml. Mau tambah log?</p><div class="grid grid-cols-2 gap-2 mt-4"><button class="h-10 rounded-xl bg-semantic-fertile-blue text-white font-bold">+200ml</button><button class="h-10 rounded-xl bg-semantic-fertile-blue text-white font-bold">+600ml</button></div><button class="w-full h-10 mt-2 rounded-xl border border-outline-variant font-bold">Buka App</button></div></div>
+        <div class="soft-card p-5"><h3 class="font-black mb-4">Security &amp; Idempotency</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div class="bg-white border border-outline-variant rounded-xl p-4"><p class="font-black">Secret validation</p><p class="text-xs text-on-surface-variant mt-1">Webhook secret tidak pernah tampil di UI.</p></div><div class="bg-white border border-outline-variant rounded-xl p-4"><p class="font-black">Duplicate callback safe</p><p class="text-xs text-on-surface-variant mt-1">Callback idempotency key mencegah double log.</p></div><div class="bg-white border border-outline-variant rounded-xl p-4"><p class="font-black">Water log stored</p><p class="text-xs text-on-surface-variant mt-1">+200/+600 masuk hydration history.</p></div><div class="bg-white border border-outline-variant rounded-xl p-4"><p class="font-black">Message edit/failure</p><p class="text-xs text-on-surface-variant mt-1">Edit berhasil atau failure tercatat audit.</p></div></div></div>
+      </div>
+    </section>
+
+    <!-- PREMIUM -->
+    <section id="premium-upgrade" class="anchor-chip section-card p-5 md:p-6">
+      <div class="grid grid-cols-1 xl:grid-cols-[.85fr_1.15fr] gap-5 items-stretch"><div class="rounded-2xl border border-warning-amber/30 bg-gradient-to-br from-yellow-50 to-amber-50 p-6"><p class="text-[11px] font-extrabold text-warning-amber uppercase tracking-[0.18em]">Premium Upgrade</p><h2 class="text-3xl font-black mt-2">Unlock Sprint 5 Premium</h2><p class="text-sm text-on-surface-variant mt-2">Advanced report, AI Clinical Infrastructure, hydration advanced, cycle tracking, Telegram reminder, family dashboard.</p><button class="mt-5 h-11 px-6 rounded-xl bg-primary text-on-primary font-bold">Upgrade Sekarang</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div class="soft-card p-4"><p class="font-black">Feature entitlement guard</p><p class="text-sm text-on-surface-variant mt-1">Frontend prompt + server-side deny.</p></div><div class="soft-card p-4"><p class="font-black">Quota exceeded state</p><p class="text-sm text-on-surface-variant mt-1">AI/OCR/PDF/Telegram fair usage.</p></div><div class="soft-card p-4"><p class="font-black">Family Premium</p><p class="text-sm text-on-surface-variant mt-1">Caregiver dashboard sesuai consent.</p></div><div class="soft-card p-4"><p class="font-black">Sprint 6 upsell placeholder</p><p class="text-sm text-on-surface-variant mt-1">Clinical Copilot tetap hidden/disabled.</p></div></div></div>
+    </section>
+
+    <!-- TASK PLAN REGISTRY -->
+    <section id="taskplan-registry" class="anchor-chip section-card p-5 md:p-6">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5"><div><p class="text-[11px] font-extrabold text-on-surface-variant uppercase tracking-[0.18em]">Task Plan Link Registry</p><h2 class="text-2xl font-black">Nama File &amp; Anchor untuk Task Plan</h2><p class="text-sm text-on-surface-variant mt-1">Gunakan format ini di task plan agar agent langsung menuju UI target.</p></div><span class="pill bg-primary text-on-primary border-primary">Ready to link</span></div>
+      <div class="bg-surface-container-low rounded-xl border border-outline-variant p-4 mb-4"><p class="text-xs font-bold uppercase text-on-surface-variant">File utama</p><code class="block mt-1 text-sm font-black break-all">SPRINT5_FULL_MOCKUP_PRODUCTION_LAYOUT_AI_SPRINT6_READY.html</code><p class="text-xs font-bold uppercase text-on-surface-variant mt-4">Pattern</p><code class="block mt-1 text-sm font-black break-all">Mockup: SPRINT5_FULL_MOCKUP_PRODUCTION_LAYOUT_AI_SPRINT6_READY.html#&lt;anchor&gt;</code></div>
+      <div class="overflow-x-auto rounded-xl border border-outline-variant"><table class="min-w-full bg-white"><thead><tr><th class="table-th">Task Area</th><th class="table-th">Anchor</th><th class="table-th">Task Plan Text</th></tr></thead><tbody>
+        <tr><td class="table-td font-bold">Foundation Admin</td><td class="table-td"><code>#foundation-admin</code></td><td class="table-td"><code>Mockup: SPRINT5_FULL_MOCKUP_PRODUCTION_LAYOUT_AI_SPRINT6_READY.html#foundation-admin</code></td></tr>
+        <tr><td class="table-td font-bold">Users/Roles</td><td class="table-td"><code>#admin-users-roles</code></td><td class="table-td"><code>Mockup: ...#admin-users-roles</code></td></tr>
+        <tr><td class="table-td font-bold">Plans/Quota</td><td class="table-td"><code>#admin-plans</code></td><td class="table-td"><code>Mockup: ...#admin-plans</code></td></tr>
+        <tr><td class="table-td font-bold">Daily Hub</td><td class="table-td"><code>#daily-health-hub</code></td><td class="table-td"><code>Mockup: ...#daily-health-hub</code></td></tr>
+        <tr><td class="table-td font-bold">Symptom/Red Flag</td><td class="table-td"><code>#symptom-logger</code>, <code>#red-flag-flow</code></td><td class="table-td"><code>Mockup: ...#red-flag-flow</code></td></tr>
+        <tr><td class="table-td font-bold">Hydration</td><td class="table-td"><code>#hydration-tracker</code></td><td class="table-td"><code>Mockup: ...#hydration-tracker</code></td></tr>
+        <tr><td class="table-td font-bold">AI Infra</td><td class="table-td"><code>#ai-clinical-infra</code>, <code>#context-package</code>, <code>#sprint6-ready</code></td><td class="table-td"><code>Mockup: ...#ai-clinical-infra</code></td></tr>
+        <tr><td class="table-td font-bold">Cycle</td><td class="table-td"><code>#cycle-tracking</code>, <code>#cycle-guardrail</code></td><td class="table-td"><code>Mockup: ...#cycle-tracking</code></td></tr>
+        <tr><td class="table-td font-bold">Telegram</td><td class="table-td"><code>#telegram-hydration</code></td><td class="table-td"><code>Mockup: ...#telegram-hydration</code></td></tr>
+      </tbody></table></div>
+    </section>
+
+  </div>
+</main>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-outline-variant mobile-bottom-nav">
+  <div class="grid grid-cols-5 h-16"><a href="#daily-health-hub" class="flex flex-col items-center justify-center text-primary text-[10px] font-bold"><span class="material-symbols-outlined fill-icon text-[21px]">today</span>Today</a><a href="#symptom-logger" class="flex flex-col items-center justify-center text-on-surface-variant text-[10px] font-bold"><span class="material-symbols-outlined text-[21px]">sick</span>Symptom</a><a href="#hydration-tracker" class="flex flex-col items-center justify-center text-on-surface-variant text-[10px] font-bold"><span class="material-symbols-outlined text-[21px]">water_drop</span>Water</a><a href="#cycle-tracking" class="flex flex-col items-center justify-center text-on-surface-variant text-[10px] font-bold"><span class="material-symbols-outlined text-[21px]">cycle</span>Cycle</a><a href="#ai-clinical-infra" class="flex flex-col items-center justify-center text-on-surface-variant text-[10px] font-bold"><span class="material-symbols-outlined text-[21px]">psychology</span>AI</a></div>
+</nav>
+
+<!-- MODALS -->
+<div id="educationModal" class="hidden fixed inset-0 z-[100] bg-black/50 modal-backdrop items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-lg w-full p-6"><div class="flex justify-between items-start gap-4"><div><h3 class="text-xl font-black">Apa arti tekanan darah?</h3><p class="text-sm text-on-surface-variant mt-1">Education card mockup: arti, tujuan, manfaat mencatat, cara ukur benar, kapan cek ulang, kapan cari bantuan medis.</p></div><button onclick="closeModal('educationModal')" class="p-2 rounded-full hover:bg-surface-container"><span class="material-symbols-outlined">close</span></button></div><div class="mt-4 space-y-3 text-sm"><p><strong>Arti:</strong> Tekanan darah menunjukkan tekanan pada pembuluh darah saat jantung bekerja.</p><p><strong>Catatan:</strong> Ini edukasi umum, bukan diagnosis.</p></div></div></div>
+<div id="emergencyModal" class="hidden fixed inset-0 z-[100] bg-black/50 modal-backdrop items-center justify-center p-4"><div class="bg-error-container border-2 border-error rounded-2xl max-w-lg w-full p-6"><h3 class="text-xl font-black text-error">Emergency Support</h3><p class="text-sm text-on-error-container mt-2">Mockup tombol emergency support. Tidak menghubungi layanan nyata.</p><button onclick="closeModal('emergencyModal')" class="mt-4 h-10 px-4 rounded-xl bg-error text-on-error font-bold">Tutup</button></div></div>
+<div id="largeInputModal" class="hidden fixed inset-0 z-[100] bg-black/50 modal-backdrop items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-lg w-full p-6"><h3 class="text-xl font-black">Konfirmasi Input Besar</h3><p class="text-sm text-on-surface-variant mt-2">Single hydration log &gt;1.000ml harus meminta konfirmasi untuk mencegah salah input.</p><div class="flex gap-2 mt-4"><button onclick="closeModal('largeInputModal')" class="h-10 px-4 rounded-xl border border-outline-variant font-bold">Batal</button><button onclick="closeModal('largeInputModal')" class="h-10 px-4 rounded-xl bg-primary text-on-primary font-bold">Ya, Tambahkan</button></div></div></div>
+<div id="cycleGuardrailModal" class="hidden fixed inset-0 z-[100] bg-black/50 modal-backdrop items-center justify-center p-4"><div class="bg-white rounded-2xl max-w-lg w-full p-6 border-2 border-warning-amber"><h3 class="text-xl font-black text-amber-900">Peringatan Kontrasepsi</h3><p class="text-sm text-on-surface-variant mt-2">Prediksi masa subur/haid tidak boleh digunakan sebagai alat kontrasepsi. Gunakan metode kontrasepsi yang tervalidasi dan konsultasi profesional kesehatan.</p><button onclick="closeModal('cycleGuardrailModal')" class="mt-4 h-10 px-4 rounded-xl bg-warning-amber text-white font-bold">Saya Mengerti</button></div></div>
+
+<script>
+  function openModal(id){ const el=document.getElementById(id); if(el){ el.classList.remove('hidden'); el.classList.add('flex'); } }
+  function closeModal(id){ const el=document.getElementById(id); if(el){ el.classList.add('hidden'); el.classList.remove('flex'); } }
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', () => {
+      document.querySelectorAll('.nav-active').forEach(n => n.classList.remove('nav-active'));
+      if(a.closest('nav') && window.innerWidth >= 1024) a.classList.add('nav-active');
+    });
+  });
+</script>
+</body>
+</html>

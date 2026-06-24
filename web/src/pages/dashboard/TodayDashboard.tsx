@@ -131,7 +131,9 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
           if (body.success && body.data) results.push(body.data)
         }
         setComparisons(results.filter(c => c.todayValue !== null))
-      } catch {}
+      } catch {
+        setComparisons([])
+      }
     }
     void loadDashboard()
     void loadComparisons()
