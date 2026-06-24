@@ -29,7 +29,7 @@ import { AlertsPage } from './pages/alerts/AlertsPage'
 import { PatternsPage } from './pages/patterns/PatternsPage'
 import { ProfileSettingsPage } from './pages/settings/ProfileSettingsPage'
 import { ProfileDeletePage } from './pages/settings/ProfileDeletePage'
-import { ConfigDashboardPage } from './pages/admin/ConfigDashboardPage'
+import { AdminPage } from './pages/admin/AdminPage'
 import { SeniorMeasurementFlow } from './pages/measurement/SeniorMeasurementFlow'
 import './App.css'
 
@@ -71,7 +71,7 @@ NAV.push(
   { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', icon: 'delete', visible: false },
   { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', icon: 'elderly', visible: false },
   { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false },
-  { path: '/admin/configs', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true },
+  { path: '/admin', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true },
 )
 
 const ALLOWED_PATHS = new Set(NAV.map(n => n.path).concat(['/kb']))
@@ -121,7 +121,7 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
     case '/kb': return <KnowledgeBasePage />
     case '/settings/profile': return <ProfileSettingsPage />
     case '/settings/delete': return <ProfileDeletePage />
-    case '/admin/configs': return <ConfigDashboardPage />
+    case '/admin': return <AdminPage />
     default: return <TodayDashboard />
   }
 }

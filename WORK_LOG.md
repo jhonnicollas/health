@@ -302,3 +302,105 @@ Rules:
 - Task: Plan, feature, subscription, entitlement APIs.
 - Scope: admin plans/features/subscriptions, /api/me/entitlements, internal quota consume.
 - Validation planned: worker tsc/test; web tsc/eslint/build.
+## 2026-06-25 00:00 UTC — Agent: Codex
+
+### Task
+- Task ID: S5F-009..S5F-014
+- Sprint: Sprint 5 Foundation
+- Status: Completed
+
+### Files Read
+- docs_sprint5/08.TASK_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL.md
+- docs_sprint5/07.API_CONTRACT_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.md
+- docs_sprint5/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+- HANDOFF.md, WORK_LOG.md
+
+### Files Changed
+- worker/src/index.ts — added 12 missing admin endpoint routes
+
+### What Changed
+- S5F-009: Validated existing plan/feature/subscription/entitlement/usage APIs (already coded, 48/48 tests pass)
+- S5F-010: Added GET/PUT /api/admin/ai-config with secret masking and copilot-safe defaults
+- S5F-011: Added GET/PUT /api/admin/feature-flags with upsert + audit
+- S5F-012: Added POST /api/billing/webhook/:provider with signature validation + idempotency
+- S5F-013: Added GET /api/admin/audit-logs and GET /api/admin/safety-events with filtered search
+- S5F-014: Added GET/PUT /api/admin/metric-catalog, metric-rules, knowledge-articles with audit
+
+### Validation
+- `cd worker && npx tsc --noEmit` — PASS
+- `cd worker && npm test` — PASS (48/48)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npx eslint .` — PASS
+- `cd web && npx vite build` — PASS
+
+### Documentation Updated
+- WORK_LOG.md — this entry
+- HANDOFF.md — pending update
+- No API contract changes needed (endpoints match docs_sprint5/07 spec)
+
+### Next Agent Notes
+- Foundation backend tasks S5F-000 through S5F-014 all complete
+- Next: S5F-015 Admin frontend shell + S5F-016 Admin frontend pages + S5F-017 Foundation gates
+
+## 2026-06-25 00:15 UTC — Agent: Codex
+
+### Task
+- Task ID: S5F-015..S5F-017
+- Sprint: Sprint 5 Foundation
+- Status: Completed
+
+### Files Changed
+- web/src/pages/admin/AdminPage.tsx — new unified admin page with 12 tab sections
+- web/src/App.tsx — replaced ConfigDashboardPage import with AdminPage, /admin route
+- web/src/App.css — added admin tab/table CSS
+- worker/src/index.ts — 12 new endpoints (S5F-010..S5F-014) added in previous turn
+
+### What Changed
+- S5F-015/S5F-016: Created single AdminPage.tsx with tabbed UI (Overview, Users, Roles, Plans, AI Config, Configs, Feature Flags, Audit, Safety, Metrics, Rules, KB). Each tab fetches from its corresponding API with loading/error states.
+- S5F-017: Foundation gates passed — all 48 worker tests pass, web typecheck/eslint/build clean.
+
+### Validation
+- `cd worker && npx tsc --noEmit` — PASS
+- `cd worker && npm test` — PASS (48/48)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npx eslint .` — PASS (0 errors)
+- `cd web && npx vite build` — PASS
+
+### Documentation Updated
+- WORK_LOG.md — this entry
+- HANDOFF.md — pending update
+
+### Next Agent Notes
+- Foundation complete. Next: Sprint 5A (Google OAuth, Education, Daily Health Hub, Symptom/Red Flag, frontend)
+
+## 2026-06-25 00:45 UTC — Agent: Codex
+
+### Task
+- Task ID: S5A-001..S5A-012 (partial)
+- Sprint: Sprint 5A
+- Status: Completed (backend)
+
+### Files Changed
+- worker/src/services/oauth.ts — new OAuth service
+- worker/src/services/education.ts — new Education service
+- worker/src/services/symptom.ts — new Symptom service + deterministic red flag detector
+- worker/src/routes-sprint5a.ts — new mounted routes file (12 endpoints)
+- worker/src/index.ts — fixed imports, added mount call
+
+### What Changed
+- S5A-001/S5A-002: Google OAuth service + login/register/link/unlink routes with state management
+- S5A-004/S5A-005: Education service with card reading + progress tracking + acknowledge
+- S5A-006/S5A-008: Daily Health Hub API + symptom prompt in measurement flow
+- S5A-009/S5A-010: Symptom service + deterministic red flag detector (14 keyword patterns)
+- S5A-011/S5A-012: Symptom safety event bridge + symptom CRUD APIs
+
+### Validation
+- `cd worker && npx tsc --noEmit` — PASS
+- `cd worker && npm test` — PASS (48/48)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npx eslint .` — PASS
+- `cd web && npx vite build` — PASS
+
+### Next Agent Notes
+- Sprint 5A frontend tasks (S5A-003, S5A-013, S5A-014, S5A-015) and remaining backend (S5A-005 admin education) not yet done
+- Move to Sprint 5B: Hydration tracker

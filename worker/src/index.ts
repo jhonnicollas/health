@@ -1,3 +1,5 @@
+import { mountSprint5ARoutes } from "./routes-sprint5a.js"
+import { mountSprint5BRoutes } from "./routes-sprint5b.js"
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
@@ -14,6 +16,9 @@ import {
 import { AuditService } from './services/audit.js'
 import { ConfigService, isSensitiveConfigKey } from './services/config.js'
 import { EntitlementService, QuotaService } from './services/entitlements.js'
+import { EducationService } from "./services/education.js"
+import { SymptomService } from "./services/symptom.js"
+import { OAuthService } from "./services/oauth.js"
 import { RbacService } from './services/rbac.js'
 
 export interface Env {
@@ -3989,8 +3994,14 @@ app.onError((error, c) => {
 })
 
 mountExtraRoutes(app as any)
+mountSprint5ARoutes(app as any)
+mountSprint5BRoutes(app as any)
 
 export {
+  getCurrentSession,
+  jsonResponse,
+  success,
+  failure,
   app,
   hashPassword,
   normalizeEmail,
@@ -5203,6 +5214,253 @@ app.delete('/api/admin/configs/:configKey', async (c) => {
   }
 })
 
+
+app.get('/api/admin/ai-config', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.config.read', startedAt)
+    if (denied) return denied
+    const configs = await ConfigService.list(c.env.DB, c.env as unknown as Record<string, unknown>)
+    const allConfigs: Record<string, unknown> = {}
+    for (const cfg of configs as any[]) { allConfigs[cfg.configKey] = cfg.isSecret ? { configured: cfg.configValue === '**ENV**' || cfg.configValue === '**SECRET**', masked: true, storageMode: cfg.storageMode || 'd1', envVarName: cfg.envVarName || null } : cfg.configValue }
+    const aiConfig = { aiTextEndpoint: allConfigs['aiTextEndpoint'] || 'https://9router.krpmerch.biz.id/v1', aiTextDefaultModel: allConfigs['aiTextDefaultModel'] || 'oc/deepseek-v4-flash-free', aiTextModels: allConfigs['aiTextModels'] ? (typeof allConfigs['aiTextModels'] === 'string' ? JSON.parse(allConfigs['aiTextModels'] as string) : allConfigs['aiTextModels']) : ['oc/deepseek-v4-flash-free','oc/mimo-v2.5-free','fallback/deterministic'], aiTextApiKey: allConfigs['aiTextApiKey'] || { configured: false, masked: true, storageMode: 'env', envVarName: 'AI_TEXT_API_KEY' }, timeoutMs: Number(allConfigs['aiExtractTimeoutMs'] || 10000), maxTokens: 1600, temperature: 0.2, disclaimerTemplate: '[NamaModelAI] is AI and can make mistakes. Always consult a doctor.', vectorizeTopK: 8, aiMemoryEnabled: allConfigs['aiMemoryEnabled'] === 'true' || false, aiClinicalCopilotRuntimeEnabled: false, aiClinicalCopilotScopeStatus: 'deferred_to_sprint6', aiClinicalCopilotAllowedActions: ['prepare_context','store_memory_metadata','query_user_namespace','return_context_trace','enforce_disclaimer','report_readiness_status'], aiClinicalCopilotForbiddenActions: ['final_diagnosis','emergency_decision','prescription','medication_dosage_instruction','replace_doctor_claim','cross_user_retrieval'] }
+    return jsonResponse(c, success(aiConfig, 200, startedAt))
+  } catch (error) { console.error('admin ai config get error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat AI config.', 500, [], startedAt)) }
+})
+
+app.put('/api/admin/ai-config', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.config.update', startedAt)
+    if (denied) return denied
+    const body = await c.req.json() as Record<string, unknown>
+    const updatedKeys: string[] = []
+    const configMap: Record<string, string> = { aiTextEndpoint: 'aiTextEndpoint', aiTextDefaultModel: 'aiTextDefaultModel', aiTextModels: 'aiTextModels', timeoutMs: 'aiExtractTimeoutMs', aiMemoryEnabled: 'aiMemoryEnabled', vectorizeTopK: 'vectorizeTopK', disclaimerTemplate: 'disclaimerTemplate', maxTokens: 'maxTokens', temperature: 'temperature' }
+    for (const [key, configKey] of Object.entries(configMap)) {
+      if (body[key] !== undefined) { const val = typeof body[key] === 'object' ? JSON.stringify(body[key]) : String(body[key]); await c.env.DB.prepare('UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = ?').bind(val, configKey).run(); updatedKeys.push(key) }
+    }
+    if (body.apiKeyConfigured === true && body.apiKeyEnvVarName) { await c.env.DB.prepare("UPDATE HL_systemConfigs SET configValue = '**ENV**', updatedAt = CURRENT_TIMESTAMP WHERE configKey = 'aiTextApiKey'").run(); updatedKeys.push('aiTextApiKey') }
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.aiConfig.update', entityType: 'HL_systemConfigs', entityId: 'ai', metadataJson: JSON.stringify({ updatedKeys, reason: body.reason || 'AI config update' }) })
+    return jsonResponse(c, success({ updatedKeys, secretValueReturned: false }, 200, startedAt))
+  } catch (error) { console.error('admin ai config update error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update AI config.', 500, [], startedAt)) }
+})
+
+app.get('/api/admin/feature-flags', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.config.read', startedAt)
+    if (denied) return denied
+    const rows = await c.env.DB.prepare('SELECT flagCode, flagName, description, enabled, targetRoleCode, targetPlanCode, metadataJson FROM HL_featureFlags ORDER BY flagCode').all<any>()
+    const flags = (rows.results || []).map((r: any) => ({ flagCode: r.flagCode, flagName: r.flagName, description: r.description, enabled: r.enabled === 1, targetRoleCode: r.targetRoleCode, targetPlanCode: r.targetPlanCode, metadata: r.metadataJson ? JSON.parse(r.metadataJson) : null }))
+    return jsonResponse(c, success(flags, 200, startedAt))
+  } catch (error) { console.error('admin feature flags list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat feature flags.', 500, [], startedAt)) }
+})
+
+app.put('/api/admin/feature-flags/:flagCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.featureFlags.manage', startedAt)
+    if (denied) return denied
+    const flagCode = c.req.param('flagCode'); const body = await c.req.json() as { flagName?: string; description?: string; enabled?: boolean; targetRoleCode?: string | null; targetPlanCode?: string | null; metadata?: unknown }
+    const existing = await c.env.DB.prepare('SELECT id FROM HL_featureFlags WHERE flagCode = ?').bind(flagCode).first<any>()
+    if (existing) { await c.env.DB.prepare('UPDATE HL_featureFlags SET flagName = COALESCE(?, flagName), description = COALESCE(?, description), enabled = COALESCE(?, enabled), targetRoleCode = ?, targetPlanCode = ?, metadataJson = COALESCE(?, metadataJson), updatedAt = CURRENT_TIMESTAMP WHERE flagCode = ?').bind(body.flagName || null, body.description || null, body.enabled !== undefined ? (body.enabled ? 1 : 0) : null, body.targetRoleCode || null, body.targetPlanCode || null, body.metadata ? JSON.stringify(body.metadata) : null, flagCode).run() }
+    else { await c.env.DB.prepare('INSERT INTO HL_featureFlags (flagCode, flagName, description, enabled, targetRoleCode, targetPlanCode, metadataJson, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(flagCode, body.flagName || flagCode, body.description || null, body.enabled ? 1 : 0, body.targetRoleCode || null, body.targetPlanCode || null, body.metadata ? JSON.stringify(body.metadata) : null).run() }
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.featureFlags.update', entityType: 'HL_featureFlags', entityId: flagCode, metadataJson: JSON.stringify({ flagCode, updated: true }) })
+    return jsonResponse(c, success({ flagCode, updated: true }, 200, startedAt))
+  } catch (error) { console.error('admin feature flag upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update feature flag.', 500, [], startedAt)) }
+})
+
+app.get('/api/admin/audit-logs', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.audit.read', startedAt)
+    if (denied) return denied
+    const { action, entityType, entityId, userId: qUserId, from, to, limit, cursor } = c.req.query()
+    let sql = 'SELECT id, userId, action, entityType, entityId, metadataJson, createdAt FROM HL_auditLogs WHERE 1=1'; const params: unknown[] = []
+    if (action) { sql += ' AND action = ?'; params.push(action) }
+    if (entityType) { sql += ' AND entityType = ?'; params.push(entityType) }
+    if (entityId) { sql += ' AND entityId = ?'; params.push(entityId) }
+    if (qUserId) { sql += ' AND userId = ?'; params.push(Number(qUserId)) }
+    if (from) { sql += ' AND createdAt >= ?'; params.push(from) }
+    if (to) { sql += ' AND createdAt <= ?'; params.push(to) }
+    if (cursor) { sql += ' AND id < ?'; params.push(Number(cursor)) }
+    sql += ' ORDER BY id DESC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 100))
+    const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+    const hasMore = (rows.results || []).length === (Number(limit) || 50)
+    const logs = (rows.results || []).map((r: any) => ({ id: r.id, userId: r.userId, action: r.action, entityType: r.entityType, entityId: r.entityId, metadata: r.metadataJson ? JSON.parse(r.metadataJson) : null, createdAt: r.createdAt })); return jsonResponse(c, success({ logs, hasMore }, 200, startedAt))
+  } catch (error) { console.error('admin audit logs list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat audit logs.', 500, [], startedAt)) }
+})
+
+app.get('/api/admin/safety-events', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.security.read', startedAt)
+    if (denied) return denied
+    const { eventType, severity, userId: qUserId, from, to, limit, cursor } = c.req.query()
+    let sql = "SELECT id, userId, sourceType, sourceId, eventType, severity, title, notificationStatus, acknowledged, createdAt FROM HL_safetyEvents WHERE 1=1"; const params: unknown[] = []
+    if (eventType) { sql += ' AND eventType = ?'; params.push(eventType) }
+    if (severity) { sql += ' AND severity = ?'; params.push(severity) }
+    if (qUserId) { sql += ' AND userId = ?'; params.push(Number(qUserId)) }
+    if (from) { sql += ' AND createdAt >= ?'; params.push(from) }
+    if (to) { sql += ' AND createdAt <= ?'; params.push(to) }
+    if (cursor) { sql += ' AND id < ?'; params.push(Number(cursor)) }
+    sql += ' ORDER BY id DESC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 100))
+    const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+    return jsonResponse(c, success(rows.results || [], 200, startedAt))
+  } catch (error) { console.error('admin safety events list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat safety events.', 500, [], startedAt)) }
+})
+
+app.get('/api/admin/metric-catalog', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.metricCatalog.manage', startedAt)
+    if (denied) return denied
+    const { category, active, q, limit, cursor } = c.req.query()
+    let sql = 'SELECT metricCode, metricName, category, unit, inputType, physicalMin, physicalMax, active FROM HL_metricCatalog WHERE 1=1'; const params: unknown[] = []
+    if (category) { sql += ' AND category = ?'; params.push(category) }
+    if (active !== undefined) { sql += ' AND active = ?'; params.push(active === 'true' ? 1 : 0) }
+    if (q) { sql += ' AND (metricName LIKE ? OR metricCode LIKE ?)'; params.push(`%${q}%`, `%${q}%`) }
+    if (cursor) { sql += ' AND id < ?'; params.push(Number(cursor)) }
+    sql += ' ORDER BY sortOrder ASC, metricCode ASC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 100))
+    const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+    return jsonResponse(c, success(rows.results || [], 200, startedAt))
+  } catch (error) { console.error('admin metric catalog list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat metric catalog.', 500, [], startedAt)) }
+})
+
+app.put('/api/admin/metric-catalog/:metricCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.metricCatalog.manage', startedAt)
+    if (denied) return denied
+    const metricCode = c.req.param('metricCode'); const body = await c.req.json() as Record<string, unknown>
+    const existing = await c.env.DB.prepare('SELECT id FROM HL_metricCatalog WHERE metricCode = ?').bind(metricCode).first<any>()
+    if (existing) {
+      const sets: string[] = []; const vals: unknown[] = []
+      for (const k of ['metricName','category','unit','inputType','requiresAttachment','requiresSex','requiresFasting','isCalculated','physicalMin','physicalMax','sortOrder','active']) { if (body[k] !== undefined) { sets.push(`${k} = ?`); vals.push(body[k]) } }
+      if (sets.length) { sets.push("updatedAt = CURRENT_TIMESTAMP"); await c.env.DB.prepare(`UPDATE HL_metricCatalog SET ${sets.join(', ')} WHERE metricCode = ?`).bind(...vals as any[], metricCode).run() }
+    }
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.metricCatalog.upsert', entityType: 'HL_metricCatalog', entityId: metricCode, metadataJson: JSON.stringify({ metricCode, updated: true }) })
+    return jsonResponse(c, success({ metricCode, updated: true }, 200, startedAt))
+  } catch (error) { console.error('admin metric catalog upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update metric catalog.', 500, [], startedAt)) }
+})
+
+app.get('/api/admin/metric-rules', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.metricRules.manage', startedAt)
+    if (denied) return denied
+    const { metricCode, severity, active, limit, cursor } = c.req.query()
+    let sql = 'SELECT id, ruleCode, metricCode, sex, ageMin, ageMax, minValue, maxValue, unit, status, severity, emergencyLevel, active FROM HL_metricRules WHERE 1=1'; const params: unknown[] = []
+    if (metricCode) { sql += ' AND metricCode = ?'; params.push(metricCode) }
+    if (severity) { sql += ' AND severity = ?'; params.push(severity) }
+    if (active !== undefined) { sql += ' AND active = ?'; params.push(active === 'true' ? 1 : 0) }
+    if (cursor) { sql += ' AND id < ?'; params.push(Number(cursor)) }
+    sql += ' ORDER BY rulePriority ASC, ruleCode ASC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 100))
+    const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+    return jsonResponse(c, success(rows.results || [], 200, startedAt))
+  } catch (error) { console.error('admin metric rules list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat metric rules.', 500, [], startedAt)) }
+})
+
+app.put('/api/admin/metric-rules/:ruleCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.metricRules.manage', startedAt)
+    if (denied) return denied
+    const ruleCode = c.req.param('ruleCode'); const body = await c.req.json() as Record<string, unknown>
+    const existing = await c.env.DB.prepare('SELECT id FROM HL_metricRules WHERE ruleCode = ?').bind(ruleCode).first<any>()
+    const fields = ['metricCode','sex','ageMin','ageMax','minValue','maxValue','unit','status','severity','popupTitle','popupMessage','recommendation','sourceLabel','emergencyLevel','rulePriority','active']
+    if (existing) {
+      const sets: string[] = []; const vals: unknown[] = []
+      for (const k of fields) { if (body[k] !== undefined) { sets.push(`${k} = ?`); vals.push(body[k]) } }
+      if (sets.length) { sets.push("updatedAt = CURRENT_TIMESTAMP"); await c.env.DB.prepare(`UPDATE HL_metricRules SET ${sets.join(', ')} WHERE ruleCode = ?`).bind(...vals as any[], ruleCode).run() }
+    }
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.metricRules.upsert', entityType: 'HL_metricRules', entityId: ruleCode, metadataJson: JSON.stringify({ ruleCode, updated: true }) })
+    return jsonResponse(c, success({ ruleCode, updated: true }, 200, startedAt))
+  } catch (error) { console.error('admin metric rules upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update metric rule.', 500, [], startedAt)) }
+})
+
+app.get('/api/admin/knowledge-articles', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.kb.manage', startedAt)
+    if (denied) return denied
+    const { category, active, q, limit, cursor } = c.req.query()
+    let sql = 'SELECT slug, title, category, active, updatedAt FROM HL_knowledgeArticles WHERE 1=1'; const params: unknown[] = []
+    if (category) { sql += ' AND category = ?'; params.push(category) }
+    if (active !== undefined) { sql += ' AND active = ?'; params.push(active === 'true' ? 1 : 0) }
+    if (q) { sql += ' AND (title LIKE ? OR slug LIKE ?)'; params.push(`%${q}%`, `%${q}%`) }
+    if (cursor) { sql += ' AND id < ?'; params.push(Number(cursor)) }
+    sql += ' ORDER BY sortOrder ASC, title ASC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 100))
+    const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+    return jsonResponse(c, success(rows.results || [], 200, startedAt))
+  } catch (error) { console.error('admin knowledge articles list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat knowledge articles.', 500, [], startedAt)) }
+})
+
+app.put('/api/admin/knowledge-articles/:slug', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.kb.manage', startedAt)
+    if (denied) return denied
+    const slug = c.req.param('slug'); const body = await c.req.json() as Record<string, unknown>
+    const existing = await c.env.DB.prepare('SELECT id FROM HL_knowledgeArticles WHERE slug = ?').bind(slug).first<any>()
+    const fields = ['title','category','contentMarkdown','sortOrder','active']
+    if (existing) {
+      const sets: string[] = []; const vals: unknown[] = []
+      for (const k of fields) { if (body[k] !== undefined) { sets.push(`${k} = ?`); vals.push(body[k]) } }
+      if (sets.length) { sets.push("updatedAt = CURRENT_TIMESTAMP"); await c.env.DB.prepare(`UPDATE HL_knowledgeArticles SET ${sets.join(', ')} WHERE slug = ?`).bind(...vals as any[], slug).run() }
+    }
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.kb.upsert', entityType: 'HL_knowledgeArticles', entityId: slug, metadataJson: JSON.stringify({ slug, updated: true }) })
+    return jsonResponse(c, success({ slug, updated: true }, 200, startedAt))
+  } catch (error) { console.error('admin knowledge article upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update knowledge article.', 500, [], startedAt)) }
+})
+
+app.post('/api/billing/webhook/:provider', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const provider = c.req.param('provider')
+    if (!['manual','stripe','midtrans','xendit'].includes(provider)) return jsonResponse(c, failure('VALIDATION_ERROR', 'Provider tidak valid.', 400, [], startedAt))
+    const secret = (c.env as any).BILLING_WEBHOOK_SECRET as string || ''
+    const signature = c.req.header('X-Webhook-Signature') || c.req.header('x-webhook-signature') || ''
+    if (provider !== 'manual' && (!signature || !secret || signature !== secret)) return jsonResponse(c, failure('UNAUTHORIZED', 'Invalid webhook signature.', 401, [], startedAt))
+    const body = await c.req.json() as { id?: string; type?: string; data?: { customerId?: string; subscriptionId?: string; status?: string } }
+    if (!body.id || !body.type) return jsonResponse(c, failure('VALIDATION_ERROR', 'Event id dan type wajib.', 400, [], startedAt))
+    const existing = await c.env.DB.prepare('SELECT id, processed FROM HL_paymentEvents WHERE provider = ? AND providerEventId = ?').bind(provider, body.id).first<any>()
+    if (existing) return jsonResponse(c, success({ provider, providerEventId: body.id, processed: existing.processed === 1, subscriptionUpdated: false, duplicate: true }, 200, startedAt))
+    const payId = await insertAndGetId(c.env.DB.prepare('INSERT INTO HL_paymentEvents (provider, eventType, providerEventId, payloadJson, processed, createdAt) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)').bind(provider, body.type, body.id, JSON.stringify(body)))
+    let subscriptionUpdated = false
+    if (body.data?.subscriptionId && body.data?.status) {
+      const sub = await c.env.DB.prepare('SELECT id FROM HL_subscriptions WHERE id = ?').bind(Number(body.data.subscriptionId)).first<any>()
+      if (sub) { await c.env.DB.prepare('UPDATE HL_subscriptions SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(body.data.status, Number(body.data.subscriptionId)).run(); subscriptionUpdated = true }
+    }
+    await c.env.DB.prepare('UPDATE HL_paymentEvents SET processed = 1, processedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(payId).run()
+    await AuditService.write(c.env.DB, { userId: 0, action: 'billing.webhook.processed', entityType: 'HL_paymentEvents', entityId: String(payId), metadataJson: JSON.stringify({ provider, providerEventId: body.id, subscriptionUpdated }) })
+    return jsonResponse(c, success({ provider, providerEventId: body.id, processed: true, subscriptionUpdated }, 200, startedAt))
+  } catch (error) { console.error('billing webhook error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal proses webhook.', 500, [], startedAt)) }
+})
 app.post('/api/telegram/verify', async (c) => {
   const startedAt = Date.now()
   try {

@@ -5705,3 +5705,15 @@ input:-webkit-autofill {
 .ai-summary-error p { color: var(--colorStatusCritical); }
 
 
+
+/* Admin Page */
+.admin-page .admin-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 1rem; }
+.admin-page .admin-tabs button { padding: 6px 12px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--surface, #fff); cursor: pointer; font-size: 0.85rem; }
+.admin-page .admin-tabs button.active { background: var(--primary, #004bca); color: #fff; border-color: var(--primary, #004bca); }
+.admin-page .admin-section h3 { margin: 0 0 0.5rem; }
+.admin-page .admin-section table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.admin-page .admin-section th, .admin-page .admin-section td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border, #ddd); }
+.admin-page .admin-section th { font-weight: 600; background: var(--surface-container, #f2f4f6); }
+.admin-page .admin-field { margin-bottom: 8px; }
+.admin-page .admin-field label { display: block; font-size: 0.8rem; font-weight: 500; margin-bottom: 2px; }
+.admin-page .admin-field input { width: 100%; padding: 6px; border: 1px solid var(--border, #ccc); border-radius: 4px; font-size: 0.85rem; }
