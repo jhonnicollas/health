@@ -5463,7 +5463,7 @@ app.post('/api/billing/webhook/:provider', async (c) => {
       if (sub) { await c.env.DB.prepare('UPDATE HL_subscriptions SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(body.data.status, Number(body.data.subscriptionId)).run(); subscriptionUpdated = true }
     }
     await c.env.DB.prepare('UPDATE HL_paymentEvents SET processed = 1, processedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(payId).run()
-    await AuditService.write(c.env.DB, { userId: 0, action: 'billing.webhook.processed', entityType: 'HL_paymentEvents', entityId: String(payId), metadataJson: JSON.stringify({ provider, providerEventId: body.id, subscriptionUpdated }) })
+    await AuditService.write(c.env.DB, { userId: null, action: "billing.webhook.processed", entityType: 'HL_paymentEvents', entityId: String(payId), metadataJson: JSON.stringify({ provider, providerEventId: body.id, subscriptionUpdated }) })
     return jsonResponse(c, success({ provider, providerEventId: body.id, processed: true, subscriptionUpdated }, 200, startedAt))
   } catch (error) { console.error('billing webhook error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal proses webhook.', 500, [], startedAt)) }
 })
