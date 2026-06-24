@@ -16,6 +16,9 @@ export type Profile = {
   timezone: string
   accessibilityMode: string
   theme: string
+  emergencyConsent?: boolean
+  aiConsent?: boolean
+  dataShareConsent?: boolean
 } | null
 
 export type AuthState = {

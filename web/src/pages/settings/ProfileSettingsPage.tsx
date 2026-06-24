@@ -57,6 +57,11 @@ export function ProfileSettingsPage() {
   const [configError, setConfigError] = useState('')
   const [savingConfigKey, setSavingConfigKey] = useState<string | null>(null)
   const [deletingConfigKey, setDeletingConfigKey] = useState<string | null>(null)
+  const [aiConsent, setAiConsent] = useState(!!profile?.aiConsent)
+  const [emergencyConsent, setEmergencyConsent] = useState(!!profile?.emergencyConsent)
+  const [dataShareConsent, setDataShareConsent] = useState(!!profile?.dataShareConsent)
+  const [consentSaving, setConsentSaving] = useState(false)
+  const [consentMsg, setConsentMsg] = useState('')
   const [newConfig, setNewConfig] = useState({
     configKey: '',
     configValue: '',
@@ -310,6 +315,23 @@ export function ProfileSettingsPage() {
     ].includes(configKey)
   }
 
+  async function handleConsentSave() {
+    setConsentSaving(true); setConsentMsg('')
+    try {
+      const res = await fetch('/api/settings/consent', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiConsent, emergencyConsent, dataShareConsent })
+      })
+      const body = (await res.json()) as { success: boolean; error?: { message: string } }
+      if (!body.success) { setConsentMsg(body.error?.message || 'Failed.'); return }
+      setConsentMsg('Consent settings saved.')
+      void refresh()
+    } catch { setConsentMsg('Could not connect.') }
+    finally { setConsentSaving(false) }
+  }
+
   return (
     <section className="settings-panel" aria-labelledby="profile-settings-title">
       <div className="settings-grid">
@@ -449,6 +471,32 @@ export function ProfileSettingsPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--colorTextSubdued)' }}>download</span>
               </button>
               {exportMessage ? <p className="form-message success" role="status">{exportMessage}</p> : null}
+            </div>
+          </section>
+
+          <section className="card" style={{ marginTop: 24 }}>
+            <h3 style={{ font: 'var(--typHeadlineMd)', color: 'var(--colorTextPrimary)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--colorPrimary)' }}>shield</span>
+              Data & Consent
+            </h3>
+            <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)', marginBottom: 16 }}>Manage your data sharing and AI preferences.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 'var(--radiusMd)', border: '1px solid var(--colorBorderSoft)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={aiConsent} onChange={(e) => setAiConsent(e.target.checked)} />
+                <div><strong style={{ font: 'var(--typLabelMd)', display: 'block' }}>AI Analysis</strong><small style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>Allow AI to generate health insights</small></div>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 'var(--radiusMd)', border: '1px solid var(--colorBorderSoft)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={emergencyConsent} onChange={(e) => setEmergencyConsent(e.target.checked)} />
+                <div><strong style={{ font: 'var(--typLabelMd)', display: 'block' }}>Emergency Alerts</strong><small style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>Allow emergency contact notifications</small></div>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 'var(--radiusMd)', border: '1px solid var(--colorBorderSoft)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={dataShareConsent} onChange={(e) => setDataShareConsent(e.target.checked)} />
+                <div><strong style={{ font: 'var(--typLabelMd)', display: 'block' }}>Data Sharing</strong><small style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>Share anonymized data for research</small></div>
+              </label>
+              <button className="btn-primary" disabled={consentSaving} onClick={() => void handleConsentSave()} type="button" style={{ marginTop: 4 }}>
+                {consentSaving ? 'Saving...' : 'Save Consent'}
+              </button>
+              {consentMsg ? <p className={`form-message ${consentMsg.includes('saved') || consentMsg.includes('Saved') ? 'success' : 'error'}`} role="status">{consentMsg}</p> : null}
             </div>
           </section>
 

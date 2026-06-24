@@ -69,27 +69,41 @@ Status `emergency` tidak boleh ditampilkan hanya sebagai teks kecil. Harus muncu
 
 ## 3. Supported Themes
 
-Aplikasi memiliki 4 mode tema:
+Aplikasi memiliki 3 mode tema via `data-theme`:
 
 ```text
-light
-warm
-dark
-highContrast
+light (default — all values in :root)
+warm (html[data-theme="warm"])
+dark (html[data-theme="dark"])
+```
+
+Dan 2 mode aksesibilitas via `data-accessibility`:
+
+```text
+senior (html[data-accessibility="senior"])
+highContrast (html[data-accessibility="highContrast"] — also triggered by data-theme="highContrast")
 ```
 
 Field database:
 
 ```text
 HL_userProfiles.theme
+HL_userProfiles.accessibilityMode
 ```
 
-Allowed values:
+Theme values:
 
 ```text
 light
 warm
 dark
+```
+
+Accessibility values:
+
+```text
+normal
+senior
 highContrast
 ```
 
@@ -97,97 +111,201 @@ highContrast
 
 ## 4. Color Tokens
 
-Gunakan CSS variables agar mudah dipakai di Tailwind, React, dan PWA.
+Source of truth: `web/src/index.css` — `:root` (shared), `html[data-theme]`, and `html[data-accessibility]`.
 
-### 4.1 Base Token Names
+### 4.1 Base Token Names (`:root`)
+
+Shared tokens across all themes. Most color/surface/primary values are defined here as defaults:
 
 ```css
 :root {
-  --colorBackground: #ffffff;
-  --colorSurface: #f8fafc;
+  /* Surface / Background */
+  --colorBackground: #f7f9fb;
+  --colorSurface: #f2f4f6;
   --colorSurfaceElevated: #ffffff;
-  --colorTextPrimary: #0f172a;
-  --colorTextSecondary: #475569;
-  --colorTextMuted: #64748b;
-  --colorBorder: #e2e8f0;
-  --colorPrimary: #2563eb;
+  --colorSurfaceContainer: #eceef0;
+  --colorSurfaceHigh: #e6e8ea;
+  --colorSurfaceDim: #d8dadc;
+  --colorSurfaceHighest: #e0e3e5;
+  --colorTextPrimary: #191c1e;
+  --colorTextSecondary: #424656;
+  --colorTextMuted: #737687;
+  --colorBorder: #c2c6d9;
+  --colorBorderSoft: #e0e3e5;
+  --colorPrimary: #0061ff;
+  --colorPrimaryStrong: #004bca;
+  --colorPrimaryContainer: #0061ff;
+  --colorOnPrimaryContainer: #f1f2ff;
   --colorPrimaryText: #ffffff;
-  --colorFocus: #2563eb;
+  --colorFocus: #0061ff;
+  --colorSecondaryContainer: #d0e1fb;
+  --colorOnSecondaryContainer: #54647a;
+  --colorTertiary: #005c85;
+  --colorTertiaryContainer: #0076a9;
+  --colorOnTertiaryContainer: #eaf4ff;
+  --colorErrorContainer: #ffdad6;
+  --colorOnErrorContainer: #93000a;
+  --colorInverseSurface: #2d3133;
+  --colorInverseOnSurface: #eff1f3;
 
-  --colorStatusNormal: #16a34a;
-  --colorStatusInfo: #0284c7;
-  --colorStatusWarning: #ca8a04;
-  --colorStatusHigh: #ea580c;
-  --colorStatusCritical: #dc2626;
-  --colorStatusEmergency: #991b1b;
+  /* Status (semantic) */
+  --colorStatusNormal: #168244;
+  --colorStatusInfo: #005c85;
+  --colorStatusWarning: #9a6700;
+  --colorStatusHigh: #b45309;
+  --colorStatusCritical: #ba1a1a;
+  --colorStatusEmergency: #7f1d1d;
 
-  --colorChartLine: #2563eb;
+  /* Overlay */
   --colorOverlay: rgba(15, 23, 42, 0.56);
+
+  /* Shadows */
+  --shadowCard: 0px 4px 6px -1px rgba(0, 0, 0, 0.05);
+  --shadowSoft: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  --shadowModal: 0px 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Spacing */
+  --space1: 0.25rem;
+  --space2: 0.5rem;
+  --space3: 0.75rem;
+  --space4: 1rem;
+  --space5: 1.25rem;
+  --space6: 1.5rem;
+  --space8: 2rem;
+  --space10: 2.5rem;
+
+  /* Radius */
+  --radiusSm: 2px;
+  --radiusMd: 4px;
+  --radiusLg: 8px;
+  --radiusXl: 12px;
+  --radiusFull: 999px;
+
+  /* Layout */
+  --sidebarWidth: 280px;
+  --containerMaxWidth: 1440px;
+  --marginDesktop: 32px;
+  --marginTablet: 24px;
+  --marginMobile: 16px;
+  --gutter: 24px;
+
+  /* Typography — shorthand: font-weight font-size/line-height font-family */
+  --typHeadlineXl: 700 36px/44px Inter, sans-serif;
+  --typHeadlineLg: 600 28px/36px Inter, sans-serif;
+  --typHeadlineLgMobile: 600 24px/32px Inter, sans-serif;
+  --typHeadlineMd: 600 20px/28px Inter, sans-serif;
+  --typBodyLg: 400 18px/28px Inter, sans-serif;
+  --typBodyMd: 400 16px/24px Inter, sans-serif;
+  --typBodySm: 400 14px/20px Inter, sans-serif;
+  --typLabelMd: 600 14px/20px Inter, sans-serif;
+  --typLabelSm: 500 12px/16px Inter, sans-serif;
+
+  /* Font stacks */
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --heading: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 ```
 
-### 4.2 Light Theme
+### 4.2 Warm Theme
 
 ```css
-[data-theme="light"] {
-  --colorBackground: #ffffff;
-  --colorSurface: #f8fafc;
+html[data-theme="warm"] {
+  --colorBackground: #f9faf7;
+  --colorSurface: #f1f4ed;
   --colorSurfaceElevated: #ffffff;
-  --colorTextPrimary: #0f172a;
-  --colorTextSecondary: #475569;
-  --colorTextMuted: #64748b;
-  --colorBorder: #e2e8f0;
-  --colorPrimary: #2563eb;
-  --colorPrimaryText: #ffffff;
+  --colorSurfaceContainer: #e9eee2;
+  --colorSurfaceHigh: #e3e8d9;
+  --colorSurfaceDim: #d5d9cc;
+  --colorSurfaceHighest: #dce0d2;
+  --colorTextPrimary: #1b1d17;
+  --colorTextSecondary: #42483c;
+  --colorTextMuted: #707767;
+  --colorBorder: #c8cebf;
+  --colorBorderSoft: #ddd9cc;
+  --colorPrimary: #2d6a4f;
+  --colorPrimaryStrong: #1b4332;
+  --colorPrimaryContainer: #2d6a4f;
+  --colorOnPrimaryContainer: #d8e8d0;
+  --colorSecondaryContainer: #d4e0c8;
+  --colorOnSecondaryContainer: #3d4a30;
+  --colorTertiary: #4a6741;
+  --colorTertiaryContainer: #6e8b60;
+  --colorOnTertiaryContainer: #e2eed8;
+  --colorErrorContainer: #ffdad6;
+  --colorOnErrorContainer: #93000a;
+  --colorInverseSurface: #2a2c22;
+  --colorInverseOnSurface: #eff1e6;
 }
 ```
 
-### 4.3 Warm Theme
+### 4.3 Dark Theme
 
 ```css
-[data-theme="warm"] {
-  --colorBackground: #fffaf0;
-  --colorSurface: #fff7ed;
-  --colorSurfaceElevated: #ffffff;
-  --colorTextPrimary: #1c1917;
-  --colorTextSecondary: #57534e;
-  --colorTextMuted: #78716c;
-  --colorBorder: #fed7aa;
-  --colorPrimary: #c2410c;
-  --colorPrimaryText: #ffffff;
+html[data-theme="dark"] {
+  --colorBackground: #101418;
+  --colorSurface: #171c22;
+  --colorSurfaceElevated: #1d232b;
+  --colorSurfaceContainer: #252c35;
+  --colorSurfaceHigh: #2c343f;
+  --colorSurfaceDim: #12161c;
+  --colorSurfaceHighest: #303a45;
+  --colorTextPrimary: #f4f7fa;
+  --colorTextSecondary: #c8d0dc;
+  --colorTextMuted: #9aa7b8;
+  --colorBorder: #3d4654;
+  --colorBorderSoft: #2f3743;
+  --colorPrimary: #7fb1ff;
+  --colorPrimaryStrong: #a8c8ff;
+  --colorPrimaryText: #07111f;
+  --colorPrimaryContainer: #7fb1ff;
+  --colorOnPrimaryContainer: #00174b;
+  --colorSecondaryContainer: #3d4654;
+  --colorOnSecondaryContainer: #c8d0dc;
+  --colorTertiary: #89ceff;
+  --colorTertiaryContainer: #005c85;
+  --colorOnTertiaryContainer: #eaf4ff;
+  --colorErrorContainer: #93000a;
+  --colorOnErrorContainer: #ffdad6;
+  --colorInverseSurface: #e6e8ea;
+  --colorInverseOnSurface: #191c1e;
+  --shadowCard: 0 18px 36px rgba(0, 0, 0, 0.3);
 }
 ```
 
-### 4.4 Dark Theme
+### 4.4 High Contrast (data-theme OR data-accessibility)
+
+Applied via both `html[data-theme="highContrast"]` and `html[data-accessibility="highContrast"]`:
 
 ```css
-[data-theme="dark"] {
-  --colorBackground: #020617;
-  --colorSurface: #0f172a;
-  --colorSurfaceElevated: #111827;
-  --colorTextPrimary: #f8fafc;
-  --colorTextSecondary: #cbd5e1;
-  --colorTextMuted: #94a3b8;
-  --colorBorder: #334155;
-  --colorPrimary: #60a5fa;
-  --colorPrimaryText: #020617;
-}
-```
-
-### 4.5 High Contrast Theme
-
-```css
-[data-theme="highContrast"] {
+html[data-theme="highContrast"],
+html[data-accessibility="highContrast"] {
   --colorBackground: #000000;
   --colorSurface: #000000;
   --colorSurfaceElevated: #111111;
+  --colorSurfaceContainer: #1a1a1a;
+  --colorSurfaceHigh: #222222;
+  --colorSurfaceDim: #000000;
+  --colorSurfaceHighest: #2a2a2a;
   --colorTextPrimary: #ffffff;
   --colorTextSecondary: #ffffff;
   --colorTextMuted: #facc15;
   --colorBorder: #ffffff;
+  --colorBorderSoft: #ffffff;
   --colorPrimary: #facc15;
+  --colorPrimaryStrong: #facc15;
   --colorPrimaryText: #000000;
-
+  --colorPrimaryContainer: #facc15;
+  --colorOnPrimaryContainer: #000000;
+  --colorSecondaryContainer: #333333;
+  --colorOnSecondaryContainer: #ffffff;
+  --colorTertiary: #00ccff;
+  --colorTertiaryContainer: #006688;
+  --colorOnTertiaryContainer: #ccffff;
+  --colorErrorContainer: #333333;
+  --colorOnErrorContainer: #ff3333;
+  --colorInverseSurface: #f0f0f0;
+  --colorInverseOnSurface: #000000;
   --colorStatusNormal: #00ff66;
   --colorStatusInfo: #00ccff;
   --colorStatusWarning: #ffff00;
@@ -255,16 +373,27 @@ font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
 
 Jika tidak memasang Inter, browser tetap memakai system font.
 
-### 6.2 Font Scale Normal
+### 6.2 Font Tokens
+
+Actual implementation uses `--typ*` shorthand tokens (font-weight font-size/line-height font-family):
 
 ```css
---fontSizeXs: 0.75rem;
---fontSizeSm: 0.875rem;
---fontSizeBase: 1rem;
---fontSizeLg: 1.125rem;
---fontSizeXl: 1.25rem;
---fontSize2xl: 1.5rem;
---fontSize3xl: 1.875rem;
+--typHeadlineXl: 700 36px/44px Inter, sans-serif;
+--typHeadlineLg: 600 28px/36px Inter, sans-serif;
+--typHeadlineLgMobile: 600 24px/32px Inter, sans-serif;
+--typHeadlineMd: 600 20px/28px Inter, sans-serif;
+--typBodyLg: 400 18px/28px Inter, sans-serif;
+--typBodyMd: 400 16px/24px Inter, sans-serif;
+--typBodySm: 400 14px/20px Inter, sans-serif;
+--typLabelMd: 600 14px/20px Inter, sans-serif;
+--typLabelSm: 500 12px/16px Inter, sans-serif;
+```
+
+Usage:
+
+```css
+font: var(--typBodyMd);
+font: var(--typHeadlineLg);
 ```
 
 ### 6.3 Senior Mode Font Scale
@@ -275,17 +404,15 @@ Jika:
 HL_userProfiles.accessibilityMode = senior
 ```
 
-maka gunakan:
+maka `senior-mode.css` mengatur:
 
 ```css
-[data-accessibility="senior"] {
-  --fontSizeBase: 1.25rem;
-  --fontSizeLg: 1.5rem;
-  --fontSizeXl: 1.75rem;
-  --fontSize2xl: 2rem;
-  --fontSize3xl: 2.5rem;
+html[data-accessibility="senior"] {
+  font-size: 19px;
 }
 ```
+
+Semua nilai `rem` otomatis lebih besar karena root font-size berubah.
 
 ### 6.4 Text Rules
 
@@ -312,26 +439,27 @@ Senior mode input angka: minimal 28px
 --space6: 1.5rem;
 --space8: 2rem;
 --space10: 2.5rem;
---space12: 3rem;
 ```
 
 ### 7.2 Radius Tokens
 
 ```css
---radiusSm: 0.375rem;
---radiusMd: 0.75rem;
---radiusLg: 1rem;
---radiusXl: 1.25rem;
---radiusFull: 9999px;
+--radiusSm: 2px;
+--radiusMd: 4px;
+--radiusLg: 8px;
+--radiusXl: 12px;
+--radiusFull: 999px;
 ```
 
 ### 7.3 Layout Spacing
 
-```text
-Mobile page padding: 16px
-Desktop page padding: 24–32px
-Card gap: 12–16px
-Section gap: 24px
+```css
+--marginMobile: 16px;
+--marginTablet: 24px;
+--marginDesktop: 32px;
+--gutter: 24px;
+--sidebarWidth: 280px;
+--containerMaxWidth: 1440px;
 ```
 
 ---
@@ -1096,58 +1224,63 @@ Data berhasil disimpan, tetapi Telegram gagal dikirim. Anda bisa cek pengaturan 
 
 Gunakan PascalCase untuk komponen React.
 
+Actual components in `web/src/`:
+
 ```text
 AppShell
+SeniorAppShell
 BottomNavigation
 MeasurementChecklist
-MeasurementCard
+DynamicMetricForm
 AttachmentUploader
-HealthNumberInput
-StatusBadge
-InterpretationModal
+ManualOverrideInput
+TrendBadge
+InterpretationPopup
 EmergencyModal
 DashboardMetricCard
 TrendChart
 AiRecommendationCard
 ReportPreview
 SeniorModeToggle
+KnowledgeBaseLayout
+MedicationFastingTracker
+SettingsProfileForm
+NotificationList
+FamilyMemberCard
 ```
+
+Icon system: Google Material Symbols Outlined, imported via CSS `@import` in index.css. Not outline SVGs.
 
 ---
 
-## 22. Tailwind Token Mapping
+## 22. Styling Approach
 
-Contoh mapping di `tailwind.config.ts`:
+This project does **not** use Tailwind CSS. All styling is done with:
 
-```ts
-export default {
-  theme: {
-    extend: {
-      colors: {
-        background: 'var(--colorBackground)',
-        surface: 'var(--colorSurface)',
-        elevated: 'var(--colorSurfaceElevated)',
-        textPrimary: 'var(--colorTextPrimary)',
-        textSecondary: 'var(--colorTextSecondary)',
-        textMuted: 'var(--colorTextMuted)',
-        border: 'var(--colorBorder)',
-        primary: 'var(--colorPrimary)',
-        primaryText: 'var(--colorPrimaryText)',
-        normal: 'var(--colorStatusNormal)',
-        info: 'var(--colorStatusInfo)',
-        warning: 'var(--colorStatusWarning)',
-        high: 'var(--colorStatusHigh)',
-        critical: 'var(--colorStatusCritical)',
-        emergency: 'var(--colorStatusEmergency)'
-      },
-      borderRadius: {
-        md: 'var(--radiusMd)',
-        lg: 'var(--radiusLg)',
-        xl: 'var(--radiusXl)'
-      }
-    }
-  }
+- CSS custom properties defined in `web/src/index.css`
+- Component-specific CSS files (e.g., `ManualOverrideInput.css`, `InterpretationPopup.css`)
+- Layout styles in `web/src/App.css`
+- Accessibility overrides in `web/src/styles/senior-mode.css` and `web/src/styles/high-contrast.css`
+
+To use a design token in CSS:
+
+```css
+.my-component {
+  color: var(--colorTextPrimary);
+  background: var(--colorSurface);
+  border: 1px solid var(--colorBorder);
+  border-radius: var(--radiusMd);
+  padding: var(--space16);
+  font: var(--typBodyMd);
 }
+```
+
+To use a design token in React inline styles:
+
+```tsx
+<div style={{ color: 'var(--colorTextPrimary)', font: 'var(--typBodyMd)' }}>
+  Content
+</div>
 ```
 
 ---
@@ -1159,160 +1292,85 @@ Sebelum merge UI, pastikan:
 ```text
 Mobile 360px aman
 Desktop 1280px aman
-Dark mode aman
-Warm mode aman
-High contrast aman
-Senior mode aman
+Light theme aman (only theme implemented via data-theme)
+Warm theme aman (data-theme="warm")
+Dark theme aman (data-theme="dark")
+High contrast aman (data-accessibility="highContrast")
+Senior mode aman (data-accessibility="senior")
 Keyboard navigation aman
 Attachment preview aman
 AI timeout message jelas
 Manual override terlihat
 Emergency modal tidak bisa terlewat
 Submit tidak menyimpan original image
+TypeScript: cd web && npx tsc -b
+Lint: cd web && npm run lint
+Build: cd web && npm run build
 ```
 
 ---
 
 ## 24. Stitch Clinical Precision Alignment
 
-### 24.1 GAP-1 Local Stitch Shell Refresh — 2026-06-21
+### 24.1 Design Tokens Source of Truth
 
-Source of truth for the refreshed production shell is `web/frontend_stitch/`.
+The Stitch design tokens are defined in `web/frontend_stitch/DESIGN.md` and applied via `web/src/index.css`.
 
-Applied UI rules:
-
-- App shell uses Material Symbols names, not ad-hoc glyphs or mojibake characters.
-- Sidebar brand, active nav rail, emergency support button, desktop topbar search, segmented density control, notification dot, user avatar, mobile topbar, bottom nav, mobile add FAB, and AI assistant FAB must visually follow `web/frontend_stitch/master-layout.html`.
-- Dashboard bento cards, AI insight banner, tab underline, and vital cards must use local Stitch tokens: `surface-container-lowest`, `outline-variant`, `primary`, `primary-container`, `tertiary-container`, `error-container`, `rounded-xl`, and Level 1 shadow.
-- New Measurement workflow must remain step-based: metric checkbox cards, full-width record cards, dashed image capture area, secondary AI auto-read button, and large submit action.
-- Medical business logic remains unchanged: UI wraps existing React state, hooks, and API calls; status/severity still comes from the rule engine.
-
-Validation required for this refresh:
-
-- `cd web && npx tsc -b`
-- `cd web && npm run lint`
-- `cd web && npm run build`
-- Owner visual review for GAP-1 score target `>=800/1000`.
-
-### 24.2 GAP-2 Responsive Layout Rules — 2026-06-21
-
-Breakpoints now match local Stitch behavior:
-
-- Mobile `<768px`: sidebar hidden, mobile topbar visible, bottom nav fixed with 5 icon+label items, content bottom padding protects against nav overlap, cards/forms collapse to one column.
-- Tablet `768px-1023px`: sidebar becomes an 88px icon rail, main content uses tablet margin, dense grids use two columns.
-- Desktop `>=1024px`: sidebar returns to fixed 280px width, main content margin follows `--sidebarWidth`, large grids can expand to 3+ columns based on component rules.
-- Touch targets stay at minimum 44px via global button sizing and explicit rail/FAB/button sizes.
-- Measurement file input keeps `capture="environment"` in `DynamicMetricForm.tsx` for mobile camera capture.
-
-### 24.3 GAP-3 AI Vision Form States — 2026-06-21
-
-Measurement cards with `requiresAttachment=true` must show:
-
-- A dashed photo capture/upload area.
-- `Baca Otomatis` action after a file is selected.
-- Per-card loading copy: `AI membaca...`.
-- Timeout fallback copy exactly: `AI terlalu lama membaca foto. Silakan input manual.`
-- Visible `rawAiValue` and confidence after AI success.
-- Manual override input remains editable before submit; changed final value sets `manualOverride`.
-
-### 24.4 GAP-4 Immediate Theme Application — 2026-06-21
-
-Settings theme controls must:
-
-- Update `document.documentElement.dataset.theme` as soon as user changes theme.
-- Update `document.documentElement.dataset.accessibility` as soon as user changes display mode.
-- After successful save, update auth context immediately so app shell and Settings reflect current DB-backed values without page reload.
-- Continue persisting source of truth in `HL_userProfiles.theme` and `HL_userProfiles.accessibilityMode`.
-
-### 24.5 GAP-5 Knowledge Base Guide Layout — 2026-06-21
-
-Knowledge Base must render structured guide UI:
-
-- Left directory with category chips and article cards.
-- Right reader with hero, icon, summary, media-ready panel, specs/use-case cards, and parsed sections.
-- No raw `<pre>` article body rendering.
-- Markdown body from `HL_knowledgeArticles.contentMarkdown` may be parsed into headings, paragraphs, and bullet lists client-side.
-- Layout must collapse to one-column on mobile and two-panel reader on tablet/desktop.
-
-### 24.6 GAP-6 Dashboard Real Data Widgets — 2026-06-21
-
-Dashboard pages must render DB-backed values:
-
-- Today: latest values, session/metric counts, emergency count, rule status badges, manual override badge, and alert list.
-- Weekly: metric averages/min/max/readings, trend badges, measurementDays, bestDay, worstDay, alertCount, and medication adherence percent when medication logs exist.
-- Monthly: metric averages/min/max/readings, measurementDays, alertCount, latest metric count, and accessible mini bar chart from daily session counts.
-- Empty states must remain explicit when period has no data.
-
-### 24.7 GAP-7 Rich Report Content — 2026-06-21
-
-Reports must expose rule-engine interpretation:
-
-- Daily report renders per-metric cards with value, severity, popup title/message, recommendation, and source label.
-- Weekly report renders adherence, bestDay, worstDay, alertCount, daysWithData, and metric table.
-- Monthly report renders sessions, daysWithData, alertCount, AI monthly summary, and metric table.
-- Empty reports show explicit no-data prompts.
-
-### 24.8 GAP-9 Settings System Config Panel — 2026-06-22
-
-Admin Settings must expose DB-backed system configuration without leaving the Settings route:
-
-- Non-admin users must not see the System Config panel; frontend discovers permission by calling `/api/admin/configs` and hiding the panel on 401/403.
-- Admin users see a `System Config` section below profile settings.
-- Config rows reuse the admin config table/form pattern: key, description, editable value, and data type.
-- Admin users can create non-protected config keys and delete non-protected config keys from the Settings route.
-- Sensitive config keys such as `telegramBotToken` render as password inputs with clear placeholder text.
-- Settings panel width may expand to support config tables; the profile form remains capped for readability.
-
-### 24.9 GAP-10 AI Assistant Chat UI — 2026-06-22
-
-AI Assistant must behave like a conversational clinical support surface:
-
-- Top context banner shows latest vitals injected into the request.
-- Safety note is always visible and states that AI does not diagnose, assign medical severity, or change medication dosage.
-- Conversation renders user and assistant chat bubbles with model/fallback metadata.
-- Loading state renders an assistant typing bubble.
-- Compose card supports multiline questions and send action.
-- Senior-friendly typography uses `--typBodyLg` inside response bubbles.
-
-Frontend Sprint 1-4 sekarang disejajarkan dengan Stitch project `HL Health Master Layout`
-(`Clinical Precision`):
+Production token values:
 
 ```text
-Font: Inter
+Font: Inter (Google Fonts, loaded in index.html)
 Canvas: #f7f9fb
-Surface/card: #ffffff
-Primary CTA: #0061ff
+Surface: #f2f4f6
+Surface/container: #eceef0
+Surface/container-high: #e6e8ea
+Surface/dim: #d8dadc
+Surface/elevated: #ffffff
+Primary: #0061ff
 Primary strong: #004bca
+On-primary-container: #f1f2ff
 Text primary: #191c1e
 Text secondary: #424656
+Text muted: #737687
 Outline: #c2c6d9
+Outline variant: #e0e3e5
+Border soft: #e0e3e5
+Status emergency: #7f1d1d
+Status critical: #ba1a1a
+Status high: #b45309
+Status warning: #9a6700
+Status info: #005c85
+Status normal: #168244
 Sidebar width: 280px
-Card radius: 8px
-Modal radius: 12px
-Status chip: pill only for semantic state
-```
-
-Implementation note:
-
-```text
-Routes/pages in web/src/pages keep existing React state, hooks, handlers, and API calls.
-Stitch layout is applied through existing page JSX wrappers plus shared CSS tokens.
-Desktop uses persistent sidebar shell; mobile uses bottom navigation.
+Card shadow: 0px 4px 6px -1px rgba(0,0,0,0.05)
+Card radius: 4px (--radiusMd)
+Modal radius: 8px (--radiusLg)
+Status chip: pill only for semantic state (--radiusFull = 999px)
 ```
 
 ---
 
 ## 25. Senior Mode Production Shell
 
-When `accessibilityMode = senior`, the app switches to a simplified shell:
+When `data-accessibility="senior"`, the app uses `SeniorAppShell` component:
+
+Source: `web/src/components/SeniorAppShell.tsx` and `web/src/styles/senior-mode.css`.
 
 ```text
-Primary tabs only: Beranda, Tambah Data, Darurat
+Primary tabs only: Home, Add Data, Emergency
 Desktop sidebar hidden
 Mobile bottom nav hidden
 Large tab buttons with high contrast state
-Darurat tab renders pulsing TOMBOL SOS
-SOS long-press state must be reachable by pointer/touch events
+Emergency tab renders SOS long-press button
+Font size: 19px base (not rem)
+Card padding: 20px
+Input min-height: 56px
+Button min-height: 56px
+SOS long-press threshold: 900ms
 ```
 
-Production UAT on 2026-06-21 verified that the senior shell replaces the normal navigation and that the SOS long-press indicator renders after a sustained press.
+Senior mode applies `data-accessibility="senior"` to `<html>`, which activates `senior-mode.css`:
+- Increases base font size to 19px
+- Increases card padding to 20px
+- Increases input/button min-height to 56px
+- Adds `.senior-shell`, `.senior-tabs`, `.senior-content` layout classes

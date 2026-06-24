@@ -25,14 +25,14 @@ Every agent must prioritize resume-safe work. Any sprint may be interrupted, so 
 
 Before starting any task, every agent must read these files in this order:
 
-1. `PRD.docx.md` or exported PRD markdown, if available
-2. `PRD_UserStory.docx.md` or exported user story markdown, if available
-3. `ARCHITECTURE.md`
-4. `api-contract.md`
-5. `schema.sql`
-6. `seed.sql`
-7. `design-system.md`
-8. `TASKS.md`
+1. `docs/01-PRD.docx.md` or exported PRD markdown, if available
+2. `docs/02-PRD_UserStory.docx.md` or exported user story markdown, if available
+3. `docs/04-ARCHITECTURE.md`
+4. `docs/05-api-contract.md`
+5. `docs/07-schema.sql`
+6. `docs/08-seed.sql`
+7. `docs/06-design-system.md`
+8. `docs/11-TASKS.md`
 9. `WORK_LOG.md`
 10. `HANDOFF.md`
 

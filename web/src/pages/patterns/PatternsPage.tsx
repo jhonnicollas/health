@@ -1,4 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+type PatternInsight = {
+  id: number
+  insightType: string
+  rangeStart: string
+  rangeEnd: string
+  summaryText: string
+  confidence: number | null
+  createdAt: string
+}
 
 type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
 
@@ -8,6 +18,16 @@ export function PatternsPage() {
   const [sleepBpResult, setSleepBpResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<'weight-bp' | 'medication' | 'sleep-bp' | null>(null)
+  const [insights, setInsights] = useState<PatternInsight[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/patterns?limit=20', { credentials: 'include' })
+      .then(r => r.json() as Promise<ApiResp<{ insights: PatternInsight[] }>>)
+      .then(body => { if (body.success && body.data?.insights) setInsights(body.data.insights) })
+      .catch(() => {})
+      .finally(() => setInsightsLoading(false))
+  }, [])
 
   async function generate(kind: 'weight-bp' | 'medication' | 'sleep-bp') {
     setLoading(kind); setError(null)
@@ -51,6 +71,25 @@ export function PatternsPage() {
         <h3>Medication Adherence Pattern (14 days)</h3>
         <button disabled={loading !== null} onClick={() => generate('medication')} type="button">{loading === 'medication' ? 'Generating...' : 'Generate Insight'}</button>
         {medResult ? <p>{medResult}</p> : null}
+      </div>
+
+      <div className="settings-card" style={{ marginTop: 24 }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>history</span>
+          Pattern History
+        </h3>
+        {insightsLoading ? <p className="muted">Loading...</p> : null}
+        {!insightsLoading && insights.length === 0 ? <p className="muted">No pattern insights yet. Generate one above.</p> : null}
+        {insights.map(ins => (
+          <div key={ins.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--colorBorderSoft, #e5e7eb)' }}>
+            <p style={{ margin: '0 0 4px' }}>{ins.summaryText}</p>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span className="badge-status badge-info"><span className="status-dot" />{ins.insightType}</span>
+              {ins.confidence !== null ? <span className="meta" style={{ fontSize: '0.75em' }}>conf: {(ins.confidence * 100).toFixed(0)}%</span> : null}
+              <span className="meta" style={{ fontSize: '0.75em' }}>{ins.rangeStart?.slice(0, 10)} — {ins.rangeEnd?.slice(0, 10)}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   )

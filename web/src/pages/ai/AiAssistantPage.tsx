@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type VitalSnapshot = {
   metricCode: string
@@ -7,6 +7,15 @@ type VitalSnapshot = {
   status: string
   severity: string
   measuredAt?: string
+}
+
+type AiRecommendation = {
+  id: number
+  sessionId?: number
+  summaryText: string
+  safetyStatus: string
+  modelName?: string
+  createdAt: string
 }
 
 type AiAssistantResponse = {
@@ -40,6 +49,16 @@ function AiAssistantPage() {
   const [vitals, setVitals] = useState<VitalSnapshot[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [recommendations, setRecommendations] = useState<AiRecommendation[]>([])
+  const [recsLoading, setRecsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/ai/recommendations?limit=10', { credentials: 'include' })
+      .then(r => r.json() as Promise<{ success: boolean; data?: { recommendations: AiRecommendation[] }; error?: { message: string } }>)
+      .then(body => { if (body.success && body.data?.recommendations) setRecommendations(body.data.recommendations) })
+      .catch(() => {})
+      .finally(() => setRecsLoading(false))
+  }, [])
 
   async function ask() {
     const trimmedQuestion = question.trim()
@@ -115,6 +134,27 @@ function AiAssistantPage() {
       <div className="ai-safety-note" role="note">
         AI hanya memberi edukasi umum. AI tidak membuat diagnosis, tidak menentukan tingkat keparahan, dan tidak mengubah dosis obat.
       </div>
+
+      {recommendations.length > 0 || !recsLoading ? (
+        <div className="settings-card" style={{ marginTop: 16 }}>
+          <h3 style={{ font: 'var(--typHeadlineSm)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>history</span>
+            Recommendation History
+          </h3>
+          {recsLoading ? <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>Loading...</p> : null}
+          {!recsLoading && recommendations.length === 0 ? <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>No recommendations yet.</p> : null}
+          {recommendations.map(rec => (
+            <div key={rec.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--colorBorderSoft)' }}>
+              <p style={{ font: 'var(--typBodySm)', margin: '0 0 4px' }}>{rec.summaryText}</p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className={`badge-status badge-${rec.safetyStatus === 'safe' ? 'normal' : rec.safetyStatus === 'filtered' ? 'warning' : 'info'}`}><span className="status-dot" />{rec.safetyStatus}</span>
+                {rec.modelName ? <span className="meta" style={{ fontSize: '0.75em' }}>{rec.modelName}</span> : null}
+                <span className="meta" style={{ fontSize: '0.75em' }}>{new Date(rec.createdAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="ai-chat-window" aria-live="polite">
         {messages.map((message) => (

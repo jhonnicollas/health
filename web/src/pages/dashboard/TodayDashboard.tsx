@@ -87,10 +87,23 @@ const SEVERITY_BADGE: Record<string, { label: string, className: string }> = {
   emergency: { label: 'Emergency', className: 'badge-emergency' }
 }
 
+type ComparisonData = {
+  metricCode: string
+  todayValue: number | null
+  threeDayAverage: number | null
+  sevenDayAverage: number | null
+  delta3Day: number | null
+  delta7Day: number | null
+  status: string
+  hasEnough3DayData: boolean
+  hasEnough7DayData: boolean
+}
+
 export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: string) => void }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [comparisons, setComparisons] = useState<ComparisonData[]>([])
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -108,7 +121,20 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
         setLoading(false)
       }
     }
-    loadDashboard()
+    const loadComparisons = async () => {
+      try {
+        const codes = ['systolic','diastolic','spo2','heartRate','bodyWeight','sleepDuration']
+        const results: ComparisonData[] = []
+        for (const code of codes) {
+          const res = await fetch(`/api/dashboard/comparison?metricCode=${code}`, { credentials: 'include' })
+          const body = await res.json()
+          if (body.success && body.data) results.push(body.data)
+        }
+        setComparisons(results.filter(c => c.todayValue !== null))
+      } catch {}
+    }
+    void loadDashboard()
+    void loadComparisons()
   }, [])
 
   if (loading) {
@@ -250,6 +276,37 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
               )
             })}
           </div>
+        </div>
+      ) : null}
+
+      {comparisons.length > 0 ? (
+        <div className="dashboard-chart-card">
+          <h3>Trend Comparison</h3>
+          <table className="report-table">
+            <thead>
+              <tr><th>Metric</th><th>Today</th><th>3-Day Avg</th><th>7-Day Avg</th><th>Trend</th></tr>
+            </thead>
+            <tbody>
+              {comparisons.map(c => (
+                <tr key={c.metricCode}>
+                  <td>{METRIC_LABELS[c.metricCode] || c.metricCode}</td>
+                  <td><strong>{c.todayValue}</strong></td>
+                  <td>{c.hasEnough3DayData ? c.threeDayAverage : '—'}</td>
+                  <td>{c.hasEnough7DayData ? c.sevenDayAverage : '—'}</td>
+                  <td>
+                    {c.delta3Day !== null ? (
+                      <span style={{ color: c.delta3Day > 0 ? 'var(--colorStatusCritical, #dc2626)' : c.delta3Day < 0 ? 'var(--colorStatusGood, #16a34a)' : 'var(--colorTextMuted)' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>
+                          {c.status === 'up' ? 'trending_up' : c.status === 'down' ? 'trending_down' : 'trending_flat'}
+                        </span>
+                        {c.delta3Day > 0 ? '+' : ''}{c.delta3Day}
+                      </span>
+                    ) : <span className="muted">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : null}
     </div>

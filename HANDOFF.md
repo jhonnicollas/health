@@ -1,6 +1,83 @@
 # HANDOFF.md — Current Resume State
 
-## Current Status — 2026-06-23 (Sprint 1 UI/UX Polish + AI Report)
+## Current Status — 2026-06-24 16:40 UTC
+
+```text
+Project: HL Health Companion
+Sprint: API Gap Fix
+Current Task: API-GAP-FIX
+Current State: COMPLETED AND DEPLOYED
+Last Completed: Implemented 6 missing API endpoints (backend + frontend)
+Production Worker: 2a3967b2-eb84-4cb0-a7df-085d7628c33c
+Worker URL:        https://hl-health-companion.indiehomesungairaya.workers.dev
+Pages Deploy:      https://58fc1508.hl-health-companion.pages.dev
+```
+
+### What Changed
+
+**Backend (worker/src/routes-extra.ts)** — 6 new endpoints:
+1. `DELETE /api/measurements/:id` — owner-scoped hard delete, cascade values/attachments/alerts, delete R2 objects, audit log
+2. `GET /api/dashboard/comparison?metricCode=systolic` — today vs 3-day/7-day average, delta, trend status
+3. `GET /api/ai/recommendations?limit=20` — paginated list from HL_aiRecommendations
+4. `GET /api/kb/:slug` — single article by slug, DB-first with hardcoded fallback
+5. `PUT /api/settings/consent` — update aiConsent/emergencyConsent/dataShareConsent in HL_userProfiles + HL_userConsents, audit log
+6. `GET /api/patterns?limit=20` — paginated list from HL_patternInsights
+
+**Frontend:**
+- HistoryPage.tsx: delete button per session row
+- TodayDashboard.tsx: trend comparison table from /api/dashboard/comparison
+- AiAssistantPage.tsx: recommendation history list from /api/ai/recommendations
+- KnowledgeBasePage.tsx: slug-based article loading from /api/kb/:slug
+- PatternsPage.tsx: insight history list from /api/patterns
+- ProfileSettingsPage.tsx: consent toggles + save via /api/settings/consent
+- auth.ts: added consent fields to Profile type
+
+**docs/05-api-contract.md**: removed NOT IMPLEMENTED markers from §13.4, §13.6
+
+### Remaining API Gaps
+
+| Type | Count | Details |
+|---|---|---|
+| Path mismatches | 1 | `PUT /api/family/:id` → actual `PUT /api/family/members/:id/permissions` |
+| Still NOT implemented | 3 | `POST /api/measurements/drafts`, `GET /api/measurements/:id` (detail, not delete), `GET /api/measurements/:id/attachments/:attachmentId/url` |
+| NOT documented | 21 | Implemented routes missing from contract doc |
+| Enum issues | 2 | theme has highContrast (it's accessibilityMode), deviceCode missing gm242b |
+
+### Known Issues
+- AI uses deterministic-fallback (aiTextApiKey empty)
+- Cloudflare cron at 5/5 limit — manual POST `/api/internal/cron/reminders` works
+
+### Next Recommended Task
+- Fix remaining path mismatch: `PUT /api/family/:id` in contract
+- Document the 21 implemented-not-documented endpoints
+- Fix enum gaps in contract
+
+```text
+Project: HL Health Companion
+Sprint: Documentation Alignment
+Current Task: Design System Doc Update
+Current State: COMPLETED
+Last Completed: Updated docs/06-design-system.md to match actual CSS source code
+Production Worker: a665c4f4-6c8a-48bb-b806-0774933e59be (unchanged)
+Worker URL:        https://hl-health-companion.indiehomesungairaya.workers.dev
+```
+
+### What Changed
+
+- Updated `docs/06-design-system.md` color tokens to match actual `index.css` values
+- Fixed warm theme (green tones, not orange)
+- Fixed high contrast to use `data-accessibility` not `data-theme`
+- Added typography tokens (`--typHeadlineXl`, `--typBodyMd`, etc.)
+- Added layout tokens (`--sidebarWidth`, `--topbarHeight`, etc.)
+- Updated component names to match actual files
+- Replaced Tailwind section with actual styling approach (plain CSS)
+- Updated QA checklist for actual theme/accessibility toggle mechanism
+
+### Next Recommended Task
+
+Set a valid 9router API key in Settings/Admin Config → verify aggressive doctor mode AI responses in production
+
+---
 
 ```text
 Project: HL Health Companion

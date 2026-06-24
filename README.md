@@ -1,51 +1,62 @@
 # HL Health Companion
 
-HL Health Companion is a Cloudflare-first health logging Progressive Web Application (PWA) designed to track, validate, and summarize user health measurements. It emphasizes strict data privacy, rule-based medical safety severity determination, dynamic AI vision extraction, and offline availability.
+Cloudflare-first health logging PWA — record vitals via photo, extract values with AI vision, validate with rule-based severity, push to Telegram, and share dashboards with family/caregivers.
 
-## 🚀 Technology Stack
+## Stack
 
-### Backend
-- **Framework:** Hono.js running on Cloudflare Workers
-- **Database:** Cloudflare D1 SQL database (Binding name: `DB`)
-- **Storage:** Cloudflare R2 bucket (Binding name: `LOGS`)
-- **AI Models:** Cloudflare Workers AI Vision Model & Cloudflare Workers AI Text LLM
-- **Background Tasks:** Cloudflare Queues
-- **Scheduler:** Cloudflare Cron Triggers
+| Layer | Tech |
+|---|---|
+| Runtime | Cloudflare Workers (TypeScript) |
+| API | Hono.js |
+| Database | Cloudflare D1 (`DB` → `multi_Ai_db`, 38 tables) |
+| Storage | Cloudflare R2 (`LOGS` → `multi-apps-ai-bucket`) |
+| AI Vision | `@cf/meta/llama-3.2-11b-vision-instruct` (configurable via `HL_systemConfigs`) |
+| AI Text | 9router OpenAI-compatible endpoint, 3-model fallback (`deepseek-v4-flash-free`, `mimo-v2.5-free`, `poolside/laguna-m.1:free`) |
+| Async | Cloudflare Queues (`telegram-submit-summary`) |
+| Scheduler | Cloudflare Cron Triggers |
+| Frontend | React 19 + Vite 8 + TypeScript 6 (vanilla CSS) |
+| Auth | HTTP-only cookie sessions (`hlSession`) |
+| PWA | Service worker + manifest, installable on mobile |
+| **Auth** | HTTP-only cookie sessions (`hlSession`) |
 
-### Frontend
-- **Framework:** React SPA built with Vite
-- **Styling:** Vanilla CSS (TailwindCSS avoided unless explicitly requested)
-- **Deployment:** PWA-ready static assets deployed to Cloudflare
+## Project Structure
 
----
-
-## 📂 Project Structure
-
-```text
+```
 hl-health-companion/
-├── docs/                      # Core specification & architecture files
-│   ├── ARCHITECTURE.md        # Architectural flow and system design
-│   ├── api-contract.md        # REST API endpoints specifications
-│   ├── schema.sql             # SQL DDL for database
-│   ├── seed.sql               # Seed data for system config & catalog
-│   ├── TASKS.md               # Source of Truth task backlog
-│   ├── TEST_PLAN.md           # Testing instructions & validation rules
-│   └── design-system.md       # UI components & aesthetics specs
-├── web/                       # React Frontend application
-├── worker/                    # Hono.js Cloudflare Worker API
-├── AGENTS.md                  # Mandatory rules for AI Agents
-├── HANDOFF.md                 # Current handoff/resume state
-├── WORK_LOG.md                # Agent activity log (append-only)
-└── package.json               # Monorepo workspaces definition
+├── docs/                        # PRD, architecture, api-contract, schema, tasks, test-plan
+├── web/                         # React SPA frontend
+│   ├── src/
+│   │   ├── pages/               # 19 page groups (auth, dashboard, measurement, reports, etc.)
+│   │   ├── components/          # Shared React components
+│   │   ├── hooks/               # useAiExtract
+│   │   ├── utils/               # imageCompressor, watermark, dateFormat, validation, bmiCalculator
+│   │   ├── context/             # AuthContext + auth (useAuth)
+│   │   ├── styles/              # senior-mode.css, high-contrast.css
+│   │   └── App.tsx              # SPA shell (sidebar + topbar + bottom nav)
+│   ├── public/                  # manifest.json, icons, sw.js, favicon.svg
+│   └── functions/api/           # Pages Function proxy → Worker URL
+├── worker/                      # Hono.js Worker (~4900 lines)
+│   └── src/
+│       ├── index.ts             # Main routes (auth, profile, measurements, dashboard, AI, reports, etc.)
+│       └── routes-extra.ts      # Extra routes (emergency, family, medications, fasting, streaks, patterns, cron)
+├── functions/api/[[path]].ts    # Pages Function proxy (rewrites /api/* → Worker origin)
+├── package.json                 # Monorepo root (workspaces: web, worker)
+└── AGENTS.md                    # Multi-agent operating rules
 ```
 
----
+## Sprint Status
 
-## ⚙️ Cloudflare Bindings & Credentials
+All **4 Sprints** complete — 151 user stories + gap remediations + enterprise production fixes.
 
-This project runs on existing Cloudflare resources. Do not create new databases or buckets.
+| Sprint | Scope | Status |
+|---|---|---|
+| Sprint 1 | Core Capture: auth, onboarding, measurement, AI vision, manual override, submit, R2, Telegram, dashboard today | ✅ |
+| Sprint 2 | Health Intelligence: rules engine, popup, AI recommendation, comparison, weekly/monthly dashboards, reports, KB | ✅ |
+| Sprint 3 | Family & Alerts: Telegram link, emergency alerts, family/caregiver RBAC, reminders, browser push, medication | ✅ |
+| Sprint 4 | Advanced: Doctor Ready PDF, fasting timer, gamification, pattern detection, senior mode, PWA, export, privacy | ✅ |
 
-### Wrangler Configuration (`worker/wrangler.toml`)
+## Cloudflare Bindings
+
 ```toml
 [[d1_databases]]
 binding = "DB"
@@ -55,53 +66,93 @@ database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"
 [[r2_buckets]]
 binding = "LOGS"
 bucket_name = "multi-apps-ai-bucket"
+
+[[queues.producers]]
+queue = "telegram-submit-summary"
+binding = "TELEGRAM_QUEUE"
+
+[[queues.consumers]]
+queue = "telegram-submit-summary"
+max_batch_size = 10
+max_batch_timeout = 5
 ```
 
-### Production Deployment Credentials
-- **Account ID:** `79dea2845a4b62ea5229c8676dea02c0`
-- **Token:** `<CLOUDFLARE_TOKEN>`
+## Development
 
----
-
-## 🛠️ Development & Setup
-
-### Prerequisites
-- Node.js (v18+)
-- Wrangler CLI installed globally (`npm i -g wrangler`)
-
-### Installation
-To install all dependencies across the monorepo, run from the root:
 ```bash
-npm install
+npm install          # install all workspaces (web + worker)
+npm run dev:web      # vite dev server → localhost:5173 (proxies /api to worker)
+npm run dev:worker   # wrangler dev → localhost:8787
 ```
 
-### Local Development
-To run the local development servers for both frontend and backend:
-- **Run Frontend:** `npm run dev:web` (Starts Vite dev server at http://localhost:5173)
-- **Run Backend (Worker):** `npm run dev:worker` (Starts wrangler local dev server)
+## Deployed URLs
 
----
+| App | URL |
+|---|---|
+| Worker API | `https://hl-health-companion-api.indiehomesungairaya.workers.dev` |
+| Pages Frontend | `https://hl-health-companion.pages.dev` |
 
-## ⚠️ Non-Negotiable Core Rules
+Pages proxies `/api/*` to Worker via `functions/api/[[path]].ts`.
 
-All developers and AI agents must strictly follow these rules (detailed in [AGENTS.md](file:///c:/codex/health/AGENTS.md)):
+## Database
 
-1. **Rule First, AI Assisted:** Medical severity/alerts are calculated solely by the `HL_metricRules` engine. AI is only used to generate summaries/insight. AI must not diagnose or prescribe.
-2. **Manual Override is Mandatory:** All AI-extracted fields must be editable before submission. If the user overrides an AI-extracted value, set `manualOverride = 1`.
-3. **No Original Image Storage:** Do not store original images. Only store watermarked, compressed webp files in R2:
-   `HL/users/{userId}/measurements/{sessionId}/{metricCode}-{attachmentId}.webp`
-4. **No Hardcoded Configs:** Values like AI timeout (`aiExtractTimeoutMs`) or max upload size (`maxUploadSizeBytes`) must be fetched from `HL_systemConfigs` table in D1.
-5. **Database Naming Conventions:**
-   - Table names must start with `HL_` followed by camelCase name (no extra underscores, e.g., `HL_users`, `HL_userProfiles`).
-   - Fields must use `camelCase` (e.g., `userId`, `createdAt`).
+38 tables with `HL_` prefix, camelCase fields. Key tables:
 
----
+- `HL_users` / `HL_sessions` / `HL_userProfiles` — auth & profiles
+- `HL_devices` / `HL_metricCatalog` / `HL_deviceMetrics` — device-metric catalog
+- `HL_metricRules` — rule-based severity engine
+- `HL_measurementSessions` / `HL_measurementValues` — measurement data
+- `HL_measurementAttachments` / `HL_lastMeasurements` — evidence & autofill cache
+- `HL_aiExtractions` / `HL_aiRecommendations` — AI logs
+- `HL_alerts` / `HL_notifications` / `HL_telegramLinks` — alerts & notifications
+- `HL_familyLinks` / `HL_familyInvites` / `HL_emergencyContacts` — family & emergency
+- `HL_medications` / `HL_medicationSchedules` / `HL_medicationLogs` — medication tracking
+- `HL_fastingSessions` — fasting timer
+- `HL_badges` / `HL_userBadges` / `HL_streaks` — gamification
+- `HL_reports` / `HL_reportShares` — reports & doctor sharing
+- `HL_patternInsights` — pattern detection
+- `HL_knowledgeArticles` — knowledge base
+- `HL_systemConfigs` — DB-backed config (no hardcoding)
+- `HL_auditLogs` / `HL_apiRateLimits` — audit & rate limiting
 
-## 🤖 Multi-Agent Execution Protocol
+## API Routes (~80 endpoints)
 
-If you are an AI agent working on this repo:
-1. **SSOT Tasks:** Always check [TASKS.md](file:///c:/codex/health/docs/TASKS.md). Pick only one task, mark it as `[-] In Progress`.
-2. **Work Log:** Append a "Started" log to [WORK_LOG.md](file:///c:/codex/health/WORK_LOG.md).
-3. **Handoff:** Update `Current Owner` in [HANDOFF.md](file:///c:/codex/health/HANDOFF.md).
-4. **Deploy & Validate:** After completing a sprint task, you **MUST** run validation (`typecheck`, `build`, `test`), deploy to production using Wrangler, and perform UAT in production.
-5. **Handoff & Complete:** Update documentation, mark task as `[x] Done` in `TASKS.md`, append completion details to `WORK_LOG.md`, and update `HANDOFF.md`.
+**Auth**: register, login, logout, me, forgot-password, forgot-password
+**Profile**: get, update, onboarding, UI settings
+**Metrics**: catalog
+**Measurements**: validate, submit, history, today, last, attachments, sync, drafts
+**Dashboard**: today, weekly, monthly, comparison
+**AI**: extract, recommendation, assistant, report-analysis
+**Reports**: daily, weekly, monthly, doctor-ready, download, share, share-token
+**Telegram**: connect, verify, test, settings, webhook
+**Family**: invite, accept, links, permissions, access-check, dashboard, caregiver dashboard
+**Emergency**: contacts CRUD, consent toggle, notify
+**Medications**: CRUD, logs, adherence
+**Fasting**: start, stop, current
+**Alerts**: list, acknowledge
+**Notifications**: list, browser subscribe
+**Patterns**: generate (sleep-bp, weight-bp, medication)
+**Reminders**: CRUD
+**Streaks / Badges**: list
+**Admin**: configs CRUD
+**Export**: CSV
+**Privacy**: delete account
+
+## Critical Rules
+
+1. **Rule First, AI Assisted** — `HL_metricRules` determines severity, not AI.
+2. **Manual Override Mandatory** — Every AI-extracted value is editable; `manualOverride=1` if changed.
+3. **No Original Image Stored** — Only compressed (50%) + watermarked webp saved to R2.
+4. **Configurable Timeout** — AI extraction timeout read from `HL_systemConfigs`, not hardcoded.
+5. **Naming** — Tables start with `HL_` (no underscore after); fields use camelCase.
+6. **No New DB/Bucket** — Use existing `multi_Ai_db` and `multi-apps-ai-bucket`.
+7. **Sensitive Data Encryption** — AES-GCM via `ENCRYPTION_KEY` secret for Telegram chat IDs, emergency contacts, medication notes.
+
+## Account
+
+- **Cloudflare Account ID**: `79dea2845a4b62ea5229c8676dea02c0`
+- **Token**: Set via `CLOUDFLARE_API_TOKEN` env var
+
+## Multi-Agent Protocol
+
+See `AGENTS.md` for task ordering, handoff, logging, and validation rules.

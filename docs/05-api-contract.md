@@ -1850,10 +1850,10 @@ month=2026-06
 
 ---
 
-## 16.4 Generate Doctor Ready PDF
+## 16.4 Generate Doctor Ready HTML Report
 
 ```http
-POST /api/reports/doctorReady30d
+POST /api/reports/doctor-ready
 ```
 
 ### Request
@@ -2771,7 +2771,7 @@ GET /api/fasting/current
 ## 23.1 Get Streaks
 
 ```http
-GET /api/gamification/streaks
+GET /api/streaks
 ```
 
 ### Response 200
@@ -2795,7 +2795,7 @@ GET /api/gamification/streaks
 ## 23.2 Get Badges
 
 ```http
-GET /api/gamification/badges
+GET /api/badges
 ```
 
 ### Response 200

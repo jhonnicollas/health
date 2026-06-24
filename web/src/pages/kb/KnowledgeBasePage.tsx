@@ -96,6 +96,7 @@ export function KnowledgeBasePage() {
   const [articles, setArticles] = useState<Article[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [category, setCategory] = useState('all')
+  const [fullArticle, setFullArticle] = useState<Article | null>(null)
 
   useEffect(() => {
     fetch('/api/kb', { credentials: 'include' })
@@ -108,6 +109,15 @@ export function KnowledgeBasePage() {
       })
   }, [])
 
+  useEffect(() => {
+    const selected = articles.find(a => a.id === selectedId)
+    if (!selected?.slug) return
+    fetch(`/api/kb/${encodeURIComponent(selected.slug)}`, { credentials: 'include' })
+      .then(r => r.json() as Promise<ApiResp<{ article: Article }>>)
+      .then(body => { if (body.success && body.data?.article) setFullArticle(body.data.article) })
+      .catch(() => {})
+  }, [selectedId, articles])
+
   const categories = useMemo(
     () => ['all', ...Array.from(new Set(articles.map(article => article.category ?? 'device')))],
     [articles]
@@ -117,7 +127,8 @@ export function KnowledgeBasePage() {
     [articles, category]
   )
   const selectedArticle = articles.find(article => article.id === selectedId) ?? visibleArticles[0] ?? null
-  const sections = selectedArticle ? parseArticle(selectedArticle.body) : []
+  const displayArticle = fullArticle && selectedArticle && fullArticle.slug === selectedArticle.slug ? { ...selectedArticle, body: (fullArticle as any).body || (fullArticle as any).contentMarkdown || selectedArticle.body } : selectedArticle
+  const sections = displayArticle ? parseArticle(displayArticle.body) : []
 
   return (
     <div className="kb-page">
@@ -166,15 +177,15 @@ export function KnowledgeBasePage() {
             </div>
           </aside>
 
-          {selectedArticle ? (
+          {displayArticle ? (
             <article className="kb-reader" aria-labelledby="kb-reader-title">
               <header className="kb-reader-hero">
-                <span className="status-chip">{CATEGORY_LABELS[selectedArticle.category ?? 'device'] ?? selectedArticle.category}</span>
+                <span className="status-chip">{CATEGORY_LABELS[displayArticle.category ?? 'device'] ?? displayArticle.category}</span>
                 <div className="kb-reader-title-row">
-                  <span className="material-symbols-outlined" aria-hidden="true">{articleIcon(selectedArticle)}</span>
-                  <h3 id="kb-reader-title">{selectedArticle.title}</h3>
+                  <span className="material-symbols-outlined" aria-hidden="true">{articleIcon(displayArticle)}</span>
+                  <h3 id="kb-reader-title">{displayArticle.title}</h3>
                 </div>
-                <p>{articleSummary(selectedArticle)}</p>
+                <p>{articleSummary(displayArticle)}</p>
                 <a href="/measurements/new" className="kb-cta-btn">
                   <span className="material-symbols-outlined">add_circle</span>
                   Record with this device
@@ -229,7 +240,6 @@ export function KnowledgeBasePage() {
         </div>
       ) : null}
     </div>
-  )
-}
+  )}
 
 export default KnowledgeBasePage

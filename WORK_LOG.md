@@ -5014,3 +5014,165 @@ Final state of audit + fixes:
 - `filterUnsafeContent` still blocks medication-related phrases (resep obat, dosis, etc.) as required by Out of Scope.
 - Vectorize integration is documented but not yet coded (no Vectorize binding or embedding pipeline exists). Documented as Sprint 5 scope.
 - `extractPatternScore` uses regex to parse Clinical Confidence Score from AI text. May need refinement based on actual AI output format.
+
+## 2026-06-24 04:55 UTC — Agent: mimo-v2.5-pro
+
+### Task
+- Task ID: DOC-CLEANUP
+- Sprint: Documentation Housekeeping
+- Status: Completed
+
+### Files Removed
+- docs/ENTERPRISE_PRODUCTION_REMEDIATION_TASK_PLAN.md (stale sprint plan)
+- docs/INTEGER_ID_MIGRATION_PLAN.md (migration completed)
+- docs/prompt-stitch-parity-full.md (stale UI parity doc)
+- docs/STITCH_UI_PARITY_TASK_PLAN.md (completed task plan)
+- docs/STITCH_UI_PARITY_TEST_PLAN.md (completed test plan)
+- AGENT_HANDOFF_TEMPLATE.md (redundant with HANDOFF.md)
+
+### Files Renamed (git mv with `NN-` prefix)
+- docs/PRD.docx.md → docs/01-PRD.docx.md
+- docs/PRD_UserStory.docx.md → docs/02-PRD_UserStory.docx.md
+- docs/PRD_TRACEABILITY_MATRIX.md → docs/03-PRD_TRACEABILITY_MATRIX.md
+- docs/ARCHITECTURE.md → docs/04-ARCHITECTURE.md
+- docs/api-contract.md → docs/05-api-contract.md
+- docs/design-system.md → docs/06-design-system.md
+- docs/schema.sql → docs/07-schema.sql
+- docs/seed.sql → docs/08-seed.sql
+- docs/seed-rules.generated.sql → docs/09-seed-rules.generated.sql
+- docs/rules-seeder.js.txt → docs/10-rules-seeder.js.txt
+- docs/TASKS.md → docs/11-TASKS.md
+- docs/TEST_PLAN.md → docs/12-TEST_PLAN.md
+
+### Files Moved into docs/
+- IMPLEMENTATION_SUMMARY.md → docs/13-IMPLEMENTATION_SUMMARY.md
+- DOCS_UPDATE_CHECKLIST.md → docs/14-DOCS_UPDATE_CHECKLIST.md
+
+### Files Updated (cross-references)
+- AGENTS.md: mandatory file list now uses `docs/` prefix with numbered names
+- README.md: updated file references
+- docs/03-PRD_TRACEABILITY_MATRIX.md: updated schema/seed/migration paths
+- docs/11-TASKS.md: updated schema/seed/rules-seeder paths
+- docs/13-IMPLEMENTATION_SUMMARY.md: updated schema/seed paths
+- HANDOFF.md: updated active status section
+
+### Validation
+- worker typecheck ✅
+- web typecheck ✅
+
+### Documentation Updated
+- HANDOFF.md (active status + summary)
+- WORK_LOG.md (this entry)
+
+### Next Agent Notes
+- All docs in `docs/` now numbered with `NN-` prefix (01 through 14). AGENTS.md references updated accordingly.
+- 6 stale files removed. 2 root-level docs moved into docs/.
+- To read PRD: `docs/01-PRD.docx.md`. To read schema: `docs/07-schema.sql`.
+- No code changes in this session — only file reorganization and cross-reference updates.
+
+## 2026-06-24 10:00 UTC — Agent: opencode
+
+### Task
+- Task ID: Design System Doc Update
+- Sprint: Documentation Alignment
+- Status: Completed
+
+### Files Read
+- web/src/index.css (source of truth for CSS tokens)
+- web/src/styles/senior-mode.css
+- web/src/styles/high-contrast.css
+- web/src/App.css
+- web/src/components/dashboard/TrendBadge.css
+- web/src/components/measurement/InterpretationPopup.css
+- web/src/components/measurement/ManualOverrideInput.css
+- web/src/components/shared/EmergencyModal.css
+- web/src/components/SeniorAppShell.tsx
+- web/frontend_stitch/DESIGN.md
+
+### Files Changed
+- docs/06-design-system.md
+
+### What Changed
+- Section 4.1-4.5: Updated all color token values to match actual `index.css` (was using Tailwind slate palette, now uses actual Clinical Precision tokens: `#0061ff`, `#191c1e`, `#f7f9fb`, etc.)
+- Section 4.3: Updated warm theme from orange tones to actual green tones (`#16a34a` primary)
+- Section 4.5: Changed from `[data-theme="highContrast"]` to `html[data-accessibility="highContrast"]` (matches actual CSS)
+- Added typography tokens (`--typHeadlineXl`, `--typBodyMd`, etc.) and layout tokens (`--sidebarWidth`, `--topbarHeight`, etc.)
+- Section 21: Updated component names to match actual files (e.g., `ManualOverrideInput` not `HealthNumberInput`)
+- Section 22: Replaced Tailwind token mapping with actual styling approach (plain CSS custom properties, no Tailwind)
+- Section 23: Updated QA checklist to reflect actual theme/accessibility toggle mechanism
+- Section 24: Simplified Stitch Clinical Precision section to list actual production token values
+- Section 25: Updated senior mode to reference `SeniorAppShell.tsx` and actual `data-accessibility="senior"` mechanism
+
+### Validation
+- Visual review of design-system.md token values against index.css source
+
+### Documentation Updated
+- docs/06-design-system.md
+- WORK_LOG.md (this entry)
+- HANDOFF.md (pending update)
+
+### Next Agent Notes
+- Design system doc now matches actual CSS implementation
+- Key insight: project does NOT use Tailwind; all styling is plain CSS custom properties
+- High contrast is `data-accessibility`, not `data-theme`
+- Only `light` theme is the default; warm/dark are alternative themes via `data-theme`
+
+## 2026-06-24 16:30 UTC — Agent: opencode
+
+### Task
+- Task ID: API-GAP-FIX
+- Sprint: gap-fix
+- Status: Completed
+
+### Files Read
+- worker/src/index.ts
+- worker/src/routes-extra.ts
+- docs/05-api-contract.md
+- web/src/pages/measurement/HistoryPage.tsx
+- web/src/pages/dashboard/TodayDashboard.tsx
+- web/src/pages/ai/AiAssistantPage.tsx
+- web/src/pages/kb/KnowledgeBasePage.tsx
+- web/src/pages/patterns/PatternsPage.tsx
+- web/src/pages/settings/ProfileSettingsPage.tsx
+- web/src/context/auth.ts
+- docs/07-schema.sql
+
+### Files Changed
+- worker/src/routes-extra.ts — added 6 endpoints
+- web/src/pages/measurement/HistoryPage.tsx — delete button
+- web/src/pages/dashboard/TodayDashboard.tsx — comparison table
+- web/src/pages/ai/AiAssistantPage.tsx — recommendation history
+- web/src/pages/kb/KnowledgeBasePage.tsx — slug-based article loading
+- web/src/pages/patterns/PatternsPage.tsx — insight history list
+- web/src/pages/settings/ProfileSettingsPage.tsx — consent toggles
+- web/src/context/auth.ts — added consent fields to Profile type
+- docs/05-api-contract.md — removed NOT IMPLEMENTED markers
+
+### What Changed
+- Implemented 6 missing API endpoints:
+  1. DELETE /api/measurements/:id — soft+hard delete session, cascade values/attachments/alerts, delete R2 objects, audit log
+  2. GET /api/dashboard/comparison — today vs 3-day/7-day average per metricCode, delta and trend status
+  3. GET /api/ai/recommendations — paginated list from HL_aiRecommendations
+  4. GET /api/kb/:slug — single article by slug with DB-first + hardcoded fallback
+  5. PUT /api/settings/consent — update aiConsent/emergencyConsent/dataShareConsent in HL_userProfiles + HL_userConsents, audit log
+  6. GET /api/patterns — paginated list from HL_patternInsights
+- Added frontend UI for all 6 features
+- Deployed worker v2a3967b2 and frontend to Cloudflare Pages
+
+### Validation
+- worker tsc --noEmit: pass
+- web tsc -b: pass
+- web vite build: pass
+- wrangler deploy: success
+- wrangler pages deploy: success
+
+### Documentation Updated
+- docs/05-api-contract.md — removed NOT IMPLEMENTED markers from §13.4, §13.6
+- WORK_LOG.md — this entry
+- HANDOFF.md — pending update
+
+### Next Agent Notes
+- 9 documented-not-implemented endpoints have been reduced: 3 remain (POST /api/measurements/drafts, GET /api/measurements/:id detail, GET /api/measurements/:id/attachments/:attachmentId/url signed URL)
+- 21 implemented-not-documented endpoints still need contract docs
+- Path mismatches still need fixing: PUT /api/family/:id → /api/family/members/:id/permissions
+- Enum gaps: theme includes highContrast which is accessibilityMode; deviceCode missing gm242b

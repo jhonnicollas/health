@@ -30,6 +30,21 @@ function HistoryPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showUnitInfo, setShowUnitInfo] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)
+  const [deleteMsg, setDeleteMsg] = useState<string | null>(null)
+
+  async function handleDelete(sessionId: number) {
+    if (!confirm('Hapus sesi pengukuran ini? Tindakan tidak bisa dibatalkan.')) return
+    setDeleting(sessionId); setDeleteMsg(null)
+    try {
+      const res = await fetch(`/api/measurements/${sessionId}`, { method: 'DELETE', credentials: 'include' })
+      const body = (await res.json()) as { success: boolean; error?: { message: string } }
+      if (!body.success) { setDeleteMsg(body.error?.message || 'Gagal menghapus.'); return }
+      setSessions(prev => prev.filter(s => s.id !== sessionId))
+      setDeleteMsg('Pengukuran dihapus.')
+    } catch { setDeleteMsg('Could not connect.') }
+    finally { setDeleting(null) }
+  }
 
   useEffect(() => {
     async function load() {
@@ -77,6 +92,7 @@ function HistoryPage() {
 
       {loading ? <p>Loading history...</p> : null}
       {error ? <p className="form-message error" role="status">{error}</p> : null}
+      {deleteMsg ? <p className={`form-message ${deleteMsg.includes('dihapus') ? 'success' : 'error'}`} role="status">{deleteMsg}</p> : null}
       {!loading && sessions.length === 0 ? <p>No measurement history yet.</p> : null}
 
       {sessions.length > 0 ? (
@@ -89,6 +105,7 @@ function HistoryPage() {
               <th>Status</th>
               <th>Rekomendasi</th>
               <th>Evidence</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -133,6 +150,11 @@ function HistoryPage() {
                       ) : (
                         <span className="muted" style={{ fontSize: '0.85em' }}>—</span>
                       )}
+                    </td>
+                    <td>
+                      <button className="evidence-btn" disabled={deleting === session.id} onClick={() => void handleDelete(session.id)} style={{ color: 'var(--colorStatusCritical, #dc2626)' }} type="button" title="Hapus sesi">
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
                     </td>
                   </tr>
                 )

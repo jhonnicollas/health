@@ -649,6 +649,171 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
     }
   })
+
+  app.delete('/api/measurements/:id', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const sessionId = c.req.param('id')
+      const session = await c.env.DB.prepare('SELECT id, userId FROM HL_measurementSessions WHERE id = ?').bind(sessionId).first<{ id: number; userId: number }>()
+      if (!session) return jsonResponse(c, failure('NOT_FOUND', 'Sesi pengukuran tidak ditemukan.', 404, [], startedAt), 404)
+      if (session.userId !== userId) return jsonResponse(c, failure('FORBIDDEN', 'Anda tidak memiliki akses ke sesi ini.', 403, [], startedAt), 403)
+      const attachments = await c.env.DB.prepare('SELECT r2Key FROM HL_measurementAttachments WHERE sessionId = ?').bind(sessionId).all<{ r2Key: string }>()
+      for (const att of (attachments.results || [])) {
+        try { await c.env.LOGS.delete(att.r2Key) } catch {}
+      }
+      await c.env.DB.batch([
+        c.env.DB.prepare('DELETE FROM HL_measurementAttachments WHERE sessionId = ?').bind(sessionId),
+        c.env.DB.prepare('DELETE FROM HL_measurementValues WHERE sessionId = ?').bind(sessionId),
+        c.env.DB.prepare('DELETE FROM HL_alerts WHERE sessionId = ?').bind(sessionId),
+        c.env.DB.prepare('DELETE FROM HL_measurementSessions WHERE id = ? AND userId = ?').bind(sessionId, userId),
+        c.env.DB.prepare("INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'measurementDelete', 'HL_measurementSessions', ?, ?, CURRENT_TIMESTAMP)").bind(userId, String(sessionId), JSON.stringify({ sessionId }))
+      ])
+      return jsonResponse(c, success({ deleted: true }, 200, startedAt), 200)
+    } catch (e) {
+      console.error('measurement delete error:', e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menghapus pengukuran.', 500, [], startedAt), 500)
+    }
+  })
+
+  app.get('/api/dashboard/comparison', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const metricCode = c.req.query('metricCode') || 'systolic'
+      const asOfDate = c.req.query('asOfDate') || new Date().toISOString().slice(0, 10)
+      const todayRow = await c.env.DB.prepare(
+        'SELECT finalValue FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(measuredAt,1,10) <= ? ORDER BY measuredAt DESC LIMIT 1'
+      ).bind(userId, metricCode, asOfDate).first<{ finalValue: number }>()
+      const threeDaysAgo = new Date(new Date(asOfDate).getTime() - 3 * 86400000).toISOString().slice(0, 10)
+      const sevenDaysAgo = new Date(new Date(asOfDate).getTime() - 7 * 86400000).toISOString().slice(0, 10)
+      const avg3 = await c.env.DB.prepare(
+        'SELECT AVG(finalValue) as avgVal, COUNT(*) as cnt FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(measuredAt,1,10) >= ? AND substr(measuredAt,1,10) < ?'
+      ).bind(userId, metricCode, threeDaysAgo, asOfDate).first<{ avgVal: number; cnt: number }>()
+      const avg7 = await c.env.DB.prepare(
+        'SELECT AVG(finalValue) as avgVal, COUNT(*) as cnt FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(measuredAt,1,10) >= ? AND substr(measuredAt,1,10) < ?'
+      ).bind(userId, metricCode, sevenDaysAgo, asOfDate).first<{ avgVal: number; cnt: number }>()
+      const todayValue = todayRow?.finalValue ?? null
+      const threeDayAverage = avg3?.cnt && avg3.cnt >= 3 ? Math.round((avg3.avgVal || 0) * 10) / 10 : null
+      const sevenDayAverage = avg7?.cnt && avg7.cnt >= 7 ? Math.round((avg7.avgVal || 0) * 10) / 10 : null
+      const delta3Day = todayValue !== null && threeDayAverage !== null ? Math.round((todayValue - threeDayAverage) * 10) / 10 : null
+      const delta7Day = todayValue !== null && sevenDayAverage !== null ? Math.round((todayValue - sevenDayAverage) * 10) / 10 : null
+      const status = delta3Day !== null ? (delta3Day > 0 ? 'up' : delta3Day < 0 ? 'down' : 'stable') : 'unknown'
+      return jsonResponse(c, success({
+        metricCode, todayValue, threeDayAverage, sevenDayAverage,
+        delta3Day, delta7Day, status,
+        hasEnough3DayData: threeDayAverage !== null,
+        hasEnough7DayData: sevenDayAverage !== null
+      }, 200, startedAt), 200)
+    } catch (e) {
+      console.error('dashboard comparison error:', e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat perbandingan.', 500, [], startedAt), 500)
+    }
+  })
+
+  app.get('/api/ai/recommendations', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100)
+      const cursor = c.req.query('cursor')
+      let query = 'SELECT id, sessionId, summaryText, safetyStatus, modelName, durationMs, createdAt FROM HL_aiRecommendations WHERE userId = ?'
+      const binds: (number | string)[] = [userId]
+      if (cursor) { query += ' AND id < ?'; binds.push(cursor) }
+      query += ' ORDER BY id DESC LIMIT ?'
+      binds.push(limit + 1)
+      const rows = await c.env.DB.prepare(query).bind(...binds).all()
+      const results = (rows.results || []).slice(0, limit)
+      const hasMore = (rows.results || []).length > limit
+      const nextCursor = hasMore && results.length > 0 ? String(results[results.length - 1].id) : null
+      return jsonResponse(c, success({ recommendations: results, pagination: { limit, cursor: nextCursor, hasMore } }, 200, startedAt), 200)
+    } catch (e) {
+      console.error('ai recommendations list error:', e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat rekomendasi.', 500, [], startedAt), 500)
+    }
+  })
+
+  app.get('/api/kb/:slug', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const slug = c.req.param('slug')
+      const row = await c.env.DB.prepare('SELECT id, slug, title, category, contentMarkdown, sortOrder FROM HL_knowledgeArticles WHERE slug = ? AND active = 1 LIMIT 1').bind(slug).first<{ id: number; slug: string; title: string; category: string; contentMarkdown: string; sortOrder: number }>()
+      if (row) return jsonResponse(c, success({ article: row }, 200, startedAt), 200)
+      const fallbacks: Record<string, { id: string; slug: string; title: string; category: string; contentMarkdown: string }> = {
+        'yuwell-yx106': { id: 'kb-yuwell-yx106', slug: 'yuwell-yx106', title: 'Panduan Yuwell YX106 Oximeter', category: 'device', contentMarkdown: '## Yuwell YX106 Oximeter\n\nClamp pada jari yang bersih dan hangat. Tunggu hingga angka stabil sebelum memfoto.\n\n### Tips Foto\nPastikan layar terlihat jelas, tidak ada silau.\n\n### Nilai Normal\nSpO2 95-100%, Heart Rate 60-100 bpm.' },
+        'omron-hem7194t1fl': { id: 'kb-omron', slug: 'omron-hem7194t1fl', title: 'Panduan OMRON HEM 7194 T1 FL', category: 'device', contentMarkdown: '## OMRON HEM 7194 T1 FL\n\nDuduk tenang 5 menit sebelum mengukur. Pangkas lengan pada posisi jantung.\n\n### Nilai Normal\nSistolik <120, Diastolik <80 mmHg (AHA 2017).' },
+        'sinocare-m101': { id: 'kb-sinocare', slug: 'sinocare-m101', title: 'Panduan Sinocare M101 GCU', category: 'device', contentMarkdown: '## Sinocare M101 GCU\n\nPilih mode test yang benar (fasting/post-meal). Cukup darah pada strip.\n\n### Nilai Normal\nGula Darah Puasa: 70-100 mg/dL, Post-Meal 2 Jam: <140 mg/dL.' },
+        'thermometer': { id: 'kb-thermometer', slug: 'thermometer', title: 'Panduan Termometer', category: 'device', contentMarkdown: '## Termometer\n\nPastikan alat bersih dan baterai cukup. Ukur sesuai petunjuk (axillary/oral).' },
+        'body-scale': { id: 'kb-scale', slug: 'body-scale', title: 'Panduan Timbangan Badan', category: 'device', contentMarkdown: '## Timbangan Badan\n\nTimbang pada permukaan datar dan keras. Ukur pada waktu yang sama setiap hari.' },
+        'health-disclaimer': { id: 'kb-disclaimer', slug: 'health-disclaimer', title: 'Disclaimer Kesehatan', category: 'safety', contentMarkdown: '## Disclaimer\n\nAplikasi ini membantu pencatatan, bukan diagnosis. Selalu konsultasi dokter.' }
+      }
+      const fallback = fallbacks[slug]
+      if (fallback) return jsonResponse(c, success({ article: fallback }, 200, startedAt), 200)
+      return jsonResponse(c, failure('NOT_FOUND', 'Artikel tidak ditemukan.', 404, [], startedAt), 404)
+    } catch (e) {
+      console.error('kb slug error:', e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat artikel.', 500, [], startedAt), 500)
+    }
+  })
+
+  app.put('/api/settings/consent', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const body = await c.req.json() as { aiConsent?: boolean; emergencyConsent?: boolean; dataShareConsent?: boolean }
+      const updates: string[] = []
+      const values: (number | string)[] = []
+      if (body.aiConsent !== undefined) { updates.push('aiConsent = ?'); values.push(body.aiConsent ? 1 : 0) }
+      if (body.emergencyConsent !== undefined) { updates.push('emergencyConsent = ?'); values.push(body.emergencyConsent ? 1 : 0) }
+      if (body.dataShareConsent !== undefined) { updates.push('dataShareConsent = ?'); values.push(body.dataShareConsent ? 1 : 0) }
+      if (updates.length === 0) return jsonResponse(c, failure('VALIDATION_ERROR', 'Tidak ada field yang dikirim.', 400, [], startedAt), 400)
+      updates.push('updatedAt = CURRENT_TIMESTAMP')
+      values.push(userId)
+      await c.env.DB.batch([
+        c.env.DB.prepare(`UPDATE HL_userProfiles SET ${updates.join(', ')} WHERE userId = ?`).bind(...values),
+        c.env.DB.prepare("INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'consentUpdate', 'HL_userProfiles', ?, ?, CURRENT_TIMESTAMP)").bind(userId, String(userId), JSON.stringify(body))
+      ])
+      const consentTypes = [
+        ...(body.aiConsent !== undefined ? [{ type: 'aiConsent', val: body.aiConsent }] : []),
+        ...(body.emergencyConsent !== undefined ? [{ type: 'emergencyConsent', val: body.emergencyConsent }] : []),
+        ...(body.dataShareConsent !== undefined ? [{ type: 'dataShareConsent', val: body.dataShareConsent }] : [])
+      ]
+      for (const ct of consentTypes) {
+        await c.env.DB.prepare("INSERT INTO HL_userConsents (userId, consentType, consentValue, createdAt, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(userId, consentType) DO UPDATE SET consentValue = excluded.consentValue, updatedAt = CURRENT_TIMESTAMP").bind(userId, ct.type, ct.val ? 1 : 0).run()
+      }
+      return jsonResponse(c, success({ updated: true }, 200, startedAt), 200)
+    } catch (e) {
+      console.error('settings consent error:', e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memperbarui persetujuan.', 500, [], startedAt), 500)
+    }
+  })
+
+  app.get('/api/patterns', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100)
+      const cursor = c.req.query('cursor')
+      let query = 'SELECT id, insightType, rangeStart, rangeEnd, summaryText, confidence, dataJson, createdAt FROM HL_patternInsights WHERE userId = ?'
+      const binds: (number | string)[] = [userId]
+      if (cursor) { query += ' AND id < ?'; binds.push(cursor) }
+      query += ' ORDER BY id DESC LIMIT ?'
+      binds.push(limit + 1)
+      const rows = await c.env.DB.prepare(query).bind(...binds).all()
+      const results = (rows.results || []).slice(0, limit)
+      const hasMore = (rows.results || []).length > limit
+      const nextCursor = hasMore && results.length > 0 ? String(results[results.length - 1].id) : null
+      return jsonResponse(c, success({ insights: results, pagination: { limit, cursor: nextCursor, hasMore } }, 200, startedAt), 200)
+    } catch (e) {
+      console.error('patterns list error:', e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat pola.', 500, [], startedAt), 500)
+    }
+  })
 }
 
 // GAP-17: single merged cron handler for all scheduled tasks
