@@ -1,5 +1,8 @@
 import { mountSprint5ARoutes } from "./routes-sprint5a.js"
 import { mountSprint5BRoutes } from "./routes-sprint5b.js"
+import { mountSprint5CRoutes } from "./routes-sprint5c.js"
+import { mountSprint5DRoutes } from "./routes-sprint5d.js"
+import { mountSprint5ERoutes } from "./routes-sprint5e.js"
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
@@ -3996,6 +3999,9 @@ app.onError((error, c) => {
 mountExtraRoutes(app as any)
 mountSprint5ARoutes(app as any)
 mountSprint5BRoutes(app as any)
+mountSprint5CRoutes(app as any)
+mountSprint5DRoutes(app as any)
+mountSprint5ERoutes(app as any)
 
 export {
   getCurrentSession,
