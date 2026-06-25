@@ -2365,13 +2365,15 @@ app.post('/api/measurements/submit', async (c) => {
       emergencyLevel: v.emergencyLevel || 'none'
     }))
 
+    const hasWarningOrAbove = savedValues.some(v => v.severity === 'warning' || v.severity === 'critical' || v.severity === 'emergency')
     return jsonResponse(c, success({
       sessionId,
       values: savedValues,
       interpretations,
       hasEmergency: hasEmergency === 1,
       streak: streakData,
-      badges: badgesData
+      badges: badgesData,
+      postSubmitPrompt: hasWarningOrAbove ? { type: 'symptomCheck', message: 'Apakah Anda mengalami keluhan terkait hasil pengukuran ini?', sessionId } : null
     }, 201, startedAt))
   } catch (error) {
     console.error('submit endpoint error:', error)
@@ -3028,7 +3030,8 @@ app.post('/api/ai/assistant', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
 
-    const body = await c.req.json().catch(() => ({})) as { question?: string }
+    const body = await c.req.json().catch(() => ({})) as { question?: string; clinicalCopilotMode?: boolean }
+    if (body.clinicalCopilotMode) return c.json({ success: false, error: { code: 'AI_CLINICAL_COPILOT_DEFERRED', message: 'AI Clinical Copilot runtime is deferred to Sprint 6.', details: [{ scopeStatus: 'deferred_to_sprint6' }] }, meta: { requestId: `req_${startedAt}`, durationMs: Date.now() - startedAt } }, 403)
     const question = (body.question || '').trim()
     if (!question) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'question wajib.', 400, [], startedAt))
@@ -3398,6 +3401,45 @@ app.get('/api/reports/monthly', async (c) => {
   }
 })
 
+app.get('/api/history/timeline', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const { from, to, types, limit, cursor } = c.req.query()
+    const typeSet = new Set((types || 'measurement,symptom,hydration,safetyEvent,cycle').split(','))
+    const limitN = Math.min(Number(limit) || 50, 100)
+    const items: any[] = []
+    if (typeSet.has('measurement')) {
+      const rows = await c.env.DB.prepare(`SELECT v.id, v.metricCode, v.finalValue, v.unit, v.status, v.severity, s.measuredAt FROM HL_measurementValues v JOIN HL_measurementSessions s ON s.id = v.sessionId WHERE s.userId = ? AND date(s.measuredAt) >= ? AND date(s.measuredAt) <= ? ORDER BY s.measuredAt DESC LIMIT ?`).bind(userId, from || '2026-01-01', to || '2099-12-31', limitN).all<any>()
+      for (const r of rows.results || []) items.push({ rowType: 'measurement', sourceId: String(r.id), occurredAt: r.measuredAt, title: `Pengukuran ${r.metricCode}`, severity: r.severity || r.status || 'normal', summary: `${r.finalValue} ${r.unit || ''}` })
+    }
+    if (typeSet.has('symptom')) {
+      const rows = await c.env.DB.prepare(`SELECT id, symptomDateTime, quickSymptomsJson, bodyArea, painScale, isRedFlag FROM HL_symptomLogs WHERE userId = ? AND date(symptomDateTime) >= ? AND date(symptomDateTime) <= ? ORDER BY symptomDateTime DESC LIMIT ?`).bind(userId, from || '2026-01-01', to || '2099-12-31', limitN).all<any>()
+      for (const r of rows.results || []) items.push({ rowType: 'symptom', sourceId: String(r.id), occurredAt: r.symptomDateTime, title: `Keluhan: ${r.bodyArea || r.quickSymptomsJson || '-'}`, severity: r.isRedFlag ? 'emergency' : 'normal', summary: r.painScale ? `Skala nyeri ${r.painScale}/10` : '', isRedFlag: !!r.isRedFlag })
+    }
+    if (typeSet.has('hydration')) {
+      const rows = await c.env.DB.prepare(`SELECT id, logDate, amountMl, source FROM HL_waterIntakeLogs WHERE userId = ? AND date(logDate) >= ? AND date(logDate) <= ? ORDER BY logDate DESC LIMIT ?`).bind(userId, from || '2026-01-01', to || '2099-12-31', limitN).all<any>()
+      for (const r of rows.results || []) items.push({ rowType: 'hydration', sourceId: String(r.id), occurredAt: r.logDate, title: 'Minum Air', severity: 'normal', summary: `${r.amountMl}ml via ${r.source || 'web'}` })
+    }
+    if (typeSet.has('safetyEvent')) {
+      const rows = await c.env.DB.prepare(`SELECT id, sourceType, eventType, severity, title, createdAt FROM HL_safetyEvents WHERE userId = ? AND date(createdAt) >= ? AND date(createdAt) <= ? ORDER BY createdAt DESC LIMIT ?`).bind(userId, from || '2026-01-01', to || '2099-12-31', limitN).all<any>()
+      for (const r of rows.results || []) items.push({ rowType: 'safetyEvent', sourceId: String(r.id), occurredAt: r.createdAt, title: r.title || r.eventType, severity: r.severity || 'normal', summary: r.eventType })
+    }
+    if (typeSet.has('cycle')) {
+      const rows = await c.env.DB.prepare(`SELECT id, logDate, flowLevel, symptoms FROM HL_cycleLogs WHERE userId = ? AND date(logDate) >= ? AND date(logDate) <= ? ORDER BY logDate DESC LIMIT ?`).bind(userId, from || '2026-01-01', to || '2099-12-31', limitN).all<any>()
+      for (const r of rows.results || []) items.push({ rowType: 'cycle', sourceId: String(r.id), occurredAt: r.logDate, title: 'Log Siklus', severity: 'normal', summary: r.flowLevel ? `Flow: ${r.flowLevel}` : (r.symptoms || 'Cycle log') })
+    }
+    items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    const hasMore = items.length > limitN
+    const sliced = hasMore ? items.slice(0, limitN) : items
+    return c.json({ success: true, data: sliced, meta: { ...jsonMeta(startedAt), hasMore } }, 200)
+  } catch (error) {
+    console.error('history timeline error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat timeline.', 500, [], startedAt))
+  }
+})
+
 // AI analysis for daily/weekly/monthly reports (US-2.3.1 + US-2.3.4)
 app.post('/api/ai/report-analysis', async (c) => {
   const startedAt = Date.now()
@@ -3405,7 +3447,8 @@ app.post('/api/ai/report-analysis', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
 
-    const body = await c.req.json() as { reportType?: string; context?: string }
+    const body = await c.req.json() as { reportType?: string; context?: string; clinicalCopilotMode?: boolean }
+    if (body.clinicalCopilotMode) return c.json({ success: false, error: { code: 'AI_CLINICAL_COPILOT_DEFERRED', message: 'AI Clinical Copilot runtime is deferred to Sprint 6.', details: [{ scopeStatus: 'deferred_to_sprint6' }] }, meta: { requestId: `req_${startedAt}`, durationMs: Date.now() - startedAt } }, 403)
     const reportType = body?.reportType
     if (reportType !== 'daily' && reportType !== 'weekly' && reportType !== 'monthly') {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'reportType harus daily/weekly/monthly.', 400, [], startedAt))
@@ -4741,8 +4784,9 @@ app.put('/api/admin/roles/:roleCode', async (c) => {
     if (denied) return denied
     const roleCode = c.req.param('roleCode')
     const body = await c.req.json() as { roleName?: string; description?: string; active?: boolean }
-    const existing = await c.env.DB.prepare('SELECT roleCode FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
+    const existing = await c.env.DB.prepare('SELECT roleCode, systemRole FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
     if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Role tidak ditemukan.', 404, [], startedAt))
+    if (existing.systemRole === 1) return jsonResponse(c, failure('FORBIDDEN', 'System role tidak bisa diubah.', 403, [], startedAt))
     await c.env.DB.prepare(
       'UPDATE HL_roles SET roleName = COALESCE(?, roleName), description = COALESCE(?, description), active = COALESCE(?, active), updatedAt = CURRENT_TIMESTAMP WHERE roleCode = ?'
     ).bind(body.roleName || null, body.description ?? null, typeof body.active === 'boolean' ? (body.active ? 1 : 0) : null, roleCode).run()
@@ -4787,7 +4831,7 @@ app.put('/api/admin/roles/:roleCode/permissions', async (c) => {
     const roleCode = c.req.param('roleCode')
     const body = await c.req.json() as { permissionCodes?: string[] }
     const permissionCodes = Array.isArray(body.permissionCodes) ? [...new Set(body.permissionCodes)] : []
-    const role = await c.env.DB.prepare('SELECT roleCode FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
+    const role = await c.env.DB.prepare('SELECT roleCode, systemRole FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
     if (!role) return jsonResponse(c, failure('NOT_FOUND', 'Role tidak ditemukan.', 404, [], startedAt))
     if (permissionCodes.length > 0) {
       const placeholders = permissionCodes.map(() => '?').join(',')
@@ -4811,6 +4855,27 @@ app.put('/api/admin/roles/:roleCode/permissions', async (c) => {
   } catch (error) {
     console.error('admin role permissions update error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update permission role.', 500, [], startedAt))
+  }
+})
+
+
+app.delete('/api/admin/roles/:roleCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.roles.manage', startedAt)
+    if (denied) return denied
+    const roleCode = c.req.param('roleCode')
+    const existing = await c.env.DB.prepare('SELECT roleCode, systemRole FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
+    if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Role tidak ditemukan.', 404, [], startedAt))
+    if (existing.systemRole === 1) return jsonResponse(c, failure('FORBIDDEN', 'System role tidak bisa dihapus.', 403, [], startedAt))
+    await c.env.DB.prepare('DELETE FROM HL_roles WHERE roleCode = ?').bind(roleCode).run()
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.roles.delete', entityType: 'HL_roles', entityId: roleCode, metadataJson: { roleCode, deleted: true } })
+    return jsonResponse(c, success({ roleCode, deleted: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin role delete error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal hapus role.', 500, [], startedAt))
   }
 })
 
@@ -5226,7 +5291,7 @@ app.get('/api/admin/ai-config', async (c) => {
   try {
     const user = await getAuthenticatedUser(c)
     if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const denied = await requireAdminPermission(c, user, 'admin.config.read', startedAt)
+    const denied = await requireAdminPermission(c, user, 'admin.aiConfig.read', startedAt)
     if (denied) return denied
     const configs = await ConfigService.list(c.env.DB, c.env as unknown as Record<string, unknown>)
     const allConfigs: Record<string, unknown> = {}
@@ -5241,7 +5306,7 @@ app.put('/api/admin/ai-config', async (c) => {
   try {
     const user = await getAuthenticatedUser(c)
     if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const denied = await requireAdminPermission(c, user, 'admin.config.update', startedAt)
+    const denied = await requireAdminPermission(c, user, 'admin.aiConfig.update', startedAt)
     if (denied) return denied
     const body = await c.req.json() as Record<string, unknown>
     const updatedKeys: string[] = []
@@ -5282,6 +5347,47 @@ app.put('/api/admin/feature-flags/:flagCode', async (c) => {
     await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.featureFlags.update', entityType: 'HL_featureFlags', entityId: flagCode, metadataJson: JSON.stringify({ flagCode, updated: true }) })
     return jsonResponse(c, success({ flagCode, updated: true }, 200, startedAt))
   } catch (error) { console.error('admin feature flag upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update feature flag.', 500, [], startedAt)) }
+})
+
+app.get('/api/admin/education/cards', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.education.manage', startedAt)
+    if (denied) return denied
+    const { topicType, active, q, limit } = c.req.query()
+    let sql = 'SELECT id, topicType, topicCode, title, active, sortOrder, updatedAt FROM HL_educationCards WHERE 1=1'; const params: unknown[] = []
+    if (topicType) { sql += ' AND topicType = ?'; params.push(topicType) }
+    if (active !== undefined) { sql += ' AND active = ?'; params.push(active === 'true' ? 1 : 0) }
+    if (q) { sql += ' AND (title LIKE ? OR topicCode LIKE ?)'; params.push(`%${q}%`, `%${q}%`) }
+    sql += ' ORDER BY sortOrder ASC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 100))
+    const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+    return jsonResponse(c, success(rows.results || [], 200, startedAt))
+  } catch (error) { console.error('admin education list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat kartu edukasi.', 500, [], startedAt)) }
+})
+
+app.put('/api/admin/education/cards/:topicType/:topicCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.education.manage', startedAt)
+    if (denied) return denied
+    const topicType = c.req.param('topicType'); const topicCode = c.req.param('topicCode')
+    const body = await c.req.json() as Record<string, unknown>
+    const existing = await c.env.DB.prepare('SELECT id FROM HL_educationCards WHERE topicType = ? AND topicCode = ?').bind(topicType, topicCode).first<any>()
+    if (existing) {
+      const fields = ['title','shortText','whyItMatters','howToUse','normalMeaning','warningMeaning','actionText','redFlagText','sourceLabel','contentMarkdown','minimumPlanCode','active','sortOrder']
+      const sets: string[] = []; const vals: unknown[] = []
+      for (const f of fields) { if (body[f] !== undefined) { sets.push(`${f} = ?`); vals.push(f === 'active' ? (body[f] ? 1 : 0) : body[f]) } }
+      if (sets.length) { sets.push("updatedAt = CURRENT_TIMESTAMP"); await c.env.DB.prepare(`UPDATE HL_educationCards SET ${sets.join(', ')} WHERE topicType = ? AND topicCode = ?`).bind(...vals as any[], topicType, topicCode).run() }
+    } else {
+      await c.env.DB.prepare('INSERT INTO HL_educationCards (topicType, topicCode, title, shortText, whyItMatters, howToUse, normalMeaning, warningMeaning, actionText, redFlagText, sourceLabel, contentMarkdown, active, sortOrder, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(topicType, topicCode, body.title || '', body.shortText || '', body.whyItMatters || '', body.howToUse || '', body.normalMeaning || '', body.warningMeaning || '', body.actionText || '', body.redFlagText || '', body.sourceLabel || 'HL Education', body.contentMarkdown || null, body.active !== false ? 1 : 0, body.sortOrder ?? 0).run()
+    }
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.education.upsert', entityType: 'HL_educationCards', entityId: `${topicType}::${topicCode}`, metadataJson: JSON.stringify({ topicType, topicCode, updated: true, inserted: !existing }) })
+    return jsonResponse(c, success({ topicType, topicCode, updated: true }, 200, startedAt))
+  } catch (error) { console.error('admin education upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update kartu edukasi.', 500, [], startedAt)) }
 })
 
 app.get('/api/admin/audit-logs', async (c) => {
@@ -5360,8 +5466,10 @@ app.put('/api/admin/metric-catalog/:metricCode', async (c) => {
       const sets: string[] = []; const vals: unknown[] = []
       for (const k of ['metricName','category','unit','inputType','requiresAttachment','requiresSex','requiresFasting','isCalculated','physicalMin','physicalMax','sortOrder','active']) { if (body[k] !== undefined) { sets.push(`${k} = ?`); vals.push(body[k]) } }
       if (sets.length) { sets.push("updatedAt = CURRENT_TIMESTAMP"); await c.env.DB.prepare(`UPDATE HL_metricCatalog SET ${sets.join(', ')} WHERE metricCode = ?`).bind(...vals as any[], metricCode).run() }
+    } else {
+      await c.env.DB.prepare('INSERT INTO HL_metricCatalog (metricCode, metricName, category, unit, inputType, requiresAttachment, requiresSex, requiresFasting, isCalculated, physicalMin, physicalMax, sortOrder, active, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(metricCode, body.metricName || metricCode, body.category || '', body.unit || '', body.inputType || 'mixed', body.requiresAttachment ? 1 : 0, body.requiresSex ? 1 : 0, body.requiresFasting ? 1 : 0, body.isCalculated ? 1 : 0, body.physicalMin ?? null, body.physicalMax ?? null, body.sortOrder ?? 0).run()
     }
-    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.metricCatalog.upsert', entityType: 'HL_metricCatalog', entityId: metricCode, metadataJson: JSON.stringify({ metricCode, updated: true }) })
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.metricCatalog.upsert', entityType: 'HL_metricCatalog', entityId: metricCode, metadataJson: JSON.stringify({ metricCode, updated: true, inserted: !existing }) })
     return jsonResponse(c, success({ metricCode, updated: true }, 200, startedAt))
   } catch (error) { console.error('admin metric catalog upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update metric catalog.', 500, [], startedAt)) }
 })
@@ -5456,7 +5564,7 @@ app.post('/api/billing/webhook/:provider', async (c) => {
     if (!body.id || !body.type) return jsonResponse(c, failure('VALIDATION_ERROR', 'Event id dan type wajib.', 400, [], startedAt))
     const existing = await c.env.DB.prepare('SELECT id, processed FROM HL_paymentEvents WHERE provider = ? AND providerEventId = ?').bind(provider, body.id).first<any>()
     if (existing) return jsonResponse(c, success({ provider, providerEventId: body.id, processed: existing.processed === 1, subscriptionUpdated: false, duplicate: true }, 200, startedAt))
-    const payId = await insertAndGetId(c.env.DB.prepare('INSERT INTO HL_paymentEvents (provider, eventType, providerEventId, payloadJson, processed, createdAt) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)').bind(provider, body.type, body.id, JSON.stringify(body)))
+    const payId = await insertAndGetId(c.env.DB.prepare('INSERT INTO HL_paymentEvents (provider, eventType, providerEventId, payloadJson, processed, createdAt) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)').bind(provider, body.type, body.id, JSON.stringify({ id: body.id, type: body.type, customerId: body.data?.customerId || null, subscriptionId: body.data?.subscriptionId || null, status: body.data?.status || null })))
     let subscriptionUpdated = false
     if (body.data?.subscriptionId && body.data?.status) {
       const sub = await c.env.DB.prepare('SELECT id FROM HL_subscriptions WHERE id = ?').bind(Number(body.data.subscriptionId)).first<any>()
