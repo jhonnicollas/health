@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/auth'
 
-type TabId = 'overview' | 'users' | 'roles' | 'plans' | 'ai-config' | 'configs' | 'feature-flags' | 'audit-logs' | 'safety-events' | 'metric-catalog' | 'metric-rules' | 'knowledge'
+type TabId = 'overview' | 'users' | 'roles' | 'plans' | 'ai-config' | 'ai-memory' | 'configs' | 'feature-flags' | 'audit-logs' | 'safety-events' | 'metric-catalog' | 'metric-rules' | 'knowledge'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' }, { id: 'users', label: 'Users' }, { id: 'roles', label: 'Roles' },
-  { id: 'plans', label: 'Plans' }, { id: 'ai-config', label: 'AI Config' }, { id: 'configs', label: 'Configs' },
-  { id: 'feature-flags', label: 'Features' }, { id: 'audit-logs', label: 'Audit' }, { id: 'safety-events', label: 'Safety' },
-  { id: 'metric-catalog', label: 'Metrics' }, { id: 'metric-rules', label: 'Rules' }, { id: 'knowledge', label: 'KB' },
+  { id: 'plans', label: 'Plans' }, { id: 'ai-config', label: 'AI Config' }, { id: 'ai-memory', label: 'AI Memory' },
+  { id: 'configs', label: 'Configs' }, { id: 'feature-flags', label: 'Features' }, { id: 'audit-logs', label: 'Audit' },
+  { id: 'safety-events', label: 'Safety' }, { id: 'metric-catalog', label: 'Metrics' }, { id: 'metric-rules', label: 'Rules' },
+  { id: 'knowledge', label: 'KB' },
 ]
 
 async function apiGet(url: string) {
@@ -86,8 +87,21 @@ function MetricCatalogTab() { return <GenericListTab title="Metric Catalog" url=
 function MetricRulesTab() { return <GenericListTab title="Metric Rules" url="/api/admin/metric-rules" cols={['Code','Metric','Severity','Range','Active']} mapRow={(r: any) => [r.ruleCode, r.metricCode, r.severity, `${r.minValue} - ${r.maxValue}`, r.active ? 'Yes' : 'No']} /> }
 function KnowledgeTab() { return <GenericListTab title="Knowledge Articles" url="/api/admin/knowledge-articles" cols={['Slug','Title','Category','Active']} mapRow={(a: any) => [a.slug, a.title, a.category, a.active ? 'Yes' : 'No']} /> }
 
+function AiMemoryTab() {
+  const [targetUid, setTargetUid] = useState('')
+  const [status, setStatus] = useState<any>(null); const [loading, setLoading] = useState(false); const [rebuilding, setRebuilding] = useState(false); const [msg, setMsg] = useState('')
+  const loadStatus = async (uid: string) => { if (!uid) return; setLoading(true); const r = await (await fetch(`/api/admin/users/${uid}/ai-memory/status`, { credentials: 'include' })).json(); setLoading(false); if (r.success) setStatus(r.data); else setMsg(r.error?.message || 'Access denied') }
+  const handleRebuild = async () => { if (!targetUid) return; setRebuilding(true); setMsg(''); const r = await (await fetch(`/api/admin/users/${targetUid}/ai-memory/rebuild`, { method: 'POST', credentials: 'include' })).json(); if (r.success) setMsg(`Rebuild queued. Job #${r.data.jobId}`); else setMsg(r.error?.message || 'Failed'); setRebuilding(false) }
+  return <Section title="AI Memory Admin"><div><label>User ID: <input value={targetUid} onChange={e => setTargetUid(e.target.value)} /></label><button onClick={() => loadStatus(targetUid)}>Check Status</button></div>
+    {loading && <p>Loading...</p>}{msg && <p>{msg}</p>}
+    {status && <div><p>Namespace: <code>{status.namespace || '-'}</code></p><p>Documents: {status.documentCount ?? 0} | Indexed: {status.indexedCount ?? 0} | Pending: {status.pendingCount ?? 0}</p>
+    <p>Sprint 6: <code>{status.sprint6ClinicalCopilot?.scopeStatus || 'deferred'}</code></p><button onClick={handleRebuild} disabled={rebuilding}>{rebuilding ? 'Rebuilding...' : 'Rebuild Memory'}</button></div>}
+    <div style={{marginTop:16}}><h4>Clinical Copilot Readiness</h4>
+    <GenericListTab title="Readiness" url="/api/admin/ai-clinical-copilot/readiness" cols={['Scope','Runtime','Allowed','Forbidden']} mapRow={(r: any) => [r.scopeStatus || '-', r.sprint6ClinicalCopilot?.runtimeEnabled ? 'Yes' : 'No', (r.allowedActions||[]).join(', '), (r.forbiddenActions||[]).join(', ')]} /></div></Section>
+}
+
 const TAB_COMPONENTS: Record<TabId, () => React.ReactNode> = {
-  overview: OverviewTab, users: UsersTab, roles: RolesTab, plans: PlansTab, 'ai-config': AiConfigTab,
+  overview: OverviewTab, users: UsersTab, roles: RolesTab, plans: PlansTab, 'ai-config': AiConfigTab, 'ai-memory': AiMemoryTab,
   configs: ConfigsTab, 'feature-flags': FeatureFlagsTab, 'audit-logs': AuditLogsTab,
   'safety-events': SafetyEventsTab, 'metric-catalog': MetricCatalogTab, 'metric-rules': MetricRulesTab, knowledge: KnowledgeTab,
 }

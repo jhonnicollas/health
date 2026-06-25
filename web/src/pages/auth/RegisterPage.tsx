@@ -201,6 +201,13 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
             ) : 'Daftar'}
           </button>
 
+          <div style={{ textAlign: 'center', margin: '16px 0', color: 'var(--colorTextMuted)', fontSize: 13 }}>— atau —</div>
+
+          <a href="/api/auth/google?mode=login" className="btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', textDecoration: 'none', marginBottom: 8 }}>
+            <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92a8.78 8.78 0 0 0 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.83.86-3.04.86-2.34 0-4.33-1.58-5.04-3.71H.96v2.34A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.96 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.95H.96A9 9 0 0 0 0 9c0 1.46.35 2.83.96 4.05l3-2.34z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3 2.34C4.67 5.16 6.66 3.58 9 3.58z"/></svg>
+            Daftar dengan Google
+          </a>
+
           <button className="secondary-action" onClick={onShowLogin} type="button">
             Sudah punya akun? Login di sini
           </button>

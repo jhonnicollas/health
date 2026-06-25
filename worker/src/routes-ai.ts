@@ -3,8 +3,9 @@ import { getCookie } from 'hono/cookie'
 import { AiMemoryService } from './services/ai-memory.js'
 import { AuditService } from './services/audit.js'
 import { RbacService } from './services/rbac.js'
+import { EntitlementService } from './services/entitlements.js'
 
-interface LocalEnv { DB: D1Database }
+interface LocalEnv { DB: D1Database; AI_MEMORY_QUEUE?: Queue; VECTORIZE_INDEX?: any }
 type HC = Context<{ Bindings: LocalEnv }>
 function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now()) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
@@ -18,15 +19,34 @@ async function getSession(c: HC): Promise<number | null> {
   return row?.userId || null
 }
 
-export function mountSprint5CRoutes(app: any) {
+const VALID_PURPOSES = ['contextReadiness','assistantContext','reportContext','sprint6Readiness']
+const VALID_SOURCE_TYPES = ['measurement','symptom','safetyEvent','hydration','cycle','medication','fasting','pattern','report','education']
+
+export function mountAiRoutes(app: any) {
   app.post('/api/ai/context/query', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
-      const body = await c.req.json() as { query?: string; topK?: number; clinicalCopilotMode?: boolean; purpose?: string }
+      const ent = await EntitlementService.requireEntitlement(c.env.DB, uid, 'feature.vectorMemory.use')
+      if (!ent.allowed) return jr(c, fail('ENTITLEMENT_REQUIRED', 'Fitur AI Memory memerlukan paket Premium.', 403, [], s), 403)
+      const body = await c.req.json() as { query?: string; topK?: number; clinicalCopilotMode?: boolean; purpose?: string; sourceTypes?: string[]; minScore?: number }
       if (body.clinicalCopilotMode) return jr(c, { body: { success: false, error: { code: 'AI_CLINICAL_COPILOT_DEFERRED', message: 'AI Clinical Copilot runtime is deferred to Sprint 6.', details: [{ scopeStatus: 'deferred_to_sprint6' }] }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status: 403 } as any, 403)
-      const topK = Math.min(body.topK || 8, 20)
-      const queryId = await AiMemoryService.logContextQuery(c.env.DB, uid, body.query || '', topK, false, 'VECTORIZE_UNAVAILABLE', Date.now() - s, '{}')
-      return jr(c, ok({ usedVectorContext: false, queryId, matches: [], fallbackReason: 'VECTORIZE_UNAVAILABLE', scopeStatus: 'sprint5_infrastructure_only' }, 200, s), 200)
+      const topK = Math.min(Math.max(body.topK || 8, 1), 20)
+      if (body.purpose && !VALID_PURPOSES.includes(body.purpose)) return jr(c, fail('VALIDATION_ERROR', 'purpose tidak valid.', 400, [], s), 400)
+      if (body.sourceTypes) { const invalid = body.sourceTypes.filter(t => !VALID_SOURCE_TYPES.includes(t)); if (invalid.length) return jr(c, fail('VALIDATION_ERROR', `sourceTypes tidak valid: ${invalid.join(',')}`, 400, [], s), 400) }
+      const minScore = body.minScore ?? 0
+      const namespace = `user:${uid}`
+      let usedVectorContext = false; let matches: any[] = []; let fallbackReason: string | null = 'VECTORIZE_UNAVAILABLE'
+      if (c.env.VECTORIZE_INDEX) {
+        try {
+          const results = await c.env.VECTORIZE_INDEX.query(body.query || '', { topK, namespace, returnValues: false, returnMetadata: true })
+          matches = (results.matches || []).filter((m: any) => (m.score || 0) >= minScore).map((m: any) => ({ vectorId: m.id, sourceType: m.metadata?.sourceType, sourceId: m.metadata?.sourceId, score: m.score, textPreview: m.metadata?.textPreview, occurredAt: m.metadata?.occurredAt }))
+          usedVectorContext = true; fallbackReason = null
+        } catch { fallbackReason = 'VECTORIZE_ERROR' }
+      }
+      const queryId = await AiMemoryService.logContextQuery(c.env.DB, uid, body.query || '', topK, usedVectorContext, fallbackReason, Date.now() - s, JSON.stringify(matches.slice(0, 3)))
+      const data: any = { usedVectorContext, queryId, namespace, scopeStatus: 'sprint5_infrastructure_only', sprint6ClinicalCopilotReady: false, matches }
+      if (!usedVectorContext) data.fallbackReason = fallbackReason
+      return jr(c, ok(data, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -44,26 +64,28 @@ export function mountSprint5CRoutes(app: any) {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       const status = await AiMemoryService.getMemoryStatus(c.env.DB, uid)
-      return jr(c, ok({ ...status, sprint6Readiness: 'deferred', clinicalCopilotRuntimeEnabled: false }, 200, s), 200)
+      return jr(c, ok(status, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
   app.post('/api/ai/memory/rebuild', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      const ent = await EntitlementService.requireEntitlement(c.env.DB, uid, 'feature.vectorMemory.use')
+      if (!ent.allowed) return jr(c, fail('ENTITLEMENT_REQUIRED', 'Fitur AI Memory memerlukan paket Premium.', 403, [], s), 403)
       const context = await AiMemoryService.buildContextPackage(c.env.DB, uid)
-      const count = await AiMemoryService.rebuildMemory(c.env.DB, uid, context)
-      await AuditService.write(c.env.DB, { userId: uid, action: 'aiMemory.rebuild', entityType: 'HL_vectorDocuments', entityId: String(uid), metadataJson: JSON.stringify({ documentsCreated: count }) })
-      return jr(c, ok({ documentsCreated: count, status: 'rebuilding', vectorizeBinding: 'configured_at_deploy' }, 200, s), 200)
+      const { jobId, estimatedDocuments } = await AiMemoryService.rebuildMemory(c.env.DB, uid, context, c.env.AI_MEMORY_QUEUE)
+      await AuditService.write(c.env.DB, { userId: uid, action: 'aiMemory.rebuild', entityType: 'HL_vectorDocuments', entityId: String(uid), metadataJson: JSON.stringify({ jobId, estimatedDocuments }) })
+      return jr(c, ok({ queued: true, jobId, jobType: 'rebuild', estimatedDocuments, scopeStatus: 'sprint5_infrastructure_only', sprint6ClinicalCopilotRuntimeEnabled: false }, 202, s), 202)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
   app.delete('/api/ai/memory', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
-      await AiMemoryService.deleteMemory(c.env.DB, uid)
-      await AuditService.write(c.env.DB, { userId: uid, action: 'aiMemory.delete.request', entityType: 'HL_vectorDocuments', entityId: String(uid) })
-      return jr(c, ok({ deleted: true }, 200, s), 200)
+      const { jobId } = await AiMemoryService.deleteMemory(c.env.DB, uid, c.env.AI_MEMORY_QUEUE)
+      await AuditService.write(c.env.DB, { userId: uid, action: 'aiMemory.delete.request', entityType: 'HL_vectorDocuments', entityId: String(uid), metadataJson: JSON.stringify({ jobId }) })
+      return jr(c, ok({ queued: true, jobId, jobType: 'delete', sprint6ClinicalCopilotImpact: 'All vector context for this user will be removed. Sprint 6 AI Clinical Copilot will need a rebuild to regain context.', scopeStatus: 'sprint5_infrastructure_only' }, 202, s), 202)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -78,7 +100,6 @@ export function mountSprint5CRoutes(app: any) {
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
-  // Admin AI memory endpoints
   app.get('/api/admin/users/:userId/ai-memory/status', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
@@ -86,7 +107,7 @@ export function mountSprint5CRoutes(app: any) {
       const targetUid = Number(c.req.param('userId'))
       const status = await AiMemoryService.getMemoryStatus(c.env.DB, targetUid)
       await AuditService.write(c.env.DB, { userId: uid, action: 'admin.aiMemory.read', entityType: 'HL_vectorDocuments', entityId: String(targetUid), metadataJson: JSON.stringify({ targetUserId: targetUid }) })
-      return jr(c, ok({ ...status, sprint6Readiness: 'deferred', clinicalCopilotMode: 'disabled', rawVectorContent: undefined }, 200, s), 200)
+      return jr(c, ok({ ...status, rawVectorContent: undefined }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -96,9 +117,9 @@ export function mountSprint5CRoutes(app: any) {
       if (!await RbacService.hasPermission(c.env.DB, uid, 'admin.aiMemory.manage')) return jr(c, fail('FORBIDDEN', 'Akses ditolak.', 403, [], s), 403)
       const targetUid = Number(c.req.param('userId'))
       const context = await AiMemoryService.buildContextPackage(c.env.DB, targetUid)
-      const count = await AiMemoryService.rebuildMemory(c.env.DB, targetUid, context)
-      await AuditService.write(c.env.DB, { userId: uid, action: 'admin.aiMemory.rebuild', entityType: 'HL_vectorDocuments', entityId: String(targetUid), metadataJson: JSON.stringify({ targetUserId: targetUid, documentsCreated: count }) })
-      return jr(c, ok({ documentsCreated: count, status: 'rebuilding' }, 200, s), 200)
+      const { jobId, estimatedDocuments } = await AiMemoryService.rebuildMemory(c.env.DB, targetUid, context, c.env.AI_MEMORY_QUEUE)
+      await AuditService.write(c.env.DB, { userId: uid, action: 'admin.aiMemory.rebuild', entityType: 'HL_vectorDocuments', entityId: String(targetUid), metadataJson: JSON.stringify({ targetUserId: targetUid, jobId, estimatedDocuments }) })
+      return jr(c, ok({ queued: true, jobId, jobType: 'rebuild', estimatedDocuments }, 202, s), 202)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -106,7 +127,12 @@ export function mountSprint5CRoutes(app: any) {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       if (!await RbacService.hasPermission(c.env.DB, uid, 'admin.aiMemory.read')) return jr(c, fail('FORBIDDEN', 'Akses ditolak.', 403, [], s), 403)
-      return jr(c, ok({ scopeStatus: 'deferred_to_sprint6', aiClinicalCopilotRuntimeEnabled: false, sprint5InfrastructureReady: true, allowedActions: ['prepare_context', 'store_memory_metadata', 'query_user_namespace', 'return_context_trace', 'enforce_disclaimer', 'report_readiness_status'], forbiddenActions: ['final_diagnosis', 'emergency_decision', 'prescription', 'medication_dosage_instruction', 'replace_doctor_claim', 'cross_user_retrieval'] }, 200, s), 200)
+      return jr(c, ok({
+        scopeStatus: 'deferred_to_sprint6',
+        sprint6ClinicalCopilot: { scopeStatus: 'deferred_to_sprint6', runtimeEnabled: false, readinessPurpose: 'context_infrastructure_only', readyChecks: { vectorNamespaceReady: true, memoryLifecycleReady: true, contextTraceReady: true, safetyBoundaryReady: true, clinicalInterviewRuntimeReady: false, differentialReasoningRuntimeReady: false, doctorHandoffRuntimeReady: false } },
+        allowedActions: ['prepare_context','store_memory_metadata','query_user_namespace','return_context_trace','enforce_disclaimer','report_readiness_status'],
+        forbiddenActions: ['final_diagnosis','emergency_decision','prescription','medication_dosage_instruction','replace_doctor_claim','cross_user_retrieval']
+      }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 }

@@ -16,8 +16,17 @@ bucket_name = "multi-apps-ai-bucket"
 queue = "telegram-submit-summary"
 binding = "TELEGRAM_QUEUE"
 
+[[queues.producers]]
+queue = "ai-memory-jobs"
+binding = "AI_MEMORY_QUEUE"
+
 [[queues.consumers]]
 queue = "telegram-submit-summary"
 max_batch_size = 10
 max_batch_timeout = 5
+
+[[queues.consumers]]
+queue = "ai-memory-jobs"
+max_batch_size = 5
+max_batch_timeout = 10
 

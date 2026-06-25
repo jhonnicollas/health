@@ -1,8 +1,8 @@
-import { mountSprint5ARoutes } from "./routes-sprint5a.js"
-import { mountSprint5BRoutes } from "./routes-sprint5b.js"
-import { mountSprint5CRoutes } from "./routes-sprint5c.js"
-import { mountSprint5DRoutes } from "./routes-sprint5d.js"
-import { mountSprint5ERoutes } from "./routes-sprint5e.js"
+import { mountAuthRoutes } from "./routes-auth.js"
+import { mountHydrationRoutes } from "./routes-hydration.js"
+import { mountAiRoutes } from "./routes-ai.js"
+import { mountCycleRoutes } from "./routes-cycle.js"
+import { mountTelegramRoutes } from "./routes-telegram.js"
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
@@ -23,6 +23,7 @@ import { EducationService } from "./services/education.js"
 import { SymptomService } from "./services/symptom.js"
 import { OAuthService } from "./services/oauth.js"
 import { RbacService } from './services/rbac.js'
+import { AiMemoryService } from './services/ai-memory.js'
 
 export interface Env {
   CLOUDFLARE_ACCOUNT_ID?: string
@@ -34,6 +35,8 @@ export interface Env {
   DB: D1Database
   LOGS: R2Bucket
   TELEGRAM_QUEUE?: Queue
+  AI_MEMORY_QUEUE?: Queue
+  VECTORIZE_INDEX?: any
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -3099,16 +3102,14 @@ app.post('/api/ai/assistant', async (c) => {
     if (aiResult) {
       const filtered = filterUnsafeContent(aiResult.text)
       let assistantReply = filtered.filtered
-      const disclaimerText = `${aiResult.model} is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini.`
-      if (!assistantReply.includes(disclaimerText)) {
-        assistantReply += '\n\n' + disclaimerText
-      }
+      assistantReply = AiMemoryService.enforceDisclaimer(assistantReply, aiResult.model)
       const patternScore = extractPatternScore(assistantReply)
       reply = assistantReply
       model = aiResult.model
       usedFallback = false
-      const dataSufficiencyScore = vitals.length >= 3 ? Math.min(vitals.length * 20, 100) : vitals.length * 10
-      const contextTrace = vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, source: 'HL_measurementValues' }))
+      const context = await AiMemoryService.buildContextPackage(c.env.DB, userId)
+      const { score: dataSufficiencyScore, scoreReason } = AiMemoryService.calculateDataSufficiency(context)
+      const contextTrace = vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, sourceType: 'measurement', source: 'HL_measurementValues' }))
 
       return jsonResponse(
         c,
@@ -3116,12 +3117,13 @@ app.post('/api/ai/assistant', async (c) => {
           {
             reply,
             patternScore,
-            disclaimer: disclaimerText,
+            disclaimer: 'AI dapat membuat kesalahan. Informasi ini bukan pengganti konsultasi dokter.',
             model,
             usedFallback,
             vitals,
             profile: profile || null,
             dataSufficiencyScore,
+            scoreReason,
             contextTrace,
             usedVectorContext: false
           },
@@ -3135,15 +3137,16 @@ app.post('/api/ai/assistant', async (c) => {
       c,
       success(
         {
-          reply,
-          patternScore: 0,
-          disclaimer: 'fallback is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya.',
-          model,
-          usedFallback,
-          vitals,
-          profile: profile || null,
-          dataSufficiencyScore: vitals.length * 10,
-          contextTrace: vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, source: 'HL_measurementValues' })),
+      reply,
+      patternScore: 0,
+      disclaimer: 'fallback is AI and can make mistakes. Informasi ini bukan pengganti konsultasi dokter.',
+      model,
+      usedFallback,
+      vitals,
+      profile: profile || null,
+      dataSufficiencyScore: 0,
+      scoreReason: 'Data kurang untuk analisis',
+      contextTrace: vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, sourceType: 'measurement', source: 'HL_measurementValues' })),
           usedVectorContext: false
         },
         200,
@@ -3438,8 +3441,8 @@ app.get('/api/history/timeline', async (c) => {
       for (const r of rows.results || []) items.push({ rowType: 'safetyEvent', sourceId: String(r.id), occurredAt: r.createdAt, title: r.title || r.eventType, severity: r.severity || 'normal', summary: r.eventType })
     }
     if (typeSet.has('cycle')) {
-      const rows = await c.env.DB.prepare(`SELECT id, logDate, flowLevel, symptoms FROM HL_cycleLogs WHERE userId = ? AND date(logDate) >= ? AND date(logDate) <= ? ORDER BY logDate DESC LIMIT ?`).bind(userId, from || '2026-01-01', to || '2099-12-31', limitN).all<any>()
-      for (const r of rows.results || []) items.push({ rowType: 'cycle', sourceId: String(r.id), occurredAt: r.logDate, title: 'Log Siklus', severity: 'normal', summary: r.flowLevel ? `Flow: ${r.flowLevel}` : (r.symptoms || 'Cycle log') })
+      const rows = await c.env.DB.prepare(`SELECT id, logDate, flowIntensity, physicalSymptomsJson FROM HL_cycleLogs WHERE userId = ? AND date(logDate) >= ? AND date(logDate) <= ? ORDER BY logDate DESC LIMIT ?`).bind(userId, from || '2026-01-01', to || '2099-12-31', limitN).all<any>()
+      for (const r of rows.results || []) items.push({ rowType: 'cycle', sourceId: String(r.id), occurredAt: r.logDate, title: 'Log Siklus', severity: 'normal', summary: r.flowIntensity ? `Flow: ${r.flowIntensity}` : (r.physicalSymptomsJson || 'Cycle log') })
     }
     items.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
     const hasMore = items.length > limitN
@@ -3485,18 +3488,15 @@ WAJIB sertakan teks ini tepat di akhir respons Anda TANPA DIUBAH sedikit pun:
     const aiResult = await callConfiguredTextAi(c, messages, 400)
     if (aiResult) {
       let analysis = aiResult.text
-      const disclaimerText = `${aiResult.model} is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini.`
-      if (!analysis.includes(disclaimerText)) {
-        analysis += '\n\n' + disclaimerText
-      }
+      analysis = AiMemoryService.enforceDisclaimer(analysis, aiResult.model)
       const patternScore = extractPatternScore(analysis)
-      return jsonResponse(c, success({ analysis, patternScore, model: aiResult.model, disclaimer: disclaimerText, usedFallback: false }, 200, startedAt))
+      return jsonResponse(c, success({ analysis, patternScore, model: aiResult.model, disclaimer: 'AI dapat membuat kesalahan. Informasi ini bukan pengganti konsultasi dokter.', usedFallback: false }, 200, startedAt))
     }
     return jsonResponse(c, success({
       analysis: 'AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda.',
       patternScore: 0,
       model: 'fallback',
-      disclaimer: 'fallback is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya.',
+      disclaimer: 'fallback: AI dapat membuat kesalahan. Informasi ini bukan pengganti konsultasi dokter.',
       usedFallback: true
     }, 200, startedAt))
   } catch (error) {
@@ -3559,6 +3559,21 @@ app.get('/api/kb', async (c) => {
 })
 
 // Telegram Connect
+app.get('/api/telegram/status', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const link = await c.env.DB.prepare(
+      'SELECT telegramChatId, verified, enabled FROM HL_telegramLinks WHERE userId = ? LIMIT 1'
+    ).bind(userId).first<{ telegramChatId: string; verified: number; enabled: number }>()
+    return jsonResponse(c, success({ linked: !!link?.verified && !!link?.enabled, telegramChatId: link?.telegramChatId ? '***' : null, enabled: !!link?.enabled }, 200, startedAt))
+  } catch (error) {
+    console.error('telegram status error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt))
+  }
+})
+
 app.post('/api/telegram/connect', async (c) => {
   const startedAt = Date.now()
   try {
@@ -4051,11 +4066,11 @@ app.onError((error, c) => {
 })
 
 mountExtraRoutes(app as any)
-mountSprint5ARoutes(app as any)
-mountSprint5BRoutes(app as any)
-mountSprint5CRoutes(app as any)
-mountSprint5DRoutes(app as any)
-mountSprint5ERoutes(app as any)
+mountAuthRoutes(app as any)
+mountHydrationRoutes(app as any)
+mountAiRoutes(app as any)
+mountCycleRoutes(app as any)
+mountTelegramRoutes(app as any)
 
 export {
   getCurrentSession,
@@ -4783,6 +4798,43 @@ app.post('/api/admin/roles', async (c) => {
   } catch (error) {
     console.error('admin role create error:', error)
     return jsonResponse(c, failure('VALIDATION_ERROR', 'Role gagal dibuat atau sudah ada.', 400, [], startedAt))
+  }
+})
+
+app.put('/api/admin/roles/:roleCode/permissions', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.roles.manage', startedAt)
+    if (denied) return denied
+    const roleCode = c.req.param('roleCode')
+    const body = await c.req.json() as { permissionCodes?: string[] }
+    const permissionCodes = Array.isArray(body.permissionCodes) ? [...new Set(body.permissionCodes)] : []
+    const role = await c.env.DB.prepare('SELECT roleCode, systemRole FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
+    if (!role) return jsonResponse(c, failure('NOT_FOUND', 'Role tidak ditemukan.', 404, [], startedAt))
+    if (permissionCodes.length > 0) {
+      const placeholders = permissionCodes.map(() => '?').join(',')
+      const rows = await c.env.DB.prepare(`SELECT permissionCode FROM HL_permissions WHERE active = 1 AND permissionCode IN (${placeholders})`).bind(...permissionCodes).all<{ permissionCode: string }>()
+      if ((rows.results || []).length !== permissionCodes.length) {
+        return jsonResponse(c, failure('VALIDATION_ERROR', 'Permission tidak valid.', 400, [], startedAt))
+      }
+    }
+    await c.env.DB.prepare('DELETE FROM HL_rolePermissions WHERE roleCode = ?').bind(roleCode).run()
+    for (const permissionCode of permissionCodes) {
+      await c.env.DB.prepare('INSERT OR IGNORE INTO HL_rolePermissions (roleCode, permissionCode, createdAt) VALUES (?, ?, CURRENT_TIMESTAMP)').bind(roleCode, permissionCode).run()
+    }
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'admin.roles.permissions.update',
+      entityType: 'HL_roles',
+      entityId: roleCode,
+      metadataJson: { roleCode, permissionCount: permissionCodes.length }
+    })
+    return jsonResponse(c, success({ roleCode, permissionCount: permissionCodes.length, updated: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin role permissions update error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update permission role.', 500, [], startedAt))
   }
 })
 
@@ -6000,8 +6052,18 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     return app.fetch(request as any, env as any, ctx as any)
   },
-  async queue(batch: MessageBatch<TelegramQueueMessage>, env: Env, _ctx: ExecutionContext): Promise<void> {
-    return telegramQueueHandler(batch, env, _ctx)
+  async queue(batch: MessageBatch<any>, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const queueName = (batch as any).queueName || ''
+    if (queueName === 'ai-memory-jobs') {
+      for (const msg of batch.messages) {
+        try { const { userId, jobType } = msg.body as { userId: number; jobType: string }
+          if (jobType === 'rebuild') { const context = await AiMemoryService.buildContextPackage(env.DB, userId); await AiMemoryService._executeRebuild(env.DB, userId, context) }
+          else if (jobType === 'delete') { await AiMemoryService.deleteMemory(env.DB, userId) }
+          msg.ack() } catch { msg.retry() }
+      }
+    } else {
+      return telegramQueueHandler(batch as MessageBatch<TelegramQueueMessage>, env, _ctx)
+    }
   },
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     return scheduledHandler(event, env as unknown as ExtraEnv, ctx)

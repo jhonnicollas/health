@@ -31,6 +31,10 @@ export function FamilyPage() {
   const [canViewDashboard, setCanViewDashboard] = useState(true)
   const [canInputMeasurement, setCanInputMeasurement] = useState(false)
   const [canReceiveAlert, setCanReceiveAlert] = useState(true)
+  const [canViewCycle, setCanViewCycle] = useState(false)
+  const [canViewSymptoms, setCanViewSymptoms] = useState(false)
+  const [canViewHydration, setCanViewHydration] = useState(false)
+  const [canViewAiReport, setCanViewAiReport] = useState(false)
 
   async function load() {
     setError(null)
@@ -71,7 +75,11 @@ export function FamilyPage() {
           permissions: {
             canViewDashboard,
             canInputMeasurement,
-            canReceiveAlert
+            canReceiveAlert,
+            canViewCycle,
+            canViewSymptoms,
+            canViewHydration,
+            canViewAiReport
           }
         })
       })
@@ -139,6 +147,23 @@ export function FamilyPage() {
         <label className="checkbox-row">
           <input checked={canReceiveAlert} onChange={(e) => setCanReceiveAlert(e.target.checked)} type="checkbox" />
           Allow alert delivery
+        </label>
+        <h4 style={{ marginTop: 12 }}>Sensitive Health Permissions</h4>
+        <label className="checkbox-row">
+          <input checked={canViewCycle} onChange={(e) => setCanViewCycle(e.target.checked)} type="checkbox" />
+          View cycle data
+        </label>
+        <label className="checkbox-row">
+          <input checked={canViewSymptoms} onChange={(e) => setCanViewSymptoms(e.target.checked)} type="checkbox" />
+          View symptom data
+        </label>
+        <label className="checkbox-row">
+          <input checked={canViewHydration} onChange={(e) => setCanViewHydration(e.target.checked)} type="checkbox" />
+          View hydration data
+        </label>
+        <label className="checkbox-row">
+          <input checked={canViewAiReport} onChange={(e) => setCanViewAiReport(e.target.checked)} type="checkbox" />
+          View AI report
         </label>
         <button disabled={submitting} type="submit">
           {submitting ? 'Sending...' : 'Send Invitation Link'}

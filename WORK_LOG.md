@@ -629,3 +629,194 @@ cd web && CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=79dea2845a4b62ea522
 
 ### Next
 - Lanjut Sprint 5 Foundation GAP (S5F-015/016/017)
+
+## 2026-06-25 13:30 UTC — Refactoring: rename sprint5 files
+
+**Done:**
+- Renamed route files: `routes-sprint5{a,b,c,d,e}.ts` → `routes-{auth,hydration,ai,cycle,telegram}.ts`
+  - Updated all imports in index.ts
+  - Function names unchanged (mountAuthRoutes etc.)
+  - Old files deleted
+- Renamed type files: `worker/src/shared-types/sprint5.ts` → `constants.ts`, `web/src/types/sprint5.ts` → `constants.ts`
+  - Internal exports: `SPRINT5_*` → `HL_*`, `Sprint5*` → `Hl*`
+  - Updated test file paths and const names
+- Renamed: `Sprint5TableName`→`HlTableName`, `Sprint5Role`→`HlRole`, `isSprint5RoleCode`→`isHlRoleCode`, etc.
+- Deleted stale `worker/dist/` sprint5 artifacts
+- Cancelled: index.ts split (too large for single session), App.css split (5.7k no section markers)
+
+**Validation:** worker tsc clean, web tsc clean, web vite build OK, 21/21 tests PASS
+
+**Next:** Index.ts split can be done incrementally over multiple sessions.
+
+---
+
+## 2026-06-25 14:00 UTC — Agent: opencode/ponytail
+
+### Task
+- Task IDs: S5A-001, S5A-002, S5A-003, S5A-008, S5A-012, S5A-013, S5B-001–S5B-008
+- Sprint: 5A+5B gap fixes
+- Status: Completed (backend+frontend gaps fixed)
+
+### Files Changed
+- **worker/src/services/oauth.ts** — Added createState/validateState/consumeState methods + sha256 helper
+- **worker/src/routes-auth.ts** — Real Google token exchange (replaced fabrication), fixed unlink logic (|| → &&), added returnTo safe-path validation, added symptom detail family+admin permission check, added GOOGLE_CLIENT_SECRET env
+- **worker/src/services/hydration.ts** — Rewrote: body weight from HL_measurementValues, fever >37.5°C +500ml, pregnant min 2400ml, lactating min 2800ml, default 2000ml, overhydration absolute 5000ml threshold, dedup safety events per day, contract warning message, deleteLog method, getHistoryDaily method, overLimitAtInsert column
+- **worker/src/routes-hydration.ts** — Rewrote: entitlement guard on all endpoints, confirmedLargeInput >1000ml validation, POST logs full contract response shape (amountMl/targetMl/percent/overhydrationWarning/safetyEventId/warningMessage), warningCode in meta, history returns daily summaries, DELETE returns targetMl, settings audit shows changed fields only, settings update invalidates cached targets, default date range last 30 days
+- **web/src/pages/symptoms/SymptomPage.tsx** — Emergency blocking modal (replaced alert()), VAS labels (Ringan/Sedang/Berat/Sangat Berat), color-coded pain buttons
+- **web/src/pages/hydration/HydrationPage.tsx** — SVG progress ring, quick add +200/+600/Custom, large input >1000ml confirmation dialog, targetReasons display, warning card with contract message, delete log functionality, retry on error
+- **web/src/pages/hydration/HydrationSettingsPage.tsx** — New: pregnant/lactating toggle, operating hours, reminder toggle (disabled 5E), custom base target
+- **web/src/pages/hydration/HydrationHistoryPage.tsx** — New: daily summary list, expandable per-day logs, overhydration badge
+- **web/src/pages/auth/RegisterPage.tsx** — Google OAuth button
+- **web/src/pages/settings/ProfileSettingsPage.tsx** — LinkedAccountsSection (Google link/unlink with LAST_LOGIN_METHOD guard)
+- **web/src/pages/measurement/SeniorMeasurementFlow.tsx** — Symptom prompt modal after measurement submit (postSubmitPrompt)
+- **web/src/App.tsx** — Added /hydration/settings and /hydration/history routes
+
+### Validation
+- `cd worker && npx tsc` — PASS
+- `cd worker && node --test test/*.test.mjs` — 66/67 PASS (1 pre-existing admin role test)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npx vite build` — PASS
+
+---
+
+## 2026-06-25 18:00 UTC — Agent: opencode (ponytail full)
+
+### Task
+- Task ID: S5A-016 + S5B-008 gap closure (dedicated test suites + EducationBottomSheet integration)
+- Sprint: Sprint 5A + 5B fix gap execution
+- Status: Completed
+
+### Files Changed
+- **web/src/pages/hydration/HydrationPage.tsx** — imported + integrated EducationBottomSheet (topicType=hydration)
+- **web/src/pages/symptoms/SymptomPage.tsx** — imported + integrated EducationBottomSheet (topicType=symptom)
+- **worker/test/sprint5a-oauth.test.mjs** — NEW: OAuth state create/validate/consume, returnTo validation, state reuse, unlink logic guards
+- **worker/test/sprint5a-symptom.test.mjs** — NEW: Red flag detection (14 keywords), symptom log + safety event creation, owner-only access, prompt-dismissals audit
+- **worker/test/sprint5a-daily.test.mjs** — NEW: Daily health hub empty/mixed data
+- **worker/test/sprint5b-hydration.test.mjs** — FIX: reason text test corrected expected value (2900 not 2400)
+
+### What Changed
+- EducationBottomSheet now rendered in HydrationPage and SymptomPage (firstTimeOnly=true hides if already acknowledged)
+- Dedicated S5A test files per FIX_PLAN requirements (S5A-016)
+- Fixed hydration reason text test: bodyWeight=65 → 1950, pregnant → 2400, fever → 2900 (was asserting 2400)
+
+### Validation
+- `cd worker && npx tsc` — PASS
+- `cd worker && node --test test/*.test.mjs` — 99/100 PASS (1 pre-existing admin role 404)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npx vite build` — PASS
+
+### All FIX_PLAN S5A+S5B Gaps — Status
+- S5A-002 Google callback: DONE ✅
+- S5A-002 Unlink logic: DONE ✅
+- S5A-001 OAuthService state methods: DONE ✅
+- S5A-001 returnTo validation: DONE ✅
+- S5A-012 Symptom detail permission: DONE ✅
+- S5A-003 Google button + link/unlink UI: DONE ✅
+- S5A-013 Emergency blocking modal + VAS labels: DONE ✅
+- S5A-008 Symptom prompt frontend: DONE ✅
+- S5A-014 Education bottom sheet: DONE ✅
+- S5A-015 History timeline: DONE ✅
+- S5A-016 Tests: DONE ✅
+- S5B-001 Target calculator: DONE ✅
+- S5B-004 Overhydration threshold 5000ml: DONE ✅
+- S5B-003 confirmedLargeInput: DONE ✅
+- S5B-005 Entitlement guard + warningCode: DONE ✅
+- S5B-006 Hydration widget: DONE ✅
+- S5B-007 Settings + history UI: DONE ✅
+- S5B-008 Tests: DONE ✅
+
+## 2026-06-25 20:00 UTC — Agent: opencode (ponytail full)
+
+### Task
+- Task IDs: S5C-001..S5C-012, S5D-001..S5D-009 — All Sprint 5C+5D gap resolution
+- Sprint: Sprint 5C + 5D
+- Status: Completed
+
+### CRITICAL Bug Fixes (3)
+1. **Family permissions query** — `SELECT canViewCycle...` changed to `SELECT permissionCode, allowed` matching `HL_familyPermissions` schema (permissionCode model)
+2. **Guardrail acknowledge INSERT** — `logDate/acknowledgementType` changed to `relatedDate/guardrailType` matching `HL_cycleGuardrailAcknowledgements` schema
+3. **Timeline query** — `flowLevel/symptoms` changed to `flowIntensity/physicalSymptomsJson` matching `HL_cycleLogs` schema
+
+### Files Changed — Backend
+- **worker/src/services/cycle.ts** — Full rewrite: server-side validation (cycleLengthDays 1-120, periodLengthDays 1-15), auto predictionPaused on pregnant/menopause, lactation→hydration sync, detectIrregularity creates HL_safetyEvents + pauses prediction (historical 2-cycle check), buildCalendarDays returns days[] array with phase/label/colorToken/needsContraceptionGuardrail, checkCalendarGuardrail with full PRD warning copy
+- **worker/src/services/ai-memory.ts** — Full rewrite: buildContextPackage expanded to 10 source types (added cycle, fasting, reports, education), sanitizeMetadata redacts sensitive fields, calculateDataSufficiency returns {score, scoreReason} with all 10 source types, rebuildMemory creates HL_aiMemoryJobs + indexes all sources, VECTORIZE_INDEX.query() call with fallback, isClinicalInfrastructureEnabled reads HL_featureFlags
+- **worker/src/routes-cycle.ts** — Full rewrite: requireCycleEligible middleware, calendar returns days[] with month/predictionPaused/copyPolicy/phaseLegend, log flow checks guardrail before save (returns {saved:false, requiresContraceptionGuardrail:true}), family permissions use permissionCode model with ON CONFLICT upsert, owner-only verification on sensitive-health PUT
+- **worker/src/routes-ai.ts** — Full rewrite: entitlement guard on context query + memory, sourceTypes/minScore/purpose validation, Vectorize query with fallback, namespace in response, rebuild→202 + jobId, delete→202 + jobId + sprint6ClinicalCopilotImpact, nested sprint6ClinicalCopilot object in all responses
+- **worker/src/index.ts** — AI assistant uses buildContextPackage + calculateDataSufficiency (not inline), enforceDisclaimer service (not inline), scoreReason in response, report-analysis uses enforceDisclaimer, AI_MEMORY_QUEUE consumer in export default, timeline cycle query fixed columns
+- **worker/wrangler.toml** — Added AI_MEMORY_QUEUE producer + consumer
+- **worker/src/types.ts** — Added AI_MEMORY_QUEUE + VECTORIZE_INDEX to Env
+
+### Files Changed — Frontend
+- **web/src/pages/cycle/CyclePage.tsx** — Full rewrite: 3-tab layout (calendar/settings/log), calendar grid with phase colors and month navigation, settings form with validation, log form with flow/mood/symptoms/unprotected/notes, blocking guardrail modal with PRD warning copy + "Saya Mengerti" acknowledge button, EducationBottomSheet
+- **web/src/pages/ai/AiMemorySettingsPage.tsx** — NEW: memory status (namespace, counts, active job), rebuild/delete actions, Sprint 6 readiness checklist
+- **web/src/pages/ai/AiAssistantPage.tsx** — Context trace collapsible panel (dataSufficiencyScore + scoreReason), Sprint 6 readiness card with link to AI memory settings
+- **web/src/pages/admin/AdminPage.tsx** — Added AI Memory tab (user status lookup, rebuild, clinical copilot readiness)
+- **web/src/pages/family/FamilyPage.tsx** — Added sensitive health permission checkboxes (cycle/symptom/hydration/aiReport)
+- **web/src/App.tsx** — Added /ai-memory route, imported AiMemorySettingsPage
+
+### Files Changed — Tests
+- **worker/test/sprint5-service.test.mjs** — Updated for new API shapes: detectIrregularity takes db arg, checkContraceptionGuardrail takes single logData, calculateDataSufficiency returns scoreReason, added 7 new tests (calendar days, calendarMethod guardrail, source types, validation, auto-pause on pregnant)
+
+### Validation
+- `cd worker && npx tsc` — PASS
+- `cd worker && node --test test/*.test.mjs` — 106/107 PASS (1 pre-existing admin role 404)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npx vite build` — PASS
+
+### All Sprint 5C+5D Gaps — Status
+- S5C-001 Vectorize binding + flag: DONE ✅
+- S5C-002 Document builder 10 sources: DONE ✅
+- S5C-003 Vector doc metadata: DONE ✅
+- S5C-004 Queue/job worker: DONE ✅
+- S5C-005 Context query response: DONE ✅
+- S5C-006 Rebuild/delete →202: DONE ✅
+- S5C-007 Assistant context/disclaimer: DONE ✅
+- S5C-008 Disclaimer service: DONE ✅
+- S5C-009 ScoreReason: DONE ✅
+- S5C-010 AI memory UI: DONE ✅
+- S5C-011 Admin AI memory: DONE ✅
+- S5C-012 Tests: DONE ✅
+- S5D-001 Cycle eligibility: DONE ✅
+- S5D-002 Settings validation + auto-pause: DONE ✅
+- S5D-003 Calendar days[] array: DONE ✅
+- S5D-004 Log guardrail-first flow: DONE ✅
+- S5D-005 PRD warning copy + calendarMethod: DONE ✅
+- S5D-006 Irregularity safety event: DONE ✅
+- S5D-007 Cycle frontend: DONE ✅
+- S5D-008 Family permissions permissionCode: DONE ✅
+- S5D-009 Tests: DONE ✅
+
+## 2026-06-25 20:30 UTC — Agent: opencode (ponytail full)
+
+### Task
+- Task IDs: S5E-001..S5E-008 — All Sprint 5E gaps resolved
+- Sprint: Sprint 5E
+- Status: Completed
+
+### Files Created
+- **worker/src/services/telegram-config.ts** — Config reader: isConfigured(), getWebhookSecret(), getBotToken(), getConfigStatus()
+- **worker/src/services/telegram-client.ts** — Telegram API: sendMessage(), editMessageText(), buildInlineKeyboard()
+- **worker/src/services/telegram-callback.ts** — Callback validation: parseCallbackBody(), validateSecret(), validateCallbackData(), findUserByChatId(), checkIdempotency(), recordCallbackEvent(), validateFullCallback()
+- **worker/test/sprint5e.test.mjs** — 19 tests covering config, client, and callback services
+
+### Files Modified
+- **worker/src/routes-telegram.ts** — Rewritten: S5E-003 webhook parses Telegram callback_query format, validates via TelegramCallbackService, returns contract response envelope, idempotency check, overhydration check, editMessageText (not answerCallbackQuery). S5E-005 cron uses TelegramClientService, calculates total/target, correct icons and message text, X-HL-Internal-Cron-Secret header, records notifications
+- **worker/src/index.ts** — Added GET /api/telegram/status endpoint for frontend linked status check
+- **web/src/pages/hydration/HydrationSettingsPage.tsx** — Added telegramQuickAddEnabled toggle + fixed reminderEnabled to be togglable
+- **web/src/pages/telegram/TelegramSettingsPage.tsx** — Removed non-contract telegramSubmitSummary/telegramEmergencyAlert fields, uses /api/telegram/status for linked display, links to hydration settings for quick-add config
+
+### Validation
+- `cd worker && npx tsc -p tsconfig.json` — PASS
+- `cd worker && node --test test/*.test.mjs` — 125/126 PASS (1 pre-existing admin role 404)
+- `cd web && npx tsc -b` — PASS
+- `cd web && npx vite build` — PASS
+
+### Sprint 5E Task Status
+- S5E-001 Telegram config reader: DONE ✅
+- S5E-002 Callback validation + idempotency: DONE ✅
+- S5E-003 Webhook rewrite: DONE ✅
+- S5E-004 Telegram client service: DONE ✅
+- S5E-005 Cron reminder: DONE ✅
+- S5E-006 Settings UI: DONE ✅
+- S5E-007 Security safety events: DONE ✅ (createSafetyEvent on reject)
+- S5E-008 Tests (19): DONE ✅

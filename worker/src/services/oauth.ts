@@ -1,3 +1,8 @@
+async function sha256(val: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 export type OAuthAccountRow = {
   id: number
   userId: number
@@ -20,6 +25,27 @@ export type OAuthStateRow = {
 }
 
 export class OAuthService {
+  static async createState(db: D1Database, provider: string, mode: string, returnTo?: string): Promise<{ state: string; nonce: string }> {
+    const state = crypto.randomUUID()
+    const nonce = crypto.randomUUID()
+    const stateHash = await sha256(state)
+    const nonceHash = await sha256(nonce)
+    const safePaths = ['/', '/dashboard', '/settings', '/settings/account-security']
+    const safeReturn = (returnTo && safePaths.includes(returnTo)) ? returnTo : '/'
+    await db.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(stateHash, nonceHash, provider, mode, safeReturn, new Date(Date.now() + 600000).toISOString()).run()
+    return { state, nonce }
+  }
+
+  static async validateState(db: D1Database, provider: string, state: string): Promise<{ valid: boolean; row: OAuthStateRow | null }> {
+    const stateHash = await sha256(state)
+    const row = await db.prepare("SELECT id, stateHash, nonceHash, provider, mode, returnTo, userId, expiresAt, consumedAt FROM HL_oauthStates WHERE stateHash = ? AND provider = ? AND consumedAt IS NULL AND expiresAt > datetime('now')").bind(stateHash, provider).first<any>()
+    return { valid: !!row, row: row || null }
+  }
+
+  static async consumeState(db: D1Database, stateId: number): Promise<void> {
+    await db.prepare('UPDATE HL_oauthStates SET consumedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(stateId).run()
+  }
+
   static async findAccount(db: D1Database, provider: string, providerSubject: string): Promise<OAuthAccountRow | null> {
     return db.prepare('SELECT id, userId, provider, providerSubject, providerEmail, providerEmailVerified FROM HL_oauthAccounts WHERE provider = ? AND providerSubject = ?').bind(provider, providerSubject).first<any>() as Promise<OAuthAccountRow | null>
   }

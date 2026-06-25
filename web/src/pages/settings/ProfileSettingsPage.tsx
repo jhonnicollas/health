@@ -36,6 +36,61 @@ type ConfigUpdateResponse = {
   error?: { message: string }
 }
 
+function LinkedAccountsSection() {
+  const [accounts, setAccounts] = useState<any[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [unlinking, setUnlinking] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/auth/google', { credentials: 'include', headers: { Accept: 'application/json' } }).catch(() => null)
+        const j = r ? await r.json() : null
+        setAccounts(j?.success ? [j.data] : [])
+      } catch { setAccounts([]) }
+      finally { setLoading(false) }
+    })()
+  }, [])
+
+  async function handleLink() {
+    const r = await fetch('/api/auth/google/link', { method: 'POST', credentials: 'include' })
+    const j = await r.json()
+    if (j.success && j.data?.redirectUrl) window.location.href = j.data.redirectUrl
+    else setMsg(j.error?.message || 'Gagal menghubungkan.')
+  }
+
+  async function handleUnlink() {
+    if (!confirm('Lepaskan akun Google? Pastikan Anda punya password atau metode login lain.')) return
+    setUnlinking(true); setMsg('')
+    try {
+      const r = await fetch('/api/auth/google/link', { method: 'DELETE', credentials: 'include' })
+      const j = await r.json()
+      if (j.success) { setMsg('Google berhasil dilepas.'); setAccounts([]) }
+      else setMsg(j.error?.code === 'LAST_LOGIN_METHOD' ? 'Tidak bisa melepas: Google adalah satu-satunya metode login Anda.' : j.error?.message || 'Gagal.')
+    } catch { setMsg('Tidak bisa terhubung.') }
+    finally { setUnlinking(false) }
+  }
+
+  if (loading) return <p>Memuat...</p>
+  const googleLinked = accounts?.some((a: any) => a.provider === 'google')
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: 12, borderRadius: 'var(--radiusMd)', border: '1px solid var(--colorBorderSoft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <svg width="20" height="20" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92a8.78 8.78 0 0 0 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.83.86-3.04.86-2.34 0-4.33-1.58-5.04-3.71H.96v2.34A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.96 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.95H.96A9 9 0 0 0 0 9c0 1.46.35 2.83.96 4.05l3-2.34z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3 2.34C4.67 5.16 6.66 3.58 9 3.58z"/></svg>
+          <div><strong style={{ font: 'var(--typLabelMd)', display: 'block' }}>Google</strong><small style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>{googleLinked ? 'Tertaut' : 'Belum tertaut'}</small></div>
+        </div>
+        {googleLinked
+          ? <button className="btn-secondary" disabled={unlinking} onClick={handleUnlink} style={{ fontSize: 13, padding: '4px 12px' }}>{unlinking ? 'Melepas...' : 'Lepas'}</button>
+          : <button className="btn-primary" onClick={handleLink} style={{ fontSize: 13, padding: '4px 12px' }}>Tautkan</button>
+        }
+      </div>
+      {msg && <p className={`form-message ${msg.includes('berhasil') ? 'success' : 'error'}`} role="status">{msg}</p>}
+    </div>
+  )
+}
+
 export function ProfileSettingsPage() {
   const { profile, refresh, user, requiresOnboarding, setAuthenticated } = useAuth()
   const [heightCm, setHeightCm] = useState(profile?.heightCm?.toString() ?? '')
@@ -501,7 +556,7 @@ export function ProfileSettingsPage() {
           </section>
 
           {configPanelVisible ? (
-            <section className="card" style={{ marginTop: 24 }}>
+          <section className="card" style={{ marginTop: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
                   <h3 style={{ font: 'var(--typHeadlineMd)', color: 'var(--colorTextPrimary)', margin: 0 }}>System Config</h3>
@@ -598,6 +653,15 @@ export function ProfileSettingsPage() {
               ) : null}
             </section>
           ) : null}
+
+          <section className="card" style={{ marginTop: 24 }}>
+            <h3 style={{ font: 'var(--typHeadlineMd)', color: 'var(--colorTextPrimary)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--colorPrimary)' }}>link</span>
+              Akun Tertaut
+            </h3>
+            <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)', marginBottom: 16 }}>Kelola metode login dan akun yang tertaut.</p>
+            <LinkedAccountsSection />
+          </section>
         </div>
       </div>
     </section>

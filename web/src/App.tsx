@@ -15,7 +15,11 @@ import { MonthlyDashboard } from './pages/dashboard/MonthlyDashboard'
 import { DailyHealthHubPage } from "./pages/dashboard/DailyHealthHubPage"
 import { SymptomPage } from "./pages/symptoms/SymptomPage"
 import { HydrationPage } from "./pages/hydration/HydrationPage"
+import { HydrationSettingsPage } from "./pages/hydration/HydrationSettingsPage"
+import { HydrationHistoryPage } from "./pages/hydration/HydrationHistoryPage"
 import { CyclePage } from "./pages/cycle/CyclePage"
+import { AiMemorySettingsPage } from "./pages/ai/AiMemorySettingsPage"
+import { HistoryTimelinePage } from "./pages/history/HistoryTimelinePage"
 import { SelectMetricPage } from './pages/measurement/SelectMetricPage'
 import { DailyReportPage } from './pages/reports/DailyReportPage'
 import { WeeklyReportPage } from './pages/reports/WeeklyReportPage'
@@ -60,7 +64,10 @@ const NAV_GROUPS: (NavGroup | NavLink)[] = [
   { path: '/alerts', label: 'Notifications & Alerts', shortLabel: 'Alerts', icon: 'notifications', badge: '3' },
   { path: "/cycle", label: "Cycle", shortLabel: "Cycle", icon: "cycle" },
   { path: "/hydration", label: "Hydration", shortLabel: "Hydrate", icon: "water_drop" },
+  { path: "/hydration/settings", label: "Hydration Settings", shortLabel: "HydrSet", icon: "water_drop", visible: false },
+  { path: "/hydration/history", label: "Hydration History", shortLabel: "HydrHist", icon: "water_drop", visible: false },
   { path: "/symptoms", label: "Symptoms", shortLabel: "Symptoms", icon: "sick" },
+  { path: "/history", label: "Health Timeline", shortLabel: "Timeline", icon: "timeline" },
   { path: "/daily-health", label: "Daily Health", shortLabel: "Health", icon: "monitoring" },
   { label: 'Health', icon: 'favorite', shortLabel: 'Health', children: [
     { path: '/tracker', label: 'Fasting & Medication', shortLabel: 'Track', icon: 'timer' },
@@ -79,6 +86,7 @@ NAV.push(
   { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', icon: 'delete', visible: false },
   { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', icon: 'elderly', visible: false },
   { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false },
+  { path: '/ai-memory', label: 'AI Memory', shortLabel: 'AI Memory', icon: 'psychology', visible: false },
   { path: '/admin', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true },
 )
 
@@ -110,6 +118,7 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
     case '/dashboard/month': return <MonthlyDashboard />
     case '/measurements/new': return <SelectMetricPage />
     case '/measurements/history': return <HistoryPage />
+    case '/history': return <HistoryTimelinePage />
     case '/measurements/senior': return <SeniorMeasurementFlow />
     case '/tracker': return <TrackerPage />
     case '/ai-assistant': return <AiAssistantPage />
@@ -129,8 +138,12 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
     case '/kb': return <KnowledgeBasePage />
     case '/daily-health': return <DailyHealthHubPage />
     case '/symptoms': return <SymptomPage />
+    case '/symptoms/new': return <SymptomPage />
     case '/hydration': return <HydrationPage />
+    case '/hydration/settings': return <HydrationSettingsPage />
+    case '/hydration/history': return <HydrationHistoryPage />
     case '/cycle': return <CyclePage />
+    case '/ai-memory': return <AiMemorySettingsPage />
     case '/settings/profile': return <ProfileSettingsPage />
     case '/settings/delete': return <ProfileDeletePage />
     case '/admin': return <AdminPage />

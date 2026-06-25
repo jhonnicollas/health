@@ -16,6 +16,8 @@ export function SeniorMeasurementFlow() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [promptSymptom, setPromptSymptom] = useState(false)
+  const [sessionId, setSessionId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -72,16 +74,39 @@ export function SeniorMeasurementFlow() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profileId: profile.id, source: 'senior', values: payloadValues })
       })
-      const body = await resp.json() as { success: boolean; error?: { message: string } }
+      const body = await resp.json() as { success: boolean; data?: { postSubmitPrompt?: { type: string }; sessionId?: number }; error?: { message: string } }
       if (!resp.ok || !body.success) {
         setError(body.error?.message || 'Gagal menyimpan.'); return
       }
-      setDone(true)
+      if (body.data?.postSubmitPrompt?.type === 'symptomCheck') {
+        setSessionId(body.data.sessionId ?? null)
+        setPromptSymptom(true)
+      } else {
+        setDone(true)
+      }
     } catch {
       setError('Tidak bisa terhubung ke server.')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (promptSymptom) {
+    return (
+      <section className="settings-panel">
+        <div style={{ textAlign: 'center', padding: 24 }}>
+          <h2>Apakah Anda mengalami keluhan?</h2>
+          <p style={{ margin: '12px 0 24px', color: 'var(--colorTextSecondary)' }}>Catat keluhan untuk pemantauan kesehatan lebih lengkap.</p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <a className="btn-primary" href={sessionId ? `/symptoms?sessionId=${sessionId}` : '/symptoms'} style={{ textDecoration: 'none' }}>Ya, catat keluhan</a>
+            <button className="btn-secondary" onClick={async () => {
+              try { await fetch('/api/symptoms/prompt-dismissals', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceSessionId: sessionId, reason: 'noSymptoms' }) }) } catch {}
+              setPromptSymptom(false); setDone(true)
+            }}>Tidak, selesai</button>
+          </div>
+        </div>
+      </section>
+    )
   }
 
   if (done) {

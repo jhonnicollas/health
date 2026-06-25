@@ -1,4 +1,4 @@
-export const SPRINT5_TABLES = [
+export const HL_TABLES = [
   'HL_roles',
   'HL_permissions',
   'HL_rolePermissions',
@@ -30,7 +30,7 @@ export const SPRINT5_TABLES = [
   'HL_telegramCallbackEvents'
 ] as const
 
-export const SPRINT5_ROLE_CODES = [
+export const HL_ROLE_CODES = [
   'user',
   'support',
   'admin',
@@ -40,7 +40,7 @@ export const SPRINT5_ROLE_CODES = [
   'medicalReviewer'
 ] as const
 
-export const SPRINT5_PERMISSION_CODES = [
+export const HL_PERMISSION_CODES = [
   'admin.access',
   'admin.users.read',
   'admin.users.update',
@@ -85,7 +85,7 @@ export const SPRINT5_PERMISSION_CODES = [
   'family.aiClinicalCopilot.read'
 ] as const
 
-export const SPRINT5_PLAN_CODES = [
+export const HL_PLAN_CODES = [
   'free',
   'premiumMonthly',
   'premiumQuarterly',
@@ -93,7 +93,7 @@ export const SPRINT5_PLAN_CODES = [
   'familyPremium'
 ] as const
 
-export const SPRINT5_FEATURE_CODES = [
+export const HL_FEATURE_CODES = [
   'feature.symptomLog.use',
   'feature.hydration.use',
   'feature.aiAssistant.use',
@@ -110,7 +110,7 @@ export const SPRINT5_FEATURE_CODES = [
   'feature.fastingInsight.use'
 ] as const
 
-export const SPRINT5_FEATURE_FLAGS = [
+export const HL_FEATURE_FLAGS = [
   'sprint5FoundationEnabled',
   'googleOAuthEnabled',
   'dailyHealthHubEnabled',
@@ -124,7 +124,7 @@ export const SPRINT5_FEATURE_FLAGS = [
   'telegramInlineHydrationEnabled'
 ] as const
 
-export const SPRINT5_CONFIG_KEYS = [
+export const HL_CONFIG_KEYS = [
   'subscriptionEnabled',
   'defaultPlanCode',
   'billingDefaultProvider',
@@ -200,13 +200,13 @@ export const TELEGRAM_CALLBACK_STATUSES = ['received', 'processed', 'rejected', 
 
 type Values<T extends readonly string[]> = T[number]
 
-export type Sprint5TableName = Values<typeof SPRINT5_TABLES>
-export type Sprint5RoleCode = Values<typeof SPRINT5_ROLE_CODES>
-export type Sprint5PermissionCode = Values<typeof SPRINT5_PERMISSION_CODES>
-export type Sprint5PlanCode = Values<typeof SPRINT5_PLAN_CODES>
-export type Sprint5FeatureCode = Values<typeof SPRINT5_FEATURE_CODES>
-export type Sprint5FeatureFlag = Values<typeof SPRINT5_FEATURE_FLAGS>
-export type Sprint5ConfigKey = Values<typeof SPRINT5_CONFIG_KEYS>
+export type HlTableName = Values<typeof HL_TABLES>
+export type HlRoleCode = Values<typeof HL_ROLE_CODES>
+export type HlPermissionCode = Values<typeof HL_PERMISSION_CODES>
+export type HlPlanCode = Values<typeof HL_PLAN_CODES>
+export type HlFeatureCode = Values<typeof HL_FEATURE_CODES>
+export type HlFeatureFlag = Values<typeof HL_FEATURE_FLAGS>
+export type HlConfigKey = Values<typeof HL_CONFIG_KEYS>
 export type BillingInterval = Values<typeof BILLING_INTERVALS>
 export type BillingProvider = Values<typeof BILLING_PROVIDERS>
 export type SubscriptionStatus = Values<typeof SUBSCRIPTION_STATUSES>
@@ -232,18 +232,18 @@ export type CycleGuardrailType = Values<typeof CYCLE_GUARDRAIL_TYPES>
 export type TelegramCallbackEventType = Values<typeof TELEGRAM_CALLBACK_EVENT_TYPES>
 export type TelegramCallbackStatus = Values<typeof TELEGRAM_CALLBACK_STATUSES>
 
-export type Sprint5Role = {
+export type HlRole = {
   id: number
-  roleCode: Sprint5RoleCode | string
+  roleCode: HlRoleCode | string
   roleName: string
   description: string | null
   systemRole: 0 | 1
   active: 0 | 1
 }
 
-export type Sprint5Plan = {
+export type HlPlan = {
   id: number
-  planCode: Sprint5PlanCode | string
+  planCode: HlPlanCode | string
   planName: string
   billingInterval: BillingInterval
   durationDays: number | null
@@ -270,14 +270,14 @@ export type SafetyEventDto = {
   createdAt: string
 }
 
-export const isSprint5RoleCode = (value: string): value is Sprint5RoleCode =>
-  (SPRINT5_ROLE_CODES as readonly string[]).includes(value)
+export const isHlRoleCode = (value: string): value is HlRoleCode =>
+  (HL_ROLE_CODES as readonly string[]).includes(value)
 
-export const isSprint5PermissionCode = (value: string): value is Sprint5PermissionCode =>
-  (SPRINT5_PERMISSION_CODES as readonly string[]).includes(value)
+export const isHlPermissionCode = (value: string): value is HlPermissionCode =>
+  (HL_PERMISSION_CODES as readonly string[]).includes(value)
 
-export const isSprint5PlanCode = (value: string): value is Sprint5PlanCode =>
-  (SPRINT5_PLAN_CODES as readonly string[]).includes(value)
+export const isHlPlanCode = (value: string): value is HlPlanCode =>
+  (HL_PLAN_CODES as readonly string[]).includes(value)
 
-export const isSprint5FeatureCode = (value: string): value is Sprint5FeatureCode =>
-  (SPRINT5_FEATURE_CODES as readonly string[]).includes(value)
+export const isHlFeatureCode = (value: string): value is HlFeatureCode =>
+  (HL_FEATURE_CODES as readonly string[]).includes(value)

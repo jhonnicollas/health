@@ -25,6 +25,8 @@ type AiAssistantResponse = {
     model: string
     usedFallback: boolean
     vitals: VitalSnapshot[]
+    dataSufficiencyScore?: number
+    scoreReason?: string
   }
   error?: { message: string }
 }
@@ -47,6 +49,9 @@ function AiAssistantPage() {
     }
   ])
   const [vitals, setVitals] = useState<VitalSnapshot[]>([])
+  const [dataSufficiencyScore, setDataSufficiencyScore] = useState<number | null>(null)
+  const [scoreReason, setScoreReason] = useState('')
+  const [contextTraceOpen, setContextTraceOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recommendations, setRecommendations] = useState<AiRecommendation[]>([])
@@ -86,6 +91,8 @@ function AiAssistantPage() {
         return
       }
       setVitals(body.data.vitals)
+      setDataSufficiencyScore(body.data?.dataSufficiencyScore ?? null)
+      setScoreReason(body.data?.scoreReason ?? '')
       setMessages((prev) => [
         ...prev,
         {
@@ -133,6 +140,28 @@ function AiAssistantPage() {
 
       <div className="ai-safety-note" role="note">
         AI hanya memberi edukasi umum. AI tidak membuat diagnosis, tidak menentukan tingkat keparahan, dan tidak mengubah dosis obat.
+      </div>
+
+      {dataSufficiencyScore !== null && (
+        <div className="settings-card" style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setContextTraceOpen(!contextTraceOpen)}>
+            <h3 style={{ font: 'var(--typHeadlineSm)', margin: 0 }}>Context Trace</h3>
+            <span style={{ fontSize: 12 }}>{contextTraceOpen ? '▲' : '▼'}</span>
+          </div>
+          {contextTraceOpen && (
+            <div style={{ marginTop: 8 }}>
+              <p>Data Sufficiency: <strong>{dataSufficiencyScore}/100</strong></p>
+              {scoreReason && <p style={{ fontSize: 13, color: '#666' }}>{scoreReason}</p>}
+              <p style={{ fontSize: 12, marginTop: 4 }}>Vector context: <span className="status-chip">Unavailable (Sprint 5 infrastructure only)</span></p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="settings-card" style={{ marginTop: 8 }}>
+        <h3 style={{ font: 'var(--typHeadlineSm)', margin: '0 0 8px' }}>Sprint 6 AI Readiness</h3>
+        <p style={{ fontSize: 13 }}>AI Clinical Copilot is deferred to Sprint 6. Current infrastructure prepares memory and context trace.</p>
+        <a href="/ai-memory" style={{ fontSize: 13, color: '#3182ce' }}>Manage AI Memory →</a>
       </div>
 
       {recommendations.length > 0 || !recsLoading ? (

@@ -4,7 +4,7 @@ import { EducationService } from './services/education.js'
 import { SymptomService } from './services/symptom.js'
 import { AuditService } from './services/audit.js'
 
-interface LocalEnv { DB: D1Database; LOGS: R2Bucket; GOOGLE_CLIENT_ID?: string; TELEGRAM_QUEUE?: Queue }
+interface LocalEnv { DB: D1Database; LOGS: R2Bucket; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; TELEGRAM_QUEUE?: Queue }
 type HC = Context<{ Bindings: LocalEnv }>
 
 function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body, status as any) }
@@ -27,8 +27,15 @@ async function hashPassword(pw: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-export function mountSprint5ARoutes(app: any) {
+const SAFE_RETURN_PATHS = ['/', '/dashboard', '/settings', '/settings/account-security']
+
+export function mountAuthRoutes(app: any) {
   const SD = 30
+  function safeReturnTo(raw: string | null | undefined): string {
+    if (!raw) return '/'
+    try { const u = new URL(raw, 'http://localhost'); if (SAFE_RETURN_PATHS.includes(u.pathname)) return u.pathname } catch {}
+    return '/'
+  }
   async function ssc(c: HC, uid: number) {
     const t = crypto.randomUUID(); const h = await sha256Token(t)
     await c.env.DB.prepare('INSERT INTO HL_sessions (userId, sessionTokenHash, createdAt, expiresAt) VALUES (?, ?, CURRENT_TIMESTAMP, datetime("now", "+" || ? || " days"))').bind(uid, h, SD).run()
@@ -43,7 +50,7 @@ export function mountSprint5ARoutes(app: any) {
       const stateHash = await sha256Token(state)
       const nonce = crypto.randomUUID()
       const nonceHash = await sha256Token(nonce)
-      await c.env.DB.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(stateHash, nonceHash, 'google', mode, c.req.query('returnTo') || '/', new Date(Date.now() + 600000).toISOString()).run()
+      await c.env.DB.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(stateHash, nonceHash, 'google', mode, safeReturnTo(c.req.query('returnTo')), new Date(Date.now() + 600000).toISOString()).run()
       const cid = (c.env as any).GOOGLE_CLIENT_ID || ''
       const ru = `${new URL(c.req.url).origin}/api/auth/google/callback`
       return jr(c, ok({ redirectUrl: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(ru)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}` }, 200, s), 200)
@@ -59,21 +66,39 @@ export function mountSprint5ARoutes(app: any) {
       const row = await c.env.DB.prepare("SELECT id, mode, returnTo, userId FROM HL_oauthStates WHERE stateHash = ? AND consumedAt IS NULL AND expiresAt > datetime('now')").bind(stateHash).first<any>()
       if (!row) return jr(c, fail('UNAUTHORIZED', 'State invalid.', 401, [], s), 401)
       await c.env.DB.prepare('UPDATE HL_oauthStates SET consumedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(row.id).run()
-      const sub = `google_${code.slice(0, 8)}`; const email = `${sub}@gmail.com`
+      const origin = new URL(c.req.url).origin
+      const redirectUri = `${origin}/api/auth/google/callback`
+      const cid = (c.env as any).GOOGLE_CLIENT_ID || ''
+      const csecret = (c.env as any).GOOGLE_CLIENT_SECRET || ''
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ code, client_id: cid, client_secret: csecret, redirect_uri: redirectUri, grant_type: 'authorization_code' })
+      })
+      const tokenData = await tokenRes.json() as any
+      if (!tokenData.id_token) return jr(c, fail('OAUTH_TOKEN_FAILED', 'Token exchange gagal.', 401, [], s), 401)
+      const payload = JSON.parse(atob(tokenData.id_token.split('.')[1])) as any
+      if (!payload.email_verified) return jr(c, fail('EMAIL_NOT_VERIFIED', 'Email Google belum diverifikasi.', 401, [], s), 401)
+      const sub = String(payload.sub)
+      const email = String(payload.email)
       if (row.mode === 'link') {
         const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
-        await c.env.DB.prepare('INSERT OR IGNORE INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, createdAt, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(uid, 'google', sub, email).run()
+        const existingLink = await c.env.DB.prepare('SELECT id FROM HL_oauthAccounts WHERE provider = ? AND providerSubject = ? AND userId != ?').bind('google', sub, uid).first<any>()
+        if (existingLink) return jr(c, fail('EMAIL_CONFLICT', 'Akun Google sudah tertaut ke akun lain.', 409, [], s), 409)
+        await c.env.DB.prepare('INSERT OR IGNORE INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(uid, 'google', sub, email).run()
         await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.link', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google' }) })
-        return c.redirect(decodeURIComponent(row.returnTo || '/settings') as any)
+        return c.redirect(safeReturnTo(row.returnTo))
       }
       const existing = await c.env.DB.prepare('SELECT userId FROM HL_oauthAccounts WHERE provider = ? AND providerSubject = ?').bind('google', sub).first<any>()
       if (existing) { await ssc(c, existing.userId); await AuditService.write(c.env.DB, { userId: existing.userId, action: 'auth.google.login', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google' }) }) } else {
+        const existingEmail = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ?').bind(email).first<any>()
+        if (existingEmail) return jr(c, fail('EMAIL_CONFLICT', 'Email sudah terdaftar dengan akun lain. Silakan login lalu tautkan Google dari pengaturan.', 409, [], s), 409)
         const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await hashPassword(pw)
         const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, 'user', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash).run()
-        await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, createdAt, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(meta.last_row_id, 'google', sub, email).run()
+        await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(meta.last_row_id, 'google', sub, email).run()
         await ssc(c, meta.last_row_id as number)
       }
-      return c.redirect(decodeURIComponent(row.returnTo || '/dashboard') as any)
+      return c.redirect(safeReturnTo(row.returnTo))
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -90,7 +115,7 @@ export function mountSprint5ARoutes(app: any) {
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       const accounts = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM HL_oauthAccounts WHERE userId = ?').bind(uid).first<any>()
       const pwUser = await c.env.DB.prepare('SELECT passwordHash FROM HL_users WHERE id = ?').bind(uid).first<any>()
-      if (!pwUser?.passwordHash || (accounts?.cnt || 0) <= 1) return jr(c, fail('LAST_LOGIN_METHOD', 'Google adalah satu-satunya metode login.', 400, [], s), 400)
+      if (!pwUser?.passwordHash && (accounts?.cnt || 0) <= 1) return jr(c, fail('LAST_LOGIN_METHOD', 'Google adalah satu-satunya metode login.', 400, [], s), 400)
       await c.env.DB.prepare("DELETE FROM HL_oauthAccounts WHERE userId = ? AND provider = 'google'").bind(uid).run()
       await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.unlink', entityType: 'HL_oauthAccounts', entityId: String(uid), metadataJson: JSON.stringify({ provider: 'google' }) })
       return jr(c, ok({ unlinked: true }, 200, s), 200)
@@ -169,9 +194,15 @@ export function mountSprint5ARoutes(app: any) {
   app.get('/api/symptoms/:symptomLogId', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
-      const log = await c.env.DB.prepare('SELECT * FROM HL_symptomLogs WHERE id = ? AND userId = ?').bind(Number(c.req.param('symptomLogId')), uid).first<any>()
+      const logId = Number(c.req.param('symptomLogId'))
+      const log = await c.env.DB.prepare('SELECT * FROM HL_symptomLogs WHERE id = ?').bind(logId).first<any>()
       if (!log) return jr(c, fail('NOT_FOUND', 'Tidak ditemukan.', 404, [], s), 404)
-      return jr(c, ok(log, 200, s), 200)
+      if (log.userId === uid) return jr(c, ok(log, 200, s), 200)
+      const fp = await c.env.DB.prepare('SELECT id FROM HL_familyPermissions WHERE grantedById = ? AND targetUserId = ? AND scope = ? LIMIT 1').bind(log.userId, uid, 'sensitive-health').first<any>()
+      if (fp) return jr(c, ok(log, 200, s), 200)
+      const adminRole = await c.env.DB.prepare("SELECT 1 FROM HL_userRoles ur JOIN HL_rolePermissions rp ON rp.roleCode = ur.roleCode JOIN HL_permissions p ON p.code = rp.permissionCode WHERE ur.userId = ? AND ur.active = 1 AND p.code = 'admin.sensitiveHealth.read' LIMIT 1").bind(uid).first<any>()
+      if (adminRole) return jr(c, ok(log, 200, s), 200)
+      return jr(c, fail('FORBIDDEN', 'Akses ditolak.', 403, [], s), 403)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
