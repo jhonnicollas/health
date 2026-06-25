@@ -43,6 +43,7 @@ type ApiErrorCode =
   | 'EMAIL_ALREADY_EXISTS'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
+  | 'ENTITLEMENT_REQUIRED'
   | 'NOT_FOUND'
   | 'QUOTA_EXCEEDED'
   | 'RATE_LIMITED'
@@ -3032,6 +3033,8 @@ app.post('/api/ai/assistant', async (c) => {
 
     const body = await c.req.json().catch(() => ({})) as { question?: string; clinicalCopilotMode?: boolean }
     if (body.clinicalCopilotMode) return c.json({ success: false, error: { code: 'AI_CLINICAL_COPILOT_DEFERRED', message: 'AI Clinical Copilot runtime is deferred to Sprint 6.', details: [{ scopeStatus: 'deferred_to_sprint6' }] }, meta: { requestId: `req_${startedAt}`, durationMs: Date.now() - startedAt } }, 403)
+    const ent = await EntitlementService.requireEntitlement(c.env.DB, userId, 'feature.aiAssistant.use')
+    if (!ent.allowed) return jsonResponse(c, failure('ENTITLEMENT_REQUIRED', 'Fitur AI memerlukan paket Premium.', 403, [{ featureCode: ent.featureCode, planCode: ent.planCode }], startedAt))
     const question = (body.question || '').trim()
     if (!question) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'question wajib.', 400, [], startedAt))
@@ -3104,6 +3107,8 @@ app.post('/api/ai/assistant', async (c) => {
       reply = assistantReply
       model = aiResult.model
       usedFallback = false
+      const dataSufficiencyScore = vitals.length >= 3 ? Math.min(vitals.length * 20, 100) : vitals.length * 10
+      const contextTrace = vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, source: 'HL_measurementValues' }))
 
       return jsonResponse(
         c,
@@ -3115,7 +3120,10 @@ app.post('/api/ai/assistant', async (c) => {
             model,
             usedFallback,
             vitals,
-            profile: profile || null
+            profile: profile || null,
+            dataSufficiencyScore,
+            contextTrace,
+            usedVectorContext: false
           },
           200,
           startedAt
@@ -3133,7 +3141,10 @@ app.post('/api/ai/assistant', async (c) => {
           model,
           usedFallback,
           vitals,
-          profile: profile || null
+          profile: profile || null,
+          dataSufficiencyScore: vitals.length * 10,
+          contextTrace: vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, source: 'HL_measurementValues' })),
+          usedVectorContext: false
         },
         200,
         startedAt

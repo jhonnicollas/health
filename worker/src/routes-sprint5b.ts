@@ -1,6 +1,7 @@
 import { Context } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { HydrationService } from './services/hydration.js'
+import { AuditService } from './services/audit.js'
 
 interface LocalEnv { DB: D1Database }
 type HC = Context<{ Bindings: LocalEnv }>
@@ -30,6 +31,7 @@ export function mountSprint5BRoutes(app: any) {
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       const body = await c.req.json() as any
       await HydrationService.upsertSettings(c.env.DB, uid, body)
+      await AuditService.write(c.env.DB, { userId: uid, action: 'hydration.settings.update', entityType: 'HL_hydrationSettings', entityId: String(uid), metadataJson: JSON.stringify({ isPregnant: body.isPregnant, isLactating: body.isLactating }) })
       return jr(c, ok({ updated: true }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
@@ -68,5 +70,19 @@ export function mountSprint5BRoutes(app: any) {
       const logs = await HydrationService.getHistory(c.env.DB, uid, from || '2026-01-01', to || '2099-12-31', Math.min(Number(limit) || 50, 200))
       return jr(c, ok(logs, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
+  })
+
+  app.delete('/api/hydration/logs/:logId', async (c: HC) => {
+    const s = Date.now()
+    try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      const logId = Number(c.req.param('logId'))
+      const existing = await c.env.DB.prepare('SELECT id, userId, logDate FROM HL_waterIntakeLogs WHERE id = ? AND userId = ?').bind(logId, uid).first<any>()
+      if (!existing) return jr(c, fail('NOT_FOUND', 'Log tidak ditemukan.', 404, [], s), 404)
+      await c.env.DB.prepare('DELETE FROM HL_waterIntakeLogs WHERE id = ? AND userId = ?').bind(logId, uid).run()
+      const dateStr = existing.logDate || new Date().toISOString().slice(0, 10)
+      const logs = await HydrationService.getTodayLogs(c.env.DB, uid, dateStr)
+      const recalculatedTotalMl = logs.reduce((sum: number, l: any) => sum + l.amountMl, 0)
+      return jr(c, ok({ deleted: true, recalculatedTotalMl, overhydrationWarning: false }, 200, s), 200)
+    } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal menghapus log.', 500, [], s), 500) }
   })
 }

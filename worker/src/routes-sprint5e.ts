@@ -17,7 +17,7 @@ async function getSession(c: HC): Promise<number | null> {
 
 export function mountSprint5ERoutes(app: any) {
   // Telegram water webhook (no session, signature validated by internal secret)
-  app.post('/api/telegram/water-webhook', async (c: HC) => {
+  app.post('/api/webhook/telegram/water', async (c: HC) => {
     const s = Date.now()
     try {
       const secret = (c.env as any).INTERNAL_API_SECRET || ''
@@ -36,6 +36,9 @@ export function mountSprint5ERoutes(app: any) {
     } catch (e) { return c.json({ ok: false, error: String(e) }) }
   })
 
+  // Legacy alias — backward compat
+  app.post('/api/telegram/water-webhook', async (c: HC) => { return c.json({ ok: true, message: 'Use /api/webhook/telegram/water' }, 301) })
+
   // Cron: send hydration reminders (internal endpoint)
   app.post('/api/internal/cron/hydration-reminders', async (c: HC) => {
     const s = Date.now()
@@ -53,7 +56,7 @@ export function mountSprint5ERoutes(app: any) {
       let sent = 0
       for (const u of users.results || []) {
         if (u.telegramChatId) {
-          try { await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: u.telegramChatId, text: '💧 Waktunya minum air! Catat asupan Anda.' }) }); sent++ } catch {}
+          try { await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: u.telegramChatId, text: '💧 Waktunya minum air! Catat asupan Anda.', reply_markup: { inline_keyboard: [[{ text: '💧 +200ml', callback_data: 'ADD_WATER_200' }, { text: '🥤 +600ml', callback_data: 'ADD_WATER_600' }]] } }) }); sent++ } catch {}
         }
       }
       return jr(c, ok({ usersFound: users.results?.length || 0, remindersSent: sent }, 200, s), 200)

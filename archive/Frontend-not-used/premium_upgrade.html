@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade Premium - HealthSync Pro</title>
+    
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-surface-variant": "#424656", "inverse-surface": "#2d3133", "secondary-fixed": "#d3e4fe",
+          "tertiary": "#005c85", "surface-container-lowest": "#ffffff", "surface-container": "#eceef0",
+          "surface-variant": "#e0e3e5", "on-primary": "#ffffff", "primary-container": "#0061ff",
+          "surface-container-highest": "#e0e3e5", "tertiary-container": "#0076a9", "surface-bright": "#f7f9fb",
+          "on-tertiary": "#ffffff", "background": "#f7f9fb", "outline": "#737687", "outline-variant": "#c2c6d9",
+          "on-secondary-container": "#54647a", "error-container": "#ffdad6", "surface-dim": "#d8dadc",
+          "primary": "#004bca", "surface-container-low": "#f2f4f6", "error": "#ba1a1a",
+          "secondary-fixed-dim": "#b7c8e1", "on-secondary": "#ffffff", "on-error-container": "#93000a",
+          "tertiary-fixed-dim": "#89ceff", "on-tertiary-container": "#eaf4ff", "on-secondary-fixed": "#0b1c30",
+          "secondary": "#505f76", "surface-container-high": "#e6e8ea", "on-tertiary-fixed": "#001e2f",
+          "inverse-on-surface": "#eff1f3", "primary-fixed-dim": "#b4c5ff", "on-tertiary-fixed-variant": "#004c6e",
+          "on-secondary-fixed-variant": "#38485d", "on-primary-container": "#f1f2ff", "primary-fixed": "#dbe1ff",
+          "inverse-primary": "#b4c5ff", "surface-tint": "#0052dc", "on-surface": "#191c1e",
+          "on-primary-fixed-variant": "#003ea8", "on-background": "#191c1e", "on-error": "#ffffff",
+          "on-primary-fixed": "#00174b", "tertiary-fixed": "#c9e6ff", "secondary-container": "#d0e1fb",
+          "surface": "#f7f9fb",
+          "status-critical": "#ba1a1a",
+          "status-normal": "#10b981",
+          "status-warning": "#f59e0b"
+        },
+        "spacing": {
+          "sidebar-width": "280px"
+        },
+        "fontFamily": { "sans": ["Inter", "sans-serif"] }
+      }
+    }
+  }
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1; }
+  
+  /* Sidebar scrollbar styling */
+  .sidebar-scroll::-webkit-scrollbar { width: 6px; }
+  .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background: #c2c6d9; border-radius: 4px; }
+  .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #737687; }
+</style>
+
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex">
+    
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 hidden lg:flex flex-col border-r border-outline-variant bg-surface-container-low z-50">
+    <div class="flex-1 overflow-y-auto py-4 sidebar-scroll">
+        <div class="p-6 border-b border-outline-variant">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary">
+                    <span class="material-symbols-outlined fill">local_hospital</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-primary leading-tight">HealthSync Pro</h1>
+                    <p class="text-xs text-outline font-medium tracking-wide">Enterprise Health</p>
+                </div>
+            </div>
+            <div class="bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 flex items-center gap-2 mt-4">
+                <span class="material-symbols-outlined text-[16px] text-primary">shield</span>
+                <span class="text-xs font-bold text-primary">Admin Access</span>
+            </div>
+        </div>
+        
+        <nav class="flex-1 flex flex-col gap-1 px-3 py-4">
+            <p class="px-3 pt-2 pb-1 text-[11px] font-bold text-outline uppercase tracking-wider">User Area</p>
+            <a href="#" class="flex items-center gap-4 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[20px]">dashboard</span> Dashboard
+            </a>
+            
+            <div class="mt-4 mb-2">
+                <div class="h-px bg-outline-variant mx-3 relative">
+                    <div class="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-surface-container-low px-2">
+                        <span class="text-[10px] font-bold text-outline uppercase tracking-widest">Admin Area</span>
+                    </div>
+                </div>
+            </div>
+
+            <a href="admin_dashboard.html" class="flex items-center gap-4 px-3 py-2.5 rounded-lg text-sm font-medium bg-primary/10 text-primary border-l-4 border-primary font-bold">
+                <span class="material-symbols-outlined text-[20px] fill">dashboard_customize</span> Admin Dashboard
+            </a>
+            <a href="admin_users_roles.html" class="flex items-center gap-4 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[20px] ">manage_accounts</span> Users & Roles
+            </a>
+            <a href="admin_plans_subscriptions.html" class="flex items-center gap-4 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[20px] ">workspace_premium</span> Plans & Subscriptions
+            </a>
+            <a href="admin_ai_config.html" class="flex items-center gap-4 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[20px] ">model_training</span> AI Configuration
+            </a>
+            <a href="admin_system_config.html" class="flex items-center gap-4 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[20px] ">tune</span> System Config
+            </a>
+            <a href="admin_audit_logs.html" class="flex items-center gap-4 px-3 py-2.5 rounded-lg text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[20px] ">fact_check</span> Audit Logs
+            </a>
+        </nav>
+    </div>
+</aside>
+
+    <main class="flex-1 lg:ml-[280px] flex flex-col min-h-screen relative w-full">
+        
+<header class="sticky top-0 z-40 flex items-center justify-between h-[64px] px-8 bg-surface border-b border-outline-variant shadow-sm">
+    <div class="flex items-center gap-4">
+        <div class="relative w-96 hidden lg:block">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+            <input type="text" placeholder="Cari user, config, atau log..." class="w-full h-10 pl-10 pr-4 bg-surface-container-lowest border border-outline-variant rounded-full text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all">
+        </div>
+    </div>
+    <div class="flex items-center gap-4">
+        <button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors relative">
+            <span class="material-symbols-outlined text-[22px]">notifications</span>
+            <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-status-critical border-2 border-surface"></span>
+        </button>
+        <div class="h-8 w-px bg-outline-variant mx-1"></div>
+        <button class="flex items-center gap-3 pl-2 pr-1 py-1 rounded-full hover:bg-surface-container transition-colors">
+            <div class="text-right hidden md:block">
+                <p class="text-sm font-bold text-on-surface leading-tight">Super Admin</p>
+                <p class="text-[11px] text-on-surface-variant">admin@hl.id</p>
+            </div>
+            <div class="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary font-bold text-sm">
+                SA
+            </div>
+        </button>
+    </div>
+</header>
+
+        <div class="flex-1 p-4 md:p-8 overflow-x-hidden">
+            <div class="max-w-[1440px] mx-auto">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-on-surface mb-2">Tingkatkan Pengalaman Anda</h1>
+                    <p class="text-on-surface-variant text-base">Dapatkan fitur AI pintar, tracking lengkap, dan akses keluarga dengan HealthSync Pro Premium.</p>
+                </div>
+                
+        <div class="max-w-4xl mx-auto py-8">
+            <div class="text-center mb-12">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-tertiary-container/10 text-tertiary-container mb-6 shadow-sm border border-tertiary-container/20">
+                    <span class="material-symbols-outlined text-[40px]">workspace_premium</span>
+                </div>
+                <h2 class="text-4xl font-extrabold text-on-surface mb-4">Pilih Paket Terbaik Untuk Anda</h2>
+                <p class="text-lg text-on-surface-variant max-w-2xl mx-auto">Dari sekadar pencatat biasa menjadi asisten kesehatan pintar yang mendampingi Anda 24/7.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+                <!-- Free Plan -->
+                <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl p-8 flex flex-col shadow-sm">
+                    <h3 class="text-2xl font-bold text-on-surface mb-2">Basic</h3>
+                    <p class="text-on-surface-variant text-sm mb-6 h-10">Pencatatan kesehatan esensial untuk personal.</p>
+                    
+                    <div class="text-4xl font-bold text-on-surface mb-8">Rp 0<span class="text-base font-normal text-on-surface-variant">/selamanya</span></div>
+                    
+                    <ul class="space-y-4 mb-8 flex-1">
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-status-normal text-[20px]">check_circle</span>
+                            <span class="text-sm text-on-surface">Pencatatan Metrik Dasar</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-status-normal text-[20px]">check_circle</span>
+                            <span class="text-sm text-on-surface">Grafik Trend Sederhana</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-status-normal text-[20px]">check_circle</span>
+                            <span class="text-sm text-on-surface">AI Vision Ekstraksi (5x/hari)</span>
+                        </li>
+                        <li class="flex items-start gap-3 opacity-50">
+                            <span class="material-symbols-outlined text-outline text-[20px]">cancel</span>
+                            <span class="text-sm text-on-surface-variant">AI Health Assistant & Memory</span>
+                        </li>
+                        <li class="flex items-start gap-3 opacity-50">
+                            <span class="material-symbols-outlined text-outline text-[20px]">cancel</span>
+                            <span class="text-sm text-on-surface-variant">Akses Caregiver / Keluarga</span>
+                        </li>
+                    </ul>
+                    
+                    <button class="w-full py-3.5 bg-surface-container text-on-surface-variant rounded-xl font-bold text-sm cursor-default" disabled>Paket Saat Ini</button>
+                </div>
+
+                <!-- Premium Plan -->
+                <div class="bg-surface-container-lowest border-2 border-primary rounded-2xl p-8 flex flex-col shadow-xl relative transform md:-translate-y-4 bg-white">
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-on-primary text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm whitespace-nowrap">Paling Populer</div>
+                    
+                    <h3 class="text-2xl font-bold text-on-surface mb-2">Pro Premium</h3>
+                    <p class="text-on-surface-variant text-sm mb-6 h-10">Kecerdasan buatan penuh untuk mengawasi kesehatan Anda.</p>
+                    
+                    <div class="text-4xl font-bold text-on-surface mb-2">Rp 49.000<span class="text-base font-normal text-on-surface-variant">/bln</span></div>
+                    <p class="text-sm text-status-normal font-semibold mb-6">Atau hemat 23% dengan Rp 449.000/thn</p>
+                    
+                    <ul class="space-y-4 mb-8 flex-1">
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+                            <span class="text-sm font-semibold text-on-surface">Semua fitur Basic</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-[20px]">smart_toy</span>
+                            <span class="text-sm font-semibold text-on-surface">AI Assistant Interaktif (200x)</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-[20px]">psychology</span>
+                            <span class="text-sm font-semibold text-on-surface">AI Memory & Pola Personalisasi</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-[20px]">family_restroom</span>
+                            <span class="text-sm font-semibold text-on-surface">Akses untuk 1 Caregiver</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-[20px]">document_scanner</span>
+                            <span class="text-sm font-semibold text-on-surface">Unlimited AI Vision Scanner</span>
+                        </li>
+                    </ul>
+                    
+                    <button class="w-full py-3.5 bg-primary text-on-primary rounded-xl font-bold text-sm shadow-md hover:bg-primary/90 hover:shadow-lg transition-all transform hover:-translate-y-0.5">Mulai Uji Coba 7 Hari Gratis</button>
+                    <p class="text-xs text-center text-on-surface-variant mt-4">Batalkan kapan saja. Bebas komitmen.</p>
+                </div>
+            </div>
+        </div>
+        
+            </div>
+        </div>
+    </main>
+</body>
+</html>

@@ -261,7 +261,7 @@ To avoid context-limit problems:
 ```text
 - WORK_LOG.md contains Sprint 5 entries only.
 - Keep each entry under 25 lines.
-- Put long debug output in separate files under docs/logs/ if needed.
+- Put long debug output in separate files under archive/docs/logs/ if needed.
 - HANDOFF.md is the single resume pointer.
 - Agents should read only latest WORK_LOG entries, not the entire history.
 ```

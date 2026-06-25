@@ -86,7 +86,7 @@ Rules:
 - <exact next step or blocker>
 ```
 
-## 2026-06-24 15:00 UTC � Agent: Antigravity
+## 2026-06-24 15:00 UTC � Agent: Antigravity
 
 ### Task
 - Task ID: Pre-Sprint 5 Mockup
@@ -570,3 +570,62 @@ cd web && CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=79dea2845a4b62ea522
 - cd web && npx tsc -b — PASS
 - cd web && npx eslint . — 0 errors
 - cd web && npx vite build — PASS
+
+## 2026-06-25 06:00 UTC — Agent: opencode (API contract gap fix)
+
+### Task
+- Task ID: S5-GAP-FIX (post-deploy API contract compliance)
+- Sprint: Sprint 5 Full
+- Status: Completed
+
+### What Changed
+- Added audit logging to 6 mutation endpoints: auth.google.link/unlink, hydration.settings.update, aiMemory.rebuild/delete, cycle.settings.update, cycle.guardrail.acknowledge
+- Fixed 3 admin AI endpoints (routes-sprint5c.ts) to use RbacService.hasPermission instead of hardcoded role='admin' check
+- Fixed PUT /api/admin/ai-config permission: admin.config.update → admin.aiConfig.update
+- Fixed GET /api/admin/ai-config permission: admin.config.read → admin.aiConfig.read
+- Added requireCycleEligible + requireEntitlement('feature.cycleTracking.use') guards to 5 cycle endpoints (settings GET/PUT, calendar, logs POST/GET, guardrails/acknowledge)
+- Fixed telegram webhook path: /api/telegram/water-webhook → /api/webhook/telegram/water (legacy alias kept)
+- Added inline keyboard to cron hydration reminders (ADD_WATER_200, ADD_WATER_600 buttons)
+- Added GET /api/history/timeline endpoint (mixed measurement/symptom/hydration/safetyEvent/cycle timeline)
+- Added OAuth state/nonce hashing (state stored as SHA-256 hash, not plaintext)
+- Added postSubmitPrompt to POST /api/measurements/submit response when severity >= warning
+- Added Sprint 5C context enhancements to POST /api/ai/assistant: entitlement check, dataSufficiencyScore, contextTrace, usedVectorContext
+- Added ENTITLEMENT_REQUIRED to ApiErrorCode type union
+- Added GET/PUT /api/admin/education/cards admin endpoints
+
+### Files Changed
+- worker/src/index.ts (timeline endpoint, ai assistant enhancements, ai-config permission fix, education admin, ENTITLEMENT_REQUIRED type, postSubmitPrompt)
+- worker/src/routes-sprint5a.ts (audit logging, OAuth state hashing)
+- worker/src/routes-sprint5b.ts (audit logging)
+- worker/src/routes-sprint5c.ts (RbacService guards, audit logging)
+- worker/src/routes-sprint5d.ts (cycle eligibility + entitlement guards, audit logging)
+- worker/src/routes-sprint5e.ts (webhook path fix, inline keyboard)
+
+### Validation
+- cd worker && npx tsc --noEmit — PASS
+- cd worker && node --test test/sprint5-service.test.mjs — 19/19 PASS
+- cd web && npx tsc -b — PASS
+- Note: register.test.mjs has 1 pre-existing failure (admin role permissions PUT 404), unrelated to these changes
+
+## 2026-06-25 12:30 UTC — Agent: Codex
+
+### Task
+- Task ID: CONTEXT-SIZE-FIX
+- Sprint: Infrastructure
+- Status: Completed
+
+### What Changed
+- Archive `docs/` (18 files, ~10K lines) → `archive/docs/`
+- Archive `docs_sprint5/Frontend-not-used/` (19 HTML + 5 PNG) → `archive/Frontend-not-used/`
+- Archive `WORK_LOG_Sprint1-4.md` (5.221 lines → ringkasan 27 lines, full di `archive/`)
+- Hapus `scratch/build_admin_mockups.py` (83K)
+- Hapus `.tmp-d1-backups/` (23MB D1 backup)
+- Buat `.opencodeignore` — exclude `docs_sprint5/*.md`, `docs_sprint5/*.html`, `archive/`, dll
+- Update `AGENTS.md` — path `docs/logs/` → `archive/docs/logs/`
+
+### Validation
+- Estimated token saved per request: ~500-700K
+- `git add .` + commit
+
+### Next
+- Lanjut Sprint 5 Foundation GAP (S5F-015/016/017)

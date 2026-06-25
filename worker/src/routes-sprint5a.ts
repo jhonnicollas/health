@@ -2,6 +2,7 @@ import { Context } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { EducationService } from './services/education.js'
 import { SymptomService } from './services/symptom.js'
+import { AuditService } from './services/audit.js'
 
 interface LocalEnv { DB: D1Database; LOGS: R2Bucket; GOOGLE_CLIENT_ID?: string; TELEGRAM_QUEUE?: Queue }
 type HC = Context<{ Bindings: LocalEnv }>
@@ -39,7 +40,10 @@ export function mountSprint5ARoutes(app: any) {
     try {
       const mode = c.req.query('mode') || 'login'
       const state = crypto.randomUUID()
-      await c.env.DB.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(state, null, 'google', mode, c.req.query('returnTo') || '/', new Date(Date.now() + 600000).toISOString()).run()
+      const stateHash = await sha256Token(state)
+      const nonce = crypto.randomUUID()
+      const nonceHash = await sha256Token(nonce)
+      await c.env.DB.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(stateHash, nonceHash, 'google', mode, c.req.query('returnTo') || '/', new Date(Date.now() + 600000).toISOString()).run()
       const cid = (c.env as any).GOOGLE_CLIENT_ID || ''
       const ru = `${new URL(c.req.url).origin}/api/auth/google/callback`
       return jr(c, ok({ redirectUrl: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(ru)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}` }, 200, s), 200)
@@ -51,17 +55,19 @@ export function mountSprint5ARoutes(app: any) {
     try {
       const { code, state } = c.req.query()
       if (!code || !state) return jr(c, fail('VALIDATION_ERROR', 'code dan state wajib.', 400, [], s), 400)
-      const row = await c.env.DB.prepare("SELECT id, mode, returnTo, userId FROM HL_oauthStates WHERE stateHash = ? AND consumedAt IS NULL AND expiresAt > datetime('now')").bind(state).first<any>()
+      const stateHash = await sha256Token(state)
+      const row = await c.env.DB.prepare("SELECT id, mode, returnTo, userId FROM HL_oauthStates WHERE stateHash = ? AND consumedAt IS NULL AND expiresAt > datetime('now')").bind(stateHash).first<any>()
       if (!row) return jr(c, fail('UNAUTHORIZED', 'State invalid.', 401, [], s), 401)
       await c.env.DB.prepare('UPDATE HL_oauthStates SET consumedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(row.id).run()
       const sub = `google_${code.slice(0, 8)}`; const email = `${sub}@gmail.com`
       if (row.mode === 'link') {
         const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
         await c.env.DB.prepare('INSERT OR IGNORE INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, createdAt, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(uid, 'google', sub, email).run()
+        await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.link', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google' }) })
         return c.redirect(decodeURIComponent(row.returnTo || '/settings') as any)
       }
       const existing = await c.env.DB.prepare('SELECT userId FROM HL_oauthAccounts WHERE provider = ? AND providerSubject = ?').bind('google', sub).first<any>()
-      if (existing) { await ssc(c, existing.userId) } else {
+      if (existing) { await ssc(c, existing.userId); await AuditService.write(c.env.DB, { userId: existing.userId, action: 'auth.google.login', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google' }) }) } else {
         const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await hashPassword(pw)
         const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, 'user', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash).run()
         await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, createdAt, updatedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(meta.last_row_id, 'google', sub, email).run()
@@ -74,6 +80,7 @@ export function mountSprint5ARoutes(app: any) {
   app.post('/api/auth/google/link', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.link.init', entityType: 'HL_oauthAccounts', entityId: String(uid) })
       return jr(c, ok({ redirectUrl: `/api/auth/google?mode=link&returnTo=${encodeURIComponent(c.req.query('returnTo') || '/settings/account-security')}` }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
@@ -85,6 +92,7 @@ export function mountSprint5ARoutes(app: any) {
       const pwUser = await c.env.DB.prepare('SELECT passwordHash FROM HL_users WHERE id = ?').bind(uid).first<any>()
       if (!pwUser?.passwordHash || (accounts?.cnt || 0) <= 1) return jr(c, fail('LAST_LOGIN_METHOD', 'Google adalah satu-satunya metode login.', 400, [], s), 400)
       await c.env.DB.prepare("DELETE FROM HL_oauthAccounts WHERE userId = ? AND provider = 'google'").bind(uid).run()
+      await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.unlink', entityType: 'HL_oauthAccounts', entityId: String(uid), metadataJson: JSON.stringify({ provider: 'google' }) })
       return jr(c, ok({ unlinked: true }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
@@ -143,12 +151,36 @@ export function mountSprint5ARoutes(app: any) {
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal memuat keluhan.', 500, [], s), 500) }
   })
 
-  app.get('/api/symptoms/:id', async (c: HC) => {
+  app.get('/api/symptoms/history', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
-      const log = await c.env.DB.prepare('SELECT * FROM HL_symptomLogs WHERE id = ? AND userId = ?').bind(Number(c.req.param('id')), uid).first<any>()
+      const { from, to, limit, redFlagOnly, sourceSessionId } = c.req.query()
+      let sql = 'SELECT id, symptomDateTime, quickSymptomsJson, bodyArea, painScale, painSeverity, isRedFlag, redFlagsJson, sourceSessionId, safetyEventId FROM HL_symptomLogs WHERE userId = ?'; const params: unknown[] = [uid]
+      if (from) { sql += ' AND date(symptomDateTime) >= ?'; params.push(from) }
+      if (to) { sql += ' AND date(symptomDateTime) <= ?'; params.push(to) }
+      if (redFlagOnly === 'true') { sql += ' AND isRedFlag = 1' }
+      if (sourceSessionId) { sql += ' AND sourceSessionId = ?'; params.push(Number(sourceSessionId)) }
+      sql += ' ORDER BY symptomDateTime DESC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 100))
+      const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+      return jr(c, ok(rows.results || [], 200, s), 200)
+    } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal memuat riwayat keluhan.', 500, [], s), 500) }
+  })
+
+  app.get('/api/symptoms/:symptomLogId', async (c: HC) => {
+    const s = Date.now()
+    try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      const log = await c.env.DB.prepare('SELECT * FROM HL_symptomLogs WHERE id = ? AND userId = ?').bind(Number(c.req.param('symptomLogId')), uid).first<any>()
       if (!log) return jr(c, fail('NOT_FOUND', 'Tidak ditemukan.', 404, [], s), 404)
       return jr(c, ok(log, 200, s), 200)
+    } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
+  })
+
+  app.post('/api/symptoms/prompt-dismissals', async (c: HC) => {
+    const s = Date.now()
+    try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      const body = await c.req.json() as { sourceSessionId?: number; reason?: string }
+      await c.env.DB.prepare('INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(uid, 'symptom.prompt.dismissed', 'HL_measurementSessions', String(body.sourceSessionId || ''), JSON.stringify({ reason: body.reason || 'noSymptoms' })).run()
+      return jr(c, ok({ dismissed: true }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 

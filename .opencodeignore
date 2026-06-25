@@ -1,0 +1,12 @@
+# Large doc files — auto-inject causes 439 errors
+docs_sprint5/*.md
+docs_sprint5/*.html
+archive/
+WORK_LOG_Sprint1-4.md
+scratch/
+.tmp-d1-backups/
+# Build artifacts
+worker/dist/
+web/dist/
+web/.wrangler/
+web/frontend_stitch/
