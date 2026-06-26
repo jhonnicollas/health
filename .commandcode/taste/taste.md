@@ -1,6 +1,7 @@
 # Taste (Continuously Learned by [CommandCode][cmd])
 
 [cmd]: https://commandcode.ai/
+
 
 # workflow
 - Pull git before starting any work session. Confidence: 0.70
