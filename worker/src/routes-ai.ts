@@ -7,15 +7,18 @@ import { EntitlementService } from './services/entitlements.js'
 
 interface LocalEnv { DB: D1Database; AI_MEMORY_QUEUE?: Queue; VECTORIZE_INDEX?: any }
 type HC = Context<{ Bindings: LocalEnv }>
-function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body, status as any) }
+function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body.body ?? body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now()) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 function fail(code: string, msg: string, status: number, errs: unknown[] = [], s = Date.now()) { return { body: { success: false, error: { code, message: msg, details: errs }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 
+function base64Url(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
 async function getSession(c: HC): Promise<number | null> {
   const token = getCookie(c, 'hlSession'); if (!token) return null
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
-  const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-  const row = await c.env.DB.prepare('SELECT userId FROM HL_sessions WHERE sessionTokenHash = ? AND revokedAt IS NULL AND expiresAt > datetime("now")').bind(h).first<any>()
+  const h = `sha256:${base64Url(buf)}`
+  const row = await c.env.DB.prepare('SELECT s.userId FROM HL_sessions s JOIN HL_users u ON u.id = s.userId WHERE s.sessionTokenHash = ? AND s.revokedAt IS NULL AND s.expiresAt > datetime("now") AND u.active = 1').bind(h).first<any>()
   return row?.userId || null
 }
 

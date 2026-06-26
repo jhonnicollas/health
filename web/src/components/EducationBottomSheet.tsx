@@ -5,11 +5,9 @@ type Props = { topicType: string; visible: boolean; onClose: () => void }
 
 export function EducationBottomSheet({ topicType, visible, onClose }: Props) {
   const [card, setCard] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!visible || !topicType) return
-    setLoading(true)
     ;(async () => {
       try {
         const r = await fetch(`/api/education/cards?topicType=${encodeURIComponent(topicType)}&firstTimeOnly=true`, { credentials: 'include' })
@@ -17,7 +15,6 @@ export function EducationBottomSheet({ topicType, visible, onClose }: Props) {
         if (j.success && j.data?.length > 0) setCard(j.data[0])
         else setCard(null)
       } catch { setCard(null) }
-      finally { setLoading(false) }
     })()
   }, [visible, topicType])
 
@@ -31,7 +28,6 @@ export function EducationBottomSheet({ topicType, visible, onClose }: Props) {
     setCard(null); onClose()
   }
 
-  if (loading) return null
   if (!card) return null
 
   return (

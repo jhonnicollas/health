@@ -119,7 +119,7 @@ class D1MockStatement {
         return null
       }
 
-      if (this.sql.includes('SELECT userId FROM HL_sessions')) {
+      if (this.sql.includes('SELECT userId FROM HL_sessions') || this.sql.includes('SELECT s.userId FROM HL_sessions')) {
         return { userId: session.userId }
       }
 
@@ -204,10 +204,10 @@ class D1MockStatement {
       return user ? { id: user.id, active: user.active } : null
     }
 
-    if (this.sql.includes('SELECT roleCode FROM HL_roles')) {
+    if (this.sql.includes('SELECT roleCode') && this.sql.includes('FROM HL_roles') && this.sql.includes('WHERE roleCode = ?') && !this.sql.includes('LEFT JOIN')) {
       const roleCode = this.params[0]
       const role = this.db.roles.find((row) => row.roleCode === roleCode)
-      return role ? { roleCode: role.roleCode } : null
+      return role ? { roleCode: role.roleCode, systemRole: role.systemRole ?? 0 } : null
     }
 
     if (this.sql.includes('FROM HL_userRoles') && this.sql.includes('HL_permissions')) {
@@ -371,6 +371,18 @@ class D1MockStatement {
       return { results: rows }
     }
 
+    if (this.sql.includes('FROM HL_measurementValues v JOIN HL_measurementSessions s')) {
+      const [userId] = this.params
+      const sessions = this.db.measurementSessions.filter((row) => row.userId === userId)
+      const rows = []
+      for (const s of sessions) {
+        for (const v of this.db.measurementValues.filter((row) => row.sessionId === s.id)) {
+          rows.push({ id: v.id, metricCode: v.metricCode, finalValue: v.finalValue, unit: v.unit, status: v.status, severity: v.severity, measuredAt: s.measuredAt })
+        }
+      }
+      return { results: rows.sort((left, right) => right.measuredAt.localeCompare(left.measuredAt)) }
+    }
+
     if (this.sql.includes('FROM HL_measurementValues')) {
       const [userId, ...sessionIds] = this.params
       const rows = this.db.measurementValues
@@ -444,6 +456,26 @@ class D1MockStatement {
       return { results: rows }
     }
 
+    if (this.sql.includes('FROM HL_symptomLogs')) {
+      const [userId] = this.params
+      return { results: this.db.symptomLogs?.filter((row) => row.userId === userId) ?? [] }
+    }
+
+    if (this.sql.includes('FROM HL_waterIntakeLogs')) {
+      const [userId] = this.params
+      return { results: this.db.waterIntakeLogs?.filter((row) => row.userId === userId) ?? [] }
+    }
+
+    if (this.sql.includes('FROM HL_safetyEvents')) {
+      const [userId] = this.params
+      return { results: this.db.safetyEvents?.filter((row) => row.userId === userId) ?? [] }
+    }
+
+    if (this.sql.includes('FROM HL_cycleLogs')) {
+      const [userId] = this.params
+      return { results: this.db.cycleLogs?.filter((row) => row.userId === userId) ?? [] }
+    }
+
     return { results: [] }
   }
 }
@@ -477,6 +509,10 @@ class D1Mock {
     this.alerts = []
     this.streaks = []
     this.aiRecommendations = []
+    this.symptomLogs = []
+    this.waterIntakeLogs = []
+    this.safetyEvents = []
+    this.cycleLogs = []
     this.devices = [
       {
         deviceCode: 'yuwellYx106',
@@ -2850,6 +2886,76 @@ test('formatIdShortDateTime renders Indonesian short-month dd MMM yyyy HH:mm', (
   assert.equal(formatIdShortDateTime(null), '-')
   assert.equal(formatIdShortDateTime(''), '-')
   assert.equal(formatIdShortDateTime('not-a-date'), 'not-a-date')
+})
+
+test('GET /api/history/timeline returns mixed measurement/symptom/hydration/safetyEvent/cycle items', async () => {
+  const db = new D1Mock()
+  const token = 'timeline-session'
+  db.users.push({
+    id: 50, email: 'timeline@example.com', passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Timeline User', telegramEnabled: 0, browserPushEnabled: 0, active: 1,
+    authProvider: 'local', createdAt: '2026-06-01T00:00:00.000Z', lastLoginAt: null
+  })
+  db.profiles.push({
+    id: 50, userId: 50, sex: 'female', birthDate: '1990-01-01', heightCm: 160,
+    timezone: 'Asia/Jakarta', accessibilityMode: 'normal', theme: 'light',
+    emergencyConsent: 1, aiConsent: 1, dataShareConsent: 0
+  })
+  db.sessions.push({
+    id: 50, userId: 50, sessionTokenHash: await sha256Token(token),
+    userAgent: null, expiresAt: new Date(Date.now() + 60000).toISOString(), revokedAt: null
+  })
+  db.measurementSessions.push({
+    id: 100, profileId: 50, userId: 50, measuredAt: '2026-06-25T08:00:00.000Z',
+    source: 'manual', hasAi: 0, hasAttachment: 0, hasEmergency: 0
+  })
+  db.measurementValues.push({
+    id: 100, sessionId: 100, userId: 50, metricCode: 'systolic', finalValue: 120,
+    unit: 'mmHg', status: 'normal', severity: 'normal'
+  })
+  db.symptomLogs.push({
+    id: 100, userId: 50, sourceSessionId: null, symptomDateTime: '2026-06-25T09:00:00.000Z',
+    quickSymptomsJson: null, bodyArea: 'head', painScale: 5, painSeverity: 'moderate',
+    mood: 'tired', startedAt: null, durationMinutes: null, description: 'headache',
+    redFlagsJson: null, isRedFlag: 0, safetyEventId: null, createdAt: '2026-06-25T09:00:00.000Z'
+  })
+
+  const response = await app.request(
+    '/api/history/timeline?from=2026-06-01&to=2026-06-30',
+    { headers: { Cookie: `hlSession=${token}` } },
+    env(db)
+  )
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.ok(Array.isArray(body.data))
+  assert.ok(body.data.some((item) => item.rowType === 'measurement' && item.sourceId === '100'))
+  assert.ok(body.data.some((item) => item.rowType === 'symptom' && item.sourceId === '100'))
+  assert.equal(body.data[0].occurredAt >= body.data[1]?.occurredAt, true, 'timeline sorted descending')
+})
+
+test('GET /api/admin/metrics returns dashboard counts', async () => {
+  const db = new D1Mock()
+  const token = 'metrics-admin-session'
+  db.users.push({
+    id: 60, email: 'metrics-admin@example.com', passwordHash: await hashPassword('StrongPass123'),
+    displayName: 'Metrics Admin', telegramEnabled: 0, browserPushEnabled: 0, active: 1,
+    authProvider: 'local', createdAt: '2026-06-01T00:00:00.000Z', lastLoginAt: null
+  })
+  db.sessions.push({
+    id: 60, userId: 60, sessionTokenHash: await sha256Token(token),
+    userAgent: null, expiresAt: new Date(Date.now() + 60000).toISOString(), revokedAt: null
+  })
+  grantAdminPermission(db, 60, 'admin.access')
+
+  const response = await app.request('/api/admin/metrics', { headers: { Cookie: `hlSession=${token}` } }, env(db))
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(body.success, true)
+  assert.ok(typeof body.data.users === 'number')
+  assert.ok(typeof body.data.plans === 'number')
+  assert.ok(typeof body.data.subscriptions === 'number')
+  assert.ok(typeof body.data.safetyEvents === 'number')
+  assert.ok(typeof body.data.auditLogs === 'number')
 })
 
 test('GET /api/dashboard/today uses user-timezone date filter (Asia/Jakarta late-UTC measurement)', async () => {

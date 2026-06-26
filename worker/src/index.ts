@@ -1802,7 +1802,7 @@ app.post('/api/auth/forgot-password', async (c) => {
     // Always return success to avoid leaking which emails are registered
     return jsonResponse(c, success({
       message: 'Jika email terdaftar, link reset password akan dikirim.',
-      sent: !!user
+      sent: true
     }, 200, startedAt))
   } catch (error) {
     console.error('forgot-password error:', error)
@@ -4622,6 +4622,33 @@ app.get('/api/admin/me', async (c) => {
   }
 })
 
+app.get('/api/admin/metrics', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.access', startedAt)
+    if (denied) return denied
+    const [users, plans, subscriptions, safetyEvents, auditLogs] = await Promise.all([
+      c.env.DB.prepare('SELECT COUNT(*) as c FROM HL_users').first<{ c: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) as c FROM HL_plans').first<{ c: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) as c FROM HL_subscriptions').first<{ c: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) as c FROM HL_safetyEvents').first<{ c: number }>(),
+      c.env.DB.prepare('SELECT COUNT(*) as c FROM HL_auditLogs').first<{ c: number }>()
+    ])
+    return jsonResponse(c, success({
+      users: users?.c ?? 0,
+      plans: plans?.c ?? 0,
+      subscriptions: subscriptions?.c ?? 0,
+      safetyEvents: safetyEvents?.c ?? 0,
+      auditLogs: auditLogs?.c ?? 0
+    }, 200, startedAt))
+  } catch (error) {
+    console.error('admin metrics error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat metrik dashboard.', 500, [], startedAt))
+  }
+})
+
 app.get('/api/admin/users', async (c) => {
   const startedAt = Date.now()
   try {
@@ -4883,44 +4910,6 @@ app.get('/api/admin/permissions', async (c) => {
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat permission.', 500, [], startedAt))
   }
 })
-
-app.put('/api/admin/roles/:roleCode/permissions', async (c) => {
-  const startedAt = Date.now()
-  try {
-    const user = await getAuthenticatedUser(c)
-    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const denied = await requireAdminPermission(c, user, 'admin.roles.manage', startedAt)
-    if (denied) return denied
-    const roleCode = c.req.param('roleCode')
-    const body = await c.req.json() as { permissionCodes?: string[] }
-    const permissionCodes = Array.isArray(body.permissionCodes) ? [...new Set(body.permissionCodes)] : []
-    const role = await c.env.DB.prepare('SELECT roleCode, systemRole FROM HL_roles WHERE roleCode = ? LIMIT 1').bind(roleCode).first()
-    if (!role) return jsonResponse(c, failure('NOT_FOUND', 'Role tidak ditemukan.', 404, [], startedAt))
-    if (permissionCodes.length > 0) {
-      const placeholders = permissionCodes.map(() => '?').join(',')
-      const rows = await c.env.DB.prepare(`SELECT permissionCode FROM HL_permissions WHERE active = 1 AND permissionCode IN (${placeholders})`).bind(...permissionCodes).all<{ permissionCode: string }>()
-      if ((rows.results || []).length !== permissionCodes.length) {
-        return jsonResponse(c, failure('VALIDATION_ERROR', 'Permission tidak valid.', 400, [], startedAt))
-      }
-    }
-    await c.env.DB.prepare('DELETE FROM HL_rolePermissions WHERE roleCode = ?').bind(roleCode).run()
-    for (const permissionCode of permissionCodes) {
-      await c.env.DB.prepare('INSERT OR IGNORE INTO HL_rolePermissions (roleCode, permissionCode, createdAt) VALUES (?, ?, CURRENT_TIMESTAMP)').bind(roleCode, permissionCode).run()
-    }
-    await AuditService.write(c.env.DB, {
-      userId: user.id,
-      action: 'admin.roles.permissions.update',
-      entityType: 'HL_roles',
-      entityId: roleCode,
-      metadataJson: { roleCode, permissionCount: permissionCodes.length }
-    })
-    return jsonResponse(c, success({ roleCode, permissionCount: permissionCodes.length, updated: true }, 200, startedAt))
-  } catch (error) {
-    console.error('admin role permissions update error:', error)
-    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update permission role.', 500, [], startedAt))
-  }
-})
-
 
 app.delete('/api/admin/roles/:roleCode', async (c) => {
   const startedAt = Date.now()

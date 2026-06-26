@@ -139,3 +139,75 @@ test('OAuth unlink allows when password exists even with 1 account', async () =>
   const shouldBlock = !pwUser?.passwordHash && (accounts?.cnt || 0) <= 1
   assert.equal(shouldBlock, false)
 })
+
+test('OAuthService.validateState respects DB expiry filter', async () => {
+  const { OAuthService } = await import('../dist/services/oauth.js')
+  // Simulate real DB behavior: expired rows are excluded by the SQL `expiresAt > datetime('now')` clause.
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        first: async () => null
+      })
+    })
+  }
+  const result = await OAuthService.validateState(mockDb, 'google', 'some-state')
+  assert.equal(result.valid, false)
+  assert.equal(result.row, null)
+})
+
+test('OAuthService.findAccount returns providerEmailVerified', async () => {
+  const { OAuthService } = await import('../dist/services/oauth.js')
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        first: async () => ({ id: 1, userId: 5, provider: 'google', providerSubject: 'sub123', providerEmail: 'a@b.com', providerEmailVerified: 0 })
+      })
+    })
+  }
+  const account = await OAuthService.findAccount(mockDb, 'google', 'sub123')
+  assert.ok(account)
+  assert.equal(account.providerEmailVerified, 0)
+  assert.equal(account.providerEmail, 'a@b.com')
+})
+
+test('OAuthService.getAccountsByUser lists linked accounts', async () => {
+  const { OAuthService } = await import('../dist/services/oauth.js')
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        all: async () => ({ results: [{ id: 1, provider: 'google', providerSubject: 'sub1' }] })
+      })
+    })
+  }
+  const accounts = await OAuthService.getAccountsByUser(mockDb, 1)
+  assert.equal(accounts.length, 1)
+  assert.equal(accounts[0].provider, 'google')
+})
+
+test('OAuthService link/unlink roundtrip', async () => {
+  const { OAuthService } = await import('../dist/services/oauth.js')
+  let inserted = false
+  let deleted = false
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        run: async () => {
+          inserted = true
+          return { meta: { last_row_id: 7 } }
+        }
+      })
+    })
+  }
+  const linkId = await OAuthService.linkAccount(mockDb, 1, 'google', 'sub789', 'x@y.com')
+  assert.equal(linkId, 7)
+  assert.ok(inserted)
+  const unlinkDb = {
+    prepare: () => ({
+      bind: () => ({
+        run: async () => { deleted = true; return { meta: {} } }
+      })
+    })
+  }
+  await OAuthService.unlinkAccount(unlinkDb, 1, 'google')
+  assert.ok(deleted)
+})

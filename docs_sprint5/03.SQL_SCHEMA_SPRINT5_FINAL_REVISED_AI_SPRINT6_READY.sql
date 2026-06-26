@@ -162,6 +162,15 @@ CREATE TABLE IF NOT EXISTS HL_featureFlags (
   FOREIGN KEY (targetPlanCode) REFERENCES HL_plans(planCode) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS HL_systemConfigs (
+  configKey TEXT PRIMARY KEY,
+  configValue TEXT NOT NULL DEFAULT '',
+  dataType TEXT NOT NULL DEFAULT 'string' CHECK (dataType IN ('string','number','boolean','json')),
+  description TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS HL_configMetadata (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   configKey TEXT NOT NULL UNIQUE,

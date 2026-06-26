@@ -27,7 +27,37 @@ function Table({ cols, rows }: { cols: string[]; rows: any[][] }) {
 }
 
 function OverviewTab() {
-  return <p>Sprint 5 Admin Panel. Select a tab from above.</p>
+  const [metrics, setMetrics] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    apiGet('/api/admin/metrics').then(r => {
+      setLoading(false)
+      if (r.success) setMetrics(r.data)
+      else setError(r.error?.message || '')
+    })
+  }, [])
+  if (loading) return <p>Loading...</p>
+  if (error) return <p className="admin-error">{error}</p>
+  const cards = metrics ? [
+    { label: 'Users', value: metrics.users },
+    { label: 'Plans', value: metrics.plans },
+    { label: 'Subscriptions', value: metrics.subscriptions },
+    { label: 'Safety Events', value: metrics.safetyEvents },
+    { label: 'Audit Logs', value: metrics.auditLogs },
+  ] : []
+  return (
+    <Section title="Dashboard Metrics">
+      <div className="admin-metric-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16 }}>
+        {cards.map((card) => (
+          <div key={card.label} style={{ padding: 16, borderRadius: 12, background: 'var(--surface-2)', textAlign: 'center' }}>
+            <div style={{ fontSize: 28, fontWeight: 700 }}>{card.value}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{card.label}</div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
 }
 
 function UsersTab() {

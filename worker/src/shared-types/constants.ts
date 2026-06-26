@@ -10,6 +10,7 @@ export const HL_TABLES = [
   'HL_usageCounters',
   'HL_featureFlags',
   'HL_configMetadata',
+  'HL_systemConfigs',
   'HL_oauthAccounts',
   'HL_oauthStates',
   'HL_educationCards',
@@ -125,6 +126,7 @@ export const HL_FEATURE_FLAGS = [
 ] as const
 
 export const HL_CONFIG_KEYS = [
+  'aiTextApiKey',
   'subscriptionEnabled',
   'defaultPlanCode',
   'billingDefaultProvider',
@@ -169,6 +171,7 @@ export const HL_CONFIG_KEYS = [
   'cycleIrregularMaxDays',
   'cycleGuardrailMessageVersion',
   'telegramWaterWebhookSecretRef',
+  'telegramBotToken',
   'telegramWaterQuickAddAmounts',
   'telegramWaterWebhookIdempotencyEnabled'
 ] as const

@@ -265,3 +265,93 @@ test('CycleService settings auto-pauses on pregnant', async () => {
   assert.equal(result.predictionPaused, true)
   assert.equal(result.pauseReason, 'pregnant')
 })
+
+test('CycleService settings auto-pauses on menopause', async () => {
+  const { CycleService } = await import('../dist/services/cycle.js')
+  const mockDb = { prepare: () => ({ bind: () => ({ first: async () => null, run: async () => ({}) }) }) }
+  const result = await CycleService.upsertSettings(mockDb, 1, { isMenopause: 1 })
+  assert.equal(result.predictionPaused, true)
+  assert.equal(result.pauseReason, 'menopause')
+})
+
+test('CycleService buildCalendarDays returns day array with phase colors', async () => {
+  const { CycleService } = await import('../dist/services/cycle.js')
+  const settings = { lastPeriodStart: '2026-06-01', cycleLengthDays: 28, periodLengthDays: 5, predictionPaused: 0 }
+  const days = CycleService.buildCalendarDays(settings, [], '2026-06')
+  assert.ok(days.length > 0)
+  assert.ok(days.some((d) => d.phase === 'period'))
+  assert.ok(days.some((d) => d.phase === 'fertile'))
+  assert.ok(days.some((d) => d.phase === 'ovulation'))
+  assert.ok(days.every((d) => typeof d.needsContraceptionGuardrail === 'boolean'))
+})
+
+test('CycleService calendar returns empty when prediction paused', async () => {
+  const { CycleService } = await import('../dist/services/cycle.js')
+  const settings = { lastPeriodStart: '2026-06-01', cycleLengthDays: 28, periodLengthDays: 5, predictionPaused: 1 }
+  const days = CycleService.buildCalendarDays(settings, [], '2026-06')
+  assert.deepEqual(days, [])
+})
+
+test('CycleService irregularity creates safety event and pauses prediction', async () => {
+  const { CycleService } = await import('../dist/services/cycle.js')
+  let safetyInserted = false
+  let settingsUpdated = false
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        first: async () => null,
+        run: async () => {
+          safetyInserted = true
+          settingsUpdated = true
+          return { meta: { last_row_id: 99 } }
+        }
+      })
+    })
+  }
+  const result = await CycleService.detectIrregularity(mockDb, { cycleLengthDays: 45 }, 1)
+  assert.ok(result)
+  assert.equal(result.isIrregular, true)
+  assert.equal(result.safetyEventId, 99)
+})
+
+test('AiMemoryService buildContextPackage includes all 10 source types', async () => {
+  const { AiMemoryService } = await import('../dist/services/ai-memory.js')
+  let callCount = 0
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        first: async () => ({ displayName: 'Test', sex: 'female', birthDate: '1990-01-01', heightCm: 160 }),
+        all: async () => { callCount++; return { results: [{ id: callCount }] } }
+      })
+    })
+  }
+  const pkg = await AiMemoryService.buildContextPackage(mockDb, 1, 1)
+  assert.ok(Array.isArray(pkg.measurements))
+  assert.ok(Array.isArray(pkg.symptoms))
+  assert.ok(Array.isArray(pkg.safetyEvents))
+  assert.ok(Array.isArray(pkg.medications))
+  assert.ok(Array.isArray(pkg.hydration))
+  assert.ok(pkg.cycle)
+  assert.ok(Array.isArray(pkg.cycle.logs))
+  assert.ok(Array.isArray(pkg.fasting))
+  assert.ok(Array.isArray(pkg.reports))
+  assert.ok(Array.isArray(pkg.education))
+  assert.ok(pkg.profile)
+})
+
+test('AiMemoryService memory status returns Sprint 6 deferred readiness', async () => {
+  const { AiMemoryService } = await import('../dist/services/ai-memory.js')
+  const mockDb = {
+    prepare: () => ({
+      bind: () => ({
+        first: async () => ({ c: 5 })
+      })
+    })
+  }
+  const status = await AiMemoryService.getMemoryStatus(mockDb, 7)
+  assert.equal(status.namespace, 'user:7')
+  assert.equal(status.documentCount, 5)
+  assert.equal(status.sprint6ClinicalCopilot.scopeStatus, 'deferred_to_sprint6')
+  assert.equal(status.sprint6ClinicalCopilot.runtimeEnabled, false)
+})
+

@@ -300,7 +300,10 @@ INSERT OR IGNORE INTO HL_systemConfigs (configKey, configValue, dataType, descri
 
 ('telegramWaterWebhookSecretRef', 'TELEGRAM_WATER_WEBHOOK_SECRET', 'string', 'Environment variable name for Telegram water webhook secret. Real secret must not be stored in D1.'),
 ('telegramWaterQuickAddAmounts', '[200,600]', 'json', 'Allowed Telegram hydration quick add values.'),
-('telegramWaterWebhookIdempotencyEnabled', 'true', 'boolean', 'Prevent duplicate Telegram callback processing.');
+('telegramWaterWebhookIdempotencyEnabled', 'true', 'boolean', 'Prevent duplicate Telegram callback processing.'),
+
+('aiTextApiKey', '', 'string', 'AI text API key. Real secret must be in env var AI_TEXT_API_KEY, not D1.'),
+('telegramBotToken', '', 'string', 'Telegram bot token. Real secret must be in env var TELEGRAM_BOT_TOKEN, not D1.');
 
 -- ---------------------------------------------------------
 -- Sprint 5 config metadata: classify secrets, refs, and UI policies.

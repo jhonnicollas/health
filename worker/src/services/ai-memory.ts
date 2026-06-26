@@ -1,6 +1,6 @@
 const SENSITIVE_FIELDS = ['description', 'notes', 'physicalSymptomsJson', 'rawDetail']
 
-function sanitizeMetadata(meta: Record<string, any>): Record<string, any> {
+export function sanitizeMetadata(meta: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = {}
   for (const [k, v] of Object.entries(meta)) {
     if (SENSITIVE_FIELDS.includes(k)) { out[k] = typeof v === 'string' ? `[${v.length} chars]` : '[redacted]' }

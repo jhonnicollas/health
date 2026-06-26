@@ -30,5 +30,14 @@ export const TelegramClientService = {
       if (!res.ok) { const t = await res.text(); return { ok: false, error: t.slice(0, 200) } }
       return { ok: true }
     } catch (e) { return { ok: false, error: String(e) } }
+  },
+
+  async answerCallbackQuery(token: string, callbackQueryId: string, text?: string): Promise<boolean> {
+    try {
+      const body: Record<string, unknown> = { callback_query_id: callbackQueryId }
+      if (text) body.text = text
+      const res = await fetch(`${TELEGRAM_API}${token}/answerCallbackQuery`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      return res.ok
+    } catch { return false }
   }
 }

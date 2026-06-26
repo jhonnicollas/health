@@ -10,15 +10,18 @@ const APP_URL = 'https://d11e4d6e.hl-health-companion.pages.dev'
 
 interface LocalEnv { DB: D1Database; TELEGRAM_BOT_TOKEN?: string; TELEGRAM_WATER_WEBHOOK_SECRET?: string }
 type HC = Context<{ Bindings: LocalEnv }>
-function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body, status as any) }
+function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body.body ?? body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now(), metaExtra?: Record<string, unknown>) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s, ...metaExtra } }, status } }
 function fail(code: string, msg: string, status: number, errs: unknown[] = [], s = Date.now()) { return { body: { success: false, error: { code, message: msg, details: errs }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 
+function base64Url(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
 async function getSession(c: HC): Promise<number | null> {
   const token = getCookie(c, 'hlSession'); if (!token) return null
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
-  const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-  const row = await c.env.DB.prepare('SELECT userId FROM HL_sessions WHERE sessionTokenHash = ? AND revokedAt IS NULL AND expiresAt > datetime("now")').bind(h).first<any>()
+  const h = `sha256:${base64Url(buf)}`
+  const row = await c.env.DB.prepare('SELECT s.userId FROM HL_sessions s JOIN HL_users u ON u.id = s.userId WHERE s.sessionTokenHash = ? AND s.revokedAt IS NULL AND s.expiresAt > datetime("now") AND u.active = 1').bind(h).first<any>()
   return row?.userId || null
 }
 
@@ -42,7 +45,7 @@ export function mountTelegramRoutes(app: any) {
     try {
       const secretHeader = c.req.header('X-HL-Telegram-Water-Secret') || ''
       if (!TelegramCallbackService.validateSecret(c.env as any, secretHeader)) {
-        await AuditService.write(c.env.DB, { userId: 0, action: 'telegram.webhook.rejected', entityType: 'HL_telegramCallbackEvents', entityId: 'unknown', metadataJson: { reason: 'invalid_secret' } })
+        await AuditService.write(c.env.DB, { userId: null, action: 'telegram.webhook.rejected', entityType: 'HL_telegramCallbackEvents', entityId: 'unknown', metadataJson: { reason: 'invalid_secret' } })
         return jr(c, fail('TELEGRAM_WEBHOOK_FORBIDDEN', 'Telegram webhook tidak valid.', 403, [], s), 403)
       }
 
@@ -66,14 +69,19 @@ export function mountTelegramRoutes(app: any) {
           rejectionReason: validation.reason
         })
         if (validation.code === 'TELEGRAM_CHAT_NOT_LINKED' || validation.code === 'INVALID_CALLBACK_DATA') {
-          await AuditService.write(c.env.DB, { userId: 0, action: 'telegram.webhook.rejected', entityType: 'HL_telegramCallbackEvents', entityId: validation.callbackQueryId || 'unknown', metadataJson: { reason: validation.reason, code: validation.code } })
-          await createSafetyEvent(c.env.DB, 0, validation.callbackQueryId || 'unknown', 'telegramSecurity', 'warning', 'Callback Tidak Valid', `Telegram callback ditolak: ${validation.reason}`)
+          await AuditService.write(c.env.DB, { userId: null, action: 'telegram.webhook.rejected', entityType: 'HL_telegramCallbackEvents', entityId: validation.callbackQueryId || 'unknown', metadataJson: { reason: validation.reason, code: validation.code } })
         }
         return jr(c, fail('TELEGRAM_WEBHOOK_FORBIDDEN', validation.reason, 403, [], s), 403)
       }
 
       // Process the callback
       const { user, callbackQueryId, chatId, messageId, amountMl } = validation
+
+      // Atomically claim the callback ID before processing to prevent race conditions
+      const claimed = await TelegramCallbackService.claimCallback(c.env.DB, callbackQueryId)
+      if (!claimed) {
+        return jr(c, ok({ callbackQueryId, duplicate: true, processed: false, message: 'Callback already processed. No duplicate water log inserted.' }, 200, s, { warningCode: 'TELEGRAM_CALLBACK_DUPLICATE' }), 200)
+      }
 
       const dateStr = new Date().toISOString().slice(0, 10)
       const logId = await HydrationService.logWater(c.env.DB, user.userId, amountMl, 'telegram', undefined, `Via Telegram: ${callbackQueryId}`)
@@ -110,6 +118,9 @@ export function mountTelegramRoutes(app: any) {
         status: 'processed',
         waterIntakeLogId: logId
       })
+
+      // Answer callback query to stop Telegram from retrying
+      if (token) { try { await TelegramClientService.answerCallbackQuery(token, callbackQueryId) } catch {} }
 
       return jr(c, ok({
         callbackQueryId,

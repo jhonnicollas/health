@@ -6,15 +6,18 @@ import { EntitlementService } from './services/entitlements.js'
 
 interface LocalEnv { DB: D1Database }
 type HC = Context<{ Bindings: LocalEnv }>
-function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body, status as any) }
+function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body.body ?? body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now(), metaExtra?: Record<string, unknown>) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s, ...metaExtra } }, status } }
 function fail(code: string, msg: string, status: number, errs: unknown[] = [], s = Date.now()) { return { body: { success: false, error: { code, message: msg, details: errs }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 
+function base64Url(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
 async function getSession(c: HC): Promise<number | null> {
   const token = getCookie(c, 'hlSession'); if (!token) return null
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
-  const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-  const row = await c.env.DB.prepare('SELECT userId FROM HL_sessions WHERE sessionTokenHash = ? AND revokedAt IS NULL AND expiresAt > datetime("now")').bind(h).first<any>()
+  const h = `sha256:${base64Url(buf)}`
+  const row = await c.env.DB.prepare('SELECT s.userId FROM HL_sessions s JOIN HL_users u ON u.id = s.userId WHERE s.sessionTokenHash = ? AND s.revokedAt IS NULL AND s.expiresAt > datetime("now") AND u.active = 1').bind(h).first<any>()
   return row?.userId || null
 }
 
@@ -76,6 +79,7 @@ export function mountHydrationRoutes(app: any) {
       if (!body.amountMl || body.amountMl < 1 || body.amountMl > 3000) return jr(c, fail('VALIDATION_ERROR', 'amountMl 1-3000.', 400, [], s), 400)
       if (body.amountMl > 1000 && !body.confirmedLargeInput) return jr(c, fail('LARGE_INPUT_CONFIRMATION_REQUIRED', 'Jumlah >1000ml memerlukan konfirmasi. Kirim confirmedLargeInput=true.', 400, [], s), 400)
       const logId = await HydrationService.logWater(c.env.DB, uid, body.amountMl, 'web', body.loggedAt, body.notes, body.amountMl > 1000)
+      await AuditService.write(c.env.DB, { userId: uid, action: 'hydration.log.create', entityType: 'HL_waterIntakeLogs', entityId: String(logId), metadataJson: { amountMl: body.amountMl, source: 'web' } })
       const dateStr = (body.loggedAt || new Date().toISOString()).slice(0, 10)
       const target = await HydrationService.getOrCalculateTarget(c.env.DB, uid, dateStr)
       const logs = await HydrationService.getTodayLogs(c.env.DB, uid, dateStr)
@@ -111,6 +115,7 @@ export function mountHydrationRoutes(app: any) {
       const logId = Number(c.req.param('logId'))
       const result = await HydrationService.deleteLog(c.env.DB, logId, uid)
       if (!result.deleted) return jr(c, fail('NOT_FOUND', 'Log tidak ditemukan.', 404, [], s), 404)
+      await AuditService.write(c.env.DB, { userId: uid, action: 'hydration.log.delete', entityType: 'HL_waterIntakeLogs', entityId: String(logId), metadataJson: {} })
       const dateStr = result.logDate || new Date().toISOString().slice(0, 10)
       const target = await HydrationService.getOrCalculateTarget(c.env.DB, uid, dateStr)
       const logs = await HydrationService.getTodayLogs(c.env.DB, uid, dateStr)

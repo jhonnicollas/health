@@ -8,20 +8,31 @@ export type SymptomLogRow = {
 
 // Deterministic red flag detection based on symptom description keywords
 const RED_FLAG_KEYWORDS: { keyword: string; title: string; message: string; severity: 'emergency' | 'critical' | 'high' }[] = [
+  // Indonesian keywords (PRD F5A-007)
+  { keyword: 'nyeri dada', title: 'Nyeri Dada', message: 'Nyeri dada memerlukan evaluasi medis segera.', severity: 'emergency' },
+  { keyword: 'sesak napas', title: 'Sesak Napas', message: 'Sesak napas mendadak memerlukan perhatian medis.', severity: 'emergency' },
+  { keyword: 'sesak nafas', title: 'Sesak Nafas', message: 'Sesak nafas mendadak memerlukan perhatian medis.', severity: 'emergency' },
+  { keyword: 'kaku kuduk', title: 'Kaku Kuduk', message: 'Kaku kuduk bisa menandakan meningitis, segera cari bantuan medis.', severity: 'emergency' },
+  { keyword: 'kelemahan sesisi', title: 'Kelemahan Sesisi', message: 'Kelemahan separuh tubuh bisa tanda stroke, segera cari bantuan medis.', severity: 'emergency' },
+  { keyword: 'pingsan', title: 'Pingsan', message: 'Pingsan tanpa sebab jelas perlu evaluasi medis segera.', severity: 'emergency' },
+  { keyword: 'pandangan gelap', title: 'Pandangan Gelap', message: 'Pandangan mendadak gelap perlu evaluasi medis segera.', severity: 'emergency' },
+  { keyword: 'mati rasa', title: 'Mati Rasa', message: 'Mati rasa separuh tubuh perlu evaluasi segera, bisa tanda stroke.', severity: 'emergency' },
+  { keyword: 'muntah darah', title: 'Muntah Darah', message: 'Muntah darah adalah tanda darurat medis.', severity: 'emergency' },
+  { keyword: 'darah di tinja', title: 'Darah di Tinja', message: 'Darah di tinja perlu evaluasi medis.', severity: 'high' },
+  { keyword: 'kejang', title: 'Kejang', message: 'Kejang memerlukan penanganan medis segera.', severity: 'emergency' },
+  { keyword: 'sakit kepala berat', title: 'Sakit Kepala Berat', message: 'Sakit kepala berat mendadak perlu evaluasi medis.', severity: 'high' },
+  { keyword: 'bicara pelo', title: 'Bicara Pelo', message: 'Bicara pelo mendadak bisa tanda stroke.', severity: 'emergency' },
+  { keyword: 'penglihatan kabur', title: 'Penglihatan Kabur', message: 'Penglihatan kabur mendadak perlu diperiksa.', severity: 'high' },
+  { keyword: 'bunuh diri', title: 'Pikiran Bunuh Diri', message: 'Segera hubungi profesional kesehatan mental.', severity: 'emergency' },
+  // English fallbacks
   { keyword: 'chest pain', title: 'Nyeri Dada', message: 'Nyeri dada memerlukan evaluasi medis segera.', severity: 'emergency' },
-  { keyword: 'chest pressure', title: 'Tekanan Dada', message: 'Tekanan dada bisa menandakan masalah jantung.', severity: 'emergency' },
   { keyword: 'shortness of breath', title: 'Sesak Napas', message: 'Sesak napas mendadak memerlukan perhatian medis.', severity: 'emergency' },
   { keyword: 'difficulty breathing', title: 'Kesulitan Bernapas', message: 'Kesulitan bernapas adalah tanda darurat.', severity: 'emergency' },
-  { keyword: 'unconscious', title: 'Kehilangan Kesadaran', message: 'Segera cari bantuan medis darurat.', severity: 'emergency' },
   { keyword: 'fainted', title: 'Pingsan', message: 'Pingsan tanpa sebab jelas perlu evaluasi.', severity: 'emergency' },
   { keyword: 'seizure', title: 'Kejang', message: 'Kejang memerlukan penanganan medis segera.', severity: 'emergency' },
-  { keyword: 'severe headache', title: 'Sakit Kepala Berat', message: 'Sakit kepala berat mendadak perlu evaluasi.', severity: 'high' },
-  { keyword: 'blurred vision', title: 'Penglihatan Kabur', message: 'Penglihatan kabur mendadak perlu diperiksa.', severity: 'high' },
-  { keyword: 'slurred speech', title: 'Bicara Pelo', message: 'Bicara pelo mendadak bisa tanda stroke.', severity: 'emergency' },
   { keyword: 'numbness', title: 'Kebas atau Mati Rasa', message: 'Kebas separuh tubuh perlu evaluasi segera.', severity: 'emergency' },
-  { keyword: 'vomiting blood', title: 'Muntah Darah', message: 'Muntah darah adalah tanda darurat medis.', severity: 'emergency' },
-  { keyword: 'blood in stool', title: 'Darah di Tinja', message: 'Darah di tinja perlu evaluasi medis.', severity: 'high' },
   { keyword: 'suicidal', title: 'Pikiran Bunuh Diri', message: 'Segera hubungi profesional kesehatan mental.', severity: 'emergency' },
+  { keyword: 'blurred vision', title: 'Penglihatan Kabur', message: 'Penglihatan kabur mendadak perlu diperiksa.', severity: 'high' },
 ]
 
 export type RedFlagResult = {

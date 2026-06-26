@@ -9,6 +9,7 @@ import { AiAssistantPage } from './pages/ai/AiAssistantPage'
 import { TrackerPage } from './pages/tracker/TrackerPage'
 import { SeniorAppShell } from './components/SeniorAppShell'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { UpgradePrompt } from './components/UpgradePrompt'
 import { TodayDashboard } from './pages/dashboard/TodayDashboard'
 import { WeeklyDashboard } from './pages/dashboard/WeeklyDashboard'
 import { MonthlyDashboard } from './pages/dashboard/MonthlyDashboard'
@@ -40,10 +41,11 @@ import { ProfileDeletePage } from './pages/settings/ProfileDeletePage'
 import { AdminPage } from './pages/admin/AdminPage'
 import { SeniorMeasurementFlow } from './pages/measurement/SeniorMeasurementFlow'
 import './App.css'
+import { useEntitlements } from './hooks/useEntitlements'
 
 /* ---- Navigation config ---- */
 
-type NavLink = { path: string; label: string; shortLabel: string; icon: string; adminOnly?: boolean; visible?: boolean; badge?: string }
+type NavLink = { path: string; label: string; shortLabel: string; icon: string; adminOnly?: boolean; visible?: boolean; badge?: string; featureCode?: string }
 type NavGroup = { label: string; icon: string; shortLabel: string; children: NavLink[] }
 
 const NAV_GROUPS: (NavGroup | NavLink)[] = [
@@ -60,14 +62,14 @@ const NAV_GROUPS: (NavGroup | NavLink)[] = [
     { path: '/reports/monthly', label: 'Monthly Report', shortLabel: 'Monthly', icon: 'calendar_month' },
     { path: '/reports/doctor', label: 'Doctor Report', shortLabel: 'Doctor', icon: 'description' },
   ]},
-  { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', icon: 'smart_toy' },
+  { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', icon: 'smart_toy', featureCode: 'feature.aiAssistant.use' },
   { path: '/alerts', label: 'Notifications & Alerts', shortLabel: 'Alerts', icon: 'notifications', badge: '3' },
-  { path: "/cycle", label: "Cycle", shortLabel: "Cycle", icon: "cycle" },
-  { path: "/hydration", label: "Hydration", shortLabel: "Hydrate", icon: "water_drop" },
+  { path: "/cycle", label: "Cycle", shortLabel: "Cycle", icon: "cycle", featureCode: 'feature.cycleTracking.use' },
+  { path: "/hydration", label: "Hydration", shortLabel: "Hydrate", icon: "water_drop", featureCode: 'feature.hydration.use' },
   { path: "/hydration/settings", label: "Hydration Settings", shortLabel: "HydrSet", icon: "water_drop", visible: false },
   { path: "/hydration/history", label: "Hydration History", shortLabel: "HydrHist", icon: "water_drop", visible: false },
-  { path: "/symptoms", label: "Symptoms", shortLabel: "Symptoms", icon: "sick" },
-  { path: "/history", label: "Health Timeline", shortLabel: "Timeline", icon: "timeline" },
+  { path: "/symptoms", label: "Symptoms", shortLabel: "Symptoms", icon: "sick", featureCode: 'feature.symptomLog.use' },
+  { path: "/history", label: "Health Timeline", shortLabel: "Timeline", icon: "timeline", featureCode: 'feature.advancedHistory.use' },
   { path: "/daily-health", label: "Daily Health", shortLabel: "Health", icon: "monitoring" },
   { label: 'Health', icon: 'favorite', shortLabel: 'Health', children: [
     { path: '/tracker', label: 'Fasting & Medication', shortLabel: 'Track', icon: 'timer' },
@@ -75,7 +77,7 @@ const NAV_GROUPS: (NavGroup | NavLink)[] = [
     { path: '/medications', label: 'Medication', shortLabel: 'Meds', icon: 'medication' },
     { path: '/patterns', label: 'Patterns', shortLabel: 'Pattern', icon: 'insights' },
   ]},
-  { path: '/family', label: 'Family / Caregiver', shortLabel: 'Family', icon: 'family_restroom' },
+  { path: '/family', label: 'Family / Caregiver', shortLabel: 'Family', icon: 'family_restroom', featureCode: 'feature.familyDashboard.use' },
   { path: '/reminders', label: 'Reminders', shortLabel: 'Remind', icon: 'alarm' },
   { path: '/emergency', label: 'Emergency Contacts', shortLabel: 'SOS', icon: 'emergency' },
   { path: '/settings/profile', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
@@ -85,8 +87,8 @@ const NAV: NavLink[] = NAV_GROUPS.flatMap(g => 'children' in g ? g.children : [g
 NAV.push(
   { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', icon: 'delete', visible: false },
   { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', icon: 'elderly', visible: false },
-  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false },
-  { path: '/ai-memory', label: 'AI Memory', shortLabel: 'AI Memory', icon: 'psychology', visible: false },
+  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false, featureCode: 'feature.telegramReminder.use' },
+  { path: '/ai-memory', label: 'AI Memory', shortLabel: 'AI Memory', icon: 'psychology', visible: false, featureCode: 'feature.vectorMemory.use' },
   { path: '/admin', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true },
 )
 
@@ -155,6 +157,7 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
 
 function AppRoutes() {
   const { loading, user, profile, requiresOnboarding } = useAuth()
+  const { loading: entitlementsLoading, isEnabled } = useEntitlements()
   const [currentPath, setCurrentPath] = useState(() => normalizePath(window.location.pathname))
   const [authView, setAuthView] = useState<'login' | 'register'>(() =>
     normalizePath(window.location.pathname) === '/register' ? 'register' : 'login'
@@ -256,7 +259,14 @@ function AppRoutes() {
 
   /* ---- Desktop / Mobile shell ---- */
   const isAdmin = user.email === 'admin@homesungai.com'
-  const visibleNav = NAV.filter(link => (!link.adminOnly || isAdmin) && link.visible !== false)
+  const visibleNav = NAV.filter(link => {
+    if (link.adminOnly && !isAdmin) return false
+    if (link.visible === false) return false
+    if (!entitlementsLoading && link.featureCode && !isEnabled(link.featureCode)) return false
+    return true
+  })
+  const currentNavLink = NAV.find(link => link.path === appPath)
+  const routeBlocked = !entitlementsLoading && currentNavLink?.featureCode && !isEnabled(currentNavLink.featureCode)
   const clock = formatClock(liveTime)
   const firstName = user.displayName.split(' ').filter(Boolean)[0] ?? 'there'
   const currentLink = visibleNav.find(link => link.path === appPath)
@@ -394,7 +404,13 @@ function AppRoutes() {
 
         <div className="app-content-area">
           <header className="app-header"><div><h1>{headerTitle}</h1><p>Here is your clinical overview for today.</p></div></header>
-          <section className="app-content">{renderRoute(appPath, navigate)}</section>
+          <section className="app-content">
+            {routeBlocked ? (
+              <UpgradePrompt feature={currentNavLink?.label ?? 'Fitur ini'} onNavigate={navigate} />
+            ) : (
+              renderRoute(appPath, navigate)
+            )}
+          </section>
         </div>
       </div>
 

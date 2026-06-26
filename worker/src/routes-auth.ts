@@ -3,24 +3,28 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { EducationService } from './services/education.js'
 import { SymptomService } from './services/symptom.js'
 import { AuditService } from './services/audit.js'
+import { sendEmergencyToContacts } from './routes-extra.js'
 
 interface LocalEnv { DB: D1Database; LOGS: R2Bucket; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; TELEGRAM_QUEUE?: Queue }
 type HC = Context<{ Bindings: LocalEnv }>
 
-function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body, status as any) }
+function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body.body ?? body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now()) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 function fail(code: string, msg: string, status: number, errs: unknown[] = [], s = Date.now()) { return { body: { success: false, error: { code, message: msg, details: errs }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 
 async function getSession(c: HC): Promise<number | null> {
   const token = getCookie(c, 'hlSession'); if (!token) return null
   const h = await sha256Token(token)
-  const row = await c.env.DB.prepare('SELECT userId FROM HL_sessions WHERE sessionTokenHash = ? AND revokedAt IS NULL AND expiresAt > datetime("now")').bind(h).first<any>()
+  const row = await c.env.DB.prepare('SELECT s.userId FROM HL_sessions s JOIN HL_users u ON u.id = s.userId WHERE s.sessionTokenHash = ? AND s.revokedAt IS NULL AND s.expiresAt > datetime("now") AND u.active = 1').bind(h).first<any>()
   return row?.userId || null
 }
 
+function base64Url(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
 async function sha256Token(val: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return `sha256:${base64Url(buf)}`
 }
 async function hashPassword(pw: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw))
@@ -53,7 +57,10 @@ export function mountAuthRoutes(app: any) {
       await c.env.DB.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(stateHash, nonceHash, 'google', mode, safeReturnTo(c.req.query('returnTo')), new Date(Date.now() + 600000).toISOString()).run()
       const cid = (c.env as any).GOOGLE_CLIENT_ID || ''
       const ru = `${new URL(c.req.url).origin}/api/auth/google/callback`
-      return jr(c, ok({ redirectUrl: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(ru)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}` }, 200, s), 200)
+      const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(ru)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}`
+      const accept = c.req.header('Accept') || ''
+      if (accept.includes('text/html')) return c.redirect(redirectUrl, 302)
+      return jr(c, ok({ redirectUrl }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -94,12 +101,16 @@ export function mountAuthRoutes(app: any) {
         const existingEmail = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ?').bind(email).first<any>()
         if (existingEmail) return jr(c, fail('EMAIL_CONFLICT', 'Email sudah terdaftar dengan akun lain. Silakan login lalu tautkan Google dari pengaturan.', 409, [], s), 409)
         const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await hashPassword(pw)
-        const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, role, createdAt, updatedAt) VALUES (?, ?, 'user', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash).run()
-        await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(meta.last_row_id, 'google', sub, email).run()
-        await ssc(c, meta.last_row_id as number)
+        const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, createdAt, updatedAt) VALUES (?, ?, 'google', ?, 0, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash, email).run()
+        const newUid = meta.last_row_id as number
+        await c.env.DB.prepare('INSERT OR IGNORE INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(newUid, 'user').run()
+        await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(newUid, 'google', sub, email).run()
+        await ssc(c, newUid)
       }
       return c.redirect(safeReturnTo(row.returnTo))
-    } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
+    } catch (e) {
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500)
+    }
   })
 
   app.post('/api/auth/google/link', async (c: HC) => {
@@ -164,7 +175,9 @@ export function mountAuthRoutes(app: any) {
       if (rf.detected) {
         seId = await SymptomService.createSafetyEvent(c.env.DB, uid, 'symptomRedFlag', rf.flags[0].severity, rf.flags[0].title, rf.flags[0].message, String(logId))
         await c.env.DB.prepare('UPDATE HL_symptomLogs SET safetyEventId = ? WHERE id = ?').bind(seId, logId).run()
+        try { await sendEmergencyToContacts(c as any, uid, rf.flags[0].severity, 'symptom', 0, '', `${rf.flags[0].title}: ${rf.flags[0].message}`) } catch {}
       }
+      await AuditService.write(c.env.DB, { userId: uid, action: 'symptom.create', entityType: 'HL_symptomLogs', entityId: String(logId), metadataJson: { isRedFlag: rf.detected, sourceSessionId: body.sourceSessionId || null } })
       return jr(c, ok({ logId, safetyEventId: seId, redFlags: rf.flags, isRedFlag: rf.detected }, 201, s), 201)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal simpan keluhan.', 500, [], s), 500) }
   })

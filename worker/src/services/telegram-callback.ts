@@ -66,6 +66,18 @@ export const TelegramCallbackService = {
     return { duplicate: false }
   },
 
+  async claimCallback(db: D1Database, callbackQueryId: string): Promise<boolean> {
+    try {
+      await db.prepare(
+        `INSERT OR IGNORE INTO HL_telegramCallbackEvents (callbackQueryId, callbackData, eventType, status, createdAt) VALUES (?, '', 'unknown', 'received', CURRENT_TIMESTAMP)`
+      ).bind(callbackQueryId).run()
+      const row = await db.prepare('SELECT id FROM HL_telegramCallbackEvents WHERE callbackQueryId = ?').bind(callbackQueryId).first<{ id: number }>()
+      return !!row
+    } catch {
+      return false
+    }
+  },
+
   async recordCallbackEvent(db: D1Database, event: {
     callbackQueryId: string
     userId: number | null
