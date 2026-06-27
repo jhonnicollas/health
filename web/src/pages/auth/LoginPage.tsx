@@ -167,6 +167,7 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
               verifyUrl="/api/auth/login/verify"
               onVerified={(data) => {
                 const d = data as { user: { id: number; email: string; displayName: string; telegramEnabled: boolean; browserPushEnabled: boolean }; profile: Record<string, unknown> | null; requiresOnboarding: boolean }
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setAuthenticated({ user: d.user, profile: d.profile as any, requiresOnboarding: d.requiresOnboarding })
               }}
             />
