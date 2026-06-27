@@ -14,7 +14,7 @@ import {
   formatIdShortDateTime
 } from '../dist/index.js'
 
-class D1MockStatement {
+export class D1MockStatement {
   constructor(db, sql) {
     this.db = db
     this.sql = sql
@@ -225,6 +225,23 @@ class D1MockStatement {
           this.db.permissions.some((permission) => permission.permissionCode === row.permissionCode && permission.active === 1)
         )
       return allowed ? { permissionCode } : null
+    }
+
+    if (this.sql.includes('FROM HL_emailOtpChallenges') && this.sql.includes('WHERE id = ?')) {
+      const id = this.params[0]
+      return this.db.emailOtpChallenges.find((row) => row.id === id) ?? null
+    }
+
+    if (this.sql.includes('FROM HL_emailOtpChallenges') && this.sql.includes('COUNT(*)')) {
+      const normalizedEmail = this.params[0]
+      const cnt = this.db.emailOtpChallenges.filter((row) => row.normalizedEmail === normalizedEmail).length
+      return { cnt }
+    }
+
+    if (this.sql.includes('FROM HL_users') && this.sql.includes('WHERE id = ?') && !this.sql.includes('HL_sessions')) {
+      const userId = this.params[0]
+      const user = this.db.users.find((row) => row.id === userId)
+      return user ?? null
     }
 
     return null
@@ -480,7 +497,7 @@ class D1MockStatement {
   }
 }
 
-class D1Mock {
+export class D1Mock {
   constructor(options = {}) {
     this.lastInsertId = 0
     this.users = []
@@ -513,6 +530,7 @@ class D1Mock {
     this.waterIntakeLogs = []
     this.safetyEvents = []
     this.cycleLogs = []
+    this.emailOtpChallenges = []
     this.devices = [
       {
         deviceCode: 'yuwellYx106',
@@ -920,7 +938,49 @@ class D1Mock {
     }
 
     if (statement.sql.includes('INSERT INTO HL_emailOtpChallenges')) {
-      this.lastInsertId++
+      const hasExplicitId = /\(id,/.test(statement.sql)
+      const id = hasExplicitId ? statement.params[0] : ++this.lastInsertId
+      const pIdx = hasExplicitId ? 1 : 0
+      const row = {
+        id,
+        userId: statement.params[pIdx],
+        normalizedEmail: statement.params[pIdx + 1],
+        otpHash: statement.params[pIdx + 2],
+        salt: statement.params[pIdx + 3],
+        purpose: statement.params[pIdx + 4],
+        expiresAt: statement.params[pIdx + 5],
+        ipHash: statement.params[pIdx + 6] ?? null,
+        failedAttempts: 0,
+        consumedAt: null,
+        resendCount: 0,
+        lastResendAt: null,
+        createdAt: new Date().toISOString()
+      }
+      this.emailOtpChallenges.push(row)
+    }
+
+    if (statement.sql.includes('UPDATE HL_emailOtpChallenges SET consumedAt')) {
+      const id = statement.params[0]
+      const challenge = this.emailOtpChallenges.find((row) => row.id === id)
+      if (challenge) challenge.consumedAt = 'CURRENT_TIMESTAMP'
+    }
+
+    if (statement.sql.includes('UPDATE HL_emailOtpChallenges SET failedAttempts')) {
+      const id = statement.params[0]
+      const challenge = this.emailOtpChallenges.find((row) => row.id === id)
+      if (challenge) challenge.failedAttempts++
+    }
+
+    if (statement.sql.includes('UPDATE HL_emailOtpChallenges SET otpHash')) {
+      const [otpHash, salt, expiresAt, id] = statement.params
+      const challenge = this.emailOtpChallenges.find((row) => row.id === id)
+      if (challenge) {
+        challenge.otpHash = otpHash
+        challenge.salt = salt
+        challenge.expiresAt = expiresAt
+        challenge.resendCount++
+        challenge.lastResendAt = 'CURRENT_TIMESTAMP'
+      }
     }
 
     if (statement.sql.includes('INSERT INTO HL_sessions')) {
@@ -998,9 +1058,19 @@ class D1Mock {
     }
 
     if (statement.sql.includes('UPDATE HL_users SET active')) {
-      const [active, userId] = statement.params
-      const user = this.users.find((row) => row.id === userId)
-      if (user) user.active = active
+      if (statement.params.length >= 2) {
+        const [active, userId] = statement.params
+        const user = this.users.find((row) => row.id === userId)
+        if (user) user.active = active
+      } else {
+        const userId = statement.params[0]
+        const user = this.users.find((row) => row.id === userId)
+        if (user) {
+          user.active = statement.sql.includes('= 0') ? 0 : 1
+          if (statement.sql.includes('emailVerifiedAt')) user.emailVerifiedAt = 'CURRENT_TIMESTAMP'
+          if (statement.sql.includes('emailVerificationMethod')) user.emailVerificationMethod = 'otp'
+        }
+      }
     }
 
     if (statement.sql.includes('INSERT INTO HL_roles')) {
@@ -1035,13 +1105,14 @@ class D1Mock {
 
     if (statement.sql.includes('INSERT INTO HL_userRoles')) {
       const [userId, roleCode, assignedBy] = statement.params
+      const effectiveAssignedBy = assignedBy ?? null
       const existing = this.userRoles.find((row) => row.userId === userId && row.roleCode === roleCode)
       if (existing) {
         existing.active = 1
         existing.revokedAt = null
-        existing.assignedBy = assignedBy
+        existing.assignedBy = effectiveAssignedBy
       } else {
-        this.userRoles.push({ userId, roleCode, assignedBy, active: 1, revokedAt: null })
+        this.userRoles.push({ userId, roleCode, assignedBy: effectiveAssignedBy, active: 1, revokedAt: null })
       }
     }
 
@@ -1241,13 +1312,13 @@ class D1Mock {
   }
 }
 
-function getCookieValue(response, name) {
+export function getCookieValue(response, name) {
   const cookie = response.headers.get('set-cookie') ?? ''
   const match = cookie.match(new RegExp(`${name}=([^;]+)`))
   return match?.[1] ?? ''
 }
 
-function assertSessionCookie(response) {
+export function assertSessionCookie(response) {
   const cookie = response.headers.get('set-cookie') ?? ''
   assert.match(cookie, /hlSession=/)
   assert.match(cookie, /HttpOnly/i)
@@ -1257,7 +1328,7 @@ function assertSessionCookie(response) {
   assert.match(cookie, /Max-Age=2592000/i)
 }
 
-function env(db = new D1Mock()) {
+export function env(db = new D1Mock()) {
   return {
     DB: db,
     LOGS: {},
