@@ -13,6 +13,16 @@ export interface Env {
   TELEGRAM_QUEUE?: Queue
   AI_MEMORY_QUEUE?: Queue
   VECTORIZE_INDEX?: any
+  GOOGLE_CLIENT_ID?: string
+  GOOGLE_CLIENT_SECRET?: string
+  RESEND_API_KEY?: string
+  EMAIL_PROVIDER?: string
+  EMAIL_FROM?: string
+  EMAIL_OTP_TTL_SECONDS?: string
+  EMAIL_OTP_MAX_ATTEMPTS?: string
+  EMAIL_OTP_RESEND_COOLDOWN_SECONDS?: string
+  EMAIL_OTP_MAX_RESENDS?: string
+  EMAIL_OTP_TEST_MODE?: string
 }
 
 export type ApiErrorCode =
@@ -25,6 +35,16 @@ export type ApiErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
+  | 'OTP_REQUIRED'
+  | 'OTP_INVALID'
+  | 'OTP_EXPIRED'
+  | 'OTP_TOO_MANY_ATTEMPTS'
+  | 'OTP_RESEND_COOLDOWN'
+  | 'OTP_RATE_LIMITED'
+  | 'EMAIL_NOT_VERIFIED'
+  | 'EMAIL_OTP_SEND_FAILED'
+  | 'EMAIL_INVALID_FORMAT'
+  | 'EMAIL_ALREADY_VERIFIED'
 
 export type ApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 429 | 500
 

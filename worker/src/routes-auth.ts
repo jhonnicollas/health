@@ -4,9 +4,9 @@ import { EducationService } from './services/education.js'
 import { SymptomService } from './services/symptom.js'
 import { AuditService } from './services/audit.js'
 import { sendEmergencyToContacts } from './routes-extra.js'
+import type { Env } from './types.js'
 
-interface LocalEnv { DB: D1Database; LOGS: R2Bucket; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string; TELEGRAM_QUEUE?: Queue }
-type HC = Context<{ Bindings: LocalEnv }>
+type HC = Context<{ Bindings: Env }>
 
 function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body.body ?? body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now()) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }

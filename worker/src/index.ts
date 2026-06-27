@@ -6,6 +6,7 @@ import { mountTelegramRoutes } from "./routes-telegram.js"
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
+import type { Env, ApiErrorCode } from './types.js'
 import {
   mountExtraRoutes,
   scheduledHandler,
@@ -25,32 +26,9 @@ import { OAuthService } from "./services/oauth.js"
 import { RbacService } from './services/rbac.js'
 import { AiMemoryService } from './services/ai-memory.js'
 
-export interface Env {
-  CLOUDFLARE_ACCOUNT_ID?: string
-  CLOUDFLARE_API_TOKEN?: string
-  TELEGRAM_BOT_TOKEN?: string
-  ENCRYPTION_KEY?: string
-  ADMIN_EMAILS?: string
-  INTERNAL_API_SECRET?: string
-  DB: D1Database
-  LOGS: R2Bucket
-  TELEGRAM_QUEUE?: Queue
-  AI_MEMORY_QUEUE?: Queue
-  VECTORIZE_INDEX?: any
-}
-
 const app = new Hono<{ Bindings: Env }>()
 
-type ApiErrorCode =
-  | 'VALIDATION_ERROR'
-  | 'EMAIL_ALREADY_EXISTS'
-  | 'UNAUTHORIZED'
-  | 'FORBIDDEN'
-  | 'ENTITLEMENT_REQUIRED'
-  | 'NOT_FOUND'
-  | 'QUOTA_EXCEEDED'
-  | 'RATE_LIMITED'
-  | 'INTERNAL_ERROR'
+export type { Env }
 
 type ApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 429 | 500
 
