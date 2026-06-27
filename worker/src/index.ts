@@ -26,6 +26,8 @@ import { OAuthService } from "./services/oauth.js"
 import { RbacService } from './services/rbac.js'
 import { AiMemoryService } from './services/ai-memory.js'
 import { CryptoService } from './services/crypto.js'
+import { EmailOtpService } from './services/email-otp.js'
+import { EmailSenderService } from './services/email-sender.js'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -949,34 +951,48 @@ app.post('/api/auth/register', async (c) => {
   }
 
   let userId: number | null = null
-  let sessionToken = ''
 
   try {
     const passwordHash = await hashPassword(validation.data.password)
     userId = await insertAndGetId(c.env.DB.prepare(
       `INSERT INTO HL_users
         (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, createdAt, updatedAt)
-       VALUES (?, ?, 'local', ?, 0, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+       VALUES (?, ?, 'local', ?, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(validation.data.email, passwordHash, validation.data.displayName))
 
-    const session = await createSession(c, userId)
-    sessionToken = session.sessionToken
+    await c.env.DB.prepare(
+      `INSERT INTO HL_auditLogs
+        (userId, action, entityType, entityId, metadataJson, createdAt)
+      VALUES (?, 'userRegister', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(
+      userId,
+      userId,
+      JSON.stringify({
+        email: validation.data.email,
+        authProvider: 'local'
+      })
+    ).run()
 
-    await c.env.DB.batch([
-      session.statement,
-      c.env.DB.prepare(
-        `INSERT INTO HL_auditLogs
-          (userId, action, entityType, entityId, metadataJson, createdAt)
-        VALUES (?, 'userRegister', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`
-      ).bind(
-        userId,
-        userId,
-        JSON.stringify({
-          email: validation.data.email,
-          authProvider: 'local'
-        })
-      )
-    ])
+    const normalizedEmail = EmailOtpService.normalizeEmail(validation.data.email)
+    const { challengeId, otp } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId, normalizedEmail, purpose: 'register' })
+    const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+    if (!sendResult.sent) {
+      const result = failure('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], startedAt)
+      return jsonResponse(c, result)
+    }
+
+    const result = success(
+      {
+        otpRequired: true,
+        challengeId,
+        maskedEmail: EmailOtpService.maskEmail(normalizedEmail),
+        expiresInSeconds: 600
+      },
+      201,
+      startedAt
+    )
+
+    return jsonResponse(c, result)
   } catch (error) {
     if (isUniqueEmailError(error)) {
       const result = failure(
@@ -1002,31 +1018,6 @@ app.post('/api/auth/register', async (c) => {
 
     return jsonResponse(c, result)
   }
-
-  setCookie(c, 'hlSession', sessionToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: SESSION_DAYS * 24 * 60 * 60
-  })
-
-  const result = success(
-    {
-      user: {
-        id: userId,
-        email: validation.data.email,
-        displayName: validation.data.displayName,
-        telegramEnabled: false,
-        browserPushEnabled: false
-      },
-      requiresOnboarding: true
-    },
-    201,
-    startedAt
-  )
-
-  return jsonResponse(c, result)
 })
 
 app.post('/api/auth/login', async (c) => {
@@ -1106,68 +1097,33 @@ app.post('/api/auth/login', async (c) => {
     return jsonResponse(c, result)
   }
 
-  let profile: ProfileRow | null
-  let sessionToken = ''
-
   try {
-    const session = await createSession(c, user.id)
-    const revokeCurrentSessionStatement = await revokeCurrentSession(c)
-    sessionToken = session.sessionToken
-    profile = await c.env.DB.prepare(
-      `SELECT id, sex, birthDate, heightCm, timezone, accessibilityMode, theme,
-        emergencyConsent, aiConsent, dataShareConsent
-       FROM HL_userProfiles
-       WHERE userId = ?
-       LIMIT 1`
+    const normalizedEmail = EmailOtpService.normalizeEmail(validation.data.email)
+    const { challengeId, otp } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId: user.id, normalizedEmail, purpose: 'login' })
+    const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+    if (!sendResult.sent) {
+      const result = failure('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], startedAt)
+      return jsonResponse(c, result)
+    }
+
+    const result = success(
+      {
+        otpRequired: true,
+        challengeId,
+        maskedEmail: EmailOtpService.maskEmail(normalizedEmail),
+        expiresInSeconds: 600
+      },
+      200,
+      startedAt
     )
-      .bind(user.id)
-      .first<ProfileRow>()
 
-    const statements = [
-      ...(revokeCurrentSessionStatement ? [revokeCurrentSessionStatement] : []),
-      session.statement,
-      c.env.DB.prepare('UPDATE HL_users SET lastLoginAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(user.id),
-      c.env.DB.prepare(
-        `INSERT INTO HL_auditLogs
-          (userId, action, entityType, entityId, metadataJson, createdAt)
-        VALUES (?, 'userLogin', 'HL_users', ?, ?, CURRENT_TIMESTAMP)`
-      ).bind(
-        user.id,
-        user.id,
-        JSON.stringify({
-          email: user.email,
-          authProvider: 'local'
-        })
-      )
-    ]
-
-    await c.env.DB.batch(statements)
+    return jsonResponse(c, result)
   } catch (error) {
-    console.error('login session create failed', error)
+    console.error('login otp create failed', error)
 
     const result = failure('INTERNAL_ERROR', 'Login gagal diproses.', 500, [])
     return jsonResponse(c, result)
   }
-
-  setCookie(c, 'hlSession', sessionToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: SESSION_DAYS * 24 * 60 * 60
-  })
-
-  const result = success(
-    {
-      user: publicUser(user),
-      profile: publicProfile(profile),
-      requiresOnboarding: !profile
-    },
-    200,
-    startedAt
-  )
-
-  return jsonResponse(c, result)
 })
 
 app.get('/api/auth/me', async (c) => {

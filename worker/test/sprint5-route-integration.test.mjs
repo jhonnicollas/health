@@ -165,13 +165,10 @@ async function login(db, seedEmail = 'seed@test.com', opts = {}) {
   if (opts.withProfile) {
     db.profiles.push({ id: 1, userId: 1, sex: 'male', birthDate: '1990-01-01', heightCm: 170, timezone: 'Asia/Jakarta', accessibilityMode: null, theme: null, emergencyConsent: null, aiConsent: null, dataShareConsent: null })
   }
-  const res = await app.request('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: seedEmail, password: 'StrongPass123' })
-  }, { DB: db, LOGS: {} })
-  assert.equal(res.status, 200, 'login must succeed')
-  return extractCookie(res)
+  const token = 'integration-test-session'
+  const hash = await sha256Token(token)
+  db.sessions.push({ id: ++db.lastInsertId, userId: 1, sessionTokenHash: hash, userAgent: null, expiresAt: '2099-12-31T00:00:00.000Z', revokedAt: null })
+  return token
 }
 
 // === GAP 1: email_verified=false OAuth rejection ===
@@ -207,7 +204,7 @@ test('POST /api/symptoms/prompt-dismissals writes HL_auditLogs at route level', 
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ sourceSessionId: 5, reason: 'noSymptoms' })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   assert.equal(res.status, 200)
   const body = await res.json()
   assert.equal(body.success, true)
@@ -225,7 +222,7 @@ test('Hydration route rejects amountMl < 1 with VALIDATION_ERROR', async () => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ amountMl: 0 })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   const body = await res.json()
   assert.equal(body.success, false)
   assert.equal(body.error.code, 'VALIDATION_ERROR')
@@ -238,7 +235,7 @@ test('Hydration route rejects amountMl > 3000 with VALIDATION_ERROR', async () =
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ amountMl: 3500 })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   const body = await res.json()
   assert.equal(body.success, false)
   assert.equal(body.error.code, 'VALIDATION_ERROR')
@@ -251,7 +248,7 @@ test('Hydration route rejects amountMl >1000 without confirmedLargeInput', async
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ amountMl: 1500 })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   const body = await res.json()
   assert.equal(body.success, false)
   assert.equal(body.error.code, 'LARGE_INPUT_CONFIRMATION_REQUIRED')
@@ -264,7 +261,7 @@ test('Hydration route accepts amountMl >1000 with confirmedLargeInput=true', asy
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ amountMl: 1500, confirmedLargeInput: true })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   const body = await res.json()
   assert.equal(body.success, true)
   assert.equal(body.data.amountMl, 1500)
@@ -277,7 +274,7 @@ test('Hydration route accepts amountMl <=1000 without confirmation', async () =>
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ amountMl: 600 })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   const body = await res.json()
   assert.equal(body.success, true)
   assert.equal(body.data.amountMl, 600)
@@ -289,7 +286,7 @@ test('GET /api/admin/ai-config requires admin.aiConfig.read permission', async (
   const cookie = await login(db, 'perm-test1@test.com', { userRoles: false })
   const res = await app.request('/api/admin/ai-config', {
     headers: { Cookie: `hlSession=${cookie}` }
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   assert.equal(res.status, 403)
   const body = await res.json()
   assert.equal(body.error.code, 'FORBIDDEN')
@@ -300,7 +297,7 @@ test('GET /api/admin/ai-config returns masked AI key for authorized admin', asyn
   const cookie = await login(db, 'perm-test2@test.com')
   const res = await app.request('/api/admin/ai-config', {
     headers: { Cookie: `hlSession=${cookie}` }
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   assert.equal(res.status, 200)
   const body = await res.json()
   assert.equal(body.success, true)
@@ -324,7 +321,7 @@ test('PUT /api/admin/ai-config writes audit log and never returns secret', async
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ aiTextDefaultModel: 'new-model', reason: 'test update' })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   assert.equal(res.status, 200)
   const body = await res.json()
   assert.equal(body.success, true)
@@ -342,7 +339,7 @@ test('PUT /api/admin/ai-config rejects non-admin user', async () => {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Cookie: `hlSession=${cookie}` },
     body: JSON.stringify({ aiTextDefaultModel: 'hack-model' })
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   assert.equal(res.status, 403)
 })
 
@@ -391,7 +388,7 @@ test('DELETE /api/auth/google/link blocks when last login method', async () => {
   const res = await app.request('/api/auth/google/link', {
     method: 'DELETE',
     headers: { Cookie: `hlSession=${cookie}` }
-  }, { DB: db, LOGS: {} })
+  }, { DB: db, LOGS: {}, EMAIL_OTP_TEST_MODE: 'true' })
   const body = await res.json()
   assert.equal(body.error.code, 'LAST_LOGIN_METHOD')
 })

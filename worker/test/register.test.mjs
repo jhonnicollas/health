@@ -904,6 +904,8 @@ class D1Mock {
         throw new Error('UNIQUE constraint failed: HL_users.email')
       }
 
+      const activeFromSql = /\bactive[,\s]+/.test(statement.sql) ? (statement.sql.includes('0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP') ? 0 : 1) : 1
+
       this.users.push({
         id,
         email,
@@ -911,10 +913,14 @@ class D1Mock {
         displayName,
         telegramEnabled: 0,
         browserPushEnabled: 0,
-        active: 1,
+        active: activeFromSql,
         authProvider: 'local',
         lastLoginAt: null
       })
+    }
+
+    if (statement.sql.includes('INSERT INTO HL_emailOtpChallenges')) {
+      this.lastInsertId++
     }
 
     if (statement.sql.includes('INSERT INTO HL_sessions')) {
@@ -1254,7 +1260,8 @@ function assertSessionCookie(response) {
 function env(db = new D1Mock()) {
   return {
     DB: db,
-    LOGS: {}
+    LOGS: {},
+    EMAIL_OTP_TEST_MODE: 'true'
   }
 }
 
@@ -1350,7 +1357,7 @@ test('validates profile and UI settings payloads', () => {
   assert.equal(invalidUi.details.length, 2)
 })
 
-test('POST /api/auth/register inserts user, session, and audit log', async () => {
+test('POST /api/auth/register creates user with active=0 and returns OTP challenge', async () => {
   const db = new D1Mock()
   const response = await app.request(
     '/api/auth/register',
@@ -1372,14 +1379,16 @@ test('POST /api/auth/register inserts user, session, and audit log', async () =>
 
   assert.equal(response.status, 201)
   assert.equal(body.success, true)
-  assert.equal(body.data.user.email, 'user@example.com')
-  assert.equal(body.data.user.displayName, 'Budi')
-  assert.equal(body.data.requiresOnboarding, true)
-  assertSessionCookie(response)
+  assert.equal(body.data.otpRequired, true)
+  assert.ok(body.data.challengeId > 0)
+  assert.equal(body.data.maskedEmail, 'u***@example.com')
+  assert.equal(body.data.expiresInSeconds, 600)
+  assert.equal(response.headers.get('set-cookie'), null)
   assert.equal(response.headers.get('cache-control'), 'no-store')
   assert.equal(db.users.length, 1)
+  assert.equal(db.users[0].active, 0)
   assert.notEqual(db.users[0].passwordHash, 'StrongPass123')
-  assert.equal(db.sessions.length, 1)
+  assert.equal(db.sessions.length, 0)
   assert.equal(db.auditLogs.length, 1)
   assert.equal(db.auditLogs[0].action, 'userRegister')
 })
@@ -1443,7 +1452,7 @@ test('POST /api/auth/register returns envelope when duplicate check fails', asyn
   assert.ok(body.meta.requestId)
 })
 
-test('POST /api/auth/login creates session and returns onboarding state', async () => {
+test('POST /api/auth/login returns OTP challenge instead of session', async () => {
   const db = new D1Mock()
   const passwordHash = await hashPassword('StrongPass123')
   db.users.push({
@@ -1476,14 +1485,13 @@ test('POST /api/auth/login creates session and returns onboarding state', async 
 
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
-  assertSessionCookie(response)
   assert.equal(body.success, true)
-  assert.equal(body.data.user.email, 'user@example.com')
-  assert.equal(body.data.user.browserPushEnabled, true)
-  assert.equal(body.data.requiresOnboarding, true)
-  assert.equal(db.sessions.length, 1)
-  assert.equal(db.auditLogs[0].action, 'userLogin')
-  assert.equal(db.users[0].lastLoginAt, 'CURRENT_TIMESTAMP')
+  assert.equal(body.data.otpRequired, true)
+  assert.ok(body.data.challengeId > 0)
+  assert.equal(body.data.maskedEmail, 'u***@example.com')
+  assert.equal(body.data.expiresInSeconds, 600)
+  assert.equal(response.headers.get('set-cookie'), null)
+  assert.equal(db.sessions.length, 0)
   assert.equal(db.rateLimits.length, 1)
 })
 
@@ -1526,6 +1534,7 @@ test('POST /api/auth/login rejects invalid credentials generically', async () =>
 
 test('GET /api/auth/me returns session user from login cookie', async () => {
   const db = new D1Mock()
+  const token = 'test-session-token'
   db.users.push({
     id: 1,
     email: 'user@example.com',
@@ -1537,27 +1546,20 @@ test('GET /api/auth/me returns session user from login cookie', async () => {
     authProvider: 'local',
     lastLoginAt: null
   })
+  db.sessions.push({
+    id: 1,
+    userId: 1,
+    sessionTokenHash: await sha256Token(token),
+    userAgent: null,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    revokedAt: null
+  })
 
-  const loginResponse = await app.request(
-    '/api/auth/login',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: 'user@example.com',
-        password: 'StrongPass123'
-      })
-    },
-    env(db)
-  )
-  const sessionToken = getCookieValue(loginResponse, 'hlSession')
   const response = await app.request(
     '/api/auth/me',
     {
       headers: {
-        Cookie: `hlSession=${sessionToken}`
+        Cookie: `hlSession=${token}`
       }
     },
     env(db)
@@ -1619,9 +1621,8 @@ test('POST /api/auth/login rate limits using HL_systemConfigs', async () => {
   assert.equal(db.rateLimits[0].requestCount, 1)
 })
 
-test('POST /api/auth/login revokes current cookie session before rotating', async () => {
+test('POST /api/auth/login returns OTP challenge without creating session', async () => {
   const db = new D1Mock()
-  const oldToken = 'old-session-token'
   db.users.push({
     id: 1,
     email: 'user@example.com',
@@ -1633,22 +1634,13 @@ test('POST /api/auth/login revokes current cookie session before rotating', asyn
     authProvider: 'local',
     lastLoginAt: null
   })
-  db.sessions.push({
-    id: 1,
-    userId: 1,
-    sessionTokenHash: await sha256Token(oldToken),
-    userAgent: null,
-    expiresAt: new Date(Date.now() + 60000).toISOString(),
-    revokedAt: null
-  })
 
   const response = await app.request(
     '/api/auth/login',
     {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Cookie: `hlSession=${oldToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         email: 'user@example.com',
@@ -1659,8 +1651,11 @@ test('POST /api/auth/login revokes current cookie session before rotating', asyn
   )
 
   assert.equal(response.status, 200)
-  assert.equal(db.sessions[0].revokedAt, 'CURRENT_TIMESTAMP')
-  assert.equal(db.sessions.length, 2)
+  const body = await response.json()
+  assert.equal(body.success, true)
+  assert.equal(body.data.otpRequired, true)
+  assert.ok(body.data.challengeId > 0)
+  assert.equal(db.sessions.length, 0)
 })
 
 test('POST /api/profile/onboarding requires auth', async () => {
