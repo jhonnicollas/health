@@ -25,6 +25,7 @@ import { SymptomService } from "./services/symptom.js"
 import { OAuthService } from "./services/oauth.js"
 import { RbacService } from './services/rbac.js'
 import { AiMemoryService } from './services/ai-memory.js'
+import { CryptoService } from './services/crypto.js'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -133,7 +134,6 @@ type RateLimitConfig = {
 }
 
 const SESSION_DAYS = 30
-const PASSWORD_HASH_ITERATIONS = 100000
 const MIN_ONBOARDING_AGE_YEARS = 13
 
 const textEncoder = new TextEncoder()
@@ -449,75 +449,15 @@ function validateUiSettingsInput(input: UiSettingsInput) {
 }
 
 async function hashPassword(password: string) {
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const key = await crypto.subtle.importKey(
-    'raw',
-    textEncoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  )
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      hash: 'SHA-256',
-      salt,
-      iterations: PASSWORD_HASH_ITERATIONS
-    },
-    key,
-    256
-  )
-
-  return `pbkdf2-sha256:${PASSWORD_HASH_ITERATIONS}:${base64Url(salt)}:${base64Url(bits)}`
+  return CryptoService.hashPassword(password)
 }
 
 async function verifyPassword(password: string, storedHash: string | null) {
-  if (!storedHash) {
-    return false
-  }
-
-  const [algorithm, iterationsText, saltText, expectedHash] = storedHash.split(':')
-  const iterations = Number(iterationsText)
-
-  if (
-    algorithm !== 'pbkdf2-sha256' ||
-    !Number.isInteger(iterations) ||
-    iterations <= 0 ||
-    !saltText ||
-    !expectedHash
-  ) {
-    return false
-  }
-
-  try {
-    const salt = base64UrlDecode(saltText)
-    const key = await crypto.subtle.importKey(
-      'raw',
-      textEncoder.encode(password),
-      'PBKDF2',
-      false,
-      ['deriveBits']
-    )
-    const bits = await crypto.subtle.deriveBits(
-      {
-        name: 'PBKDF2',
-        hash: 'SHA-256',
-        salt,
-        iterations
-      },
-      key,
-      256
-    )
-
-    return timingSafeEqual(base64Url(bits), expectedHash)
-  } catch {
-    return false
-  }
+  return CryptoService.verifyPassword(password, storedHash)
 }
 
 async function sha256Token(value: string) {
-  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(value))
-  return `sha256:${base64Url(digest)}`
+  return CryptoService.sha256Token(value)
 }
 
 function generateToken() {
@@ -571,20 +511,6 @@ async function decryptSensitive(c: Context<{ Bindings: Env }>, value: string | n
     base64UrlDecode(cipherText)
   )
   return textDecoder.decode(decrypted)
-}
-
-function timingSafeEqual(left: string, right: string) {
-  if (left.length !== right.length) {
-    return false
-  }
-
-  let diff = 0
-
-  for (let index = 0; index < left.length; index += 1) {
-    diff |= left.charCodeAt(index) ^ right.charCodeAt(index)
-  }
-
-  return diff === 0
 }
 
 function createId(prefix: string) {

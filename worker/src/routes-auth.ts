@@ -3,6 +3,7 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { EducationService } from './services/education.js'
 import { SymptomService } from './services/symptom.js'
 import { AuditService } from './services/audit.js'
+import { CryptoService } from './services/crypto.js'
 import { sendEmergencyToContacts } from './routes-extra.js'
 import type { Env } from './types.js'
 
@@ -14,21 +15,9 @@ function fail(code: string, msg: string, status: number, errs: unknown[] = [], s
 
 async function getSession(c: HC): Promise<number | null> {
   const token = getCookie(c, 'hlSession'); if (!token) return null
-  const h = await sha256Token(token)
+  const h = await CryptoService.sha256Token(token)
   const row = await c.env.DB.prepare('SELECT s.userId FROM HL_sessions s JOIN HL_users u ON u.id = s.userId WHERE s.sessionTokenHash = ? AND s.revokedAt IS NULL AND s.expiresAt > datetime("now") AND u.active = 1').bind(h).first<any>()
   return row?.userId || null
-}
-
-function base64Url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-}
-async function sha256Token(val: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val))
-  return `sha256:${base64Url(buf)}`
-}
-async function hashPassword(pw: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
 const SAFE_RETURN_PATHS = ['/', '/dashboard', '/settings', '/settings/account-security']
@@ -41,7 +30,7 @@ export function mountAuthRoutes(app: any) {
     return '/'
   }
   async function ssc(c: HC, uid: number) {
-    const t = crypto.randomUUID(); const h = await sha256Token(t)
+    const t = crypto.randomUUID(); const h = await CryptoService.sha256Token(t)
     await c.env.DB.prepare('INSERT INTO HL_sessions (userId, sessionTokenHash, createdAt, expiresAt) VALUES (?, ?, CURRENT_TIMESTAMP, datetime("now", "+" || ? || " days"))').bind(uid, h, SD).run()
     setCookie(c, 'hlSession', t, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: SD * 86400 })
   }
@@ -51,9 +40,9 @@ export function mountAuthRoutes(app: any) {
     try {
       const mode = c.req.query('mode') || 'login'
       const state = crypto.randomUUID()
-      const stateHash = await sha256Token(state)
+      const stateHash = await CryptoService.sha256Token(state)
       const nonce = crypto.randomUUID()
-      const nonceHash = await sha256Token(nonce)
+      const nonceHash = await CryptoService.sha256Token(nonce)
       await c.env.DB.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(stateHash, nonceHash, 'google', mode, safeReturnTo(c.req.query('returnTo')), new Date(Date.now() + 600000).toISOString()).run()
       const cid = (c.env as any).GOOGLE_CLIENT_ID || ''
       const ru = `${new URL(c.req.url).origin}/api/auth/google/callback`
@@ -69,7 +58,7 @@ export function mountAuthRoutes(app: any) {
     try {
       const { code, state } = c.req.query()
       if (!code || !state) return jr(c, fail('VALIDATION_ERROR', 'code dan state wajib.', 400, [], s), 400)
-      const stateHash = await sha256Token(state)
+      const stateHash = await CryptoService.sha256Token(state)
       const row = await c.env.DB.prepare("SELECT id, mode, returnTo, userId FROM HL_oauthStates WHERE stateHash = ? AND consumedAt IS NULL AND expiresAt > datetime('now')").bind(stateHash).first<any>()
       if (!row) return jr(c, fail('UNAUTHORIZED', 'State invalid.', 401, [], s), 401)
       await c.env.DB.prepare('UPDATE HL_oauthStates SET consumedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(row.id).run()
@@ -100,7 +89,7 @@ export function mountAuthRoutes(app: any) {
       if (existing) { await ssc(c, existing.userId); await AuditService.write(c.env.DB, { userId: existing.userId, action: 'auth.google.login', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google' }) }) } else {
         const existingEmail = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ?').bind(email).first<any>()
         if (existingEmail) return jr(c, fail('EMAIL_CONFLICT', 'Email sudah terdaftar dengan akun lain. Silakan login lalu tautkan Google dari pengaturan.', 409, [], s), 409)
-        const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await hashPassword(pw)
+        const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await CryptoService.hashPassword(pw)
         const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, createdAt, updatedAt) VALUES (?, ?, 'google', ?, 0, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash, email).run()
         const newUid = meta.last_row_id as number
         await c.env.DB.prepare('INSERT OR IGNORE INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(newUid, 'user').run()
