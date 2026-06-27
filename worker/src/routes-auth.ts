@@ -4,6 +4,8 @@ import { EducationService } from './services/education.js'
 import { SymptomService } from './services/symptom.js'
 import { AuditService } from './services/audit.js'
 import { CryptoService } from './services/crypto.js'
+import { EmailOtpService } from './services/email-otp.js'
+import { EmailSenderService } from './services/email-sender.js'
 import { sendEmergencyToContacts } from './routes-extra.js'
 import type { Env } from './types.js'
 
@@ -90,7 +92,7 @@ export function mountAuthRoutes(app: any) {
         const existingEmail = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ?').bind(email).first<any>()
         if (existingEmail) return jr(c, fail('EMAIL_CONFLICT', 'Email sudah terdaftar dengan akun lain. Silakan login lalu tautkan Google dari pengaturan.', 409, [], s), 409)
         const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await CryptoService.hashPassword(pw)
-        const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, createdAt, updatedAt) VALUES (?, ?, 'google', ?, 0, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash, email).run()
+        const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, emailVerifiedAt, emailVerificationMethod, createdAt, updatedAt) VALUES (?, ?, 'google', ?, 0, 0, 1, CURRENT_TIMESTAMP, 'google', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash, email).run()
         const newUid = meta.last_row_id as number
         await c.env.DB.prepare('INSERT OR IGNORE INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(newUid, 'user').run()
         await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(newUid, 'google', sub, email).run()
@@ -120,6 +122,175 @@ export function mountAuthRoutes(app: any) {
       await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.unlink', entityType: 'HL_oauthAccounts', entityId: String(uid), metadataJson: JSON.stringify({ provider: 'google' }) })
       return jr(c, ok({ unlinked: true }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
+  })
+
+  app.post('/api/auth/register/start', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const body = await c.req.json<any>()
+      const email = String(body.email || '').trim()
+      const password = String(body.password || '')
+      const displayName = String(body.displayName || '')
+      const normalizedEmail = EmailOtpService.normalizeEmail(email)
+
+      if (!EmailOtpService.validateEmailFormat(normalizedEmail)) return jr(c, fail('EMAIL_INVALID_FORMAT', 'Format email tidak valid.', 400, [], s), 400)
+      if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) return jr(c, fail('VALIDATION_ERROR', 'Password minimal 8 karakter dengan huruf besar, kecil, dan angka.', 400, [], s), 400)
+      if (displayName.trim().length < 2) return jr(c, fail('VALIDATION_ERROR', 'Nama tampilan minimal 2 karakter.', 400, [], s), 400)
+
+      const existing = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ?').bind(normalizedEmail).first<any>()
+      if (existing) return jr(c, fail('EMAIL_ALREADY_EXISTS', 'Email sudah terdaftar.', 409, [], s), 409)
+
+      const rateLimit = await EmailOtpService.assertRateLimit(c.env.DB, normalizedEmail)
+      if (!rateLimit.allowed) return jr(c, fail('OTP_RATE_LIMITED', 'Terlalu banyak permintaan. Coba lagi nanti.', 429, [], s), 429)
+
+      const passwordHash = await CryptoService.hashPassword(password)
+      const result = await c.env.DB.prepare(
+        `INSERT INTO HL_users (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, createdAt, updatedAt) VALUES (?, ?, 'local', ?, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(normalizedEmail, passwordHash, displayName).run()
+      const userId = Number((result.meta as any)?.last_row_id ?? (result.meta as any)?.lastRowId)
+
+      const { challengeId, otp, expiresAt } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId, normalizedEmail, purpose: 'register' })
+      const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+      if (!sendResult.sent) return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], s), 500)
+
+      return jr(c, ok({ otpRequired: true, challengeId, maskedEmail: EmailOtpService.maskEmail(normalizedEmail), expiresInSeconds: 600 }, 200, s), 200)
+    } catch (e) {
+      return jr(c, fail('INTERNAL_ERROR', 'Registrasi gagal diproses.', 500, [], s), 500)
+    }
+  })
+
+  app.post('/api/auth/register/verify', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const body = await c.req.json<any>()
+      const challengeId = Number(body.challengeId)
+      const otp = String(body.otp || '').trim()
+
+      if (!challengeId || !/^\d{6}$/.test(otp)) return jr(c, fail('VALIDATION_ERROR', 'Challenge ID dan OTP 6 digit wajib.', 400, [], s), 400)
+
+      const result = await EmailOtpService.verifyChallenge(c.env.DB, c.env, { challengeId, otp, purpose: 'register' })
+
+      if (!result.valid) {
+        const code = result.error === 'OTP_EXPIRED' ? 'OTP_EXPIRED' : result.error === 'OTP_TOO_MANY_ATTEMPTS' ? 'OTP_TOO_MANY_ATTEMPTS' : 'OTP_INVALID'
+        const msg = result.error === 'OTP_EXPIRED' ? 'Kode verifikasi kadaluarsa.' : result.error === 'OTP_TOO_MANY_ATTEMPTS' ? 'Terlalu banyak percobaan. Minta kode baru.' : 'Kode verifikasi tidak valid.'
+        return jr(c, fail(code as any, msg, 400, [], s), 400)
+      }
+
+      const uid = result.userId as number
+      await c.env.DB.batch([
+        c.env.DB.prepare("UPDATE HL_users SET active = 1, emailVerifiedAt = CURRENT_TIMESTAMP, emailVerificationMethod = 'otp', updatedAt = CURRENT_TIMESTAMP WHERE id = ?").bind(uid),
+        c.env.DB.prepare('INSERT INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(uid, 'user'),
+      ])
+
+      const t = crypto.randomUUID(); const h = await CryptoService.sha256Token(t)
+      await c.env.DB.prepare('INSERT INTO HL_sessions (userId, sessionTokenHash, createdAt, expiresAt) VALUES (?, ?, CURRENT_TIMESTAMP, datetime("now", "+" || ? || " days"))').bind(uid, h, 30).run()
+      setCookie(c, 'hlSession', t, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 30 * 86400 })
+
+      await AuditService.write(c.env.DB, { userId: uid, action: 'userRegister.otpVerify', entityType: 'HL_users', entityId: uid })
+
+      const user = await c.env.DB.prepare('SELECT id, email, displayName, telegramEnabled, browserPushEnabled FROM HL_users WHERE id = ?').bind(uid).first<any>()
+      return jr(c, ok({ user: { id: user.id, email: user.email, displayName: user.displayName, telegramEnabled: !!user.telegramEnabled, browserPushEnabled: !!user.browserPushEnabled }, requiresOnboarding: true }, 200, s), 200)
+    } catch (e) {
+      return jr(c, fail('INTERNAL_ERROR', 'Verifikasi gagal diproses.', 500, [], s), 500)
+    }
+  })
+
+  app.post('/api/auth/login/start', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const body = await c.req.json<any>()
+      const email = String(body.email || '').trim()
+      const password = String(body.password || '')
+      const normalizedEmail = EmailOtpService.normalizeEmail(email)
+
+      const user = await c.env.DB.prepare("SELECT id, email, passwordHash, displayName, active FROM HL_users WHERE email = ? AND authProvider = 'local'").bind(normalizedEmail).first<any>()
+      const passwordMatches = await CryptoService.verifyPassword(password, user?.passwordHash ?? null)
+
+      if (!user || user.active !== 1 || !passwordMatches) return jr(c, fail('UNAUTHORIZED', 'Email atau password salah.', 401, [], s), 401)
+
+      const rateLimit = await EmailOtpService.assertRateLimit(c.env.DB, normalizedEmail)
+      if (!rateLimit.allowed) return jr(c, fail('OTP_RATE_LIMITED', 'Terlalu banyak permintaan.', 429, [], s), 429)
+
+      const { challengeId, otp, expiresAt } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId: user.id, normalizedEmail, purpose: 'login' })
+      const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+      if (!sendResult.sent) return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], s), 500)
+
+      return jr(c, ok({ otpRequired: true, challengeId, maskedEmail: EmailOtpService.maskEmail(normalizedEmail), expiresInSeconds: 600 }, 200, s), 200)
+    } catch (e) {
+      return jr(c, fail('INTERNAL_ERROR', 'Login gagal diproses.', 500, [], s), 500)
+    }
+  })
+
+  app.post('/api/auth/login/verify', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const body = await c.req.json<any>()
+      const challengeId = Number(body.challengeId)
+      const otp = String(body.otp || '').trim()
+
+      if (!challengeId || !/^\d{6}$/.test(otp)) return jr(c, fail('VALIDATION_ERROR', 'Challenge ID dan OTP 6 digit wajib.', 400, [], s), 400)
+
+      const result = await EmailOtpService.verifyChallenge(c.env.DB, c.env, { challengeId, otp, purpose: 'login' })
+
+      if (!result.valid) {
+        const code = result.error === 'OTP_EXPIRED' ? 'OTP_EXPIRED' : result.error === 'OTP_TOO_MANY_ATTEMPTS' ? 'OTP_TOO_MANY_ATTEMPTS' : 'OTP_INVALID'
+        const msg = result.error === 'OTP_EXPIRED' ? 'Kode verifikasi kadaluarsa.' : result.error === 'OTP_TOO_MANY_ATTEMPTS' ? 'Terlalu banyak percobaan.' : 'Kode verifikasi tidak valid.'
+        return jr(c, fail(code as any, msg, 400, [], s), 400)
+      }
+
+      const user = await c.env.DB.prepare('SELECT id, email, displayName, telegramEnabled, browserPushEnabled, active FROM HL_users WHERE id = ?').bind(result.userId).first<any>()
+      if (!user || user.active !== 1) return jr(c, fail('UNAUTHORIZED', 'Akun tidak aktif.', 401, [], s), 401)
+
+      const t = crypto.randomUUID(); const h = await CryptoService.sha256Token(t)
+      await c.env.DB.batch([
+        c.env.DB.prepare('INSERT INTO HL_sessions (userId, sessionTokenHash, createdAt, expiresAt) VALUES (?, ?, CURRENT_TIMESTAMP, datetime("now", "+" || ? || " days"))').bind(user.id, h, 30),
+        c.env.DB.prepare('UPDATE HL_users SET lastLoginAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(user.id),
+      ])
+      setCookie(c, 'hlSession', t, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 30 * 86400 })
+
+      const profile = await c.env.DB.prepare('SELECT id, sex, birthDate, heightCm, timezone, accessibilityMode, theme, emergencyConsent, aiConsent, dataShareConsent FROM HL_userProfiles WHERE userId = ?').bind(user.id).first<any>()
+
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'userLogin.otpVerify', entityType: 'HL_users', entityId: user.id })
+
+      return jr(c, ok({ user: { id: user.id, email: user.email, displayName: user.displayName, telegramEnabled: !!user.telegramEnabled, browserPushEnabled: !!user.browserPushEnabled }, profile, requiresOnboarding: !profile }, 200, s), 200)
+    } catch (e) {
+      return jr(c, fail('INTERNAL_ERROR', 'Verifikasi login gagal.', 500, [], s), 500)
+    }
+  })
+
+  app.post('/api/auth/otp/resend', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const body = await c.req.json<any>()
+      const challengeId = Number(body.challengeId)
+      if (!challengeId) return jr(c, fail('VALIDATION_ERROR', 'Challenge ID wajib.', 400, [], s), 400)
+
+      const result = await EmailOtpService.resendChallenge(c.env.DB, c.env, { challengeId })
+
+      if (!result.ok) {
+        const code = result.error === 'OTP_RATE_LIMITED' ? 'OTP_RATE_LIMITED' : result.error === 'OTP_RESEND_COOLDOWN' ? 'OTP_RESEND_COOLDOWN' : 'OTP_INVALID'
+        const msg = result.error === 'OTP_RATE_LIMITED' ? 'Batas kirim ulang tercapai.' : result.error === 'OTP_RESEND_COOLDOWN' ? 'Tunggu sebentar sebelum kirim ulang.' : 'Kode tidak valid.'
+        return jr(c, fail(code as any, msg, 400, [], s), 400)
+      }
+
+      const row = await c.env.DB.prepare('SELECT normalizedEmail FROM HL_emailOtpChallenges WHERE id = ?').bind(challengeId).first<any>()
+      const sendResult = await EmailSenderService.sendOtp(c.env, row?.normalizedEmail || '', result.otp!)
+      if (!sendResult.sent) return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim ulang kode.', 500, [], s), 500)
+
+      return jr(c, ok({ maskedEmail: EmailOtpService.maskEmail(row?.normalizedEmail || ''), expiresInSeconds: 600 }, 200, s), 200)
+    } catch (e) {
+      return jr(c, fail('INTERNAL_ERROR', 'Kirim ulang gagal.', 500, [], s), 500)
+    }
+  })
+
+  app.get('/api/dev/test-email-outbox/latest', async (c: HC) => {
+    if (c.env.EMAIL_OTP_TEST_MODE !== 'true') return jr(c, fail('FORBIDDEN', 'Not available.', 403, []), 403)
+    const email = String(c.req.query('email') || '')
+    if (!email) return jr(c, fail('VALIDATION_ERROR', 'email query required.', 400, []), 400)
+    const entries = EmailSenderService.getTestOutbox(email)
+    const latest = entries[entries.length - 1]
+    if (!latest) return jr(c, fail('NOT_FOUND', 'No outbox entries.', 404, []), 404)
+    return jr(c, ok({ otp: latest.otp, sentAt: latest.sentAt }, 200), 200)
   })
 
   app.get('/api/education/cards', async (c: HC) => {
