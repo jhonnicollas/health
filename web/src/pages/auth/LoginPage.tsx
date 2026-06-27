@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
+import { EmailOtpVerificationStep } from '../../components/auth/EmailOtpVerificationStep'
 
 type LoginState = 'idle' | 'submitting' | 'error'
 
 type LoginResponse = {
   success: boolean
   data?: {
+    otpRequired?: boolean
+    challengeId?: number
+    maskedEmail?: string
+    expiresInSeconds?: number
     user: {
       id: number
       email: string
@@ -41,6 +46,7 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState<LoginState>('idle')
   const [message, setMessage] = useState('')
+  const [otpChallenge, setOtpChallenge] = useState<{ challengeId: number; maskedEmail: string; expiresInSeconds: number } | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -66,6 +72,15 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
         const detail = body.error?.details?.[0]?.message
         setStatus('error')
         setMessage(detail ?? body.error?.message ?? 'Login gagal.')
+        return
+      }
+
+      if (body.data?.otpRequired) {
+        setOtpChallenge({
+          challengeId: body.data.challengeId!,
+          maskedEmail: body.data.maskedEmail!,
+          expiresInSeconds: body.data.expiresInSeconds!
+        })
         return
       }
 
@@ -95,7 +110,7 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
           </div>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} style={otpChallenge ? { display: 'none' } : undefined}>
           <div className="form-heading">
             <h2>Sign in</h2>
             <p>Clinical workspace</p>
@@ -141,6 +156,24 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
             </p>
           ) : null}
         </form>
+
+        {otpChallenge && (
+          <>
+            <EmailOtpVerificationStep
+              challengeId={otpChallenge.challengeId}
+              maskedEmail={otpChallenge.maskedEmail}
+              expiresInSeconds={otpChallenge.expiresInSeconds}
+              purpose="login"
+              verifyUrl="/api/auth/login/verify"
+              onVerified={(data) => { setAuthenticated(data) }}
+            />
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <a href="/api/auth/google" className="btn-secondary" style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,padding:'10px 20px',textDecoration:'none'}}>
+                <span className="material-symbols-outlined">login</span>Login dengan Google
+              </a>
+            </div>
+          </>
+        )}
       </section>
     </main>
   )
