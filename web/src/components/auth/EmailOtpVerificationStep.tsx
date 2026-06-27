@@ -6,11 +6,11 @@ type Props = {
   maskedEmail: string
   expiresInSeconds: number
   purpose: 'register' | 'login'
-  onVerified: (data: any) => void
+  onVerified: (data: Record<string, unknown>) => void
   verifyUrl: string
 }
 
-export function EmailOtpVerificationStep({ challengeId, maskedEmail, expiresInSeconds: _expiresInSeconds, purpose: _purpose, onVerified, verifyUrl }: Props) {
+export function EmailOtpVerificationStep({ challengeId, maskedEmail, onVerified, verifyUrl }: Props) {
   const [otp, setOtp] = useState('')
   const [status, setStatus] = useState<'input' | 'verifying' | 'error'>('input')
   const [message, setMessage] = useState('')

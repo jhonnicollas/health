@@ -241,15 +241,18 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
               expiresInSeconds={otpChallenge.expiresInSeconds}
               purpose="register"
               verifyUrl="/api/auth/register/verify"
-              onVerified={(data: any) => {
+              onVerified={(data) => {
+                const d = data as { user: Record<string, unknown>; requiresOnboarding: boolean }
                 setAuthenticated({
                   user: {
-                    ...data.user,
-                    telegramEnabled: data.user?.telegramEnabled ?? false,
-                    browserPushEnabled: data.user?.browserPushEnabled ?? false
+                    id: d.user.id as number,
+                    email: d.user.email as string,
+                    displayName: d.user.displayName as string,
+                    telegramEnabled: (d.user.telegramEnabled as boolean) ?? false,
+                    browserPushEnabled: (d.user.browserPushEnabled as boolean) ?? false
                   },
                   profile: null,
-                  requiresOnboarding: data.requiresOnboarding ?? true
+                  requiresOnboarding: d.requiresOnboarding ?? true
                 })
               }}
             />

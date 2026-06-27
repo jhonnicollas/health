@@ -165,7 +165,10 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
               expiresInSeconds={otpChallenge.expiresInSeconds}
               purpose="login"
               verifyUrl="/api/auth/login/verify"
-              onVerified={(data) => { setAuthenticated(data) }}
+              onVerified={(data) => {
+                const d = data as { user: { id: number; email: string; displayName: string; telegramEnabled: boolean; browserPushEnabled: boolean }; profile: Record<string, unknown> | null; requiresOnboarding: boolean }
+                setAuthenticated({ user: d.user, profile: d.profile as any, requiresOnboarding: d.requiresOnboarding })
+              }}
             />
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <a href="/api/auth/google" className="btn-secondary" style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,padding:'10px 20px',textDecoration:'none'}}>
