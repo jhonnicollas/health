@@ -78,14 +78,14 @@ export class D1MockStatement {
       return profile ? { id: profile.id } : null
     }
 
-    if (this.sql.includes('SELECT id FROM HL_users')) {
+    if (this.sql.includes('FROM HL_users') && (this.sql.includes('SELECT id FROM HL_users') || this.sql.includes('SELECT id, active FROM HL_users')) && this.sql.includes('WHERE email = ?')) {
       if (this.db.failSelect) {
         throw new Error('D1 unavailable')
       }
 
       const email = this.params[0]
       const user = this.db.users.find((row) => row.email === email)
-      return user ? { id: user.id } : null
+      return user ? { id: user.id, active: user.active } : null
     }
 
     if (this.sql.includes('FROM HL_users') && this.sql.includes("authProvider = 'local'")) {

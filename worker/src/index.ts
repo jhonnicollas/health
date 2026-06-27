@@ -918,12 +918,12 @@ app.post('/api/auth/register', async (c) => {
     return jsonResponse(c, result)
   }
 
-  let existing: { id: number } | null
+  let existing: { id: number; active: number } | null
 
   try {
-    existing = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ? LIMIT 1')
+    existing = await c.env.DB.prepare('SELECT id, active FROM HL_users WHERE email = ? LIMIT 1')
       .bind(validation.data.email)
-      .first<{ id: number }>()
+      .first<{ id: number; active: number }>()
   } catch (error) {
     console.error('register duplicate check failed', error)
 
@@ -938,7 +938,7 @@ app.post('/api/auth/register', async (c) => {
     return jsonResponse(c, result)
   }
 
-  if (existing) {
+  if (existing && existing.active === 1) {
     const result = failure(
       'EMAIL_ALREADY_EXISTS',
       'Email sudah terdaftar.',
@@ -948,6 +948,10 @@ app.post('/api/auth/register', async (c) => {
     )
 
     return jsonResponse(c, result)
+  }
+
+  if (existing && existing.active === 0) {
+    await c.env.DB.prepare('DELETE FROM HL_users WHERE id = ? AND active = 0').bind(existing.id).run()
   }
 
   let userId: number | null = null
@@ -977,6 +981,7 @@ app.post('/api/auth/register', async (c) => {
     const { challengeId, otp } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId, normalizedEmail, purpose: 'register' })
     const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
     if (!sendResult.sent) {
+      if (userId) await c.env.DB.prepare('DELETE FROM HL_users WHERE id = ? AND active = 0').bind(userId).run()
       const result = failure('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], startedAt)
       return jsonResponse(c, result)
     }

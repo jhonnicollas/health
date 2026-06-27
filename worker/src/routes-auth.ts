@@ -137,8 +137,9 @@ export function mountAuthRoutes(app: any) {
       if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) return jr(c, fail('VALIDATION_ERROR', 'Password minimal 8 karakter dengan huruf besar, kecil, dan angka.', 400, [], s), 400)
       if (displayName.trim().length < 2) return jr(c, fail('VALIDATION_ERROR', 'Nama tampilan minimal 2 karakter.', 400, [], s), 400)
 
-      const existing = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ?').bind(normalizedEmail).first<any>()
-      if (existing) return jr(c, fail('EMAIL_ALREADY_EXISTS', 'Email sudah terdaftar.', 409, [], s), 409)
+      const existing = await c.env.DB.prepare('SELECT id, active FROM HL_users WHERE email = ?').bind(normalizedEmail).first<any>()
+      if (existing && existing.active === 1) return jr(c, fail('EMAIL_ALREADY_EXISTS', 'Email sudah terdaftar.', 409, [], s), 409)
+      if (existing && existing.active === 0) await c.env.DB.prepare('DELETE FROM HL_users WHERE id = ? AND active = 0').bind(existing.id).run()
 
       const rateLimit = await EmailOtpService.assertRateLimit(c.env.DB, normalizedEmail)
       if (!rateLimit.allowed) return jr(c, fail('OTP_RATE_LIMITED', 'Terlalu banyak permintaan. Coba lagi nanti.', 429, [], s), 429)
@@ -151,7 +152,10 @@ export function mountAuthRoutes(app: any) {
 
       const { challengeId, otp, expiresAt } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId, normalizedEmail, purpose: 'register' })
       const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
-      if (!sendResult.sent) return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], s), 500)
+      if (!sendResult.sent) {
+        await c.env.DB.prepare('DELETE FROM HL_users WHERE id = ? AND active = 0').bind(userId).run()
+        return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], s), 500)
+      }
 
       return jr(c, ok({ otpRequired: true, challengeId, maskedEmail: EmailOtpService.maskEmail(normalizedEmail), expiresInSeconds: 600 }, 200, s), 200)
     } catch (e) {
@@ -179,7 +183,7 @@ export function mountAuthRoutes(app: any) {
       const uid = result.userId as number
       await c.env.DB.batch([
         c.env.DB.prepare("UPDATE HL_users SET active = 1, emailVerifiedAt = CURRENT_TIMESTAMP, emailVerificationMethod = 'otp', updatedAt = CURRENT_TIMESTAMP WHERE id = ?").bind(uid),
-        c.env.DB.prepare('INSERT INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(uid, 'user'),
+        c.env.DB.prepare('INSERT OR IGNORE INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(uid, 'user'),
       ])
 
       const t = crypto.randomUUID(); const h = await CryptoService.sha256Token(t)
