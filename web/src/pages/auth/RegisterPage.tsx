@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
+import { EmailOtpVerificationStep } from '../../components/auth/EmailOtpVerificationStep'
 
 type RegisterState = 'idle' | 'submitting' | 'success' | 'error'
 
 type RegisterResponse = {
   success: boolean
   data?: {
+    otpRequired?: boolean
+    challengeId?: number
+    maskedEmail?: string
+    expiresInSeconds?: number
     user: {
       id: number
       email: string
@@ -47,6 +52,7 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
   const [status, setStatus] = useState<RegisterState>('idle')
   const [message, setMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [otpChallenge, setOtpChallenge] = useState<{ challengeId: number; maskedEmail: string; expiresInSeconds: number } | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -80,6 +86,14 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
       }
 
       setStatus('success')
+      if (body.data?.otpRequired && body.data.challengeId != null) {
+        setOtpChallenge({
+          challengeId: body.data.challengeId,
+          maskedEmail: body.data.maskedEmail ?? email,
+          expiresInSeconds: body.data.expiresInSeconds ?? 300
+        })
+        return
+      }
       setMessage(
         body.data?.requiresOnboarding
           ? 'Akun berhasil dibuat. Lanjutkan ke onboarding profil kesehatan.'
@@ -122,7 +136,7 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
           </div>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} style={otpChallenge ? { display: 'none' } : undefined}>
           <div className="form-heading">
             <h2>Create account</h2>
             <p>Start personal workspace</p>
@@ -218,6 +232,29 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
             </p>
           ) : null}
         </form>
+
+        {otpChallenge && (
+          <div className="auth-form">
+            <EmailOtpVerificationStep
+              challengeId={otpChallenge.challengeId}
+              maskedEmail={otpChallenge.maskedEmail}
+              expiresInSeconds={otpChallenge.expiresInSeconds}
+              purpose="register"
+              verifyUrl="/api/auth/register/verify"
+              onVerified={(data: any) => {
+                setAuthenticated({
+                  user: {
+                    ...data.user,
+                    telegramEnabled: data.user?.telegramEnabled ?? false,
+                    browserPushEnabled: data.user?.browserPushEnabled ?? false
+                  },
+                  profile: null,
+                  requiresOnboarding: data.requiresOnboarding ?? true
+                })
+              }}
+            />
+          </div>
+        )}
       </section>
     </main>
   )
