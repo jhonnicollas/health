@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, no-empty */
 import { useEffect, useState } from 'react'
+import { useI18n } from '../../i18n'
+import { translateErrorCode } from '../../api/translateError'
 
 export function AiMemorySettingsPage() {
+  const { t, locale } = useI18n()
   const [status, setStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [rebuilding, setRebuilding] = useState(false)
@@ -9,66 +12,76 @@ export function AiMemorySettingsPage() {
 
   async function load() {
     try {
-      const r = await (await fetch('/api/ai/memory/status', { credentials: 'include' })).json()
+      const res = await fetch('/api/ai/memory/status', { credentials: 'include' })
+      if (!res.ok) { setMsg(t('ai.loadFailed')); return }
+      const r = await res.json()
       if (r.success) setStatus(r.data)
-    } catch {} finally { setLoading(false) }
+    } catch { setMsg(t('ai.connError')) } finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [])
 
   const handleRebuild = async () => {
     setRebuilding(true); setMsg('')
-    const r = await (await fetch('/api/ai/memory/rebuild', { method: 'POST', credentials: 'include' })).json()
-    if (r.success) setMsg(`Rebuild queued. Job #${r.data.jobId}`)
-    else setMsg(r.error?.message || 'Failed')
+    try {
+      const res = await fetch('/api/ai/memory/rebuild', { method: 'POST', credentials: 'include' })
+      if (!res.ok) { setMsg(t('ai.rebuildFailed')); setRebuilding(false); return }
+      const r = await res.json()
+      if (r.success) setMsg(`${t('ai.rebuildQueued')}${r.data.jobId}`)
+      else setMsg(r.error?.code ? translateErrorCode(r.error.code, locale, r.error.message) : t('ai.rebuildFailed'))
+    } catch { setMsg(t('ai.connError')) }
     setRebuilding(false)
   }
 
   const handleDelete = async () => {
-    if (!confirm('Hapus semua AI memory? Data asli tidak akan terhapus.')) return
+    if (!confirm(t('ai.deleteConfirm'))) return
     setMsg('')
-    const r = await (await fetch('/api/ai/memory', { method: 'DELETE', credentials: 'include' })).json()
-    if (r.success) setMsg(`Delete queued. Job #${r.data.jobId}`)
-    else setMsg(r.error?.message || 'Failed')
+    try {
+      const res = await fetch('/api/ai/memory', { method: 'DELETE', credentials: 'include' })
+      if (!res.ok) { setMsg(t('ai.deleteFailed')); return }
+      const r = await res.json()
+      if (r.success) setMsg(`${t('ai.deleteQueued')}${r.data.jobId}`)
+      else setMsg(r.error?.code ? translateErrorCode(r.error.code, locale, r.error.message) : t('ai.deleteFailed'))
+    } catch { setMsg(t('ai.connError')) }
     load()
   }
 
-  if (loading) return <section className="settings-panel"><p>Memuat...</p></section>
+  if (loading) return <section className="settings-panel"><p>{t('ai.loadingShort')}</p></section>
 
   const cop6 = status?.sprint6ClinicalCopilot || {}
   const readyChecks = cop6.readyChecks || {}
 
   return (
     <section className="settings-panel">
-      <div className="page-heading"><h2>AI Memory</h2><span className="status-chip">Infrastructure</span></div>
-      <p>AI Memory menyimpan konteks kesehatan Anda untuk mendukung fitur AI di Sprint 6. Ini bukan diagnosis AI.</p>
+      <div className="page-heading"><h2>{t('ai.memoryTitle')}</h2><span className="status-chip">{t('ai.memoryInfrastructure')}</span></div>
+      <p>{t('ai.memoryDesc')}</p>
 
       <div className="settings-card">
-        <h3>Status</h3>
-        <p>Namespace: <code>{status?.namespace || '-'}</code></p>
-        <p>Dokumen: {status?.documentCount ?? 0} | Indexed: {status?.indexedCount ?? 0} | Pending: {status?.pendingCount ?? 0}</p>
-        {status?.activeJob && <p>Job aktif: #{status.activeJob.jobId} ({status.activeJob.jobType}) — {status.activeJob.status}</p>}
+        <h3>{t('ai.statusLabel')}</h3>
+        <p>{t('ai.namespace')} <code>{status?.namespace || '-'}</code></p>
+        <p>{t('ai.documents')} {status?.documentCount ?? 0} | {t('ai.indexed')} {status?.indexedCount ?? 0} | {t('ai.pending')} {status?.pendingCount ?? 0}</p>
+        {status?.activeJob && <p>{t('ai.activeJob')} #{status.activeJob.jobId} ({status.activeJob.jobType}) — {status.activeJob.status}</p>}
       </div>
 
       <div className="settings-card">
-        <h3>Aksi</h3>
-        <button onClick={handleRebuild} disabled={rebuilding}>{rebuilding ? 'Mengantre...' : 'Rebuild Memory'}</button>
-        <button className="danger" onClick={handleDelete} style={{ marginLeft: 8 }}>Hapus Memory</button>
+        <h3>{t('ai.actions')}</h3>
+        <button onClick={handleRebuild} disabled={rebuilding}>{rebuilding ? t('ai.queuing') : t('ai.rebuildMemory')}</button>
+        <button className="danger" onClick={handleDelete} style={{ marginLeft: 8 }}>{t('ai.deleteMemory')}</button>
         {msg && <p style={{ marginTop: 8 }}>{msg}</p>}
       </div>
 
       <div className="settings-card">
-        <h3>Sprint 6 Readiness</h3>
-        <p>Status: <code>{cop6.scopeStatus || 'deferred_to_sprint6'}</code></p>
-        <p>Runtime: {cop6.runtimeEnabled ? 'Aktif' : 'Nonaktif'}</p>
+        <h3>{t('ai.sprint6ReadinessTitle')}</h3>
+        <p>{t('ai.runtimeStatus')} <code>{cop6.scopeStatus || 'deferred_to_sprint6'}</code></p>
+        <p>{t('ai.runtime')} {cop6.runtimeEnabled ? t('ai.active') : t('ai.inactive')}</p>
         <ul>
-          <li>{readyChecks.vectorNamespaceReady ? '✓' : '✗'} Vector Namespace</li>
-          <li>{readyChecks.memoryLifecycleReady ? '✓' : '✗'} Memory Lifecycle</li>
-          <li>{readyChecks.contextTraceReady ? '✓' : '✗'} Context Trace</li>
-          <li>{readyChecks.safetyBoundaryReady ? '✓' : '✗'} Safety Boundary</li>
-          <li>{readyChecks.clinicalInterviewRuntimeReady ? '✓' : '✗'} Clinical Interview (Sprint 6)</li>
-          <li>{readyChecks.differentialReasoningRuntimeReady ? '✓' : '✗'} Differential Reasoning (Sprint 6)</li>
-          <li>{readyChecks.doctorHandoffRuntimeReady ? '✓' : '✗'} Doctor Handoff (Sprint 6)</li>
+          <li>{readyChecks.vectorNamespaceReady ? '✓' : '✗'} {t('ai.vecNamespace')}</li>
+          <li>{readyChecks.memoryLifecycleReady ? '✓' : '✗'} {t('ai.memLifecycle')}</li>
+          <li>{readyChecks.contextTraceReady ? '✓' : '✗'} {t('ai.ctxTrace')}</li>
+          <li>{readyChecks.safetyBoundaryReady ? '✓' : '✗'} {t('ai.safetyBoundary')}</li>
+          <li>{readyChecks.clinicalInterviewRuntimeReady ? '✓' : '✗'} {t('ai.clinicalInterview')}</li>
+          <li>{readyChecks.differentialReasoningRuntimeReady ? '✓' : '✗'} {t('ai.diffReasoning')}</li>
+          <li>{readyChecks.doctorHandoffRuntimeReady ? '✓' : '✗'} {t('ai.doctorHandoff')}</li>
         </ul>
       </div>
     </section>

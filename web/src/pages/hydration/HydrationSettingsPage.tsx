@@ -8,21 +8,24 @@ export function HydrationSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch('/api/hydration/settings', { credentials: 'include' })
+        if (!r.ok) { setError('Gagal memuat pengaturan.'); return }
         const j = await r.json()
         if (j.success) setSettings(j.data)
-      } catch {} finally { setLoading(false) }
+      } catch { setError('Tidak bisa terhubung ke server.') } finally { setLoading(false) }
     })()
   }, [])
 
   async function save(data: Record<string, unknown>) {
-    setSaving(true); setMsg('')
+    setSaving(true); setMsg(''); setError(null)
     try {
       const r = await fetch('/api/hydration/settings', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+      if (!r.ok) { setMsg('Gagal menyimpan pengaturan.'); return }
       const j = await r.json()
       setMsg(j.success ? 'Pengaturan tersimpan.' : j.error?.message || 'Gagal.')
     } catch { setMsg('Tidak bisa terhubung.') }
@@ -86,6 +89,7 @@ export function HydrationSettingsPage() {
           </button>
         </div>
 
+        {error ? <p className="form-message error">{error}</p> : null}
         {msg && <p className={`form-message ${msg.includes('tersimpan') ? 'success' : 'error'}`}>{msg}</p>}
       </div>
     </section>

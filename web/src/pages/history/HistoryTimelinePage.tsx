@@ -8,6 +8,7 @@ export function HistoryTimelinePage() {
   const { user } = useAuth()
   const [entries, setEntries] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [types, setTypes] = useState<Record<string, boolean>>({ measurement: true, symptom: true, safetyEvent: true, hydration: true, cycle: true })
 
   useEffect(() => {
@@ -16,9 +17,10 @@ export function HistoryTimelinePage() {
       try {
         const activeTypes = Object.entries(types).filter(([, v]) => v).map(([k]) => k)
         const r = await fetch(`/api/history/timeline?types=${activeTypes.join(',')}`, { credentials: 'include' })
+        if (!r.ok) { setError('Gagal memuat riwayat.'); return }
         const j = await r.json()
         if (j.success) setEntries(j.data || [])
-      } catch {} finally { setLoading(false) }
+      } catch { setError('Tidak bisa terhubung ke server.') } finally { setLoading(false) }
     })()
   }, [user, types])
 
@@ -27,6 +29,7 @@ export function HistoryTimelinePage() {
   return (
     <section className="settings-panel">
       <div className="page-heading"><h2>📜 Riwayat Kesehatan</h2></div>
+      {error && <p className="form-message error">{error}</p>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {Object.keys(ROW_ICONS).map(t => (
           <button key={t} className={types[t] ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: 12, padding: '4px 10px' }}

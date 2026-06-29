@@ -1,0 +1,53 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/landing/Hero.astro";
+import TrustIndicators from "@/components/landing/TrustIndicators.astro";
+import ProblemSection from "@/components/landing/ProblemSection.astro";
+import WorkflowSection from "@/components/landing/WorkflowSection.astro";
+import CapabilityPreview from "@/components/landing/CapabilityPreview.astro";
+import DeviceMetricSection from "@/components/landing/DeviceMetricSection.astro";
+import DashboardPreview from "@/components/landing/DashboardPreview.astro";
+import FamilySection from "@/components/landing/FamilySection.astro";
+import SafetySection from "@/components/common/SafetySection.astro";
+import PricingTeaser from "@/components/landing/PricingTeaser.astro";
+import BlogPreview from "@/components/landing/BlogPreview.astro";
+import NewsletterSection from "@/components/landing/NewsletterSection.astro";
+import CTASection from "@/components/common/CTASection.astro";
+import FAQAccordion from "@/components/common/FAQAccordion.astro";
+import { getFaq } from "@/data/faq";
+import { t } from "@/i18n/translations";
+
+const locale = "en" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id/`,
+  en: `https://isehat.biz.id/en/`,
+};
+---
+
+<BaseLayout title={t(locale, "site.title")} description={t(locale, "site.description")} locale={locale} alternateUrls={alternateUrls}>
+  <Hero locale={locale} />
+  <TrustIndicators locale={locale} />
+  <ProblemSection locale={locale} />
+  <WorkflowSection locale={locale} />
+  <CapabilityPreview locale={locale} />
+  <DeviceMetricSection locale={locale} />
+  <DashboardPreview locale={locale} />
+  <FamilySection locale={locale} />
+  <SafetySection locale={locale} />
+  <PricingTeaser locale={locale} />
+  <BlogPreview locale={locale} />
+  <NewsletterSection locale={locale} />
+
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl md:text-4xl font-bold mb-8 text-center" style="color: var(--color-text);">{t(locale, "faq.title")}</h2>
+      {getFaq(locale).map((item) => (
+        <FAQAccordion question={item.question}>
+          {item.answer}
+        </FAQAccordion>
+      ))}
+    </div>
+  </section>
+
+  <CTASection locale={locale} />
+</BaseLayout>

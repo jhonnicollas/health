@@ -1,0 +1,30 @@
+---
+export interface Props {
+  question: string;
+}
+
+const { question } = Astro.props;
+---
+
+<div class="faq-item" style="border-bottom: 1px solid var(--color-border);">
+  <button class="faq-toggle w-full flex items-center justify-between py-4 text-left font-medium" style="color: var(--color-text);" aria-expanded="false">
+    <span>{question}</span>
+    <svg class="faq-chevron w-5 h-5 transition-transform" style="color: var(--color-text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+  <div class="faq-answer pb-4 hidden">
+    <p class="text-sm" style="color: var(--color-text-muted);"><slot /></p>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll(".faq-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const answer = btn.nextElementSibling as HTMLElement;
+      const chevron = btn.querySelector(".faq-chevron") as SVGElement;
+      const expanded = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", String(!expanded));
+      answer?.classList.toggle("hidden");
+      chevron?.style.setProperty("transform", expanded ? "" : "rotate(180deg)");
+    });
+  });
+</script>

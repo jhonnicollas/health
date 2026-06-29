@@ -67,5 +67,7 @@ export const CryptoService = {
     const cryptoKey = await crypto.subtle.importKey('raw', textEncoder.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
     const sig = await crypto.subtle.sign('HMAC', cryptoKey, textEncoder.encode(message))
     return base64Url(sig)
-  }
+  },
+
+  timingSafeEqual
 }

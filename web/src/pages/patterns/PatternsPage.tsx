@@ -20,12 +20,13 @@ export function PatternsPage() {
   const [loading, setLoading] = useState<'weight-bp' | 'medication' | 'sleep-bp' | null>(null)
   const [insights, setInsights] = useState<PatternInsight[]>([])
   const [insightsLoading, setInsightsLoading] = useState(true)
+  const [insightsError, setInsightsError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/patterns?limit=20', { credentials: 'include' })
-      .then(r => r.json() as Promise<ApiResp<{ insights: PatternInsight[] }>>)
-      .then(body => { if (body.success && body.data?.insights) setInsights(body.data.insights) })
-      .catch(() => {})
+      .then(r => { if (!r.ok) { setInsightsError('Gagal memuat pattern history.'); return null } return r.json() as Promise<ApiResp<{ insights: PatternInsight[] }>> })
+      .then(body => { if (body && body.success && body.data?.insights) setInsights(body.data.insights) })
+      .catch(() => { setInsightsError('Tidak bisa terhubung ke server.') })
       .finally(() => setInsightsLoading(false))
   }, [])
 
@@ -33,8 +34,9 @@ export function PatternsPage() {
     setLoading(kind); setError(null)
     try {
       const res = await fetch(`/api/patterns/generate/${kind}`, { method: 'POST', credentials: 'include' })
+      if (!res.ok) { setError('Gagal membuat insight.'); return }
       const body = (await res.json()) as ApiResp<{ insight?: string; hasEnoughData?: boolean; adherence?: number; lowSleepAvg?: number; normalSleepAvg?: number }>
-      if (!body.success) { setError(body.error?.message || 'Failed.'); return }
+      if (!body.success) { setError(body.error?.message || 'Gagal membuat insight.'); return }
       const msg = body.data?.hasEnoughData === false
         ? 'Not enough data (minimum 14 days).'
         : body.data?.insight || 'Done.'
@@ -79,7 +81,8 @@ export function PatternsPage() {
           Pattern History
         </h3>
         {insightsLoading ? <p className="muted">Loading...</p> : null}
-        {!insightsLoading && insights.length === 0 ? <p className="muted">No pattern insights yet. Generate one above.</p> : null}
+        {!insightsLoading && insightsError ? <p className="form-message error">{insightsError}</p> : null}
+        {!insightsLoading && !insightsError && insights.length === 0 ? <p className="muted">No pattern insights yet. Generate one above.</p> : null}
         {insights.map(ins => (
           <div key={ins.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--colorBorderSoft, #e5e7eb)' }}>
             <p style={{ margin: '0 0 4px' }}>{ins.summaryText}</p>

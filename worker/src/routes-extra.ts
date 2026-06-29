@@ -498,6 +498,41 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     }
   })
 
+  // US-4.1.5 get report measurement data for CSV export
+  app.get('/api/reports/:id/data', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const reportId = c.req.param('id')
+      const report = await c.env.DB.prepare('SELECT userId, rangeStart, rangeEnd FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: number; rangeStart: string; rangeEnd: string }>()
+      if (!report) return jsonResponse(c, failure('NOT_FOUND', 'Report tidak ditemukan.', 404, [], startedAt), 404)
+      if (report.userId !== userId) {
+        const link = await c.env.DB.prepare("SELECT id FROM HL_familyLinks WHERE ownerUserId = ? AND linkedUserId = ? AND status = 'active' AND canViewDashboard = 1").bind(report.userId, userId).first()
+        if (!link) return jsonResponse(c, failure('FORBIDDEN', 'Tidak ada akses.', 403, [], startedAt), 403)
+      }
+      const values = await c.env.DB.prepare(
+        `SELECT metricCode, finalValue, unit, status, severity, measuredAt
+         FROM HL_measurementValues
+         WHERE userId = ? AND measuredAt BETWEEN ? AND ?
+         ORDER BY measuredAt DESC, metricCode ASC`
+      ).bind(report.userId, report.rangeStart, report.rangeEnd).all<{
+        metricCode: string; finalValue: number; unit: string; status: string; severity: string; measuredAt: string
+      }>()
+      const profile = await c.env.DB.prepare('SELECT displayName FROM HL_users WHERE id = ?').bind(report.userId).first<{ displayName: string }>()
+      return jsonResponse(c, success({
+        reportId,
+        patientName: profile?.displayName || '-',
+        rangeStart: report.rangeStart,
+        rangeEnd: report.rangeEnd,
+        count: (values.results || []).length,
+        values: values.results || []
+      }, 200, startedAt), 200)
+    } catch (e) {
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat data laporan.', 500, [], startedAt), 500)
+    }
+  })
+
   // US-4.1.4 public share view
   app.get('/api/reports/share/:shareToken', async (c) => {
     const startedAt = Date.now()
@@ -789,6 +824,124 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     } catch (e) {
       console.error('settings consent error:', e)
       return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memperbarui persetujuan.', 500, [], startedAt), 500)
+    }
+  })
+
+  // Seed test data for the authenticated user (measurements, symptoms, hydration)
+  // Restricted to admin/superAdmin roles to prevent production data pollution
+  app.post('/api/dev/seed-test-data', async (c) => {
+    const startedAt = Date.now()
+    try {
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
+      const userRoles = await c.env.DB.prepare(
+        'SELECT roleCode FROM HL_userRoles WHERE userId = ? AND active = 1'
+      ).bind(userId).all<{ roleCode: string }>()
+      const roleCodes = (userRoles.results || []).map(r => r.roleCode)
+      if (!roleCodes.includes('admin') && !roleCodes.includes('superAdmin')) {
+        return jsonResponse(c, failure('FORBIDDEN', 'Hanya admin yang dapat membuat test data.', 403, [], startedAt), 403)
+      }
+      const profile = await c.env.DB.prepare('SELECT id, heightCm, timezone FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ id: number; heightCm: number | null; timezone: string }>()
+      if (!profile) return jsonResponse(c, failure('NOT_FOUND', 'Profil belum dibuat. Selesaikan onboarding dulu.', 404, [], startedAt), 404)
+      const tz = profile.timezone || 'UTC'
+      const today = new Date()
+      const seeded: { measurements: number; symptoms: number; hydration: number } = { measurements: 0, symptoms: 0, hydration: 0 }
+
+      // Seed 14 days of measurement data with realistic values
+      const metricSamples = [
+        { metricCode: 'systolic', unit: 'mmHg', min: 110, max: 145 },
+        { metricCode: 'diastolic', unit: 'mmHg', min: 70, max: 95 },
+        { metricCode: 'heartRate', unit: 'bpm', min: 60, max: 95 },
+        { metricCode: 'spo2', unit: '%', min: 95, max: 100 },
+        { metricCode: 'glucoseFasting', unit: 'mg/dL', min: 80, max: 120 },
+        { metricCode: 'bodyWeight', unit: 'kg', min: 60, max: 75 },
+        { metricCode: 'bodyTemperature', unit: 'C', min: 36.1, max: 37.2 }
+      ]
+
+      for (let dayOffset = 13; dayOffset >= 0; dayOffset--) {
+        const d = new Date(today)
+        d.setDate(d.getDate() - dayOffset)
+        const measuredAt = d.toISOString().slice(0, 10) + 'T08:00:00Z'
+        const sessionId = await insertAndGetId(c.env.DB.prepare(
+          `INSERT INTO HL_measurementSessions (userId, profileId, measuredAt, source, notes, hasAi, hasAttachment, hasEmergency, submittedAt, createdAt, updatedAt)
+           VALUES (?, ?, ?, 'manual', 'Sample data', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        ).bind(userId, profile.id, measuredAt))
+
+        for (const sample of metricSamples) {
+          const finalValue = Math.round((sample.min + Math.random() * (sample.max - sample.min)) * 10) / 10
+          let status = 'Normal'
+          let severity = 'normal'
+          if (sample.metricCode === 'systolic' && finalValue >= 140) { status = 'Hypertension Stage 2'; severity = 'warning' }
+          else if (sample.metricCode === 'systolic' && finalValue >= 130) { status = 'Hypertension Stage 1'; severity = 'caution' }
+          else if (sample.metricCode === 'glucoseFasting' && finalValue >= 126) { status = 'Diabetes'; severity = 'warning' }
+          else if (sample.metricCode === 'glucoseFasting' && finalValue >= 100) { status = 'Prediabetes'; severity = 'caution' }
+
+          await c.env.DB.prepare(
+            `INSERT INTO HL_measurementValues (sessionId, userId, metricCode, finalValue, unit, status, severity, emergencyLevel, measuredAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+          ).bind(sessionId, userId, sample.metricCode, finalValue, sample.unit, status, severity, severity === 'warning' ? 'warning' : 'none', measuredAt).run()
+          seeded.measurements++
+        }
+
+        // Auto-calculate BMI if bodyWeight present
+        if (profile.heightCm && profile.heightCm > 0) {
+          const bwRow = await c.env.DB.prepare(
+            'SELECT finalValue FROM HL_measurementValues WHERE sessionId = ? AND metricCode = ?'
+          ).bind(sessionId, 'bodyWeight').first<{ finalValue: number }>()
+          if (bwRow) {
+            const bmi = Math.round((bwRow.finalValue / ((profile.heightCm / 100) ** 2)) * 10) / 10
+            await c.env.DB.prepare(
+              `INSERT INTO HL_measurementValues (sessionId, userId, metricCode, finalValue, unit, status, severity, emergencyLevel, measuredAt, createdAt, updatedAt)
+               VALUES (?, ?, 'bmi', ?, 'kg/m2', 'Normal', 'normal', 'none', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+            ).bind(sessionId, userId, bmi, measuredAt).run()
+            seeded.measurements++
+          }
+        }
+      }
+
+      // Seed 7 symptoms
+      const symptomSamples = [
+        { bodyArea: 'head', painScale: 3, description: 'Sakit kepala ringan' },
+        { bodyArea: 'chest', painScale: 5, description: 'Nyeri dada saat aktivitas' },
+        { bodyArea: 'abdomen', painScale: 2, description: 'Mual setelah makan' },
+        { bodyArea: 'head', painScale: 4, description: 'Pusing saat berdiri' },
+        { bodyArea: 'other', painScale: 1, description: 'Keluhan umum' },
+        { bodyArea: 'chest', painScale: 6, description: 'Sesak napas ringan' },
+        { bodyArea: 'head', painScale: 2, description: 'Leher terasa berat' }
+      ]
+      for (let i = 0; i < symptomSamples.length; i++) {
+        const d = new Date(today)
+        d.setDate(d.getDate() - i * 2)
+        const symptomDateTime = d.toISOString().slice(0, 10) + 'T10:00:00Z'
+        await c.env.DB.prepare(
+          `INSERT INTO HL_symptoms (userId, bodyArea, painScale, description, symptomDateTime, redFlagged, redFlagReason, createdAt)
+           VALUES (?, ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP)`
+        ).bind(userId, symptomSamples[i].bodyArea, symptomSamples[i].painScale, symptomSamples[i].description, symptomDateTime).run()
+        seeded.symptoms++
+      }
+
+      // Seed 14 days of hydration
+      for (let dayOffset = 13; dayOffset >= 0; dayOffset--) {
+        const d = new Date(today)
+        d.setDate(d.getDate() - dayOffset)
+        const date = d.toISOString().slice(0, 10)
+        const amount = Math.round(1500 + Math.random() * 1500)
+        const target = 2500
+        await c.env.DB.prepare(
+          `INSERT INTO HL_hydrationLogs (userId, amount, unit, source, loggedAt, createdAt)
+           VALUES (?, ?, 'ml', 'web', ?, CURRENT_TIMESTAMP)`
+        ).bind(userId, amount, date + 'T09:00:00Z').run()
+        seeded.hydration++
+      }
+
+      await c.env.DB.prepare(
+        "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'seedTestData', 'HL_users', ?, ?, CURRENT_TIMESTAMP)"
+      ).bind(userId, userId, JSON.stringify(seeded)).run()
+
+      return jsonResponse(c, success({ seeded, message: 'Test data berhasil dibuat.' }, 200, startedAt), 200)
+    } catch (e) {
+      console.error('seed test data error:', e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal membuat test data.', 500, [], startedAt), 500)
     }
   })
 

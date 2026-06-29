@@ -25,12 +25,15 @@ export type AuthState = {
   user: User | null
   profile: Profile
   requiresOnboarding: boolean
+  roles?: string[]
+  permissions?: string[]
 }
 
 export type AuthContextValue = AuthState & {
   loading: boolean
   refresh: () => Promise<void>
   setAuthenticated: (state: AuthState) => void
+  logout: () => Promise<void>
 }
 
 export type AuthResponse = {

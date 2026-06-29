@@ -1332,7 +1332,8 @@ export function env(db = new D1Mock()) {
   return {
     DB: db,
     LOGS: {},
-    EMAIL_OTP_TEST_MODE: 'true'
+    EMAIL_OTP_TEST_MODE: 'true',
+    ENCRYPTION_KEY: 'test-encryption-key-for-otp-only'
   }
 }
 
@@ -1642,6 +1643,8 @@ test('GET /api/auth/me returns session user from login cookie', async () => {
   assert.equal(body.data.user.email, 'user@example.com')
   assert.equal(body.data.user.telegramEnabled, true)
   assert.equal(body.data.requiresOnboarding, true)
+  assert.ok(Array.isArray(body.data.roles))
+  assert.ok(Array.isArray(body.data.permissions))
 })
 
 test('POST /api/auth/login rate limits using HL_systemConfigs', async () => {

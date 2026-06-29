@@ -11,6 +11,7 @@ export function EducationBottomSheet({ topicType, visible, onClose }: Props) {
     ;(async () => {
       try {
         const r = await fetch(`/api/education/cards?topicType=${encodeURIComponent(topicType)}&firstTimeOnly=true`, { credentials: 'include' })
+        if (!r.ok) { setCard(null); return }
         const j = await r.json()
         if (j.success && j.data?.length > 0) setCard(j.data[0])
         else setCard(null)
@@ -21,10 +22,10 @@ export function EducationBottomSheet({ topicType, visible, onClose }: Props) {
   if (!visible) return null
 
   async function acknowledge() {
-    if (!card) return
+    if (!card || !card.topicType || !card.topicCode) return
     try {
       await fetch(`/api/education/cards/${card.topicType}/${card.topicCode}/acknowledge`, { method: 'POST', credentials: 'include' })
-    } catch {}
+    } catch { /* best effort */ }
     setCard(null); onClose()
   }
 

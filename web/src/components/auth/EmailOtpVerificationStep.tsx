@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { OtpInput } from './OtpInput'
+import { useI18n } from '../../i18n'
 
 type Props = {
   challengeId: number
@@ -11,6 +12,7 @@ type Props = {
 }
 
 export function EmailOtpVerificationStep({ challengeId, maskedEmail, onVerified, verifyUrl }: Props) {
+  const { t } = useI18n()
   const [otp, setOtp] = useState('')
   const [status, setStatus] = useState<'input' | 'verifying' | 'error'>('input')
   const [message, setMessage] = useState('')
@@ -73,9 +75,9 @@ export function EmailOtpVerificationStep({ challengeId, maskedEmail, onVerified,
 
   return (
     <div style={{ maxWidth: 400, margin: '0 auto', padding: 24, textAlign: 'center' }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Verifikasi Email</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t('auth.otpTitle')}</h2>
       <p style={{ color: '#6b7280', marginBottom: 24 }}>
-        Masukkan kode 6 digit yang dikirim ke <strong>{maskedEmail}</strong>
+        {t('auth.otpSubtitle')} <strong>{maskedEmail}</strong>
       </p>
       <form onSubmit={handleVerify}>
         <OtpInput length={6} value={otp} onChange={setOtp} disabled={status === 'verifying'} autoFocus />
@@ -89,18 +91,18 @@ export function EmailOtpVerificationStep({ challengeId, maskedEmail, onVerified,
             fontWeight: 600, fontSize: 16, border: 'none', cursor: otp.length === 6 ? 'pointer' : 'default'
           }}
         >
-          {status === 'verifying' ? 'Memverifikasi...' : 'Verifikasi'}
+          {status === 'verifying' ? t('auth.verifyingButton') : t('auth.verifyButton')}
         </button>
       </form>
       <div style={{ marginTop: 16 }}>
         {cooldown > 0 ? (
-          <span style={{ color: '#6b7280', fontSize: 14 }}>Kirim ulang dalam {cooldown}d</span>
+          <span style={{ color: '#6b7280', fontSize: 14 }}>{t('auth.resendIn')} {cooldown}{t('auth.seconds')}</span>
         ) : resendsLeft > 0 ? (
           <button
             onClick={handleResend}
             style={{ background: 'none', border: 'none', color: '#1a56db', cursor: 'pointer', fontSize: 14, textDecoration: 'underline' }}
           >
-            Kirim ulang kode ({resendsLeft} lagi)
+            {t('auth.resendButton')} ({resendsLeft})
           </button>
         ) : (
           <span style={{ color: '#6b7280', fontSize: 14 }}>Batas kirim ulang tercapai</span>

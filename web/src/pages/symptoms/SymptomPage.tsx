@@ -1,80 +1,198 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, no-empty */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { useAuth } from '../../context/auth'
+import { useI18n } from '../../i18n'
+import { translateErrorCode } from '../../api/translateError'
+import { useToast } from '../../components/Toast'
 import { EducationBottomSheet } from '../../components/EducationBottomSheet'
 
-const VAS_SEGMENTS: { max: number; label: string; color: string }[] = [
-  { max: 3, label: 'Ringan', color: '#2ecc71' },
-  { max: 6, label: 'Sedang', color: '#f39c12' },
-  { max: 9, label: 'Berat', color: '#e67e22' },
-  { max: 10, label: 'Sangat Berat', color: '#e74c3c' },
+const SYMPTOM_PRESETS = [
+  { id: 'headache', labelKey: 'symptom.headache', emoji: '🤕', bodyArea: 'head' },
+  { id: 'chest_pain', labelKey: 'symptom.chestPain', emoji: '💔', bodyArea: 'chest' },
+  { id: 'shortness_breath', labelKey: 'symptom.shortnessBreath', emoji: '😮‍💨', bodyArea: 'chest' },
+  { id: 'nausea', labelKey: 'symptom.nausea', emoji: '🤢', bodyArea: 'abdomen' },
+  { id: 'dizziness', labelKey: 'symptom.dizziness', emoji: '😵‍💫', bodyArea: 'head' },
+  { id: 'neck_heavy', labelKey: 'symptom.neckHeavy', emoji: '🧣', bodyArea: 'head' },
+  { id: 'blurred_vision', labelKey: 'symptom.blurredVision', emoji: '👁️', bodyArea: 'head' },
+  { id: 'other', labelKey: 'symptom.other', emoji: '➕', bodyArea: 'other' },
 ]
-function vasLabel(v: number) { return VAS_SEGMENTS.find(s => v <= s.max)?.label || '' }
+
+const VAS_SEGMENTS = [
+  { max: 3, labelKey: 'symptom.mild', color: '#2ecc71' },
+  { max: 6, labelKey: 'symptom.moderate', color: '#f39c12' },
+  { max: 9, labelKey: 'symptom.severe', color: '#e67e22' },
+  { max: 10, labelKey: 'symptom.verySevere', color: '#e74c3c' },
+]
+
+function vasLabelKey(v: number) { return VAS_SEGMENTS.find(s => v <= s.max)?.labelKey || '' }
 function vasColor(v: number) { return VAS_SEGMENTS.find(s => v <= s.max)?.color || '#2ecc71' }
 
-const MOODS: Record<string,string> = { normal: 'Normal', sad: 'Sedih', angry: 'Marah', anxious: 'Cemas', happy: 'Senang', tired: 'Lelah' }
-const BODY_AREAS = ['head','chest','abdomen','back','arms','legs','throat','other']
+function nowTime() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
-export function SymptomPage() {
+export function SymptomPage({ onNavigate }: { onNavigate?: (path: string) => void }) {
   const { user } = useAuth()
-  const [bodyArea, setBodyArea] = useState('')
-  const [painScale, setPainScale] = useState(0)
-  const [mood, setMood] = useState('')
-  const [description, setDescription] = useState('')
+  const { t, locale } = useI18n()
+  const { show: showToast } = useToast()
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [painScale, setPainScale] = useState(1)
+  const [time, setTime] = useState(nowTime())
+  const [duration, setDuration] = useState('')
+  const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [emergencyModal, setEmergencyModal] = useState<any>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [eduVisible, setEduVisible] = useState(true)
 
-  if (!user) return <section className="settings-panel"><h2>Silakan login</h2></section>
+  if (!user) return <section className="settings-panel"><h2>{t('symptom.pleaseLogin')}</h2></section>
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault(); setSaving(true); setResult(null)
+  const toggleSymptom = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setResult(null)
+    setSubmitError(null)
+
+    const selectedLabels = Array.from(selected).map(id => SYMPTOM_PRESETS.find(s => s.id === id)?.labelKey).map(k => k ? t(k) : '').filter(Boolean)
+    const descriptionParts = [selectedLabels.join(', ')]
+    if (duration) descriptionParts.push(`Durasi: ${duration}`)
+    if (notes) descriptionParts.push(notes)
+    const description = descriptionParts.filter(Boolean).join('. ')
+
+    const bodyArea = SYMPTOM_PRESETS.find(s => selected.has(s.id))?.bodyArea || 'other'
+    const dateTime = new Date().toISOString().slice(0, 11) + time + ':00'
+
     try {
-      const r = await fetch('/api/symptoms', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bodyArea: bodyArea || null, painScale: painScale || null, mood: mood || null, description, symptomDateTime: new Date().toISOString() }) })
-      const j = await r.json(); setResult(j)
-      if (j.success && j.data?.redFlags?.length) setEmergencyModal(j.data.redFlags[0])
-    } catch {} finally { setSaving(false) }
+      const r = await fetch('/api/symptoms', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bodyArea, painScale, description, symptomDateTime: dateTime })
+      })
+      const j = await r.json()
+      setResult(j)
+      if (!r.ok || !j.success) setSubmitError(j.error?.code ? translateErrorCode(j.error.code, locale, j.error?.message) : t('symptom.saveFailed'))
+      else if (j.data?.redFlags?.length) {
+        setEmergencyModal(j.data.redFlags[0])
+        showToast(t('symptom.redFlagToast'), 'warning')
+      }
+      else {
+        showToast(t('symptom.savedToast'), 'success')
+        setSelected(new Set())
+        setPainScale(1)
+        setTime(nowTime())
+        setDuration('')
+        setNotes('')
+        setTimeout(() => onNavigate?.('/history'), 1500)
+      }
+    } catch { setSubmitError(t('symptom.connError')); showToast(t('symptom.saveFailedToast'), 'error') } finally { setSaving(false) }
   }
 
   return (
-    <section className="settings-panel">
+    <section className="settings-panel symptom-page">
       {emergencyModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--colorSurfaceElevated, #fff)', borderRadius: 16, padding: 32, maxWidth: 420, width: '90%', textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
-            <h2 style={{ color: 'var(--colorStatusCritical, #c0392b)', margin: '0 0 12px' }}>{emergencyModal.title}</h2>
-            <p style={{ margin: '0 0 24px', lineHeight: 1.5 }}>{emergencyModal.message}</p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="tel:119" className="btn-primary" style={{ textDecoration: 'none', minWidth: 160 }}>📞 Hubungi Darurat</a>
-              <button className="btn-secondary" onClick={() => setEmergencyModal(null)} style={{ minWidth: 160 }}>Saya mengerti, lanjutkan</button>
+        <div className="modal-backdrop" onClick={() => setEmergencyModal(null)}>
+          <div className="emergency-modal" onClick={e => e.stopPropagation()}>
+            <div className="emergency-icon"><span className="material-symbols-outlined fill-icon">emergency</span></div>
+            <h2>{emergencyModal.title}</h2>
+            <p>{emergencyModal.message}</p>
+            <div className="emergency-actions">
+              <a href="tel:119" className="emergency-call">{t('symptom.emergencyCall')}</a>
+              <button className="secondary" onClick={() => setEmergencyModal(null)}>{t('symptom.emergencyContinue')}</button>
             </div>
           </div>
         </div>
       )}
-      <div className="page-heading"><h2>Catat Keluhan</h2></div>
-      <form onSubmit={handleSubmit}>
-        <div className="admin-field"><label>Area Tubuh</label><select value={bodyArea} onChange={e => setBodyArea(e.target.value)}><option value="">Pilih area</option>{BODY_AREAS.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
-        <div className="admin-field">
-          <label>Nyeri (1-10) — <strong style={{ color: vasColor(painScale) }}>{vasLabel(painScale)}</strong></label>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-              <button key={n} type="button" className={painScale === n ? 'btn-primary' : 'btn-secondary'}
-                onClick={() => setPainScale(n)}
-                style={{ width: 36, height: 36, fontSize: 14, padding: 0, borderColor: painScale === n ? vasColor(n) : undefined, background: painScale === n ? vasColor(n) : undefined, color: painScale === n ? '#fff' : undefined }}>
-                {n}
-              </button>
-            ))}
+
+      <div className="symptom-header">
+        <div>
+          <p className="eyebrow">{t('symptom.eyebrow')}</p>
+          <h2>{t('symptom.title')}</h2>
+          <p className="subtitle">{t('symptom.subtitle')}</p>
+        </div>
+        <span className="pill linked-pill">{t('symptom.linkedOptional')}</span>
+      </div>
+
+      {/* Linked measurement placeholder — app can wire real data later */}
+      <div className="linked-measurement-card">
+        <div className="lm-icon"><span className="material-symbols-outlined fill-icon">monitor_heart</span></div>
+        <div>
+          <p className="lm-label">{t('symptom.linkLabel')}</p>
+          <p className="lm-value">Tekanan Darah 135/88 mmHg</p>
+          <div className="lm-tags"><span className="pill elevated">Elevated</span><span className="pill">14:00 WIB</span></div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="symptom-form">
+        <div className="symptom-card">
+          <div className="symptom-card-header">
+            <div>
+              <h3>{t('symptom.selectSymptom')}</h3>
+              <p>{t('symptom.selectSymptomDesc')}</p>
+            </div>
+            <span className="pill count-pill">{selected.size} {t('symptom.selected')}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 4, color: 'var(--colorTextMuted)' }}>
-            {VAS_SEGMENTS.map(s => <span key={s.label} style={{ color: s.color }}>{s.label}</span>)}
+          <div className="symptom-chips">
+            {SYMPTOM_PRESETS.map(s => {
+              const isSelected = selected.has(s.id)
+              return (
+                <button key={s.id} type="button" className={isSelected ? 'symptom-chip selected' : 'symptom-chip'} onClick={() => toggleSymptom(s.id)}>
+                  <span>{s.emoji} {t(s.labelKey)}</span>
+                  {isSelected && <span className="material-symbols-outlined fill-icon">check_circle</span>}
+                </button>
+              )
+            })}
           </div>
         </div>
-        <div className="admin-field"><label>Suasana Hati</label><select value={mood} onChange={e => setMood(e.target.value)}><option value="">Pilih</option>{Object.entries(MOODS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-        <div className="admin-field"><label>Deskripsi</label><textarea rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Jelaskan keluhan secara detail..." /></div>
-        <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Menyimpan...' : 'Simpan Keluhan'}</button>
+
+        <div className="symptom-grid">
+          <div className="symptom-card vas-card">
+            <h3>{t('symptom.vasTitle')}</h3>
+            <p className="hint">{t('symptom.vasHint')}</p>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              value={painScale}
+              onChange={e => setPainScale(Number(e.target.value))}
+              className="vas-slider"
+              style={{ '--vas-color': vasColor(painScale) } as React.CSSProperties}
+            />
+            <div className="vas-labels">
+              <span>{t('symptom.vasMin')}</span>
+              <span className="current" style={{ color: vasColor(painScale) }}>{painScale} {t(vasLabelKey(painScale))}</span>
+              <span>{t('symptom.vasMax')}</span>
+            </div>
+          </div>
+
+          <div className="symptom-card detail-card">
+            <h3>{t('symptom.detail')}</h3>
+            <div className="detail-row">
+              <input type="time" value={time} onChange={e => setTime(e.target.value)} />
+              <input type="text" value={duration} onChange={e => setDuration(e.target.value)} placeholder={t('symptom.durationPlaceholder')} />
+            </div>
+            <textarea rows={4} value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('symptom.notesPlaceholder')} />
+            <button type="submit" disabled={saving || selected.size === 0} className="symptom-save-btn">
+              {saving ? t('symptom.saving') : t('symptom.save')}
+            </button>
+          </div>
+        </div>
+
+        {submitError && <p className="form-message error" role="alert">{submitError}</p>}
+        {result?.data?.redFlags?.length > 0 && !emergencyModal && <p className="form-message error">{t('symptom.redFlagPrefix')} {result.data.redFlags.map((f: any) => f.title).join(', ')}</p>}
       </form>
-      {result?.data?.redFlags?.length > 0 && !emergencyModal && <p className="form-message error">Red flag: {result.data.redFlags.map((f: any) => f.title).join(', ')}</p>}
+
       <EducationBottomSheet topicType="symptom" visible={eduVisible} onClose={() => setEduVisible(false)} />
     </section>
   )

@@ -1,0 +1,46 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "en" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id/terms`,
+  en: `https://isehat.biz.id/en/terms`,
+};
+---
+
+<BaseLayout title={t(locale, "terms.title")} description="iSehat terms of service. Terms and conditions for using iSehat services." locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 prose" style="color: var(--color-text);">
+      <h1 class="text-4xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "terms.title")}</h1>
+      <p class="text-sm mb-6" style="color: var(--color-text-muted);">Last updated: June 2026</p>
+
+      <h2>1. Acceptance of Terms</h2>
+      <p>By using iSehat, you agree to these terms. If you do not agree, please do not use our services.</p>
+
+      <h2>2. Service Description</h2>
+      <p>iSehat is a daily health companion app that helps record, understand, and share health data from home health devices. iSehat is NOT a diagnostic tool, NOT a doctor replacement, and does NOT prescribe medication.</p>
+
+      <h2>3. User Responsibility</h2>
+      <p>You are responsible for the data you input. Always verify data before saving. Do not rely on iSehat for emergency medical decisions.</p>
+
+      <h2>4. Medical Limitations</h2>
+      <p>iSehat does not provide diagnosis, prescriptions, dosage changes, or medical decisions. Health status and interpretation are determined by structured rules, not AI. Always consult a doctor for medical decisions.</p>
+
+      <h2>5. Privacy and Consent</h2>
+      <p>Your health data is sensitive data. Family and caregiver access requires your explicit consent. See <a href="/en/privacy" style="color: var(--color-primary);">Privacy Policy</a> for details.</p>
+
+      <h2>6. Plans and Pricing</h2>
+      <p>iSehat offers Free and Premium plans. Pricing and features may change. Price changes will be announced in advance.</p>
+
+      <h2>7. Limitation of Liability</h2>
+      <p>iSehat is provided "as is." We do not guarantee accuracy, completeness, or reliability for medical decisions. The risk of using the service lies with the user.</p>
+
+      <h2>8. Changes to Terms</h2>
+      <p>We may change these terms from time to time. Changes will be announced on this website.</p>
+
+      <h2>9. Contact</h2>
+      <p>Questions? Contact us through the <a href="/en/contact" style="color: var(--color-primary);">contact page</a>.</p>
+    </div>
+  </section>
+</BaseLayout>

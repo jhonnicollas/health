@@ -1,0 +1,82 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+---
+
+<section class="section-padding">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "dashboard.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "dashboard.subtitle")}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+      <div class="card p-0 overflow-hidden">
+        <div class="p-3 text-sm font-medium" style="background-color: var(--color-primary); color: var(--color-primary-foreground);">
+          {t(locale, "dashboard.weekly")}
+        </div>
+        <div class="p-6 space-y-3" style="background-color: var(--color-surface);">
+          <div class="flex justify-between text-sm" style="color: var(--color-text-muted);">
+            <span>{t(locale, "dashboard.avgSistolik")}</span>
+            <span class="font-semibold" style="color: var(--color-text);">122 mmHg</span>
+          </div>
+          <div class="w-full rounded-full h-2" style="background-color: var(--color-bg-soft);">
+            <div class="h-2 rounded-full" style="width: 61%; background-color: var(--color-success);"></div>
+          </div>
+          <div class="flex justify-between text-sm" style="color: var(--color-text-muted);">
+            <span>{t(locale, "dashboard.avgDiastolik")}</span>
+            <span class="font-semibold" style="color: var(--color-text);">80 mmHg</span>
+          </div>
+          <div class="w-full rounded-full h-2" style="background-color: var(--color-bg-soft);">
+            <div class="h-2 rounded-full" style="width: 53%; background-color: var(--color-success);"></div>
+          </div>
+          <div class="flex justify-between text-sm" style="color: var(--color-text-muted);">
+            <span>SpO2</span>
+            <span class="font-semibold" style="color: var(--color-text);">97%</span>
+          </div>
+          <div class="w-full rounded-full h-2" style="background-color: var(--color-bg-soft);">
+            <div class="h-2 rounded-full" style="width: 97%; background-color: var(--color-info);"></div>
+          </div>
+          <div class="text-xs mt-2 p-2 rounded" style="background-color: var(--color-bg-soft); color: var(--color-text-muted);">
+            {t(locale, "dashboard.comparison")}
+          </div>
+        </div>
+      </div>
+      <div class="card p-0 overflow-hidden">
+        <div class="p-3 text-sm font-medium" style="background-color: var(--color-primary); color: var(--color-primary-foreground);">
+          {t(locale, "dashboard.report")}
+        </div>
+        <div class="p-6 space-y-3" style="background-color: var(--color-surface);">
+          <div class="flex items-center gap-2 text-sm" style="color: var(--color-text-muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {t(locale, "dashboard.charts")}
+          </div>
+          <div class="flex items-center gap-2 text-sm" style="color: var(--color-text-muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {t(locale, "dashboard.summaries")}
+          </div>
+          <div class="flex items-center gap-2 text-sm" style="color: var(--color-text-muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {t(locale, "dashboard.medlog")}
+          </div>
+          <div class="flex items-center gap-2 text-sm" style="color: var(--color-text-muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {t(locale, "dashboard.alertlog")}
+          </div>
+          <div class="flex items-center gap-2 text-sm" style="color: var(--color-text-muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {t(locale, "dashboard.disclaimer")}
+          </div>
+          <div class="text-xs mt-2 p-2 rounded" style="background-color: var(--color-bg-soft); color: var(--color-text-muted);">
+            {t(locale, "dashboard.ready")}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

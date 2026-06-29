@@ -1,0 +1,44 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import CTASection from "@/components/common/CTASection.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "en" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id/use-cases/caregiver`,
+  en: `https://isehat.biz.id/en/use-cases/caregiver`,
+};
+---
+
+<BaseLayout title={t(locale, "usecase.caregiver.title")} description={t(locale, "usecase.caregiver.subtitle")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "usecase.caregiver.title")}</h1>
+      <p class="text-lg mb-8" style="color: var(--color-text-muted);">{t(locale, "usecase.caregiver.subtitle")}</p>
+
+      <div class="space-y-8">
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📊 {t(locale, "usecase.caregiver.dashboard")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.caregiver.dashboard.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🔐 {t(locale, "usecase.caregiver.permission")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.caregiver.permission.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🔔 {t(locale, "usecase.caregiver.alertSetting")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.caregiver.alertSetting.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">👁️ {t(locale, "usecase.caregiver.visibility")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.caregiver.visibility.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🔒 {t(locale, "usecase.caregiver.privacy")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.caregiver.privacy.desc")}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <CTASection locale={locale} />
+</BaseLayout>

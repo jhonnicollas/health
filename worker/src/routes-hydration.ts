@@ -11,7 +11,8 @@ function ok(data: unknown, status = 200, s = Date.now(), metaExtra?: Record<stri
 function fail(code: string, msg: string, status: number, errs: unknown[] = [], s = Date.now()) { return { body: { success: false, error: { code, message: msg, details: errs }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 
 function base64Url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const bytes = new Uint8Array(buf); let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  return btoa(bin).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
 }
 async function getSession(c: HC): Promise<number | null> {
   const token = getCookie(c, 'hlSession'); if (!token) return null
@@ -67,7 +68,7 @@ export function mountHydrationRoutes(app: any) {
       const overCheck = await HydrationService.checkOverhydration(c.env.DB, uid, dateStr, totalMl)
       const settings = await HydrationService.getSettings(c.env.DB, uid)
       const contractSettings = settings ? { enabled: !!settings.enabled, reminderEnabled: !!settings.reminderEnabled, operatingStart: settings.operatingStart, operatingEnd: settings.operatingEnd, telegramQuickAddEnabled: !!settings.telegramQuickAddEnabled } : { enabled: true, reminderEnabled: true, operatingStart: '09:00', operatingEnd: '18:00', telegramQuickAddEnabled: true }
-      return jr(c, ok({ date: dateStr, targetMl: target.targetMl, baseTargetMl: target.baseTargetMl, totalMl, percent: Math.round((totalMl / target.targetMl) * 100), targetReasons: target.reasons, overhydrationWarning: overCheck.triggered, safetyEventId: overCheck.safetyEventId || null, settings: contractSettings, logs }, 200, s), 200)
+      return jr(c, ok({ date: dateStr, targetMl: target.targetMl, baseTargetMl: target.baseTargetMl, totalMl, percent: target.targetMl > 0 ? Math.round((totalMl / target.targetMl) * 100) : 0, targetReasons: target.reasons, overhydrationWarning: overCheck.triggered, safetyEventId: overCheck.safetyEventId || null, settings: contractSettings, logs }, 200, s), 200)
     } catch (e) { console.error('hydration today error:', e); return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -95,16 +96,23 @@ export function mountHydrationRoutes(app: any) {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       const ent = await requireHydration(c.env.DB, uid); if (!ent.ok) return jr(c, fail('ENTITLEMENT_REQUIRED', ent.error!, 403, [], s), 403)
-      const { from, to, limit } = c.req.query()
+      const { from, to, limit, source, minAmount, maxAmount, mode } = c.req.query()
       const now = new Date()
       const defaultFrom = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10)
-      const dailyLogs = await HydrationService.getHistoryDaily(c.env.DB, uid, from || defaultFrom, to || now.toISOString().slice(0, 10), Math.min(Number(limit) || 50, 200))
+      const fromStr = from || defaultFrom
+      const toStr = to || now.toISOString().slice(0, 10)
+      const limitNum = Math.min(Number(limit) || 200, 200)
+      if (mode === 'logs') {
+        const logs = await HydrationService.getFilteredLogs(c.env.DB, uid, fromStr, toStr, source || undefined, minAmount ? Number(minAmount) : undefined, maxAmount ? Number(maxAmount) : undefined, limitNum)
+        return jr(c, ok({ mode: 'logs', from: fromStr, to: toStr, logs }, 200, s), 200)
+      }
+      const dailyLogs = await HydrationService.getHistoryDaily(c.env.DB, uid, fromStr, toStr, limitNum)
       const enriched = await Promise.all(dailyLogs.map(async (row: any) => {
         const target = await HydrationService.getOrCalculateTarget(c.env.DB, uid, row.date)
         const totalMl = Number(row.totalMl) || 0
-        return { date: row.date, targetMl: target.targetMl, totalMl, percent: Math.round((totalMl / target.targetMl) * 100), overhydrationWarning: totalMl > 5000, logCount: Number(row.logCount) || 0 }
+        return { date: row.date, targetMl: target.targetMl, totalMl, percent: target.targetMl > 0 ? Math.round((totalMl / target.targetMl) * 100) : 0, overhydrationWarning: totalMl > 5000, logCount: Number(row.logCount) || 0 }
       }))
-      return jr(c, ok(enriched, 200, s), 200)
+      return jr(c, ok({ mode: 'daily', from: fromStr, to: toStr, days: enriched }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 

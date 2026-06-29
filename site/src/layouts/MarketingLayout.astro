@@ -1,0 +1,19 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import type { Locale } from "@/i18n/utils";
+
+export interface Props {
+  title: string;
+  description: string;
+  locale?: Locale;
+  canonical?: string;
+  ogImage?: string;
+  alternateUrls?: Record<string, string>;
+}
+
+const { title, description, locale = "id", canonical, ogImage, alternateUrls } = Astro.props;
+---
+
+<BaseLayout title={title} description={description} locale={locale} canonical={canonical} ogImage={ogImage} alternateUrls={alternateUrls}>
+  <slot />
+</BaseLayout>

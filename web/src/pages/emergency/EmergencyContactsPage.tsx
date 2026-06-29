@@ -179,15 +179,18 @@ export function EmergencyContactsPage() {
         body: JSON.stringify({ consentGiven })
       })
       await load()
-    } catch { /* ignore */ }
+    } catch { setError('Tidak bisa terhubung ke server.') }
   }
 
   async function remove(id: number) {
-    const res = await fetch(`/api/emergency/contacts/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    })
-    if (res.ok) await load()
+    try {
+      const res = await fetch(`/api/emergency/contacts/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+      if (!res.ok) { setError('Gagal menghapus kontak.'); return }
+      await load()
+    } catch { setError('Tidak bisa terhubung ke server.') }
   }
 
   return (

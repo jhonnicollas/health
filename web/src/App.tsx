@@ -10,14 +10,31 @@ import { TrackerPage } from './pages/tracker/TrackerPage'
 import { SeniorAppShell } from './components/SeniorAppShell'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { UpgradePrompt } from './components/UpgradePrompt'
+import { WelcomeWizard } from './components/WelcomeWizard'
+import { ToastProvider } from './components/Toast'
+import { LanguageSwitcher } from './components/i18n/LanguageSwitcher'
+import { I18nProvider, useI18n } from './i18n'
+import './i18n/locales/common'
+import './i18n/locales/errors'
+import './i18n/locales/auth'
+import './i18n/locales/billing'
+import './i18n/locales/ai'
+import './i18n/locales/dashboard'
+import './i18n/locales/hydration'
+import './i18n/locales/symptom'
+import './i18n/locales/cycle'
+import './i18n/locales/admin'
+import './i18n/locales/settings'
+import './i18n/locales/kb'
+import './i18n/locales/nav'
 import { TodayDashboard } from './pages/dashboard/TodayDashboard'
 import { WeeklyDashboard } from './pages/dashboard/WeeklyDashboard'
 import { MonthlyDashboard } from './pages/dashboard/MonthlyDashboard'
 import { DailyHealthHubPage } from "./pages/dashboard/DailyHealthHubPage"
 import { SymptomPage } from "./pages/symptoms/SymptomPage"
 import { HydrationPage } from "./pages/hydration/HydrationPage"
-import { HydrationSettingsPage } from "./pages/hydration/HydrationSettingsPage"
 import { HydrationHistoryPage } from "./pages/hydration/HydrationHistoryPage"
+import { HydrationSettingsPage } from "./pages/hydration/HydrationSettingsPage"
 import { CyclePage } from "./pages/cycle/CyclePage"
 import { AiMemorySettingsPage } from "./pages/ai/AiMemorySettingsPage"
 import { HistoryTimelinePage } from "./pages/history/HistoryTimelinePage"
@@ -27,6 +44,8 @@ import { WeeklyReportPage } from './pages/reports/WeeklyReportPage'
 import { MonthlyReportPage } from './pages/reports/MonthlyReportPage'
 import { DoctorReportPage } from './pages/reports/DoctorReportPage'
 import { KnowledgeBasePage } from './pages/kb/KnowledgeBasePage'
+import { FaqPage } from './pages/kb/FaqPage'
+import { UserManualPage } from './pages/kb/UserManualPage'
 import { RemindersPage } from './pages/reminders/RemindersPage'
 import { MedicationsPage } from './pages/medications/MedicationsPage'
 import { FamilyPage } from './pages/family/FamilyPage'
@@ -37,62 +56,93 @@ import { CaregiverDashboardPage } from './pages/caregiver/CaregiverDashboardPage
 import { AlertsPage } from './pages/alerts/AlertsPage'
 import { PatternsPage } from './pages/patterns/PatternsPage'
 import { ProfileSettingsPage } from './pages/settings/ProfileSettingsPage'
+import { AppSettingsPage } from './pages/settings/AppSettingsPage'
 import { ProfileDeletePage } from './pages/settings/ProfileDeletePage'
 import { AdminPage } from './pages/admin/AdminPage'
 import { SeniorMeasurementFlow } from './pages/measurement/SeniorMeasurementFlow'
+import { PremiumUpgradePage } from './pages/premium/PremiumUpgradePage'
+import { BillingSuccessPage } from './pages/billing/BillingSuccessPage'
+import { BillingCancelPage } from './pages/billing/BillingCancelPage'
+import { MockCheckoutPage } from './pages/billing/MockCheckoutPage'
+import { BillingSettingsPage } from './pages/billing/BillingSettingsPage'
 import './App.css'
 import { useEntitlements } from './hooks/useEntitlements'
+import { formatDateTimeShort } from './utils/dateFormat'
 
 /* ---- Navigation config ---- */
 
-type NavLink = { path: string; label: string; shortLabel: string; icon: string; adminOnly?: boolean; visible?: boolean; badge?: string; featureCode?: string }
-type NavGroup = { label: string; icon: string; shortLabel: string; children: NavLink[] }
+type NavLink = { path: string; label: string; labelKey?: string; shortLabel: string; icon: string; adminOnly?: boolean; visible?: boolean; badge?: string; featureCode?: string; paidOnly?: boolean }
+type NavGroup = { label: string; labelKey?: string; icon: string; shortLabel: string; children: NavLink[] }
 
 const NAV_GROUPS: (NavGroup | NavLink)[] = [
-  { label: 'Dashboard', icon: 'dashboard', shortLabel: 'Dash', children: [
-    { path: '/dashboard', label: 'Today', shortLabel: 'Today', icon: 'dashboard' },
-    { path: '/dashboard/week', label: 'Weekly View', shortLabel: 'Week', icon: 'date_range' },
-    { path: '/dashboard/month', label: 'Monthly Summary', shortLabel: 'Month', icon: 'calendar_month' },
+  { label: 'Dashboard', labelKey: 'nav.dashboard', icon: 'dashboard', shortLabel: 'Dash', children: [
+    { path: '/dashboard', label: 'Today', labelKey: 'nav.today', shortLabel: 'Today', icon: 'dashboard' },
+    { path: '/dashboard/week', label: 'Weekly View', labelKey: 'nav.weeklyView', shortLabel: 'Week', icon: 'date_range' },
+    { path: '/dashboard/month', label: 'Monthly Summary', labelKey: 'nav.monthlySummary', shortLabel: 'Month', icon: 'calendar_month' },
   ]},
-  { path: '/measurements/new', label: 'New Measurement', shortLabel: 'New', icon: 'add_circle' },
-  { path: '/measurements/history', label: 'History', shortLabel: 'History', icon: 'history' },
-  { label: 'Reports', icon: 'assessment', shortLabel: 'Rpts', children: [
-    { path: '/reports/daily', label: 'Daily Report', shortLabel: 'Daily', icon: 'today' },
-    { path: '/reports/weekly', label: 'Weekly Report', shortLabel: 'Weekly', icon: 'date_range' },
-    { path: '/reports/monthly', label: 'Monthly Report', shortLabel: 'Monthly', icon: 'calendar_month' },
-    { path: '/reports/doctor', label: 'Doctor Report', shortLabel: 'Doctor', icon: 'description' },
+  { label: 'Measurements', labelKey: 'nav.measurements', icon: 'monitor_heart', shortLabel: 'Meas', children: [
+    { path: '/measurements/new', label: 'New Measurement', labelKey: 'nav.newMeasurement', shortLabel: 'New', icon: 'add_circle' },
+    { path: '/measurements/history', label: 'Measurement History', labelKey: 'nav.measurementHistory', shortLabel: 'History', icon: 'history' },
+    { path: '/daily-health', label: 'Daily Health Hub', labelKey: 'nav.dailyHealthHub', shortLabel: 'Health', icon: 'monitoring' },
+    { path: '/history', label: 'Unified Health Timeline', labelKey: 'nav.unifiedTimeline', shortLabel: 'Timeline', icon: 'timeline', featureCode: 'feature.advancedHistory.use' },
   ]},
-  { path: '/ai-assistant', label: 'AI Assistant', shortLabel: 'AI', icon: 'smart_toy', featureCode: 'feature.aiAssistant.use' },
-  { path: '/alerts', label: 'Notifications & Alerts', shortLabel: 'Alerts', icon: 'notifications', badge: '3' },
-  { path: "/cycle", label: "Cycle", shortLabel: "Cycle", icon: "cycle", featureCode: 'feature.cycleTracking.use' },
-  { path: "/hydration", label: "Hydration", shortLabel: "Hydrate", icon: "water_drop", featureCode: 'feature.hydration.use' },
-  { path: "/hydration/settings", label: "Hydration Settings", shortLabel: "HydrSet", icon: "water_drop", visible: false },
-  { path: "/hydration/history", label: "Hydration History", shortLabel: "HydrHist", icon: "water_drop", visible: false },
-  { path: "/symptoms", label: "Symptoms", shortLabel: "Symptoms", icon: "sick", featureCode: 'feature.symptomLog.use' },
-  { path: "/history", label: "Health Timeline", shortLabel: "Timeline", icon: "timeline", featureCode: 'feature.advancedHistory.use' },
-  { path: "/daily-health", label: "Daily Health", shortLabel: "Health", icon: "monitoring" },
-  { label: 'Health', icon: 'favorite', shortLabel: 'Health', children: [
-    { path: '/tracker', label: 'Fasting & Medication', shortLabel: 'Track', icon: 'timer' },
-    { path: '/fasting', label: 'Fasting Timer', shortLabel: 'Fast', icon: 'timer' },
-    { path: '/medications', label: 'Medication', shortLabel: 'Meds', icon: 'medication' },
-    { path: '/patterns', label: 'Patterns', shortLabel: 'Pattern', icon: 'insights' },
+  { label: 'Reports', labelKey: 'nav.reports', icon: 'assessment', shortLabel: 'Rpts', children: [
+    { path: '/reports/daily', label: 'Daily Report', labelKey: 'nav.dailyReport', shortLabel: 'Daily', icon: 'today' },
+    { path: '/reports/weekly', label: 'Weekly Report', labelKey: 'nav.weeklyReport', shortLabel: 'Weekly', icon: 'date_range' },
+    { path: '/reports/monthly', label: 'Monthly Report', labelKey: 'nav.monthlyReport', shortLabel: 'Monthly', icon: 'calendar_month' },
+    { path: '/reports/doctor', label: 'Doctor Report', labelKey: 'nav.doctorReport', shortLabel: 'Doctor', icon: 'description', paidOnly: true },
   ]},
-  { path: '/family', label: 'Family / Caregiver', shortLabel: 'Family', icon: 'family_restroom', featureCode: 'feature.familyDashboard.use' },
-  { path: '/reminders', label: 'Reminders', shortLabel: 'Remind', icon: 'alarm' },
-  { path: '/emergency', label: 'Emergency Contacts', shortLabel: 'SOS', icon: 'emergency' },
-  { path: '/settings/profile', label: 'Settings', shortLabel: 'Settings', icon: 'settings' },
+  { label: 'Health Tracking', labelKey: 'nav.healthTracking', icon: 'favorite', shortLabel: 'Health', children: [
+    { path: '/symptoms', label: 'Symptoms', labelKey: 'nav.symptoms', shortLabel: 'Symptoms', icon: 'sick', featureCode: 'feature.symptomLog.use' },
+    { path: '/hydration', label: 'Hydration', labelKey: 'nav.hydration', shortLabel: 'Hydrate', icon: 'water_drop', featureCode: 'feature.hydration.use' },
+    { path: '/hydration/history', label: 'Hydration History', labelKey: 'nav.hydrationHistory', shortLabel: 'HydrHist', icon: 'history', visible: false },
+    { path: '/hydration/settings', label: 'Hydration Settings', labelKey: 'nav.hydrationSettings', shortLabel: 'HydrSet', icon: 'water_drop', visible: false },
+    { path: '/cycle', label: 'Cycle Tracking', labelKey: 'nav.cycleTracking', shortLabel: 'Cycle', icon: 'cycle', featureCode: 'feature.cycleTracking.use', paidOnly: true },
+  ]},
+  { label: 'Lifestyle', labelKey: 'nav.lifestyle', icon: 'health_and_safety', shortLabel: 'Life', children: [
+    { path: '/tracker', label: 'Fasting & Medication', labelKey: 'nav.fastingMedication', shortLabel: 'Track', icon: 'timer' },
+    { path: '/fasting', label: 'Fasting Timer', labelKey: 'nav.fastingTimer', shortLabel: 'Fast', icon: 'timer' },
+    { path: '/medications', label: 'Medication', labelKey: 'nav.medication', shortLabel: 'Meds', icon: 'medication' },
+    { path: '/patterns', label: 'Patterns', labelKey: 'nav.patterns', shortLabel: 'Pattern', icon: 'insights' },
+    { path: '/reminders', label: 'Reminders', labelKey: 'nav.reminders', shortLabel: 'Remind', icon: 'alarm' },
+  ]},
+  { label: 'AI & Insights', labelKey: 'nav.aiInsights', icon: 'psychology', shortLabel: 'AI', children: [
+    { path: '/ai-assistant', label: 'AI Assistant', labelKey: 'nav.aiAssistant', shortLabel: 'AI', icon: 'smart_toy', featureCode: 'feature.aiAssistant.use' },
+    { path: '/ai-memory', label: 'AI Memory', labelKey: 'nav.aiMemory', shortLabel: 'Memory', icon: 'memory', visible: false, featureCode: 'feature.vectorMemory.use', paidOnly: true },
+  ]},
+  { label: 'Family & Safety', labelKey: 'nav.familySafety', icon: 'family_restroom', shortLabel: 'Family', children: [
+    { path: '/family', label: 'Family / Caregiver', labelKey: 'nav.familyCaregiver', shortLabel: 'Family', icon: 'family_restroom', featureCode: 'feature.familyDashboard.use', paidOnly: true },
+    { path: '/emergency', label: 'Emergency Contacts', labelKey: 'nav.emergencyContacts', shortLabel: 'SOS', icon: 'emergency' },
+    { path: '/alerts', label: 'Notifications & Alerts', labelKey: 'nav.notificationsAlerts', shortLabel: 'Alerts', icon: 'notifications' },
+  ]},
+  { label: 'Education', labelKey: 'nav.education', icon: 'school', shortLabel: 'Edu', children: [
+    { path: '/kb', label: 'Knowledge Base', labelKey: 'nav.knowledgeBase', shortLabel: 'KB', icon: 'menu_book' },
+    { path: '/faq', label: 'FAQ', labelKey: 'nav.faq', shortLabel: 'FAQ', icon: 'quiz' },
+    { path: '/manual', label: 'User Manual', labelKey: 'nav.userManual', shortLabel: 'Manual', icon: 'description' },
+  ]},
+  { label: 'Settings', labelKey: 'nav.settings', icon: 'settings', shortLabel: 'Settings', children: [
+    { path: '/settings/profile', label: 'Profile', labelKey: 'nav.profile', shortLabel: 'Profile', icon: 'person' },
+    { path: '/settings/app', label: 'App Settings', labelKey: 'nav.appSettings', shortLabel: 'App', icon: 'tune' },
+    { path: '/settings/billing', label: 'Billing', labelKey: 'nav.billing', shortLabel: 'Billing', icon: 'credit_card' },
+    { path: '/telegram', label: 'Telegram', labelKey: 'nav.telegram', shortLabel: 'Telegram', icon: 'send', visible: false, featureCode: 'feature.telegramReminder.use', paidOnly: true },
+  ]},
+  { label: 'Admin Panel', labelKey: 'nav.adminPanel', icon: 'admin_panel_settings', shortLabel: 'Admin', children: [
+    { path: '/admin', label: 'Admin Dashboard', labelKey: 'nav.adminDashboard', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true },
+    { path: '/ai-memory', label: 'AI Memory', labelKey: 'nav.aiMemory', shortLabel: 'AI Memory', icon: 'psychology', adminOnly: true },
+  ]},
 ]
 
 const NAV: NavLink[] = NAV_GROUPS.flatMap(g => 'children' in g ? g.children : [g]).filter(n => !('children' in n)) as NavLink[]
 NAV.push(
   { path: '/settings/delete', label: 'Delete Account', shortLabel: 'Privacy', icon: 'delete', visible: false },
   { path: '/measurements/senior', label: 'Senior Mode', shortLabel: 'Senior', icon: 'elderly', visible: false },
-  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false, featureCode: 'feature.telegramReminder.use' },
-  { path: '/ai-memory', label: 'AI Memory', shortLabel: 'AI Memory', icon: 'psychology', visible: false, featureCode: 'feature.vectorMemory.use' },
+  { path: '/telegram', label: 'Telegram', shortLabel: 'Telegram', icon: 'send', visible: false, featureCode: 'feature.telegramReminder.use', paidOnly: true },
+  { path: '/ai-memory', label: 'AI Memory', shortLabel: 'AI Memory', icon: 'psychology', visible: false, featureCode: 'feature.vectorMemory.use', paidOnly: true },
   { path: '/admin', label: 'Admin', shortLabel: 'Admin', icon: 'admin_panel_settings', adminOnly: true },
 )
 
-const ALLOWED_PATHS = new Set(NAV.map(n => n.path).concat(['/kb']))
+const ALLOWED_PATHS = new Set(NAV.map(n => n.path).concat(['/kb', '/faq', '/manual', '/premium/upgrade', '/symptoms/new', '/caregiver', '/onboarding', '/billing/success', '/billing/cancel', '/billing/mock-checkout', '/settings/billing', '/settings/app']))
+const NEVER_BLOCK_PATHS = new Set(['/premium/upgrade', '/billing/success', '/billing/cancel', '/billing/mock-checkout'])
 const MOBILE_NAV_PATHS = new Set(['/dashboard', '/measurements/new', '/measurements/history', '/alerts', '/ai-assistant', '/emergency'])
 
 /* ---- Helpers ---- */
@@ -103,8 +153,8 @@ function normalizePath(path: string) {
   return path
 }
 
-function getInitials(name: string) {
-  return name.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || 'HL'
+function getInitials(name?: string) {
+  return (name || '').split(' ').filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || 'HL'
 }
 
 function Icon({ name, className = '' }: { name: string; className?: string }) {
@@ -138,16 +188,24 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
     case '/alerts': return <AlertsPage />
     case '/patterns': return <PatternsPage />
     case '/kb': return <KnowledgeBasePage />
+    case '/faq': return <FaqPage onNavigate={onNavigate} />
+    case '/manual': return <UserManualPage onNavigate={onNavigate} />
     case '/daily-health': return <DailyHealthHubPage />
-    case '/symptoms': return <SymptomPage />
-    case '/symptoms/new': return <SymptomPage />
+    case '/symptoms': return <SymptomPage onNavigate={onNavigate} />
+    case '/symptoms/new': return <SymptomPage onNavigate={onNavigate} />
     case '/hydration': return <HydrationPage />
     case '/hydration/settings': return <HydrationSettingsPage />
     case '/hydration/history': return <HydrationHistoryPage />
     case '/cycle': return <CyclePage />
     case '/ai-memory': return <AiMemorySettingsPage />
     case '/settings/profile': return <ProfileSettingsPage />
+    case '/settings/app': return <AppSettingsPage onNavigate={onNavigate} />
     case '/settings/delete': return <ProfileDeletePage />
+    case '/premium/upgrade': return <PremiumUpgradePage onNavigate={onNavigate} />
+    case '/billing/success': return <BillingSuccessPage onNavigate={onNavigate} />
+    case '/billing/cancel': return <BillingCancelPage onNavigate={onNavigate} />
+    case '/billing/mock-checkout': return <MockCheckoutPage />
+    case '/settings/billing': return <BillingSettingsPage onNavigate={onNavigate} />
     case '/admin': return <AdminPage />
     default: return <TodayDashboard />
   }
@@ -156,8 +214,8 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
 /* ---- Main layout ---- */
 
 function AppRoutes() {
-  const { loading, user, profile, requiresOnboarding } = useAuth()
-  const { loading: entitlementsLoading, isEnabled } = useEntitlements()
+  const { loading, user, profile, requiresOnboarding, roles, permissions, logout, refresh } = useAuth()
+  const { loading: entitlementsLoading, isEnabled, entitlements } = useEntitlements()
   const [currentPath, setCurrentPath] = useState(() => normalizePath(window.location.pathname))
   const [authView, setAuthView] = useState<'login' | 'register'>(() =>
     normalizePath(window.location.pathname) === '/register' ? 'register' : 'login'
@@ -170,10 +228,14 @@ function AppRoutes() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<NavLink[]>([])
+  const [notifData, setNotifData] = useState<any[]>([])
+  const notifCount = notifData.filter(a => !a.acknowledged).length
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
   const notifRef = useRef<HTMLDivElement | null>(null)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Dashboard', 'Reports', 'Health']))
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['nav.dashboard', 'nav.reports', 'nav.healthTracking']))
+  const [showWizard, setShowWizard] = useState(() => { try { return localStorage.getItem('hl-welcome-seen') !== 'true' } catch { return false } })
+  const { t } = useI18n()
 
   function toggleSidebar() {
     setSidebarCollapsed((prev) => {
@@ -185,8 +247,7 @@ function AppRoutes() {
 
   async function handleLogout() {
     setUserMenuOpen(false)
-    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }) } catch { /* ignore */ }
-    navigate('/login')
+    await logout()
   }
 
   useEffect(() => {
@@ -233,7 +294,7 @@ function AppRoutes() {
   }
 
   /* ---- Auth / Loading / Onboarding gates ---- */
-  if (loading) return <main className="auth-page"><p className="loading-text">Checking session...</p></main>
+  if (loading) return <main className="auth-page"><p className="loading-text">{t('nav.checkingSession')}</p></main>
 
   if (!user) {
     const authPath = normalizePath(window.location.pathname)
@@ -250,7 +311,7 @@ function AppRoutes() {
   }
 
   const appPath = ALLOWED_PATHS.has(currentPath) ? currentPath : '/dashboard'
-  if (!ALLOWED_PATHS.has(currentPath) || normalizePath(window.location.pathname) === '/onboarding')
+  if (!ALLOWED_PATHS.has(currentPath))
     window.history.replaceState(null, '', '/dashboard')
 
   /* ---- Senior shell ---- */
@@ -258,7 +319,8 @@ function AppRoutes() {
     return <SeniorAppShell activePath={appPath} navigate={navigate} />
 
   /* ---- Desktop / Mobile shell ---- */
-  const isAdmin = user.email === 'admin@homesungai.com'
+  const isAdmin = (permissions || []).includes('admin.access') || (roles || []).includes('superAdmin')
+  const currentPlanCode = entitlements?.planCode || 'free'
   const visibleNav = NAV.filter(link => {
     if (link.adminOnly && !isAdmin) return false
     if (link.visible === false) return false
@@ -266,11 +328,11 @@ function AppRoutes() {
     return true
   })
   const currentNavLink = NAV.find(link => link.path === appPath)
-  const routeBlocked = !entitlementsLoading && currentNavLink?.featureCode && !isEnabled(currentNavLink.featureCode)
+  const routeBlocked = !NEVER_BLOCK_PATHS.has(appPath) && !entitlementsLoading && currentNavLink?.featureCode && !isEnabled(currentNavLink.featureCode)
   const clock = formatClock(liveTime)
-  const firstName = user.displayName.split(' ').filter(Boolean)[0] ?? 'there'
+  const firstName = (user.displayName || '').split(' ').filter(Boolean)[0] ?? t('nav.goodMorning')
   const currentLink = visibleNav.find(link => link.path === appPath)
-  const headerTitle = appPath === '/dashboard' ? `Good Morning, ${firstName}` : currentLink?.label ?? 'Dashboard'
+  const headerTitle = appPath === '/dashboard' ? `${t('nav.goodMorning')}, ${firstName}` : (currentLink?.labelKey ? t(currentLink.labelKey) : currentLink?.label) ?? t('nav.dashboard')
 
   return (
     <main className={`app-page ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -279,14 +341,14 @@ function AppRoutes() {
         <div className="sidebar-brand">
           <div className="sidebar-brand-row">
             <span className="sidebar-brand-icon"><Icon name="local_hospital" className="fill" /></span>
-            {!sidebarCollapsed && <div><h1>HealthSync Pro</h1><p>Enterprise Health</p></div>}
+            {!sidebarCollapsed && <div><h1>HealthSync Pro</h1></div>}
           </div>
-          <button className="sidebar-collapse-btn" onClick={toggleSidebar} type="button" aria-label={sidebarCollapsed ? 'Expand' : 'Collapse'}>
+          <button className="sidebar-collapse-btn" onClick={toggleSidebar} type="button" aria-label={sidebarCollapsed ? t('nav.expand') : t('nav.collapse')}>
             <Icon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} />
           </button>
           {!sidebarCollapsed && (
             <button className="emergency-support-btn" onClick={() => navigate('/emergency')} type="button">
-              <Icon name="emergency" /> Emergency Support
+              <Icon name="emergency" /> {t('nav.emergencySupport')}
             </button>
           )}
         </div>
@@ -294,27 +356,29 @@ function AppRoutes() {
           <nav className="sidebar-nav" aria-label="Main navigation">
             {NAV_GROUPS.map((item) => {
               if ('children' in item) {
-                const isExpanded = expandedGroups.has(item.label)
+                const isExpanded = expandedGroups.has(item.labelKey || item.label)
                 return (
                   <div key={item.label} className={`nav-group ${item.children.some(c => c.path === appPath) ? 'has-active' : ''}`}>
                     <button className={`nav-group-toggle ${isExpanded ? 'expanded' : ''}`} onClick={() => setExpandedGroups(prev => {
                       const n = new Set(prev)
-                      if (n.has(item.label)) {
-                        n.delete(item.label)
+                      const key = item.labelKey || item.label
+                      if (n.has(key)) {
+                        n.delete(key)
                       } else {
-                        n.add(item.label)
+                        n.add(key)
                       }
                       return n
                     })} type="button">
                       <Icon name={item.icon} className="nav-icon" />
-                      {!sidebarCollapsed && <span>{item.label}</span>}
+                      {!sidebarCollapsed && <span>{item.labelKey ? t(item.labelKey) : item.label}</span>}
                       {!sidebarCollapsed && <Icon name="expand_more" className="nav-group-chevron" />}
                     </button>
                     {!sidebarCollapsed && isExpanded && (
                       <div className="nav-group-children">
                         {item.children.map(child => (
                           <button key={child.path} className={`nav-btn nav-child ${appPath === child.path ? 'active' : ''}`} onClick={() => navigate(child.path)} type="button">
-                            <Icon name={child.icon} className="nav-icon" /><span>{child.label}</span>
+                            <Icon name={child.icon} className="nav-icon" /><span>{child.labelKey ? t(child.labelKey) : child.label}</span>
+                            {child.paidOnly && currentPlanCode === 'free' ? <span className="nav-badge pro-badge">PRO</span> : null}
                           </button>
                         ))}
                       </div>
@@ -323,9 +387,10 @@ function AppRoutes() {
                 )
               }
               return (
-                <button key={item.path} className={appPath === item.path ? 'nav-btn active' : 'nav-btn'} onClick={() => navigate(item.path)} title={sidebarCollapsed ? item.label : undefined} type="button">
+                <button key={item.path} className={appPath === item.path ? 'nav-btn active' : 'nav-btn'} onClick={() => navigate(item.path)} title={sidebarCollapsed ? (item.labelKey ? t(item.labelKey) : item.label) : undefined} type="button">
                   <Icon name={item.icon} className="nav-icon" />
-                  {!sidebarCollapsed && <span>{item.label}</span>}
+                  {!sidebarCollapsed && <span>{item.labelKey ? t(item.labelKey) : item.label}</span>}
+                  {!sidebarCollapsed && item.paidOnly && currentPlanCode === 'free' ? <span className="nav-badge pro-badge">PRO</span> : null}
                   {!sidebarCollapsed && item.badge ? <span className="nav-badge">{item.badge}</span> : null}
                 </button>
               )
@@ -333,8 +398,10 @@ function AppRoutes() {
           </nav>
         </div>
         <div className="sidebar-footer">
-          <button onClick={() => navigate('/kb')} type="button"><Icon name="help" />{!sidebarCollapsed && <span>Help Center</span>}</button>
-          <button onClick={handleLogout} type="button"><Icon name="logout" />{!sidebarCollapsed && <span>Logout</span>}</button>
+          <LanguageSwitcher compact={sidebarCollapsed} />
+          <button onClick={() => { try { localStorage.removeItem('hl-welcome-seen') } catch { /* ignore */ } setShowWizard(true) }} type="button" title={t('nav.appTour')}><Icon name="tour" />{!sidebarCollapsed && <span>{t('nav.appTour')}</span>}</button>
+          <button onClick={() => navigate('/kb')} type="button"><Icon name="help" />{!sidebarCollapsed && <span>{t('nav.helpCenter')}</span>}</button>
+          <button onClick={handleLogout} type="button"><Icon name="logout" />{!sidebarCollapsed && <span>{t('nav.logout')}</span>}</button>
         </div>
       </aside>
 
@@ -357,13 +424,13 @@ function AppRoutes() {
           <div className="topbar-search-wrap" ref={searchWrapRef}>
             <label className="topbar-search">
               <Icon name="search" className="search-icon" />
-              <input onChange={e => { setSearchQuery(e.target.value); const q = e.target.value.trim().toLowerCase(); if (q.length < 2) { setSearchResults([]); return }; const pool = [...visibleNav]; if (!pool.some(n => n.path === '/kb')) pool.push({ path: '/kb', label: 'Knowledge Base', shortLabel: 'KB', icon: 'menu_book' } as NavLink); setSearchResults(pool.filter(l => l.label.toLowerCase().includes(q) || l.shortLabel.toLowerCase().includes(q) || l.path.toLowerCase().includes(q)).slice(0, 8)) }} placeholder="Cari..." type="search" value={searchQuery} />
+              <input onChange={e => { setSearchQuery(e.target.value); const q = e.target.value.trim().toLowerCase(); if (q.length < 2) { setSearchResults([]); return }; const pool = [...visibleNav];              if (!pool.some(n => n.path === '/kb')) pool.push({ path: '/kb', label: 'Knowledge Base', labelKey: 'nav.knowledgeBase', shortLabel: 'KB', icon: 'menu_book' } as NavLink); setSearchResults(pool.filter(l => (l.labelKey ? t(l.labelKey) : l.label).toLowerCase().includes(q) || l.shortLabel.toLowerCase().includes(q) || l.path.toLowerCase().includes(q)).slice(0, 8)) }}              placeholder={t('nav.search')} type="search" value={searchQuery} />
             </label>
             {searchResults.length > 0 && (
               <div className="search-dropdown" role="listbox">
                 {searchResults.map(link => (
                   <button className="search-result-item" key={link.path} onClick={() => { setSearchQuery(''); setSearchResults([]); navigate(link.path) }} type="button">
-                    <Icon name={link.icon} className="nav-icon" /><span className="search-result-label">{link.label}</span>
+                    <Icon name={link.icon} className="nav-icon" /><span className="search-result-label">{link.labelKey ? t(link.labelKey) : link.label}</span>
                   </button>
                 ))}
               </div>
@@ -372,18 +439,18 @@ function AppRoutes() {
           <div className="topbar-actions">
             <div className="topbar-clock"><span className="clock-date">{clock.dateStr}</span><span className="clock-time">{clock.timeStr}</span></div>
             <div className="topbar-theme-switch">
-              {['light', 'warm', 'dark'].map(t => (
-                <button key={t} className={profile?.theme === t ? 'active' : ''} onClick={() => { document.documentElement.dataset.theme = t; fetch('/api/profile', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: t, timezone: profile?.timezone ?? 'Asia/Jakarta', heightCm: profile?.heightCm ?? 170, accessibilityMode: profile?.accessibilityMode ?? 'normal' }) }).catch(() => {}) }} type="button" aria-label={`${t} mode`}><Icon name={t === 'light' ? 'light_mode' : t === 'warm' ? 'wb_sunny' : 'dark_mode'} /></button>
+              {['light', 'warm', 'dark'].map(thm => (
+                <button key={thm} className={profile?.theme === thm ? 'active' : ''} onClick={() => { document.documentElement.dataset.theme = thm; fetch('/api/profile', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: thm, timezone: profile?.timezone ?? 'Asia/Jakarta', heightCm: profile?.heightCm ?? 170, accessibilityMode: profile?.accessibilityMode ?? 'normal' }) }).then(r => { if (r.ok) void refresh() }).catch(() => {}) }} type="button" aria-label={`${thm} mode`}><Icon name={thm === 'light' ? 'light_mode' : thm === 'warm' ? 'wb_sunny' : 'dark_mode'} /></button>
               ))}
             </div>
             <div className="topbar-display-mode">
               {(['normal', 'senior', 'highContrast'] as const).map(m => (
-                <button key={m} className={profile?.accessibilityMode === m || (!profile?.accessibilityMode && m === 'normal') ? 'active' : ''} onClick={() => { document.documentElement.dataset.accessibility = m; fetch('/api/profile', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: profile?.theme ?? 'light', timezone: profile?.timezone ?? 'Asia/Jakarta', heightCm: profile?.heightCm ?? 170, accessibilityMode: m }) }).catch(() => {}) }} type="button" aria-label={m}><Icon name={m === 'normal' ? 'desktop_windows' : m === 'senior' ? 'elderly' : 'contrast'} /></button>
+                <button key={m} className={profile?.accessibilityMode === m || (!profile?.accessibilityMode && m === 'normal') ? 'active' : ''} onClick={() => { document.documentElement.dataset.accessibility = m; fetch('/api/profile', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: profile?.theme ?? 'light', timezone: profile?.timezone ?? 'Asia/Jakarta', heightCm: profile?.heightCm ?? 170, accessibilityMode: m }) }).then(r => { if (r.ok) void refresh() }).catch(() => {}) }} type="button" aria-label={m}><Icon name={m === 'normal' ? 'desktop_windows' : m === 'senior' ? 'elderly' : 'contrast'} /></button>
               ))}
             </div>
             <div className="topbar-notif-wrap" ref={notifRef}>
-              <button className="topbar-icon-btn has-alert" onClick={() => setNotifOpen(o => !o)} type="button"><Icon name="notifications" /></button>
-              {notifOpen && <div className="notif-dropdown"><div className="notif-header">Notifications</div><div className="notif-empty">No new notifications</div></div>}
+              <button className="topbar-icon-btn has-alert" onClick={() => { setNotifOpen(o => !o); if (!notifOpen) void (async () => { try { const r = await fetch('/api/alerts?limit=5', { credentials: 'include' }); const j = await r.json(); if (j.success) setNotifData(j.data?.alerts || []); } catch { /* ignore */ } })() }} type="button"><Icon name="notifications" />{notifCount > 0 && <span className="notif-badge">{notifCount}</span>}</button>
+              {notifOpen && <div className="notif-dropdown"><div className="notif-header">{t('nav.notifLatest')}</div>{notifData.length === 0 ? <div className="notif-empty">{t('nav.notifEmpty')}</div> : <div className="notif-list">{notifData.map((a) => { const dt = formatDateTimeShort(a.createdAt); return <div key={a.id} className={`notif-item severity-${a.severity}`}><span className="material-symbols-outlined notif-icon">{a.severity === 'critical' ? 'error' : 'warning'}</span><div><strong>{a.metricCode}</strong><p>{a.message}</p><small>{dt.date} {dt.time}</small></div></div> })}</div>}</div>}
             </div>
             <div className="topbar-user-wrap" ref={userMenuRef}>
               <button className="topbar-user" onClick={() => setUserMenuOpen(o => !o)} type="button" aria-label={`User menu for ${user.displayName}`}>
@@ -392,9 +459,9 @@ function AppRoutes() {
               </button>
               {userMenuOpen && (
                 <div className="user-dropdown">
-                  <button onClick={() => { setUserMenuOpen(false); navigate('/settings/profile') }} type="button"><Icon name="person" /> Profile & Settings</button>
-                  <button onClick={() => { setUserMenuOpen(false); navigate('/reports/daily') }} type="button"><Icon name="assessment" /> My Reports</button>
-                  <button onClick={() => { setUserMenuOpen(false); (async () => { try { const r = await fetch('/api/auth/forgot-password', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email }) }); const b = await r.json(); window.alert(b.success ? 'Link reset password sudah dikirim ke email Anda.' : 'Gagal: ' + (b.error?.message ?? '')) } catch { window.alert('Tidak bisa terhubung ke server.') } })() }} type="button"><Icon name="lock_reset" /> Reset Password</button>
+                  <button onClick={() => { setUserMenuOpen(false); navigate('/settings/profile') }} type="button"><Icon name="person" /> {t('nav.profileSettings')}</button>
+                  <button onClick={() => { setUserMenuOpen(false); navigate('/reports/daily') }} type="button"><Icon name="assessment" /> {t('nav.myReports')}</button>
+                  <button onClick={() => { setUserMenuOpen(false); (async () => { try { const r = await fetch('/api/auth/forgot-password', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: user.email }) }); const b = await r.json(); window.alert(b.success ? t('nav.resetSent') : 'Gagal: ' + (b.error?.message ?? '')) } catch { window.alert(t('common.connError')) } })() }} type="button"><Icon name="lock_reset" /> {t('nav.resetPassword')}</button>
                   <hr /><button onClick={handleLogout} type="button" className="user-dropdown-logout"><Icon name="logout" /> Logout</button>
                 </div>
               )}
@@ -403,10 +470,10 @@ function AppRoutes() {
         </div>
 
         <div className="app-content-area">
-          <header className="app-header"><div><h1>{headerTitle}</h1><p>Here is your clinical overview for today.</p></div></header>
+          <header className="app-header"><div><h1>{headerTitle}</h1><p>{t('nav.clinicalOverview')}</p></div></header>
           <section className="app-content">
             {routeBlocked ? (
-              <UpgradePrompt feature={currentNavLink?.label ?? 'Fitur ini'} onNavigate={navigate} />
+              <UpgradePrompt feature={currentNavLink?.labelKey ? t(currentNavLink.labelKey) : (currentNavLink?.label ?? t('nav.dashboard'))} onNavigate={navigate} />
             ) : (
               renderRoute(appPath, navigate)
             )}
@@ -423,12 +490,19 @@ function AppRoutes() {
           </button>
         ))}
       </nav>
+
+      {showWizard && (
+        <WelcomeWizard
+          onClose={() => { try { localStorage.setItem('hl-welcome-seen', 'true') } catch { /* ignore */ } setShowWizard(false) }}
+          onNavigate={navigate}
+        />
+      )}
     </main>
   )
 }
 
 function App() {
-  return <ErrorBoundary><AuthProvider><AppRoutes /></AuthProvider></ErrorBoundary>
+  return <ErrorBoundary><AuthProvider><I18nProvider><ToastProvider><AppRoutes /></ToastProvider></I18nProvider></AuthProvider></ErrorBoundary>
 }
 
 export default App

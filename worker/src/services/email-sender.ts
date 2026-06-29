@@ -1,23 +1,15 @@
 import type { Env } from '../types.js'
+import type { SupportedLocale } from '../i18n/locale.js'
+import { getOtpEmailTemplate } from '../i18n/email-templates.js'
 
 const DEFAULT_FROM = 'iSehat <otp@mail.isehat.biz.id>'
 
 const testOutbox = new Map<string, { otp: string; sentAt: number }[]>()
 
-function otpHtml(otp: string): string {
-  return `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px;">
-<h2 style="color:#1a56db;">Kode Verifikasi iSehat</h2>
-<p>Kode verifikasi Anda:</p>
-<p style="font-size:32px;font-weight:700;letter-spacing:6px;color:#1a56db;">${otp}</p>
-<p>Kode berlaku selama 10 menit.</p>
-<p style="color:#6b7280;font-size:14px;">Jika Anda tidak meminta kode ini, abaikan email ini.</p>
-</body></html>`
-}
-
 export const EmailSenderService = {
-  async sendOtp(env: Env, email: string, otp: string): Promise<{ sent: boolean; error?: string }> {
+  async sendOtp(env: Env, email: string, otp: string, locale: SupportedLocale = 'id-ID'): Promise<{ sent: boolean; error?: string }> {
     const from = env.EMAIL_FROM || DEFAULT_FROM
-    const subject = 'Kode verifikasi iSehat'
+    const { subject, html } = getOtpEmailTemplate(locale, otp)
 
     if (env.EMAIL_PROVIDER === 'mock' || env.EMAIL_OTP_TEST_MODE === 'true') {
       const list = testOutbox.get(email) || []
@@ -36,7 +28,7 @@ export const EmailSenderService = {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ from, to: [email], subject, html: otpHtml(otp) }),
+        body: JSON.stringify({ from, to: [email], subject, html }),
       })
       if (!res.ok) {
         const body = await res.text()

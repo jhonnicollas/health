@@ -3,6 +3,7 @@ import { mountHydrationRoutes } from "./routes-hydration.js"
 import { mountAiRoutes } from "./routes-ai.js"
 import { mountCycleRoutes } from "./routes-cycle.js"
 import { mountTelegramRoutes } from "./routes-telegram.js"
+import { mountAdminRoutes } from "./routes-admin.js"
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
@@ -28,12 +29,20 @@ import { AiMemoryService } from './services/ai-memory.js'
 import { CryptoService } from './services/crypto.js'
 import { EmailOtpService } from './services/email-otp.js'
 import { EmailSenderService } from './services/email-sender.js'
+import { parseLocale } from './i18n/locale.js'
+import { getAiDisclaimer } from './i18n/disclaimer-templates.js'
+import { CheckoutSessionService } from './services/billing/checkout-session.js'
+import { SubscriptionActivationService } from './services/billing/subscription-activation.js'
+import { readBillingConfig } from './services/billing/config.js'
+import { MockBillingProvider } from './services/billing/providers/mock.js'
+import { XenditBillingProvider } from './services/billing/providers/xendit.js'
+import type { BillingProvider } from './services/billing/provider.js'
 
 const app = new Hono<{ Bindings: Env }>()
 
 export type { Env }
 
-type ApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 429 | 500
+type ApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 410 | 429 | 500 | 502
 
 type RegisterInput = {
   email?: unknown
@@ -58,6 +67,7 @@ type OnboardingInput = {
 }
 
 type ProfileUpdateInput = {
+  displayName?: unknown
   heightCm?: unknown
   timezone?: unknown
   theme?: unknown
@@ -77,6 +87,7 @@ type UserRow = {
   telegramEnabled: number
   browserPushEnabled: number
   active: number
+  lastLoginAt?: string | null
 }
 
 type ProfileRow = {
@@ -367,6 +378,8 @@ function validateOnboardingInput(input: OnboardingInput) {
 
 function validateProfileUpdateInput(input: ProfileUpdateInput) {
   const details: Array<{ field: string; message: string }> = []
+  const hasDisplayName = input.displayName !== undefined && input.displayName !== null && input.displayName !== ''
+  const displayName = hasDisplayName ? (typeof input.displayName === 'string' ? input.displayName.trim() : '') : undefined
   const hasHeightCm = input.heightCm !== undefined && input.heightCm !== null
   const heightCm = hasHeightCm ? (typeof input.heightCm === 'number' ? input.heightCm : Number(input.heightCm)) : undefined
   const hasTimezone = input.timezone !== undefined && input.timezone !== null && input.timezone !== ''
@@ -374,6 +387,13 @@ function validateProfileUpdateInput(input: ProfileUpdateInput) {
   const theme = typeof input.theme === 'string' ? input.theme : undefined
   const accessibilityMode =
     typeof input.accessibilityMode === 'string' ? input.accessibilityMode : undefined
+
+  if (hasDisplayName && displayName!.trim().length < 2) {
+    details.push({ field: 'displayName', message: 'Nama tampilan minimal 2 karakter.' })
+  }
+  if (hasDisplayName && displayName!.length > 100) {
+    details.push({ field: 'displayName', message: 'Nama tampilan maksimal 100 karakter.' })
+  }
 
   if (hasHeightCm && (!Number.isFinite(heightCm!) || heightCm! < 50 || heightCm! > 250)) {
     details.push({ field: 'heightCm', message: 'Tinggi badan harus antara 50 dan 250 cm.' })
@@ -412,6 +432,7 @@ function validateProfileUpdateInput(input: ProfileUpdateInput) {
   return {
     ok: true as const,
     data: {
+      displayName,
       heightCm,
       timezone,
       theme,
@@ -979,7 +1000,8 @@ app.post('/api/auth/register', async (c) => {
 
     const normalizedEmail = EmailOtpService.normalizeEmail(validation.data.email)
     const { challengeId, otp } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId, normalizedEmail, purpose: 'register' })
-    const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+    const otpLocale = parseLocale(c.req.raw.headers)
+    const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp, otpLocale)
     if (!sendResult.sent) {
       if (userId) await c.env.DB.prepare('DELETE FROM HL_users WHERE id = ? AND active = 0').bind(userId).run()
       const result = failure('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], startedAt)
@@ -1074,7 +1096,7 @@ app.post('/api/auth/login', async (c) => {
 
   try {
     user = await c.env.DB.prepare(
-      `SELECT id, email, passwordHash, displayName, telegramEnabled, browserPushEnabled, active
+      `SELECT id, email, passwordHash, displayName, telegramEnabled, browserPushEnabled, active, lastLoginAt
        FROM HL_users
        WHERE email = ? AND authProvider = 'local'
        LIMIT 1`
@@ -1102,10 +1124,57 @@ app.post('/api/auth/login', async (c) => {
     return jsonResponse(c, result)
   }
 
+  // ponytail: skip OTP if logged in within 30 days
+  const lastLoginSec = user.lastLoginAt ? Date.parse(user.lastLoginAt) : 0
+  const THIRTY_DAYS_MS = 30 * 24 * 3600 * 1000
+  if (lastLoginSec && Date.now() - lastLoginSec < THIRTY_DAYS_MS) {
+    const token = crypto.randomUUID()
+    const h = await sha256Token(token)
+
+    try {
+      await c.env.DB.prepare('INSERT INTO HL_sessions (userId, sessionTokenHash, createdAt, expiresAt) VALUES (?, ?, CURRENT_TIMESTAMP, datetime("now", "+30 days"))')
+        .bind(user.id, h).run()
+    } catch {
+      const result = failure('INTERNAL_ERROR', 'Login gagal diproses.', 500, [])
+      return jsonResponse(c, result)
+    }
+
+    setCookie(c, 'hlSession', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 30 * 86400
+    })
+
+    await c.env.DB.prepare('UPDATE HL_users SET lastLoginAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?')
+      .bind(user.id).run()
+
+    await AuditService.write(c.env.DB, {
+      userId: user.id,
+      action: 'userLogin.passwordOnly',
+      entityType: 'HL_users',
+      entityId: String(user.id)
+    })
+
+    const profile = await c.env.DB.prepare(
+      'SELECT id, sex, birthDate, heightCm, timezone, accessibilityMode, theme, emergencyConsent, aiConsent, dataShareConsent FROM HL_userProfiles WHERE userId = ?'
+    ).bind(user.id).first<any>()
+
+    const result = success({
+      user: { id: user.id, email: user.email, displayName: user.displayName, telegramEnabled: !!user.telegramEnabled, browserPushEnabled: !!user.browserPushEnabled },
+      profile,
+      requiresOnboarding: !profile
+    }, 200, startedAt)
+
+    return jsonResponse(c, result)
+  }
+
   try {
     const normalizedEmail = EmailOtpService.normalizeEmail(validation.data.email)
     const { challengeId, otp } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId: user.id, normalizedEmail, purpose: 'login' })
-    const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+    const otpLocale = parseLocale(c.req.raw.headers)
+    const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp, otpLocale)
     if (!sendResult.sent) {
       const result = failure('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], startedAt)
       return jsonResponse(c, result)
@@ -1193,10 +1262,17 @@ app.get('/api/auth/me', async (c) => {
         }
       : null
 
+    const [roles, permissions] = await Promise.all([
+      RbacService.getUserRoles(c.env.DB, row.id),
+      RbacService.getUserPermissions(c.env.DB, row.id)
+    ])
+
     const result = success(
       {
         user: publicUser(row),
         profile: publicProfile(profile),
+        roles: roles.map(r => r.roleCode),
+        permissions,
         requiresOnboarding: !profile
       },
       200,
@@ -1332,6 +1408,29 @@ app.post('/api/profile/onboarding', async (c) => {
   }
 })
 
+app.get('/api/me/preferences', async (c) => {
+  const startedAt = Date.now()
+  const user = await getAuthenticatedUser(c)
+  if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+  try {
+    const row = await c.env.DB.prepare('SELECT preferredLocale FROM HL_userProfiles WHERE userId = ?').bind(user.id).first<{ preferredLocale: string | null }>()
+    return jsonResponse(c, success({ preferredLocale: row?.preferredLocale || 'id-ID' }, 200, startedAt))
+  } catch { return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat preferensi.', 500, [], startedAt)) }
+})
+
+app.put('/api/me/preferences', async (c) => {
+  const startedAt = Date.now()
+  const user = await getAuthenticatedUser(c)
+  if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+  try {
+    const body = await c.req.json<{ preferredLocale?: string }>()
+    const locale = body.preferredLocale
+    if (!locale || !['id-ID', 'en-US'].includes(locale)) return jsonResponse(c, failure('VALIDATION_ERROR', 'Locale tidak valid. Gunakan id-ID atau en-US.', 400, [], startedAt))
+    await c.env.DB.prepare('UPDATE HL_userProfiles SET preferredLocale = ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?').bind(locale, user.id).run()
+    return jsonResponse(c, success({ updated: true, preferredLocale: locale }, 200, startedAt))
+  } catch { return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menyimpan preferensi.', 500, [], startedAt)) }
+})
+
 app.get('/api/profile', async (c) => {
   const startedAt = Date.now()
   const user = await getAuthenticatedUser(c)
@@ -1435,8 +1534,9 @@ app.put('/api/profile', async (c) => {
     const nextTheme = validation.data.theme ?? existingProfile.theme
     const nextAccessibilityMode =
       validation.data.accessibilityMode ?? existingProfile.accessibilityMode
+    const nextDisplayName = validation.data.displayName ?? undefined
 
-    await c.env.DB.batch([
+    const batchStmts = [
       c.env.DB.prepare(
         `UPDATE HL_userProfiles
          SET heightCm = ?, timezone = ?, theme = ?, accessibilityMode = ?, updatedAt = CURRENT_TIMESTAMP
@@ -1470,7 +1570,15 @@ app.put('/api/profile', async (c) => {
           })
         })
       )
-    ])
+    ]
+
+    if (nextDisplayName) {
+      batchStmts.push(
+        c.env.DB.prepare('UPDATE HL_users SET displayName = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(nextDisplayName, user.id)
+      )
+    }
+
+    await c.env.DB.batch(batchStmts)
 
     const result = success(
       {
@@ -2982,7 +3090,7 @@ app.post('/api/ai/assistant', async (c) => {
           {
             reply,
             patternScore,
-            disclaimer: 'AI dapat membuat kesalahan. Informasi ini bukan pengganti konsultasi dokter.',
+            disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)),
             model,
             usedFallback,
             vitals,
@@ -3004,7 +3112,7 @@ app.post('/api/ai/assistant', async (c) => {
         {
       reply,
       patternScore: 0,
-      disclaimer: 'fallback is AI and can make mistakes. Informasi ini bukan pengganti konsultasi dokter.',
+      disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)),
       model,
       usedFallback,
       vitals,
@@ -3355,13 +3463,13 @@ WAJIB sertakan teks ini tepat di akhir respons Anda TANPA DIUBAH sedikit pun:
       let analysis = aiResult.text
       analysis = AiMemoryService.enforceDisclaimer(analysis, aiResult.model)
       const patternScore = extractPatternScore(analysis)
-      return jsonResponse(c, success({ analysis, patternScore, model: aiResult.model, disclaimer: 'AI dapat membuat kesalahan. Informasi ini bukan pengganti konsultasi dokter.', usedFallback: false }, 200, startedAt))
+      return jsonResponse(c, success({ analysis, patternScore, model: aiResult.model, disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)), usedFallback: false }, 200, startedAt))
     }
     return jsonResponse(c, success({
       analysis: 'AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda.',
       patternScore: 0,
       model: 'fallback',
-      disclaimer: 'fallback: AI dapat membuat kesalahan. Informasi ini bukan pengganti konsultasi dokter.',
+      disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)),
       usedFallback: true
     }, 200, startedAt))
   } catch (error) {
@@ -3936,6 +4044,7 @@ mountHydrationRoutes(app as any)
 mountAiRoutes(app as any)
 mountCycleRoutes(app as any)
 mountTelegramRoutes(app as any)
+mountAdminRoutes(app as any)
 
 export {
   getCurrentSession,
@@ -4403,6 +4512,8 @@ function isAdminUser(c: Context<{ Bindings: Env }>, user: UserRow): boolean {
 }
 
 async function requireAdminPermission(c: Context<{ Bindings: Env }>, user: UserRow, permissionCode: string, startedAt: number) {
+  const userRoles = await RbacService.getUserRoles(c.env.DB, user.id)
+  if (userRoles.some(r => r.roleCode === 'superAdmin')) return null
   if (await RbacService.hasPermission(c.env.DB, user.id, permissionCode)) return null
   return jsonResponse(c, failure('FORBIDDEN', 'Permission admin diperlukan.', 403, [{ permissionCode }], startedAt))
 }
@@ -5469,11 +5580,129 @@ app.put('/api/admin/knowledge-articles/:slug', async (c) => {
   } catch (error) { console.error('admin knowledge article upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update knowledge article.', 500, [], startedAt)) }
 })
 
+// ============ BILLING ROUTES ============
+
+app.post('/api/billing/checkout', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { planCode?: string }
+    if (!body.planCode) return jsonResponse(c, failure('VALIDATION_ERROR', 'planCode wajib.', 400, [], startedAt))
+
+    const config = readBillingConfig((c.env as any))
+    let provider: BillingProvider
+    if (config.provider === 'mock') {
+      provider = new MockBillingProvider(config)
+    } else {
+      if (!config.xenditSecretKey) throw new Error('XENDIT_SECRET_KEY tidak dikonfigurasi.')
+      provider = new XenditBillingProvider(config)
+    }
+    const user = await c.env.DB.prepare('SELECT email, displayName FROM HL_users WHERE id = ?').bind(userId).first<{ email: string; displayName: string }>()
+    if (!user) return jsonResponse(c, failure('NOT_FOUND', 'User tidak ditemukan.', 404, [], startedAt))
+
+    const session = await CheckoutSessionService.createPendingCheckout(
+      c.env.DB, userId, body.planCode,
+      'IDR', config.provider, config.xenditMode,
+      config.successUrl, config.cancelUrl
+    )
+
+    const checkout = await provider.createCheckout({
+      userId, email: user.email, planCode: body.planCode, planName: body.planCode,
+      amount: session.amount, currency: session.currency, merchantRef: session.merchantRef,
+      successUrl: `${config.successUrl}?checkoutId=${encodeURIComponent(session.id)}`,
+      cancelUrl: `${config.cancelUrl}?checkoutId=${encodeURIComponent(session.id)}`
+    })
+
+    await CheckoutSessionService.attachProviderCheckout(c.env.DB, session.merchantRef, checkout.providerCheckoutId, checkout.checkoutUrl)
+
+    await AuditService.write(c.env.DB, {
+      userId, action: 'billing.checkout.created', entityType: 'HL_billingCheckoutSessions',
+      entityId: session.id, metadataJson: JSON.stringify({ planCode: body.planCode, amount: session.amount, provider: checkout.provider })
+    })
+
+    return jsonResponse(c, success({
+      checkoutId: session.id, provider: checkout.provider, mode: checkout.mode,
+      merchantRef: session.merchantRef, checkoutUrl: checkout.checkoutUrl,
+      amount: session.amount, currency: session.currency, status: 'pending'
+    }, 200, startedAt))
+
+  } catch (e: unknown) {
+    const err = e as Error & { code?: string; status?: number; detail?: string; message?: string; stack?: string }
+    console.error('billing checkout error:', err?.message || String(e))
+    if (err.code === 'FREE_PLAN') return jsonResponse(c, failure('VALIDATION_ERROR', 'Plan gratis tidak memerlukan checkout. Upgrade di halaman /premium/upgrade.', 400, [], startedAt))
+    if (err.code === 'PLAN_NOT_FOUND') return jsonResponse(c, failure('NOT_FOUND', 'Plan tidak ditemukan.', 404, [], startedAt))
+    if (err.code === 'PLAN_INACTIVE') return jsonResponse(c, failure('VALIDATION_ERROR', 'Plan tidak aktif.', 400, [], startedAt))
+    if (err.code === 'XENDIT_ERROR') return jsonResponse(c, failure('BILLING_PROVIDER_ERROR', `Gagal menghubungi penyedia pembayaran: ${err.message}`.slice(0, 200), 502, [], startedAt))
+    return jsonResponse(c, failure('INTERNAL_ERROR', `Gagal membuat checkout: ${err?.message || ''}`.slice(0, 200), 500, [], startedAt))
+  }
+})
+
+app.get('/api/billing/checkout/:checkoutId', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const checkoutId = c.req.param('checkoutId')
+    const session = await CheckoutSessionService.getById(c.env.DB, checkoutId)
+    if (!session || session.userId !== userId) return jsonResponse(c, failure('NOT_FOUND', 'Checkout tidak ditemukan.', 404, [], startedAt))
+    return jsonResponse(c, success({
+      checkoutId: session.id, planCode: session.planCode, amount: session.amount,
+      currency: session.currency, status: session.status, provider: session.provider,
+      checkoutUrl: session.checkoutUrl, paidAt: session.paidAt, createdAt: session.createdAt
+    }, 200, startedAt))
+  } catch (error) { console.error('billing checkout get error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat checkout.', 500, [], startedAt)) }
+})
+
+app.get('/api/billing/my-subscription', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const sub = await c.env.DB.prepare("SELECT planCode, status, provider, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd FROM HL_subscriptions WHERE userId = ? AND status = 'active' AND (currentPeriodEnd IS NULL OR currentPeriodEnd >= datetime('now')) ORDER BY id DESC LIMIT 1").bind(userId).first<{ planCode: string; status: string; provider: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: number }>()
+    if (!sub) return jsonResponse(c, success({ planCode: 'free', status: 'active', provider: 'none', currentPeriodStart: null, currentPeriodEnd: null, cancelAtPeriodEnd: false }, 200, startedAt))
+    return jsonResponse(c, success({ planCode: sub.planCode, status: sub.status, provider: sub.provider, currentPeriodStart: sub.currentPeriodStart, currentPeriodEnd: sub.currentPeriodEnd, cancelAtPeriodEnd: sub.cancelAtPeriodEnd === 1 }, 200, startedAt))
+  } catch (error) { console.error('billing my-subscription error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat subscription.', 500, [], startedAt)) }
+})
+
+app.get('/api/billing/invoices', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const sessions = await CheckoutSessionService.listUserSessions(c.env.DB, userId, 50)
+    const invoices = sessions.map(s => ({ checkoutId: s.id, planCode: s.planCode, amount: s.amount, currency: s.currency, status: s.status, provider: s.provider, createdAt: s.createdAt, paidAt: s.paidAt }))
+    return jsonResponse(c, success(invoices, 200, startedAt))
+  } catch (error) { console.error('billing invoices error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat invoice.', 500, [], startedAt)) }
+})
+
 app.post('/api/billing/webhook/:provider', async (c) => {
   const startedAt = Date.now()
   try {
     const provider = c.req.param('provider')
-    if (!['manual','stripe','midtrans','xendit'].includes(provider)) return jsonResponse(c, failure('VALIDATION_ERROR', 'Provider tidak valid.', 400, [], startedAt))
+    if (!['manual','stripe','midtrans','xendit','mock'].includes(provider)) return jsonResponse(c, failure('VALIDATION_ERROR', 'Provider tidak valid.', 400, [], startedAt))
+
+    // Xendit webhook: verify x-callback-token
+    if (provider === 'xendit') {
+      const xenditToken = (c.env as any).XENDIT_WEBHOOK_TOKEN as string || ''
+      const callbackToken = c.req.header('x-callback-token') || ''
+      if (!xenditToken || callbackToken !== xenditToken) {
+        await AuditService.write(c.env.DB, { userId: null, action: 'billing.webhook.rejected', entityType: 'HL_paymentEvents', entityId: 'xendit_callback_token', metadataJson: '{ "reason": "invalid_x_callback_token" }' })
+        return jsonResponse(c, failure('UNAUTHORIZED', 'Invalid webhook token.', 403, [], startedAt))
+      }
+      return await handleXenditWebhook(c, startedAt)
+    }
+
+    // Mock webhook (for testing only — requires auth)
+    if (provider === 'mock') {
+      const config = readBillingConfig((c.env as any))
+      if (!config.isMockEnabled) return jsonResponse(c, failure('FORBIDDEN', 'Mock provider tidak diaktifkan.', 403, [], startedAt))
+      const userId = await getCurrentSession(c)
+      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      return await handleMockWebhook(c, startedAt, userId)
+    }
+
+    // Legacy: generic webhook
     const secret = (c.env as any).BILLING_WEBHOOK_SECRET as string || ''
     const signature = c.req.header('X-Webhook-Signature') || c.req.header('x-webhook-signature') || ''
     if (provider !== 'manual' && (!signature || !secret || signature !== secret)) return jsonResponse(c, failure('UNAUTHORIZED', 'Invalid webhook signature.', 401, [], startedAt))
@@ -5922,4 +6151,92 @@ export default {
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     return scheduledHandler(event, env as unknown as ExtraEnv, ctx)
   }
+}
+
+// ============ Webhook helper functions (after app definition for access to c.env) ============
+
+async function handleXenditWebhook(c: Context<{ Bindings: Env }>, startedAt: number) {
+  const body = await c.req.json() as { id?: string; external_id?: string; amount?: number; status?: string; paid_at?: string; currency?: string }
+  const eventId = body.id || ''
+  if (!eventId || !body.external_id) return jsonResponse(c, failure('VALIDATION_ERROR', 'Event id dan external_id wajib.', 400, [], startedAt))
+
+  // Dedup
+  const existing = await c.env.DB.prepare('SELECT id, processed FROM HL_paymentEvents WHERE provider = ? AND providerEventId = ?').bind('xendit', eventId).first<{ id: number; processed: number }>()
+  if (existing) return jsonResponse(c, success({ provider: 'xendit', providerEventId: eventId, processed: existing.processed === 1, duplicate: true }, 200, startedAt))
+
+  // Record event
+  const payResult = await c.env.DB.prepare('INSERT INTO HL_paymentEvents (provider, eventType, providerEventId, payloadJson, processed, createdAt) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)').bind('xendit', body.status || 'unknown', eventId, JSON.stringify({ id: eventId, status: body.status, external_id: body.external_id, amount: body.amount, currency: body.currency }))
+  const payId = await insertAndGetId(payResult)
+
+  // Look up checkout session by merchantRef
+  const session = await CheckoutSessionService.getByMerchantRef(c.env.DB, body.external_id || '')
+  if (!session) {
+    await AuditService.write(c.env.DB, { userId: null, action: 'billing.webhook.rejected', entityType: 'HL_paymentEvents', entityId: String(payId), metadataJson: JSON.stringify({ reason: 'unknown_merchantRef', external_id: body.external_id }) })
+    return jsonResponse(c, success({ provider: 'xendit', providerEventId: eventId, processed: true, acknowledged: true, unknownMerchantRef: true }, 200, startedAt))
+  }
+
+  // Verify amount/currency (mandatory)
+  if (body.amount === undefined || body.amount === null) {
+    await AuditService.write(c.env.DB, { userId: session.userId, action: 'billing.webhook.rejected', entityType: 'HL_billingCheckoutSessions', entityId: session.id, metadataJson: JSON.stringify({ reason: 'amount_missing' }) })
+    return jsonResponse(c, failure('VALIDATION_ERROR', 'Jumlah tidak ditemukan dalam webhook.', 400, [], startedAt))
+  }
+  if (body.amount !== session.amount) {
+    await AuditService.write(c.env.DB, { userId: session.userId, action: 'billing.webhook.rejected', entityType: 'HL_billingCheckoutSessions', entityId: session.id, metadataJson: JSON.stringify({ reason: 'amount_mismatch', expected: session.amount, received: body.amount }) })
+    return jsonResponse(c, failure('VALIDATION_ERROR', 'Jumlah tidak cocok.', 400, [], startedAt))
+  }
+
+  // Process paid
+  const status = (body.status || '').toUpperCase()
+  if (status === 'PAID' || status === 'SETTLED') {
+    await CheckoutSessionService.markPaid(c.env.DB, session.id, body.paid_at)
+    try {
+      await SubscriptionActivationService.activatePaidSubscription(c.env.DB, session.userId, session.planCode, session.id, eventId)
+    } catch (e) {
+      console.error('Xendit webhook subscription activation failed:', (e as Error)?.message || e)
+      await c.env.DB.prepare('UPDATE HL_paymentEvents SET processed = 0, processedAt = NULL WHERE id = ?').bind(payId).run()
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal mengaktifkan subscription.', 500, [], startedAt))
+    }
+  } else if (status === 'EXPIRED') {
+    await CheckoutSessionService.markExpired(c.env.DB, session.id)
+  } else if (status === 'FAILED') {
+    await CheckoutSessionService.markFailed(c.env.DB, session.id)
+  }
+
+  await c.env.DB.prepare('UPDATE HL_paymentEvents SET processed = 1, processedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(payId).run()
+  await AuditService.write(c.env.DB, { userId: session.userId, action: status === 'PAID' ? 'billing.webhook.received' : 'billing.webhook.duplicate', entityType: 'HL_billingCheckoutSessions', entityId: session.id, metadataJson: JSON.stringify({ provider: 'xendit', providerEventId: eventId, status: body.status }) })
+
+  return jsonResponse(c, success({ provider: 'xendit', providerEventId: eventId, processed: true, subscriptionActivated: status === 'PAID' }, 200, startedAt))
+}
+
+async function handleMockWebhook(c: Context<{ Bindings: Env }>, startedAt: number, userId: number) {
+  const body = await c.req.json() as { checkoutId?: string; status?: string }
+  if (!body.checkoutId) return jsonResponse(c, failure('VALIDATION_ERROR', 'checkoutId wajib.', 400, [], startedAt))
+  const status = body.status || 'paid'
+
+  const session = await CheckoutSessionService.getById(c.env.DB, body.checkoutId)
+  if (!session) return jsonResponse(c, failure('NOT_FOUND', 'Checkout tidak ditemukan.', 404, [], startedAt))
+  if (session.userId !== userId) return jsonResponse(c, failure('FORBIDDEN', 'Akses ditolak.', 403, [], startedAt))
+
+  const eventId = `mock_${body.checkoutId}_${status}`
+  const existing = await c.env.DB.prepare('SELECT id FROM HL_paymentEvents WHERE provider = ? AND providerEventId = ?').bind('manual', eventId).first<{ id: number }>()
+  if (existing) return jsonResponse(c, success({ provider: 'mock', processed: true, duplicate: true }, 200, startedAt))
+
+  const payResult = await c.env.DB.prepare('INSERT INTO HL_paymentEvents (provider, eventType, providerEventId, payloadJson, processed, createdAt) VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)').bind('manual', status, eventId, JSON.stringify({ checkoutId: body.checkoutId, status }))
+  const payId = await insertAndGetId(payResult)
+
+  if (status === 'paid') {
+    await CheckoutSessionService.markPaid(c.env.DB, session.id)
+    try {
+      await SubscriptionActivationService.activatePaidSubscription(c.env.DB, session.userId, session.planCode, session.id, eventId, 'manual')
+    } catch (e) {
+      console.error('Mock webhook subscription activation failed:', (e as Error)?.message || e)
+      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal mengaktifkan subscription.', 500, [], startedAt))
+    }
+  } else if (status === 'failed') {
+    await CheckoutSessionService.markFailed(c.env.DB, session.id)
+  }
+
+  await AuditService.write(c.env.DB, { userId: session.userId, action: 'billing.mock.webhook', entityType: 'HL_billingCheckoutSessions', entityId: session.id, metadataJson: JSON.stringify({ status }) })
+
+  return jsonResponse(c, success({ provider: 'mock', processed: true, subscriptionActivated: status === 'paid' }, 200, startedAt))
 }

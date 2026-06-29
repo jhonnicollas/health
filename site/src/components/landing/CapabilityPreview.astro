@@ -1,0 +1,47 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+import FeatureCard from "../common/FeatureCard.astro";
+import { productionCapabilities } from "@/data/productionCapabilities";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+
+const categoryKeyMap: Record<string, string> = {
+  coreCapture: "capability.coreCapture",
+  healthIntelligence: "capability.healthIntelligence",
+  monitoring: "capability.monitoring",
+  dailyCompanion: "capability.dailyCompanion",
+  advanced: "capability.advanced",
+  commercial: "capability.commercial",
+};
+
+const categories = Object.entries(productionCapabilities);
+---
+
+<section class="section-padding">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "capability.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "capability.subtitle")}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {categories.map(([key, cat]) => (
+        <div class="card">
+          <h3 class="font-semibold text-lg mb-4" style="color: var(--color-primary);">{t(locale, categoryKeyMap[key] || key)}</h3>
+          <ul class="space-y-2">
+            {cat.items.map((item) => (
+              <li class="flex items-start gap-2 text-sm" style="color: var(--color-text-muted);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="flex-shrink-0 mt-0.5" style="color: var(--color-success);"><polyline points="20 6 9 17 4 12"/></svg>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

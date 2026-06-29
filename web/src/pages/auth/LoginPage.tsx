@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
 import { EmailOtpVerificationStep } from '../../components/auth/EmailOtpVerificationStep'
+import { LanguageSwitcher } from '../../components/i18n/LanguageSwitcher'
+import { useI18n } from '../../i18n'
 
 type LoginState = 'idle' | 'submitting' | 'error'
 
@@ -41,11 +43,25 @@ type LoginResponse = {
 }
 
 export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
-  const { setAuthenticated } = useAuth()
+  const { setAuthenticated, refresh } = useAuth()
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [status, setStatus] = useState<LoginState>('idle')
-  const [message, setMessage] = useState('')
+  function getOAuthError() {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const errorCode = params.get('error')
+      const errorMessage = params.get('message')
+      if (errorCode && errorMessage) {
+        window.history.replaceState(null, '', window.location.pathname)
+        return { status: 'error' as LoginState, message: errorMessage }
+      }
+    } catch { /* ignore */ }
+    return { status: 'idle' as LoginState, message: '' }
+  }
+  const oauthError = getOAuthError()
+  const [status, setStatus] = useState<LoginState>(oauthError.status)
+  const [message, setMessage] = useState(oauthError.message)
   const [otpChallenge, setOtpChallenge] = useState<{ challengeId: number; maskedEmail: string; expiresInSeconds: number } | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -85,6 +101,7 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
       }
 
       setAuthenticated(body.data)
+      void refresh()
     } catch {
       setStatus('error')
       setMessage('Tidak bisa terhubung ke server. Coba lagi sebentar.')
@@ -95,14 +112,12 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
 
   return (
     <main className="auth-page">
+      <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 100 }}><LanguageSwitcher compact /></div>
       <section className="auth-panel" aria-labelledby="login-title">
         <div className="auth-copy">
           <p className="eyebrow">HL Health Companion</p>
-          <h1 id="login-title">Masuk ke catatan kesehatan</h1>
-          <p>
-            Gunakan email dan password untuk membuka dashboard pribadi Anda. Sesi
-            disimpan lewat cookie aman, bukan token yang bisa dibaca halaman.
-          </p>
+          <h1 id="login-title">{t('auth.loginTitle')}</h1>
+          <p>{t('auth.loginSubtitle')}</p>
           <div className="auth-feature-grid" aria-label="Ringkasan keamanan">
             <span>Rule-first</span>
             <span>Manual override</span>
@@ -116,10 +131,11 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
             <p>Clinical workspace</p>
           </div>
           <label>
-            Email
+            {t('auth.emailLabel')}
             <input
               autoComplete="email"
               name="email"
+              placeholder={t('auth.emailPlaceholder')}
               onChange={(event) => setEmail(event.target.value)}
               required
               type="email"
@@ -128,10 +144,11 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
           </label>
 
           <label>
-            Password
+            {t('auth.passwordLabel')}
             <input
               autoComplete="current-password"
               name="password"
+              placeholder={t('auth.passwordPlaceholder')}
               onChange={(event) => setPassword(event.target.value)}
               required
               type="password"
@@ -140,14 +157,14 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
           </label>
 
           <a href="/api/auth/google" className="btn-secondary" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
-            <span className="material-symbols-outlined">login</span>Login dengan Google
+            <span className="material-symbols-outlined">login</span>{t('auth.googleButton')}
           </a>
           <button disabled={submitting} type="submit">
-            {submitting ? 'Memeriksa...' : 'Login'}
+            {submitting ? t('auth.submittingLogin') : t('auth.submitLogin')}
           </button>
 
           <button className="secondary-action" onClick={onShowRegister} type="button">
-            Buat akun baru
+            {t('auth.registerTitle')}
           </button>
 
           {message ? (
@@ -169,11 +186,12 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
                 const d = data as { user: { id: number; email: string; displayName: string; telegramEnabled: boolean; browserPushEnabled: boolean }; profile: Record<string, unknown> | null; requiresOnboarding: boolean }
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setAuthenticated({ user: d.user, profile: d.profile as any, requiresOnboarding: d.requiresOnboarding })
+                void refresh()
               }}
             />
             <div style={{ textAlign: 'center', marginTop: 16 }}>
               <a href="/api/auth/google" className="btn-secondary" style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8,padding:'10px 20px',textDecoration:'none'}}>
-                <span className="material-symbols-outlined">login</span>Login dengan Google
+                <span className="material-symbols-outlined">login</span>{t('auth.googleButton')}
               </a>
             </div>
           </>

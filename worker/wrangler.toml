@@ -5,8 +5,8 @@ workers_dev = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "multi_Ai_db"
-database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"
+database_name = "isehat_db"
+database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
 
 [[r2_buckets]]
 binding = "LOGS"
@@ -31,11 +31,19 @@ max_batch_size = 5
 max_batch_timeout = 10
 
 [vars]
-EMAIL_PROVIDER = "mock"
+EMAIL_PROVIDER = "resend"
 EMAIL_FROM = "iSehat <otp@mail.isehat.biz.id>"
 EMAIL_OTP_TTL_SECONDS = "600"
 EMAIL_OTP_MAX_ATTEMPTS = "5"
 EMAIL_OTP_RESEND_COOLDOWN_SECONDS = "60"
 EMAIL_OTP_MAX_RESENDS = "3"
-EMAIL_OTP_TEST_MODE = "true"
+EMAIL_OTP_TEST_MODE = "false"
+AI_TEXT_API_BASE = "https://9router.krpmerch.biz.id/v1"
+AI_TEXT_MODEL = "oc/deepseek-v4-flash-free"
+BILLING_PROVIDER = "xendit_test"
+XENDIT_MODE = "test"
+XENDIT_BASE_URL = "https://api.xendit.co"
+BILLING_CURRENCY = "IDR"
+BILLING_SUCCESS_URL = "https://app.isehat.biz.id/billing/success"
+BILLING_CANCEL_URL = "https://app.isehat.biz.id/billing/cancel"
 

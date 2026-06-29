@@ -1,0 +1,44 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "en" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id/disclaimer`,
+  en: `https://isehat.biz.id/en/disclaimer`,
+};
+---
+
+<BaseLayout title={t(locale, "disclaimerPage.title")} description={t(locale, "disclaimer.site")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-4xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "disclaimerPage.title")}</h1>
+
+      <div class="medical-disclaimer mb-8" style="font-size: 1rem;">
+        <p><strong>Important:</strong> {t(locale, "disclaimer.hero")}</p>
+      </div>
+
+      <div class="space-y-6 text-base" style="color: var(--color-text-muted);">
+        <h2 class="text-2xl font-bold" style="color: var(--color-text);">What iSehat Does</h2>
+        <ul class="space-y-2 list-none">
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> Helps record health measurement data</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> Displays rule-based structured interpretation</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> AI helps read numbers from health device photos</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> User verifies data before saving</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> Creates reports to bring to your doctor</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> General health education</li>
+        </ul>
+
+        <h2 class="text-2xl font-bold" style="color: var(--color-text);">What iSehat Does NOT Do</h2>
+        <ul class="space-y-2 list-none">
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Diagnose diseases</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Prescribe medication</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Adjust medication dosages</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Replace doctors</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Determine emergency conditions</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Guarantee cures</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,121 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { getCollection } from "astro:content";
+import { blogCategories } from "@/data/blogCategories";
+import MedicalDisclaimerBox from "@/components/common/MedicalDisclaimerBox.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "en" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id/blog`,
+  en: `https://isehat.biz.id/en/blog`,
+};
+
+const posts = await getCollection("blog", ({ data }) => !data.draft);
+const sorted = posts.sort(
+  (a, b) => new Date(b.data.publishedAt).getTime() - new Date(a.data.publishedAt).getTime()
+);
+const featured = sorted.find((p) => p.data.featured) || sorted[0];
+---
+
+<BaseLayout title={t(locale, "blog.title")} description={t(locale, "blog.subtitle")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "blog.title")}</h1>
+        <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "blog.subtitle")}</p>
+      </div>
+
+      <div class="mb-8 max-w-md mx-auto">
+        <input
+          id="blog-search"
+          type="search"
+          placeholder={t(locale, "blog.search")}
+          class="w-full px-4 py-3 rounded-lg text-sm"
+          style="background-color: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border);"
+          aria-label={t(locale, "blog.search")}
+        />
+      </div>
+
+      <div class="flex flex-wrap justify-center gap-2 mb-8">
+        <button class="blog-cat-btn text-xs px-3 py-1.5 rounded-full" data-category="" style="background-color: var(--color-primary); color: var(--color-primary-foreground);">{t(locale, "blog.all")}</button>
+        {blogCategories.map((cat) => (
+          <button class="blog-cat-btn text-xs px-3 py-1.5 rounded-full" data-category={cat} style="background-color: var(--color-surface); color: var(--color-text-muted); box-shadow: var(--shadow-soft);">{cat}</button>
+        ))}
+      </div>
+
+      {featured && (
+        <div class="mb-12">
+          <a href={`/en/blog/${featured.slug}`} class="card block group hover:translate-y-[-2px] transition-transform" style="background: var(--gradient-card);">
+            <div class="text-xs font-medium mb-2" style="color: var(--color-primary);">{t(locale, "blog.featured")}</div>
+            <h2 class="text-2xl font-bold mb-2" style="color: var(--color-text);">{featured.data.title}</h2>
+            <p class="text-sm" style="color: var(--color-text-muted);">{featured.data.description}</p>
+          </a>
+        </div>
+      )}
+
+      <div id="blog-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {sorted.map((post) => (
+          <a
+            href={`/en/blog/${post.slug}`}
+            class="blog-post-card card group hover:translate-y-[-2px] transition-transform"
+            data-category={post.data.category}
+            data-title={post.data.title.toLowerCase()}
+            data-description={post.data.description.toLowerCase()}
+          >
+            <div class="text-xs font-medium mb-2" style="color: var(--color-primary);">{post.data.category}</div>
+            <h3 class="font-semibold mb-2" style="color: var(--color-text);">{post.data.title}</h3>
+            <p class="text-sm line-clamp-2" style="color: var(--color-text-muted);">{post.data.description}</p>
+          </a>
+        ))}
+      </div>
+
+      {sorted.length === 0 && (
+        <p class="text-center text-sm" style="color: var(--color-text-muted);">{t(locale, "blog.coming")}</p>
+      )}
+
+      <div class="mt-12">
+        <MedicalDisclaimerBox locale={locale} />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  const searchInput = document.getElementById("blog-search") as HTMLInputElement;
+  const cards = document.querySelectorAll(".blog-post-card");
+  const catBtns = document.querySelectorAll(".blog-cat-btn");
+  let activeCategory = "";
+
+  function filterPosts() {
+    const query = (searchInput?.value || "").toLowerCase();
+    cards.forEach((card) => {
+      const el = card as HTMLElement;
+      const cat = el.dataset.category || "";
+      const title = el.dataset.title || "";
+      const desc = el.dataset.description || "";
+      const matchCat = !activeCategory || cat === activeCategory;
+      const matchSearch = !query || title.includes(query) || desc.includes(query) || cat.toLowerCase().includes(query);
+      el.style.display = matchCat && matchSearch ? "" : "none";
+    });
+  }
+
+  searchInput?.addEventListener("input", filterPosts);
+
+  catBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeCategory = (btn as HTMLElement).dataset.category || "";
+      catBtns.forEach((b) => {
+        const bEl = b as HTMLElement;
+        if (b === btn) {
+          bEl.style.backgroundColor = "var(--color-primary)";
+          bEl.style.color = "var(--color-primary-foreground)";
+        } else {
+          bEl.style.backgroundColor = "var(--color-surface)";
+          bEl.style.color = "var(--color-text-muted)";
+        }
+      });
+      filterPosts();
+    });
+  });
+</script>

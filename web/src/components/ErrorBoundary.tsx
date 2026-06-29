@@ -7,8 +7,8 @@ type State = { hasError: boolean; error: Error | null }
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
+  static getDerivedStateFromError(error: unknown): State {
+    return { hasError: true, error: error instanceof Error ? error : new Error(String(error)) }
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {

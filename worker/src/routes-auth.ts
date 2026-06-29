@@ -7,6 +7,7 @@ import { CryptoService } from './services/crypto.js'
 import { EmailOtpService } from './services/email-otp.js'
 import { EmailSenderService } from './services/email-sender.js'
 import { sendEmergencyToContacts } from './routes-extra.js'
+import { parseLocale } from './i18n/locale.js'
 import type { Env } from './types.js'
 
 type HC = Context<{ Bindings: Env }>
@@ -31,6 +32,11 @@ export function mountAuthRoutes(app: any) {
     try { const u = new URL(raw, 'http://localhost'); if (SAFE_RETURN_PATHS.includes(u.pathname)) return u.pathname } catch {}
     return '/'
   }
+  function oauthErrorRedirect(path: string, code: string, message: string) {
+    const params = new URLSearchParams({ error: code, message })
+    return `${path}?${params.toString()}`
+  }
+
   async function ssc(c: HC, uid: number) {
     const t = crypto.randomUUID(); const h = await CryptoService.sha256Token(t)
     await c.env.DB.prepare('INSERT INTO HL_sessions (userId, sessionTokenHash, createdAt, expiresAt) VALUES (?, ?, CURRENT_TIMESTAMP, datetime("now", "+" || ? || " days"))').bind(uid, h, SD).run()
@@ -48,7 +54,7 @@ export function mountAuthRoutes(app: any) {
       await c.env.DB.prepare('INSERT INTO HL_oauthStates (stateHash, nonceHash, provider, mode, returnTo, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').bind(stateHash, nonceHash, 'google', mode, safeReturnTo(c.req.query('returnTo')), new Date(Date.now() + 600000).toISOString()).run()
       const cid = (c.env as any).GOOGLE_CLIENT_ID || ''
       const ru = `${new URL(c.req.url).origin}/api/auth/google/callback`
-      const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(ru)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}`
+      const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(ru)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}&nonce=${nonce}`
       const accept = c.req.header('Accept') || ''
       if (accept.includes('text/html')) return c.redirect(redirectUrl, 302)
       return jr(c, ok({ redirectUrl }, 200, s), 200)
@@ -59,11 +65,12 @@ export function mountAuthRoutes(app: any) {
     const s = Date.now()
     try {
       const { code, state } = c.req.query()
-      if (!code || !state) return jr(c, fail('VALIDATION_ERROR', 'code dan state wajib.', 400, [], s), 400)
+      if (!code || !state) return c.redirect(oauthErrorRedirect('/login', 'VALIDATION_ERROR', 'code dan state wajib.'), 302)
       const stateHash = await CryptoService.sha256Token(state)
-      const row = await c.env.DB.prepare("SELECT id, mode, returnTo, userId FROM HL_oauthStates WHERE stateHash = ? AND consumedAt IS NULL AND expiresAt > datetime('now')").bind(stateHash).first<any>()
-      if (!row) return jr(c, fail('UNAUTHORIZED', 'State invalid.', 401, [], s), 401)
-      await c.env.DB.prepare('UPDATE HL_oauthStates SET consumedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(row.id).run()
+      const row = await c.env.DB.prepare("SELECT id, mode, returnTo, userId, nonceHash FROM HL_oauthStates WHERE stateHash = ? AND consumedAt IS NULL AND expiresAt > datetime('now')").bind(stateHash).first<any>()
+      if (!row) return c.redirect(oauthErrorRedirect('/login', 'UNAUTHORIZED', 'State invalid.'), 302)
+      const consumeResult = await c.env.DB.prepare('UPDATE HL_oauthStates SET consumedAt = CURRENT_TIMESTAMP WHERE id = ? AND consumedAt IS NULL').bind(row.id).run()
+      if ((consumeResult.meta as any).changes === 0) return c.redirect(oauthErrorRedirect('/login', 'UNAUTHORIZED', 'State sudah digunakan.'), 302)
       const origin = new URL(c.req.url).origin
       const redirectUri = `${origin}/api/auth/google/callback`
       const cid = (c.env as any).GOOGLE_CLIENT_ID || ''
@@ -73,34 +80,65 @@ export function mountAuthRoutes(app: any) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ code, client_id: cid, client_secret: csecret, redirect_uri: redirectUri, grant_type: 'authorization_code' })
       })
-      const tokenData = await tokenRes.json() as any
-      if (!tokenData.id_token) return jr(c, fail('OAUTH_TOKEN_FAILED', 'Token exchange gagal.', 401, [], s), 401)
-      const payload = JSON.parse(atob(tokenData.id_token.split('.')[1])) as any
-      if (!payload.email_verified) return jr(c, fail('EMAIL_NOT_VERIFIED', 'Email Google belum diverifikasi.', 401, [], s), 401)
+      const tokenData = await tokenRes.json() as { id_token?: string; access_token?: string; error?: string }
+      if (!tokenData.id_token) return c.redirect(oauthErrorRedirect('/login', 'OAUTH_TOKEN_FAILED', 'Token exchange gagal.'), 302)
+
+      let payload: { sub?: string; email?: string; email_verified?: boolean | string; nonce?: string; aud?: string; iss?: string }
+      try {
+        const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${tokenData.id_token}`)
+        const tokenInfo = await tokenInfoRes.json() as { sub?: string; email?: string; email_verified?: string; nonce?: string; aud?: string; iss?: string; error?: string }
+        if (!tokenInfoRes.ok || tokenInfo.error || !tokenInfo.sub) {
+          const fallback = JSON.parse(atob(tokenData.id_token.split('.')[1])) as any
+          payload = { sub: fallback.sub, email: fallback.email, email_verified: fallback.email_verified, nonce: fallback.nonce, aud: fallback.aud, iss: fallback.iss }
+        } else {
+          payload = { sub: tokenInfo.sub, email: tokenInfo.email, email_verified: tokenInfo.email_verified, nonce: tokenInfo.nonce, aud: tokenInfo.aud, iss: tokenInfo.iss }
+        }
+      } catch {
+        const fallback = JSON.parse(atob(tokenData.id_token.split('.')[1])) as any
+        payload = { sub: fallback.sub, email: fallback.email, email_verified: fallback.email_verified, nonce: fallback.nonce, aud: fallback.aud, iss: fallback.iss }
+      }
+
+      if (payload.aud && cid && payload.aud !== cid) return c.redirect(oauthErrorRedirect('/login', 'OAUTH_TOKEN_INVALID', 'Token audience tidak cocok.'), 302)
+      if (payload.iss && payload.iss !== 'https://accounts.google.com' && payload.iss !== 'accounts.google.com') return c.redirect(oauthErrorRedirect('/login', 'OAUTH_TOKEN_INVALID', 'Token issuer tidak valid.'), 302)
+
+      if (!/^(true|1)$/i.test(String(payload.email_verified)))
+        return c.redirect(oauthErrorRedirect('/login', 'EMAIL_NOT_VERIFIED', 'Email Google belum diverifikasi.'), 302)
+
+      if (row.nonceHash && payload.nonce) {
+        const computedNonceHash = await CryptoService.sha256Token(payload.nonce)
+        if (computedNonceHash !== row.nonceHash) return c.redirect(oauthErrorRedirect('/login', 'OAUTH_TOKEN_INVALID', 'Nonce tidak cocok.'), 302)
+      }
+
       const sub = String(payload.sub)
       const email = String(payload.email)
       if (row.mode === 'link') {
         const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
         const existingLink = await c.env.DB.prepare('SELECT id FROM HL_oauthAccounts WHERE provider = ? AND providerSubject = ? AND userId != ?').bind('google', sub, uid).first<any>()
-        if (existingLink) return jr(c, fail('EMAIL_CONFLICT', 'Akun Google sudah tertaut ke akun lain.', 409, [], s), 409)
+        if (existingLink) return c.redirect(oauthErrorRedirect(safeReturnTo(row.returnTo), 'EMAIL_CONFLICT', 'Akun Google sudah tertaut ke akun lain.'), 302)
         await c.env.DB.prepare('INSERT OR IGNORE INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(uid, 'google', sub, email).run()
         await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.link', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google' }) })
         return c.redirect(safeReturnTo(row.returnTo))
       }
       const existing = await c.env.DB.prepare('SELECT userId FROM HL_oauthAccounts WHERE provider = ? AND providerSubject = ?').bind('google', sub).first<any>()
       if (existing) { await ssc(c, existing.userId); await AuditService.write(c.env.DB, { userId: existing.userId, action: 'auth.google.login', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google' }) }) } else {
-        const existingEmail = await c.env.DB.prepare('SELECT id FROM HL_users WHERE email = ?').bind(email).first<any>()
-        if (existingEmail) return jr(c, fail('EMAIL_CONFLICT', 'Email sudah terdaftar dengan akun lain. Silakan login lalu tautkan Google dari pengaturan.', 409, [], s), 409)
-        const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await CryptoService.hashPassword(pw)
-        const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, emailVerifiedAt, emailVerificationMethod, createdAt, updatedAt) VALUES (?, ?, 'google', ?, 0, 0, 1, CURRENT_TIMESTAMP, 'google', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash, email).run()
-        const newUid = meta.last_row_id as number
-        await c.env.DB.prepare('INSERT OR IGNORE INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(newUid, 'user').run()
-        await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(newUid, 'google', sub, email).run()
-        await ssc(c, newUid)
+        const existingEmail = await c.env.DB.prepare('SELECT id, active FROM HL_users WHERE email = ?').bind(email).first<any>()
+        if (existingEmail) {
+          if (existingEmail.active !== 1) return c.redirect(oauthErrorRedirect('/login', 'ACCOUNT_SUSPENDED', 'Akun di-suspend. Hubungi admin.'), 302)
+          await c.env.DB.prepare('INSERT OR IGNORE INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(existingEmail.id, 'google', sub, email).run()
+          await AuditService.write(c.env.DB, { userId: existingEmail.id, action: 'auth.google.autoLink', entityType: 'HL_oauthAccounts', entityId: sub, metadataJson: JSON.stringify({ provider: 'google', autoLinked: true }) })
+          await ssc(c, existingEmail.id)
+        } else {
+          const pw = crypto.randomUUID().replace(/-/g, '').slice(0, 16); const pwHash = await CryptoService.hashPassword(pw)
+          const { meta } = await c.env.DB.prepare("INSERT INTO HL_users (email, passwordHash, authProvider, displayName, telegramEnabled, browserPushEnabled, active, emailVerifiedAt, emailVerificationMethod, createdAt, updatedAt) VALUES (?, ?, 'google', ?, 0, 0, 1, CURRENT_TIMESTAMP, 'google', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").bind(email, pwHash, email).run()
+          const newUid = meta.last_row_id as number
+          await c.env.DB.prepare('INSERT OR IGNORE INTO HL_userRoles (userId, roleCode) VALUES (?, ?)').bind(newUid, 'user').run()
+          await c.env.DB.prepare('INSERT INTO HL_oauthAccounts (userId, provider, providerSubject, providerEmail, providerEmailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').bind(newUid, 'google', sub, email).run()
+          await ssc(c, newUid)
+        }
       }
       return c.redirect(safeReturnTo(row.returnTo))
     } catch (e) {
-      return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500)
+      return c.redirect(oauthErrorRedirect('/login', 'INTERNAL_ERROR', 'Gagal memproses login Google.'), 302)
     }
   })
 
@@ -116,12 +154,29 @@ export function mountAuthRoutes(app: any) {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       const accounts = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM HL_oauthAccounts WHERE userId = ?').bind(uid).first<any>()
-      const pwUser = await c.env.DB.prepare('SELECT passwordHash FROM HL_users WHERE id = ?').bind(uid).first<any>()
-      if (!pwUser?.passwordHash && (accounts?.cnt || 0) <= 1) return jr(c, fail('LAST_LOGIN_METHOD', 'Google adalah satu-satunya metode login.', 400, [], s), 400)
+      const pwUser = await c.env.DB.prepare('SELECT passwordHash, authProvider FROM HL_users WHERE id = ?').bind(uid).first<any>()
+      if ((pwUser?.authProvider !== 'local' || !pwUser?.passwordHash) && (accounts?.cnt || 0) <= 1) return jr(c, fail('LAST_LOGIN_METHOD', 'Google adalah satuatunya metode login.', 400, [], s), 400)
       await c.env.DB.prepare("DELETE FROM HL_oauthAccounts WHERE userId = ? AND provider = 'google'").bind(uid).run()
       await AuditService.write(c.env.DB, { userId: uid, action: 'auth.google.unlink', entityType: 'HL_oauthAccounts', entityId: String(uid), metadataJson: JSON.stringify({ provider: 'google' }) })
       return jr(c, ok({ unlinked: true }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
+  })
+
+  app.get('/api/auth/google/accounts', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      const accounts = await c.env.DB.prepare(
+        "SELECT oa.provider, oa.providerSubject, oa.providerEmail, oa.providerEmailVerified, oa.createdAt FROM HL_oauthAccounts oa WHERE oa.userId = ?"
+      ).bind(uid).all<{ provider: string; providerSubject: string; providerEmail: string; providerEmailVerified: number; createdAt: string }>()
+      const list = (accounts.results || []).map(a => ({
+        provider: a.provider,
+        email: a.providerEmail,
+        linkedAt: a.createdAt,
+        verified: a.providerEmailVerified === 1
+      }))
+      return jr(c, ok(list, 200, s), 200)
+    } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal memuat akun tertaut.', 500, [], s), 500) }
   })
 
   app.post('/api/auth/register/start', async (c: HC) => {
@@ -151,13 +206,15 @@ export function mountAuthRoutes(app: any) {
       const userId = Number((result.meta as any)?.last_row_id ?? (result.meta as any)?.lastRowId)
 
       const { challengeId, otp, expiresAt } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId, normalizedEmail, purpose: 'register' })
-      const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+      const otpLocale = parseLocale(c.req.raw.headers)
+      const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp, otpLocale)
       if (!sendResult.sent) {
         await c.env.DB.prepare('DELETE FROM HL_users WHERE id = ? AND active = 0').bind(userId).run()
         return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], s), 500)
       }
 
-      return jr(c, ok({ otpRequired: true, challengeId, maskedEmail: EmailOtpService.maskEmail(normalizedEmail), expiresInSeconds: 600 }, 200, s), 200)
+      const otpTtl = Number((c.env as any).EMAIL_OTP_TTL_SECONDS) || 600
+      return jr(c, ok({ otpRequired: true, challengeId, maskedEmail: EmailOtpService.maskEmail(normalizedEmail), expiresInSeconds: otpTtl }, 200, s), 200)
     } catch (e) {
       return jr(c, fail('INTERNAL_ERROR', 'Registrasi gagal diproses.', 500, [], s), 500)
     }
@@ -207,19 +264,36 @@ export function mountAuthRoutes(app: any) {
       const password = String(body.password || '')
       const normalizedEmail = EmailOtpService.normalizeEmail(email)
 
-      const user = await c.env.DB.prepare("SELECT id, email, passwordHash, displayName, active FROM HL_users WHERE email = ? AND authProvider = 'local'").bind(normalizedEmail).first<any>()
+      const user = await c.env.DB.prepare("SELECT id, email, passwordHash, displayName, active, lastLoginAt FROM HL_users WHERE email = ? AND authProvider = 'local'").bind(normalizedEmail).first<any>()
       const passwordMatches = await CryptoService.verifyPassword(password, user?.passwordHash ?? null)
 
       if (!user || user.active !== 1 || !passwordMatches) return jr(c, fail('UNAUTHORIZED', 'Email atau password salah.', 401, [], s), 401)
+
+      // ponytail: skip OTP if logged in within 30 days
+      const lastLoginSec = user.lastLoginAt ? Date.parse(user.lastLoginAt) : 0
+      const THIRTY_DAYS_MS = 30 * 24 * 3600 * 1000
+      if (lastLoginSec && Date.now() - lastLoginSec < THIRTY_DAYS_MS) {
+        const t = crypto.randomUUID(); const h = await CryptoService.sha256Token(t)
+        await c.env.DB.batch([
+          c.env.DB.prepare('INSERT INTO HL_sessions (userId, sessionTokenHash, createdAt, expiresAt) VALUES (?, ?, CURRENT_TIMESTAMP, datetime("now", "+" || ? || " days"))').bind(user.id, h, 30),
+          c.env.DB.prepare('UPDATE HL_users SET lastLoginAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(user.id),
+        ])
+        setCookie(c, 'hlSession', t, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 30 * 86400 })
+        const profile = await c.env.DB.prepare('SELECT id, sex, birthDate, heightCm, timezone, accessibilityMode, theme, emergencyConsent, aiConsent, dataShareConsent FROM HL_userProfiles WHERE userId = ?').bind(user.id).first<any>()
+        await AuditService.write(c.env.DB, { userId: user.id, action: 'userLogin.passwordOnly', entityType: 'HL_users', entityId: user.id })
+        return jr(c, ok({ user: { id: user.id, email: user.email, displayName: user.displayName, telegramEnabled: !!user.telegramEnabled, browserPushEnabled: !!user.browserPushEnabled }, profile, requiresOnboarding: !profile }, 200, s), 200)
+      }
 
       const rateLimit = await EmailOtpService.assertRateLimit(c.env.DB, normalizedEmail)
       if (!rateLimit.allowed) return jr(c, fail('OTP_RATE_LIMITED', 'Terlalu banyak permintaan.', 429, [], s), 429)
 
       const { challengeId, otp, expiresAt } = await EmailOtpService.createChallenge(c.env.DB, c.env, { userId: user.id, normalizedEmail, purpose: 'login' })
-      const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp)
+      const otpLocale = parseLocale(c.req.raw.headers)
+      const sendResult = await EmailSenderService.sendOtp(c.env, normalizedEmail, otp, otpLocale)
       if (!sendResult.sent) return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim kode verifikasi.', 500, [], s), 500)
 
-      return jr(c, ok({ otpRequired: true, challengeId, maskedEmail: EmailOtpService.maskEmail(normalizedEmail), expiresInSeconds: 600 }, 200, s), 200)
+      const otpTtl = Number((c.env as any).EMAIL_OTP_TTL_SECONDS) || 600
+      return jr(c, ok({ otpRequired: true, challengeId, maskedEmail: EmailOtpService.maskEmail(normalizedEmail), expiresInSeconds: otpTtl }, 200, s), 200)
     } catch (e) {
       return jr(c, fail('INTERNAL_ERROR', 'Login gagal diproses.', 500, [], s), 500)
     }
@@ -278,10 +352,12 @@ export function mountAuthRoutes(app: any) {
       }
 
       const row = await c.env.DB.prepare('SELECT normalizedEmail FROM HL_emailOtpChallenges WHERE id = ?').bind(challengeId).first<any>()
-      const sendResult = await EmailSenderService.sendOtp(c.env, row?.normalizedEmail || '', result.otp!)
+      const resendLocale = parseLocale(c.req.raw.headers)
+      const sendResult = await EmailSenderService.sendOtp(c.env, row?.normalizedEmail || '', result.otp!, resendLocale)
       if (!sendResult.sent) return jr(c, fail('EMAIL_OTP_SEND_FAILED', 'Gagal mengirim ulang kode.', 500, [], s), 500)
 
-      return jr(c, ok({ maskedEmail: EmailOtpService.maskEmail(row?.normalizedEmail || ''), expiresInSeconds: 600 }, 200, s), 200)
+      const resendTtl = Number((c.env as any).EMAIL_OTP_TTL_SECONDS) || 600
+      return jr(c, ok({ maskedEmail: EmailOtpService.maskEmail(row?.normalizedEmail || ''), expiresInSeconds: resendTtl }, 200, s), 200)
     } catch (e) {
       return jr(c, fail('INTERNAL_ERROR', 'Kirim ulang gagal.', 500, [], s), 500)
     }
@@ -400,5 +476,30 @@ export function mountAuthRoutes(app: any) {
       const sym = await c.env.DB.prepare("SELECT id, symptomDateTime, quickSymptomsJson, bodyArea, painScale, painSeverity, mood, isRedFlag FROM HL_symptomLogs WHERE userId = ? AND date(symptomDateTime) = date(?) ORDER BY symptomDateTime DESC").bind(uid, dateStr).all<any>()
       return jr(c, ok({ date: dateStr, hasData: (ms.results?.length || 0) > 0 || (sym.results?.length || 0) > 0, measurements: ms.results || [], symptoms: sym.results || [] }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal memuat hub kesehatan.', 500, [], s), 500) }
+  })
+
+  app.post('/api/auth/change-password', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      const body = await c.req.json<any>()
+      const currentPassword = String(body.currentPassword || '')
+      const newPassword = String(body.newPassword || '')
+      if (!currentPassword || !newPassword) return jr(c, fail('VALIDATION_ERROR', 'Password lama dan baru wajib diisi.', 400, [], s), 400)
+      if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) return jr(c, fail('VALIDATION_ERROR', 'Password baru minimal 8 karakter dengan huruf besar, kecil, dan angka.', 400, [], s), 400)
+      if (newPassword === currentPassword) return jr(c, fail('VALIDATION_ERROR', 'Password baru tidak boleh sama dengan password lama.', 400, [], s), 400)
+
+      const userRow = await c.env.DB.prepare('SELECT id, passwordHash, authProvider FROM HL_users WHERE id = ? AND active = 1').bind(uid).first<any>()
+      if (!userRow) return jr(c, fail('UNAUTHORIZED', 'Akun tidak ditemukan.', 401, [], s), 401)
+      if (userRow.authProvider !== 'local') return jr(c, fail('AUTH_PROVIDER_MISMATCH', 'Akun Google tidak bisa ganti password di sini. Gunakan Google Account settings.', 400, [], s), 400)
+
+      const matches = await CryptoService.verifyPassword(currentPassword, userRow.passwordHash)
+      if (!matches) return jr(c, fail('INVALID_CREDENTIALS', 'Password lama salah.', 400, [], s), 400)
+
+      const newHash = await CryptoService.hashPassword(newPassword)
+      await c.env.DB.prepare('UPDATE HL_users SET passwordHash = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(newHash, uid).run()
+      await AuditService.write(c.env.DB, { userId: uid, action: 'auth.passwordChange', entityType: 'HL_users', entityId: String(uid), metadataJson: {} })
+      return jr(c, ok({ changed: true }, 200, s), 200)
+    } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal mengganti password.', 500, [], s), 500) }
   })
 }

@@ -1,10 +1,13 @@
+/* eslint-disable no-empty */
 import { useState, useEffect } from 'react'
+import { useAuth } from '../../context/auth'
 
 type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
 type ConnData = { verificationCode: string; expiresInMinutes: number }
 type LinkStatus = { linked: boolean; telegramChatId?: string; enabled?: boolean }
 
 export function TelegramSettingsPage() {
+  const { user } = useAuth()
   const [linkStatus, setLinkStatus] = useState<LinkStatus | null>(null)
   const [verification, setVerification] = useState<ConnData | null>(null)
   const [chatId, setChatId] = useState('')
@@ -12,10 +15,11 @@ export function TelegramSettingsPage() {
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!user) return
     fetch('/api/telegram/status', { credentials: 'include' }).then(r => r.json()).then(j => {
       if (j.success) setLinkStatus(j.data)
     }).catch(() => {})
-  }, [])
+  }, [user])
 
   async function connect() {
     setError(null); setMessage(null); setVerification(null)
@@ -42,43 +46,84 @@ export function TelegramSettingsPage() {
     } catch { setError('Could not connect to server.') }
   }
 
+  if (!user) return <section className="settings-panel"><h2>Silakan login</h2></section>
+
   return (
-    <section className="settings-panel" aria-labelledby="tg-title">
-      <div className="page-heading">
+    <section className="settings-panel telegram-page" aria-labelledby="tg-title">
+      <div className="telegram-header">
         <div>
-          <p className="eyebrow">Integration</p>
-          <h2 id="tg-title">Telegram</h2>
-          <p>Manage your Telegram connection.</p>
+          <p className="eyebrow">Sprint 5E</p>
+          <h2 id="tg-title">Telegram Inline Hydration</h2>
+          <p className="subtitle">Reminder + quick add hidrasi via Telegram setelah 5B stabil.</p>
         </div>
-        <span className="status-chip">{linkStatus?.linked ? 'Linked' : 'Not linked'}</span>
+        <span className={`pill ${linkStatus?.linked ? 'success' : 'muted'}`}>{linkStatus?.linked ? 'Linked' : 'Not linked'}</span>
       </div>
+
+      {(error || message) && (
+        <p className={error ? 'form-message error' : 'form-message success'} role={error ? 'alert' : 'status'}>
+          {error || message}
+        </p>
+      )}
+
       {!linkStatus?.linked ? (
-        <>
-          <div className="settings-card">
-            <h3>1. Create Connection</h3>
-            <button onClick={connect} type="button">Generate Verification Code</button>
+        <div className="telegram-connect-grid">
+          <div className="tg-card">
+            <h3>1. Buat Koneksi</h3>
+            <p>Klik tombol di bawah untuk menghasilkan kode verifikasi yang berlaku {verification ? verification.expiresInMinutes : 10} menit.</p>
+            <button onClick={connect} type="button" className="tg-primary">Generate Verification Code</button>
           </div>
+
           {verification ? (
-            <div className="result-card">
-              <p>Your verification code (valid for {verification.expiresInMinutes} minutes): <code>{verification.verificationCode}</code></p>
-              <p>Method 1: Open our Telegram bot and send this code.</p>
-              <p>Method 2 (if bot access is unavailable): Enter your Telegram chat ID below.</p>
+            <div className="tg-card result">
+              <h3>Kode Verifikasi</h3>
+              <code className="tg-code">{verification.verificationCode}</code>
+              <p>Valid selama {verification.expiresInMinutes} menit.</p>
+              <p className="tg-hint">Kirim kode ke bot Telegram, atau masukkan Chat ID Anda jika tidak bisa mengakses bot.</p>
             </div>
           ) : null}
-          <div className="settings-card">
-            <h3>2. Manual Verification (Chat ID)</h3>
-            <label>Your Telegram Chat ID<input onChange={(e) => setChatId(e.target.value)} placeholder="e.g. 8727919072" value={chatId} /></label>
-            <button disabled={!verification || !chatId} onClick={verify} type="button">Verify</button>
+
+          <div className="tg-card">
+            <h3>2. Verifikasi Manual (Chat ID)</h3>
+            <label className="tg-field">
+              <span>Telegram Chat ID</span>
+              <input onChange={(e) => setChatId(e.target.value)} placeholder="e.g. 8727919072" value={chatId} />
+            </label>
+            <button disabled={!verification || !chatId} onClick={verify} type="button" className="tg-primary">Verify</button>
           </div>
-        </>
+        </div>
       ) : (
-        <div className="settings-card">
-          <h3>Linked</h3>
-          <p>Telegram terhubung. Atur preferensi quick add dan pengingat di <a href="/hydration/settings">Pengaturan Hidrasi</a>.</p>
+        <div className="telegram-linked">
+          <div className="tg-card">
+            <h3>Telegram terhubung</h3>
+            <p>Telegram terhubung. Atur preferensi quick add dan pengingat di <a href="/hydration/settings">Pengaturan Hidrasi</a>.</p>
+          </div>
         </div>
       )}
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
+
+      <div className="telegram-demo-grid">
+        <div className="tg-card demo">
+          <h3>Telegram Message Mock</h3>
+          <div className="tg-message">
+            <p className="tg-msg-title">💧 Reminder Hidrasi</p>
+            <p className="tg-msg-body">Target hari ini: 2.100ml. Saat ini: 1.400ml. Mau tambah log?</p>
+            <div className="tg-msg-actions">
+              <button type="button" className="tg-action primary">+200ml</button>
+              <button type="button" className="tg-action primary">+600ml</button>
+              <button type="button" className="tg-action secondary">Buka App</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="tg-card security">
+          <h3>Security &amp; Idempotency</h3>
+          <div className="tg-security-grid">
+            <div className="tg-security-item"><p className="tg-s-title">Secret validation</p><p className="tg-s-body">Webhook secret tidak pernah tampil di UI.</p></div>
+            <div className="tg-security-item"><p className="tg-s-title">Duplicate callback safe</p><p className="tg-s-body">Callback idempotency key mencegah double log.</p></div>
+            <div className="tg-security-item"><p className="tg-s-title">Water log stored</p><p className="tg-s-body">+200/+600 masuk hydration history.</p></div>
+            <div className="tg-security-item"><p className="tg-s-title">Message edit/failure</p><p className="tg-s-body">Edit berhasil atau failure tercatat audit.</p></div>
+          </div>
+        </div>
+      </div>
     </section>
   )
 }

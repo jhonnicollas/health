@@ -1,0 +1,31 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+import { APP_SIGNUP_URL } from "@/data/navigation";
+
+interface Props {
+  locale?: Locale;
+  title?: string;
+  subtitle?: string;
+  primaryCta?: string;
+  primaryHref?: string;
+  secondaryCta?: string;
+  secondaryHref?: string;
+}
+
+const { locale = "id", title = t(locale, "cta.title"), subtitle = t(locale, "cta.subtitle"), primaryCta = t(locale, "cta.primary"), primaryHref = APP_SIGNUP_URL, secondaryCta, secondaryHref } = Astro.props;
+---
+
+<section class="section-padding" style="background: var(--gradient-hero);">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{title}</h2>
+    <p class="text-lg mb-8" style="color: var(--color-text-muted);">{subtitle}</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a href={primaryHref} class="btn-primary text-lg px-8 py-4">{primaryCta}</a>
+      {secondaryCta && secondaryHref && (
+        <a href={secondaryHref} class="btn-secondary text-lg px-8 py-4">{secondaryCta}</a>
+      )}
+    </div>
+    <p class="text-xs mt-4" style="color: var(--color-text-muted);">{t(locale, "hero.trust")}</p>
+  </div>
+</section>

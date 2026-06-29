@@ -1,0 +1,52 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import CTASection from "@/components/common/CTASection.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "en" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id/use-cases/laporan-dokter`,
+  en: `https://isehat.biz.id/en/use-cases/laporan-dokter`,
+};
+---
+
+<BaseLayout title={t(locale, "usecase.report.title")} description={t(locale, "usecase.report.subtitle")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "usecase.report.title")}</h1>
+      <p class="text-lg mb-8" style="color: var(--color-text-muted);">{t(locale, "usecase.report.subtitle")}</p>
+
+      <div class="space-y-8">
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📊 {t(locale, "usecase.report.charts")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.report.charts.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📋 {t(locale, "usecase.report.summary")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.report.summary.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">💊 {t(locale, "usecase.report.medlog")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.report.medlog.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🚨 {t(locale, "usecase.report.alertlog")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.report.alertlog.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📝 {t(locale, "usecase.report.symptoms")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.report.symptoms.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📎 {t(locale, "usecase.report.evidence")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.report.evidence.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">⚖️ {t(locale, "usecase.report.disclaimer")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.report.disclaimer.desc")}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <CTASection locale={locale} />
+</BaseLayout>

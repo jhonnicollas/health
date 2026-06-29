@@ -1,0 +1,103 @@
+---
+import BlogLayout from "@/layouts/BlogLayout.astro";
+import MedicalDisclaimerBox from "@/components/common/MedicalDisclaimerBox.astro";
+import Breadcrumb from "@/components/common/Breadcrumb.astro";
+import { formatDate } from "@/utils/date";
+import { getCollection } from "astro:content";
+import { t } from "@/i18n/translations";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog", ({ data }) => !data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }));
+}
+
+const locale = "en" as const;
+const { post } = Astro.props;
+const { Content } = await post.render();
+const readingTime = Math.max(1, Math.ceil(post.body?.split(/\s+/).length / 200)) || 3;
+
+const allPosts = await getCollection("blog", ({ data }) => !data.draft);
+const related = allPosts
+  .filter((p) => p.slug !== post.slug && p.data.category === post.data.category)
+  .slice(0, 3);
+
+const pathWithoutSlug = `/blog/${post.slug}`;
+const alternateUrls = {
+  id: `https://isehat.biz.id${pathWithoutSlug}`,
+  en: `https://isehat.biz.id/en${pathWithoutSlug}`,
+};
+---
+
+<BlogLayout
+  title={post.data.title}
+  description={post.data.description}
+  publishedAt={post.data.publishedAt}
+  updatedAt={post.data.updatedAt}
+  category={post.data.category}
+  ogImage={post.data.coverImage}
+  locale={locale}
+  alternateUrls={alternateUrls}
+>
+  <Breadcrumb items={["Blog", post.data.category, post.data.title]} label="Navigation" />
+
+  <div class="mb-6">
+    <div class="text-sm font-medium mb-2" style="color: var(--color-primary);">{post.data.category}</div>
+    <h1 class="text-3xl md:text-4xl font-bold mb-3" style="color: var(--color-text);">{post.data.title}</h1>
+    <p class="text-lg mb-4" style="color: var(--color-text-muted);">{post.data.description}</p>
+    <div class="flex flex-wrap gap-4 text-sm" style="color: var(--color-text-muted);">
+      <span>{post.data.author}</span>
+      <span>{formatDate(post.data.publishedAt)}</span>
+      <span>{readingTime} {t(locale, "blog.readingTime")}</span>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-3">
+      {post.data.tags?.map((tag: string) => (
+        <span class="text-xs px-2 py-1 rounded-full" style="background-color: var(--color-bg-soft); color: var(--color-text-muted);">{tag}</span>
+      ))}
+    </div>
+  </div>
+
+  <MedicalDisclaimerBox locale={locale} class="mb-8" />
+
+  <div class="prose max-w-none mb-8" style="color: var(--color-text);">
+    <Content />
+  </div>
+
+  {post.data.references?.length > 0 && (
+    <div class="mb-8">
+      <h2 class="text-xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "blog.references")}</h2>
+      <ol class="list-decimal list-inside space-y-2 text-sm" style="color: var(--color-text-muted);">
+        {post.data.references.map((ref: { label: string; url: string }) => (
+          <li>
+            {ref.url ? (
+              <a href={ref.url} target="_blank" rel="noopener noreferrer" class="underline" style="color: var(--color-primary);">{ref.label}</a>
+            ) : (
+              <span>{ref.label}</span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  )}
+
+  <div class="card mb-8 text-center">
+    <p class="font-semibold mb-2" style="color: var(--color-text);">{t(locale, "blog.cta")}</p>
+    <a href="https://app.isehat.biz.id/register" class="btn-primary">{t(locale, "cta.primary")}</a>
+  </div>
+
+  {related.length > 0 && (
+    <div class="mb-8">
+      <h2 class="text-xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "blog.related")}</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {related.map((r) => (
+          <a href={`/en/blog/${r.slug}`} class="card group hover:translate-y-[-2px] transition-transform">
+            <div class="text-xs font-medium mb-1" style="color: var(--color-primary);">{r.data.category}</div>
+            <h3 class="font-semibold text-sm" style="color: var(--color-text);">{r.data.title}</h3>
+          </a>
+        ))}
+      </div>
+    </div>
+  )}
+</BlogLayout>

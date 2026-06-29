@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useI18n } from '../../i18n'
 
 type Article = {
   id: string
@@ -17,20 +18,20 @@ type ArticleSection = {
   bullets: string[]
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  all: 'All',
-  device: 'Devices',
-  metric: 'Metrics',
-  safety: 'Safety'
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+  all: 'kb.catAll',
+  device: 'kb.catDevice',
+  metric: 'kb.catMetric',
+  safety: 'kb.catSafety'
 }
 
-const WORKFLOW_STEPS = [
-  { icon: 'info', label: 'Purpose', description: 'Understand what this device measures' },
-  { icon: 'settings_input_component', label: 'Device Setup', description: 'Prepare the device for measurement' },
-  { icon: 'photo_camera', label: 'Photo', description: 'Take a clear photo of the reading' },
-  { icon: 'analytics', label: 'Read Result', description: 'Verify the extracted values' },
-  { icon: 'replay', label: 'Retry', description: 'Retake if the reading is unclear' },
-  { icon: 'contact_phone', label: 'Medical Contact', description: 'Consult a doctor for interpretation' }
+const WORKFLOW_STEP_KEYS = [
+  { icon: 'info', labelKey: 'kb.stepPurpose', descKey: 'kb.stepPurposeDesc' },
+  { icon: 'settings_input_component', labelKey: 'kb.stepSetup', descKey: 'kb.stepSetupDesc' },
+  { icon: 'photo_camera', labelKey: 'kb.stepPhoto', descKey: 'kb.stepPhotoDesc' },
+  { icon: 'analytics', labelKey: 'kb.stepRead', descKey: 'kb.stepReadDesc' },
+  { icon: 'replay', labelKey: 'kb.stepRetry', descKey: 'kb.stepRetryDesc' },
+  { icon: 'contact_phone', labelKey: 'kb.stepContact', descKey: 'kb.stepContactDesc' }
 ]
 
 function articleIcon(article: Article) {
@@ -94,6 +95,7 @@ function matchWorkflowStep(section: ArticleSection): number {
 }
 
 export function KnowledgeBasePage() {
+  const { t } = useI18n()
   const [articles, setArticles] = useState<Article[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [category, setCategory] = useState('all')
@@ -101,9 +103,9 @@ export function KnowledgeBasePage() {
 
   useEffect(() => {
     fetch('/api/kb', { credentials: 'include' })
-      .then((r) => r.json() as Promise<ApiResp<{ articles: Article[] }>>)
+      .then((r) => { if (!r.ok) return null; return r.json() as Promise<ApiResp<{ articles: Article[] }>> })
       .then((d) => {
-        if (d.success && d.data?.articles) {
+        if (d && d.success && d.data?.articles) {
           setArticles(d.data.articles)
           setSelectedId(d.data.articles[0]?.id ?? null)
         }
@@ -114,8 +116,8 @@ export function KnowledgeBasePage() {
     const selected = articles.find(a => a.id === selectedId)
     if (!selected?.slug) return
     fetch(`/api/kb/${encodeURIComponent(selected.slug)}`, { credentials: 'include' })
-      .then(r => r.json() as Promise<ApiResp<{ article: Article }>>)
-      .then(body => { if (body.success && body.data?.article) setFullArticle(body.data.article) })
+      .then(r => { if (!r.ok) return null; return r.json() as Promise<ApiResp<{ article: Article }>> })
+      .then(body => { if (body && body.success && body.data?.article) setFullArticle(body.data.article) })
       .catch(() => {})
   }, [selectedId, articles])
 
@@ -135,14 +137,14 @@ export function KnowledgeBasePage() {
     <div className="kb-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Knowledge</p>
-          <h2>Knowledge Base</h2>
-          <p>Guided measurement workflows for each device.</p>
+          <p className="eyebrow">{t('kb.eyebrow')}</p>
+          <h2>{t('kb.title')}</h2>
+          <p>{t('kb.subtitle')}</p>
         </div>
-        <span className="status-chip">{articles.length} guides</span>
+        <span className="status-chip">{articles.length} {t('kb.guides')}</span>
       </div>
 
-      {articles.length === 0 ? <p>No guides available yet.</p> : null}
+      {articles.length === 0 ? <p>{t('kb.noGuides')}</p> : null}
 
       {articles.length > 0 ? (
         <div className="kb-shell">
@@ -155,7 +157,7 @@ export function KnowledgeBasePage() {
                   onClick={() => setCategory(item)}
                   type="button"
                 >
-                  {CATEGORY_LABELS[item] ?? item}
+                  {t(CATEGORY_LABEL_KEYS[item] ?? '') || item}
                 </button>
               ))}
             </div>
@@ -181,7 +183,7 @@ export function KnowledgeBasePage() {
           {displayArticle ? (
             <article className="kb-reader" aria-labelledby="kb-reader-title">
               <header className="kb-reader-hero">
-                <span className="status-chip">{CATEGORY_LABELS[displayArticle.category ?? 'device'] ?? displayArticle.category}</span>
+                <span className="status-chip">{t(CATEGORY_LABEL_KEYS[displayArticle.category ?? 'device'] ?? '') || displayArticle.category}</span>
                 <div className="kb-reader-title-row">
                   <span className="material-symbols-outlined" aria-hidden="true">{articleIcon(displayArticle)}</span>
                   <h3 id="kb-reader-title">{displayArticle.title}</h3>
@@ -189,19 +191,19 @@ export function KnowledgeBasePage() {
                 <p>{articleSummary(displayArticle)}</p>
                 <a href="/measurements/new" className="kb-cta-btn">
                   <span className="material-symbols-outlined">add_circle</span>
-                  Record with this device
+                  {t('kb.recordWithDevice')}
                 </a>
               </header>
 
               <div className="kb-workflow-stepper">
-                {WORKFLOW_STEPS.map((step, i) => (
-                  <div key={step.label} className={`kb-workflow-step ${sections.some(s => matchWorkflowStep(s) === i) ? 'has-content' : ''}`}>
+                {WORKFLOW_STEP_KEYS.map((step, i) => (
+                  <div key={step.labelKey} className={`kb-workflow-step ${sections.some(s => matchWorkflowStep(s) === i) ? 'has-content' : ''}`}>
                     <div className="kb-workflow-step-icon">
                       <span className="material-symbols-outlined">{step.icon}</span>
                     </div>
                     <div className="kb-workflow-step-text">
-                      <strong>{i + 1}. {step.label}</strong>
-                      <small>{step.description}</small>
+                      <strong>{i + 1}. {t(step.labelKey)}</strong>
+                      <small>{t(step.descKey)}</small>
                     </div>
                   </div>
                 ))}
@@ -232,8 +234,8 @@ export function KnowledgeBasePage() {
               <div className="kb-contact-footer">
                 <span className="material-symbols-outlined">contact_phone</span>
                 <div>
-                  <strong>Need medical interpretation?</strong>
-                  <p>Consult your doctor for clinical decisions. This app provides data, not diagnosis.</p>
+                  <strong>{t('kb.needInterpretation')}</strong>
+                  <p>{t('kb.consultDoctor')}</p>
                 </div>
               </div>
             </article>

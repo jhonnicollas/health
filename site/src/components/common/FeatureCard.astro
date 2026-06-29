@@ -1,0 +1,32 @@
+---
+export interface Props {
+  title: string;
+  description?: string;
+  icon?: string;
+  safety?: string;
+  cta?: string;
+  ctaHref?: string;
+}
+
+const { title, description, icon, safety, cta, ctaHref } = Astro.props;
+---
+
+<div class="card group hover:translate-y-[-2px] transition-transform">
+  {icon && (
+    <div class="text-2xl mb-3" style="color: var(--color-primary);">{icon}</div>
+  )}
+  <h3 class="font-semibold text-lg mb-2" style="color: var(--color-text);">{title}</h3>
+  {description && <p class="text-sm mb-3" style="color: var(--color-text-muted);">{description}</p>}
+  {safety && (
+    <p class="text-xs mb-2 flex items-center gap-1" style="color: var(--color-warning);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      {safety}
+    </p>
+  )}
+  {cta && ctaHref && (
+    <a href={ctaHref} class="text-sm font-medium inline-flex items-center gap-1" style="color: var(--color-primary);">
+      {cta}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+  )}
+</div>

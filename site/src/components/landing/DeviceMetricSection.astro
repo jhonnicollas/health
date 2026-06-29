@@ -1,0 +1,40 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+import { supportedDevices, allMetrics } from "@/data/productionCapabilities";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+---
+
+<section class="section-padding" style="background-color: var(--color-bg-soft);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "device.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "device.subtitle")}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+      {supportedDevices.map((device) => (
+        <div class="card">
+          <h3 class="font-semibold mb-2" style="color: var(--color-text);">{device.name}</h3>
+          <div class="flex flex-wrap gap-2">
+            {device.metrics.map((m) => (
+              <span class="text-xs px-2 py-1 rounded-full" style="background-color: var(--color-primary); color: var(--color-primary-foreground); opacity: 0.9;">{m}</span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+    <div class="max-w-4xl mx-auto">
+      <h3 class="font-semibold mb-4 text-center" style="color: var(--color-text);">{t(locale, "device.allMetrics")}</h3>
+      <div class="flex flex-wrap justify-center gap-2">
+        {allMetrics.map((m) => (
+          <span class="text-xs px-3 py-1.5 rounded-full" style="background-color: var(--color-surface); color: var(--color-text-muted); box-shadow: var(--shadow-soft);">{m}</span>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

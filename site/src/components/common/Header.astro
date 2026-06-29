@@ -1,0 +1,120 @@
+---
+import { navigation, APP_LOGIN_URL, APP_SIGNUP_URL } from "@/data/navigation";
+import { t } from "@/i18n/translations";
+import { localeNames } from "@/i18n/utils";
+import type { Locale } from "@/i18n/utils";
+import LanguageSwitcher from "./LanguageSwitcher.astro";
+
+export interface Props {
+  locale?: Locale;
+  currentPath?: string;
+}
+
+const { locale = "id", currentPath = "/" } = Astro.props;
+
+const navItems = [
+  { label: t(locale, "nav.fitur"), href: locale === "en" ? "/en/features" : "/features" },
+  { label: t(locale, "nav.harga"), href: locale === "en" ? "/en/pricing" : "/pricing" },
+  { label: t(locale, "nav.blog"), href: locale === "en" ? "/en/blog" : "/blog" },
+  { label: t(locale, "nav.usecase"), href: locale === "en" ? "/en/use-cases/keluarga" : "/use-cases/keluarga" },
+  { label: t(locale, "nav.tentang"), href: locale === "en" ? "/en/about" : "/about" },
+  { label: t(locale, "nav.kontak"), href: locale === "en" ? "/en/contact" : "/contact" },
+];
+
+const themeLabels = { light: t(locale, "theme.light"), dark: t(locale, "theme.dark"), warm: t(locale, "theme.warm") };
+---
+
+<header id="site-header" class="fixed top-0 left-0 right-0 z-50 transition-colors" style="background-color: var(--color-bg); border-bottom: 1px solid var(--color-border);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <a href={locale === "en" ? "/en" : "/"} class="flex items-center gap-2 font-bold text-xl" style="color: var(--color-primary);">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="28" height="28" rx="6" fill="currentColor" />
+          <path d="M8 14h4l2-4 3 8 2-4h3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        iSehat
+      </a>
+
+      <nav class="hidden md:flex items-center gap-6">
+        {navItems.map((item) => (
+          <a href={item.href} class="text-sm font-medium transition-colors hover:opacity-80" style="color: var(--color-text-muted);">
+            {item.label}
+          </a>
+        ))}
+      </nav>
+
+      <div class="hidden md:flex items-center gap-3">
+        <LanguageSwitcher locale={locale} currentPath={currentPath} />
+        <button id="theme-toggle-desktop" type="button" aria-label="Toggle theme" class="p-2 rounded-lg transition-colors" style="color: var(--color-text-muted);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
+        <a href={APP_LOGIN_URL} class="text-sm font-medium transition-colors hover:opacity-80" style="color: var(--color-text-muted);">{t(locale, "nav.masuk")}</a>
+        <a href={APP_SIGNUP_URL} class="btn-primary text-sm">{t(locale, "nav.daftar")}</a>
+      </div>
+
+      <button id="mobile-menu-btn" type="button" class="md:hidden p-2 rounded-lg" style="color: var(--color-text-muted);" aria-label="Menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="mobile-menu" class="hidden md:hidden" style="border-top: 1px solid var(--color-border); background-color: var(--color-bg);">
+    <div class="px-4 py-4 space-y-3">
+      {navItems.map((item) => (
+        <a href={item.href} class="block text-base font-medium py-2" style="color: var(--color-text-muted);">{item.label}</a>
+      ))}
+      <div class="flex items-center gap-3 pt-3" style="border-top: 1px solid var(--color-border);">
+        <LanguageSwitcher locale={locale} currentPath={currentPath} />
+        <button id="theme-toggle-mobile" type="button" aria-label="Toggle theme" class="p-2 rounded-lg" style="color: var(--color-text-muted);">
+          {locale === "id" ? "Tema" : "Theme"}: <span id="theme-label-mobile">{themeLabels[locale === "id" ? "light" : "light"]}</span>
+        </button>
+      </div>
+      <a href={APP_LOGIN_URL} class="block text-base font-medium py-2" style="color: var(--color-text-muted);">{t(locale, "nav.masuk")}</a>
+      <a href={APP_SIGNUP_URL} class="btn-primary text-center block">{t(locale, "nav.daftar")}</a>
+    </div>
+  </div>
+</header>
+
+<div class="h-16"></div>
+
+<script>
+  const mobileBtn = document.getElementById("mobile-menu-btn");
+  const mobileMenu = document.getElementById("mobile-menu");
+  mobileBtn?.addEventListener("click", () => {
+    mobileMenu?.classList.toggle("hidden");
+  });
+
+  function initTheme() {
+    const theme = localStorage.getItem("isehat-theme") || "light";
+    document.documentElement.setAttribute("data-theme", theme);
+    updateLabel(theme);
+  }
+
+  function updateLabel(theme: string) {
+    const el = document.getElementById("theme-label-mobile");
+    if (el) {
+      const map: Record<string,string> = el.dataset.labels ? JSON.parse(el.dataset.labels) : {};
+      el.textContent = map[theme] || theme;
+    }
+  }
+
+  function cycleTheme() {
+    const order = ["light", "dark", "warm"];
+    const current = localStorage.getItem("isehat-theme") || "light";
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    localStorage.setItem("isehat-theme", next);
+    document.documentElement.setAttribute("data-theme", next);
+    updateLabel(next);
+  }
+
+  initTheme();
+  document.getElementById("theme-toggle-desktop")?.addEventListener("click", cycleTheme);
+  document.getElementById("theme-toggle-mobile")?.addEventListener("click", cycleTheme);
+
+  const header = document.getElementById("site-header");
+  window.addEventListener("scroll", () => {
+    if (!header) return;
+    header.style.backdropFilter = window.scrollY > 10 ? "blur(12px)" : "none";
+    header.style.opacity = window.scrollY > 10 ? "0.97" : "1";
+  });
+</script>

@@ -1,0 +1,51 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+import { getPricingPlans } from "@/data/pricing";
+
+export interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+const slicedPlans = getPricingPlans(locale).slice(0, 3);
+---
+
+<section class="section-padding">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "pricing.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "pricing.subtitle")}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+      {slicedPlans.map((plan, i) => (
+        <div class:list={["card relative", plan.highlight && "ring-2"]} style={plan.highlight ? "border-color: var(--color-primary);" : ""}>
+          {plan.highlight && (
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold" style="background-color: var(--color-primary); color: var(--color-primary-foreground);">{t(locale, "pricing.populer")}</div>
+          )}
+          <h3 class="font-bold text-xl mb-1" style="color: var(--color-text);">{plan.name}</h3>
+          <div class="mb-1">
+            <span class="text-2xl font-bold" style="color: var(--color-primary);">{plan.price}</span>
+            {plan.period && <span class="text-sm" style="color: var(--color-text-muted);">{plan.period}</span>}
+          </div>
+          <p class="text-sm mb-4" style="color: var(--color-text-muted);">{plan.description}</p>
+          <ul class="space-y-2 mb-6">
+            {plan.features.map((f) => (
+              <li class="flex items-start gap-2 text-sm" style="color: var(--color-text-muted);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="flex-shrink-0 mt-0.5" style="color: var(--color-success);"><polyline points="20 6 9 17 4 12"/></svg>
+                {f}
+              </li>
+            ))}
+          </ul>
+          <a href={i === 0 ? "https://app.isehat.biz.id/register" : locale === "en" ? "/en/pricing" : "/pricing"} class:list={["w-full text-center block", plan.highlight ? "btn-primary" : "btn-secondary"]}>{plan.cta}</a>
+        </div>
+      ))}
+    </div>
+    <div class="text-center mt-8">
+      <a href={locale === "en" ? "/en/pricing" : "/pricing"} class="text-sm font-medium inline-flex items-center gap-1" style="color: var(--color-primary);">
+        {t(locale, "pricing.allPlans")}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </div>
+</section>

@@ -40,6 +40,8 @@ export function MedicationsPage() {
         fetch('/api/medications', { credentials: 'include' }),
         fetch('/api/medications/logs', { credentials: 'include' })
       ])
+      if (!medRes.ok) { setError('Gagal memuat obat.'); return }
+      if (!logRes.ok) { setError('Gagal memuat log obat.'); return }
       const medBody = (await medRes.json()) as ApiResp<{ medications: Medication[] }>
       const logBody = (await logRes.json()) as ApiResp<{ logs: MedicationLog[] }>
       if (!medBody.success) {

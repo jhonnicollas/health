@@ -1,0 +1,41 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+import MedicalDisclaimerBox from "./MedicalDisclaimerBox.astro";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+
+const safetyItems = [
+  { icon: "🛡️", titleKey: "safety.rule", descKey: "safety.rule.desc" },
+  { icon: "✋", titleKey: "safety.manual", descKey: "safety.manual.desc" },
+  { icon: "🚫", titleKey: "safety.nodoc", descKey: "safety.nodoc.desc" },
+  { icon: "🏥", titleKey: "safety.redflag", descKey: "safety.redflag.desc" },
+  { icon: "🔐", titleKey: "safety.consentfirst", descKey: "safety.consentfirst.desc" },
+  { icon: "🔒", titleKey: "safety.datasensitif", descKey: "safety.datasensitif.desc" },
+];
+---
+
+<section class="section-padding" style="background-color: var(--color-bg-soft);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-3xl md:text-4xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "safety.title")}</h2>
+      <p class="text-lg mb-8" style="color: var(--color-text-muted);">{t(locale, "safety.subtitle")}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+      {safetyItems.map((item) => (
+        <div class="card text-center">
+          <div class="text-2xl mb-2" style="color: var(--color-primary);">{item.icon}</div>
+          <h3 class="font-semibold mb-2" style="color: var(--color-text);">{t(locale, item.titleKey)}</h3>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, item.descKey)}</p>
+        </div>
+      ))}
+    </div>
+    <div class="max-w-2xl mx-auto mt-8">
+      <MedicalDisclaimerBox locale={locale} />
+    </div>
+  </div>
+</section>

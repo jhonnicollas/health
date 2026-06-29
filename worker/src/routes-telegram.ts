@@ -15,7 +15,8 @@ function ok(data: unknown, status = 200, s = Date.now(), metaExtra?: Record<stri
 function fail(code: string, msg: string, status: number, errs: unknown[] = [], s = Date.now()) { return { body: { success: false, error: { code, message: msg, details: errs }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 
 function base64Url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const bytes = new Uint8Array(buf); let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  return btoa(bin).replace(/=+$/g, '').replace(/\+/g, '-').replace(/\//g, '_')
 }
 async function getSession(c: HC): Promise<number | null> {
   const token = getCookie(c, 'hlSession'); if (!token) return null
@@ -138,7 +139,7 @@ export function mountTelegramRoutes(app: any) {
   })
 
   // Legacy alias — backward compat
-  app.post('/api/telegram/water-webhook', async (c: HC) => { return c.json({ ok: true, message: 'Use /api/webhook/telegram/water' }, 301) })
+  app.post('/api/telegram/water-webhook', async (c: HC) => { return c.redirect('/api/webhook/telegram/water', 307) })
 
   // S5E-005: Hydration reminder cron route
   app.post('/api/internal/cron/hydration-reminders', async (c: HC) => {
@@ -146,7 +147,7 @@ export function mountTelegramRoutes(app: any) {
     try {
       const internalSecret = (c.env as any).INTERNAL_API_SECRET || ''
       const header = c.req.header('X-HL-Internal-Cron-Secret') || c.req.header('authorization') || ''
-      if (internalSecret && !header.includes(internalSecret)) return jr(c, fail('UNAUTHORIZED', 'Invalid secret.', 401, [], s), 401)
+      if (internalSecret && header !== internalSecret) return jr(c, fail('UNAUTHORIZED', 'Invalid secret.', 401, [], s), 401)
 
       const body = await c.req.json().catch(() => ({})) as { runAt?: string; dryRun?: boolean }
       const runAt = body.runAt || new Date().toISOString()

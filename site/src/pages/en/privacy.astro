@@ -1,0 +1,48 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "en" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id/privacy`,
+  en: `https://isehat.biz.id/en/privacy`,
+};
+---
+
+<BaseLayout title={t(locale, "privacy.title")} description="iSehat privacy policy. Health data is sensitive and protected." locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 prose" style="color: var(--color-text);">
+      <h1 class="text-4xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "privacy.title")}</h1>
+      <p class="text-sm mb-6" style="color: var(--color-text-muted);">Last updated: June 2026</p>
+
+      <h2>1. Introduction</h2>
+      <p>iSehat respects your privacy. This policy explains how we handle data on the public website isehat.biz.id.</p>
+
+      <h2>2. Data Collected on the Public Website</h2>
+      <p>The public website isehat.biz.id does NOT collect personal health data. This website is an informational and educational site.</p>
+      <p>If you use the contact or newsletter forms, we only collect information you provide voluntarily (name, email, message).</p>
+
+      <h2>3. Health Data</h2>
+      <p>User health data is stored separately in a protected application environment (app.isehat.biz.id), NOT on this public website. Health data is sensitive data and is protected according to the application policy.</p>
+
+      <h2>4. Cookies and Tracking</h2>
+      <p>This website uses localStorage to store theme preferences (light/dark/warm). No tracking cookies are currently used.</p>
+      <p>If we add analytics or pixels in the future, we will update this policy and ask for your consent first.</p>
+
+      <h2>5. Family and Caregiver Access</h2>
+      <p>Family and caregiver access to health data requires explicit consent from the primary user. Access without consent is not permitted.</p>
+
+      <h2>6. Data Security</h2>
+      <p>We implement reasonable security measures to protect data. However, no system is completely risk-free. We continuously improve security.</p>
+
+      <h2>7. Your Rights</h2>
+      <p>You have the right to request access, correction, or deletion of data you provided through this public website. Contact us through the contact page.</p>
+
+      <h2>8. Policy Changes</h2>
+      <p>We may update this policy from time to time. Significant changes will be announced on this website.</p>
+
+      <h2>9. Contact</h2>
+      <p>If you have questions about privacy, contact us through the <a href="/en/contact" style="color: var(--color-primary);">contact page</a>.</p>
+    </div>
+  </section>
+</BaseLayout>

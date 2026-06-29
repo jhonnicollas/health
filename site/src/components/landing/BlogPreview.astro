@@ -1,0 +1,41 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+import { getCollection } from "astro:content";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+
+const posts = await getCollection("blog", ({ data }) => !data.draft);
+const latest = posts
+  .sort((a, b) => new Date(b.data.publishedAt).getTime() - new Date(a.data.publishedAt).getTime())
+  .slice(0, 3);
+---
+
+<section class="section-padding" style="background-color: var(--color-bg-soft);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "blog.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "blog.subtitle")}</p>
+    </div>
+    {latest.length > 0 ? (
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {latest.map((post) => (
+          <a href={`/blog/${post.slug}`} class="card group hover:translate-y-[-2px] transition-transform">
+            <div class="text-xs font-medium mb-2" style="color: var(--color-primary);">{post.data.category}</div>
+            <h3 class="font-semibold mb-2" style="color: var(--color-text);">{post.data.title}</h3>
+            <p class="text-sm line-clamp-2" style="color: var(--color-text-muted);">{post.data.description}</p>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <p class="text-center text-sm" style="color: var(--color-text-muted);">{t(locale, "blog.coming")}</p>
+    )}
+    <div class="text-center mt-8">
+      <a href="/blog" class="btn-secondary">{t(locale, "blog.viewAll")}</a>
+    </div>
+  </div>
+</section>

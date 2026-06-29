@@ -98,8 +98,11 @@ export function FamilyPage() {
   }
 
   async function revoke(id: number) {
-    const res = await fetch(`/api/family/${id}`, { method: 'DELETE', credentials: 'include' })
-    if (res.ok) await load()
+    try {
+      const res = await fetch(`/api/family/${id}`, { method: 'DELETE', credentials: 'include' })
+      if (!res.ok) { setError('Gagal mencabut akses.'); return }
+      await load()
+    } catch { setError('Tidak bisa terhubung ke server.') }
   }
 
   return (

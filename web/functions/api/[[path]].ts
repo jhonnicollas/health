@@ -1,4 +1,4 @@
-const WORKER_ORIGIN = 'https://hl-health-companion.indiehomesungairaya.workers.dev'
+const WORKER_ORIGIN = 'https://hl-health-companion-api.indiehomesungairaya.workers.dev'
 
 export async function onRequest(context) {
   const req = context.request

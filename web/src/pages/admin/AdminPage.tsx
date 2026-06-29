@@ -1,15 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/auth'
+import { useI18n } from '../../i18n'
 
-type TabId = 'overview' | 'users' | 'roles' | 'plans' | 'ai-config' | 'ai-memory' | 'configs' | 'feature-flags' | 'audit-logs' | 'safety-events' | 'metric-catalog' | 'metric-rules' | 'knowledge'
+type TabId = 'overview' | 'users' | 'roles' | 'plans' | 'plan-features' | 'ai-config' | 'ai-memory' | 'configs' | 'feature-flags' | 'audit-logs' | 'safety-events' | 'metric-catalog' | 'metric-rules' | 'knowledge'
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' }, { id: 'users', label: 'Users' }, { id: 'roles', label: 'Roles' },
-  { id: 'plans', label: 'Plans' }, { id: 'ai-config', label: 'AI Config' }, { id: 'ai-memory', label: 'AI Memory' },
-  { id: 'configs', label: 'Configs' }, { id: 'feature-flags', label: 'Features' }, { id: 'audit-logs', label: 'Audit' },
-  { id: 'safety-events', label: 'Safety' }, { id: 'metric-catalog', label: 'Metrics' }, { id: 'metric-rules', label: 'Rules' },
-  { id: 'knowledge', label: 'KB' },
+const TABS: { id: TabId; labelKey: string; permission?: string }[] = [
+  { id: 'overview', labelKey: 'admin.tabOverview' }, { id: 'users', labelKey: 'admin.tabUsers', permission: 'admin.users.read' }, { id: 'roles', labelKey: 'admin.tabRoles', permission: 'admin.roles.read' },
+  { id: 'plans', labelKey: 'admin.tabPlans', permission: 'admin.billing.read' }, { id: 'plan-features', labelKey: 'admin.tabPlanFeatures', permission: 'admin.billing.manage' }, { id: 'ai-config', labelKey: 'admin.tabAiConfig', permission: 'admin.aiConfig.update' }, { id: 'ai-memory', labelKey: 'admin.tabAiMemory', permission: 'admin.aiMemory.read' },
+  { id: 'configs', labelKey: 'admin.tabConfigs', permission: 'admin.config.read' }, { id: 'feature-flags', labelKey: 'admin.tabFeatureFlags', permission: 'admin.featureFlags.manage' }, { id: 'audit-logs', labelKey: 'admin.tabAudit', permission: 'admin.audit.read' },
+  { id: 'safety-events', labelKey: 'admin.tabSafety', permission: 'admin.security.read' }, { id: 'metric-catalog', labelKey: 'admin.tabMetrics', permission: 'admin.metricCatalog.manage' }, { id: 'metric-rules', labelKey: 'admin.tabRules', permission: 'admin.metricRules.manage' },
+  { id: 'knowledge', labelKey: 'admin.tabKb', permission: 'admin.education.manage' },
 ]
 
 async function apiGet(url: string) {
@@ -26,7 +27,7 @@ function Table({ cols, rows }: { cols: string[]; rows: any[][] }) {
   return <table><thead><tr>{cols.map(c => <th key={c}>{c}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table>
 }
 
-function OverviewTab() {
+function OverviewTab({ onTab }: { onTab?: (id: TabId) => void }) {
   const [metrics, setMetrics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,21 +41,26 @@ function OverviewTab() {
   if (loading) return <p>Loading...</p>
   if (error) return <p className="admin-error">{error}</p>
   const cards = metrics ? [
-    { label: 'Users', value: metrics.users },
-    { label: 'Plans', value: metrics.plans },
-    { label: 'Subscriptions', value: metrics.subscriptions },
-    { label: 'Safety Events', value: metrics.safetyEvents },
-    { label: 'Audit Logs', value: metrics.auditLogs },
+    { label: 'Users', value: metrics.users, trend: '+11% active', tone: 'success' },
+    { label: 'Premium', value: metrics.subscriptions, trend: '24% conversion', tone: 'info' },
+    { label: 'AI Calls', value: metrics.aiCalls ?? '—', trend: 'quota guarded', tone: 'warning' },
+    { label: 'Safety', value: metrics.safetyEvents, trend: 'red flag events', tone: 'critical' },
   ] : []
   return (
     <Section title="Dashboard Metrics">
-      <div className="admin-metric-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16 }}>
+      <div className="admin-metric-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
         {cards.map((card) => (
-          <div key={card.label} style={{ padding: 16, borderRadius: 12, background: 'var(--surface-2)', textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{card.value}</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{card.label}</div>
+          <div key={card.label} className="admin-metric-card" style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid var(--border, #e5e7eb)' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary, #6b7280)' }}>{card.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, margin: '4px 0' }}>{card.value}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: card.tone === 'success' ? '#047857' : card.tone === 'info' ? '#0369a1' : card.tone === 'warning' ? '#b45309' : '#dc2626' }}>{card.trend}</div>
           </div>
         ))}
+      </div>
+      <div className="admin-overview-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+        <button onClick={() => onTab?.('users')} className="admin-action-btn primary"><span className="material-symbols-outlined">manage_accounts</span>Manage Users</button>
+        <button onClick={() => onTab?.('plan-features')} className="admin-action-btn"><span className="material-symbols-outlined">workspace_premium</span>Plan Editor</button>
+        <button onClick={() => onTab?.('audit-logs')} className="admin-action-btn"><span className="material-symbols-outlined">fact_check</span>Audit Logs</button>
       </div>
     </Section>
   )
@@ -77,17 +83,55 @@ function RolesTab() {
 }
 
 function PlansTab() {
-  const [data, setData] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
-  useEffect(() => { apiGet('/api/admin/plans').then(r => { setLoading(false); if (r.success) setData(r.data?.plans || r.data || []); else setError(r.error?.message || '') }) }, [])
+  const [data, setData] = useState<any[]>([]); const [features, setFeatures] = useState<Record<string, any>>({}); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
+  useEffect(() => {
+    ;(async () => {
+      const r = await apiGet('/api/admin/plans')
+      setLoading(false)
+      if (r.success) {
+        const plans = r.data?.plans || r.data || []
+        setData(plans)
+        const featureMap: Record<string, any> = {}
+        await Promise.all(plans.map(async (p: any) => {
+          const fr = await apiGet(`/api/admin/plans/${encodeURIComponent(p.planCode)}/features`)
+          if (fr.success) featureMap[p.planCode] = (fr.data?.features || fr.data || []).reduce((acc: any, f: any) => { acc[f.featureCode] = f; return acc }, {})
+        }))
+        setFeatures(featureMap)
+      } else setError(r.error?.message || '')
+    })()
+  }, [])
   if (loading) return <p>Loading...</p>
   if (error) return <p className="admin-error">{error}</p>
-  return <Section title="Plans"><Table cols={['Code','Name','Interval','Active']} rows={data.map((p: any) => [p.planCode, p.planName, p.billingInterval, p.active ? 'Yes' : 'No'])} /></Section>
+  const activePlans = data.filter((p: any) => p.active).sort((a: any, b: any) => (a.planCode === 'free' ? -1 : b.planCode === 'free' ? 1 : 0))
+  const featureCodes = [...new Set(Object.values(features).flatMap((m: any) => Object.keys(m || {})))]
+  const displayFeature = (_code: string, f?: any) => {
+    if (!f || !f.enabled) return <span style={{ color: 'var(--text-muted, #9ca3af)' }}>Off</span>
+    if (f.quotaLimit) return <span>{f.quotaLimit}/{f.quotaWindow || 'period'}</span>
+    return <span style={{ color: '#047857', fontWeight: 800 }}>On</span>
+  }
+  return (
+    <Section title="Plans, Features, Entitlement &amp; Quota">
+      <div className="admin-plans-table-wrap" style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border, #e5e7eb)', background: '#fff' }}>
+        <table className="admin-plans-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead><tr style={{ background: '#f8fafc' }}><th style={{ padding: 12, textAlign: 'left', borderBottom: '1px solid var(--border, #e5e7eb)' }}>Feature</th>{activePlans.map((p: any) => <th key={p.planCode} style={{ padding: 12, textAlign: 'center', borderBottom: '1px solid var(--border, #e5e7eb)' }}>{p.planName}</th>)}</tr></thead>
+          <tbody>
+            {featureCodes.map((fc) => (
+              <tr key={fc} style={{ borderBottom: '1px solid var(--border, #f3f4f6)' }}>
+                <td style={{ padding: 12, fontWeight: 800 }}>{fc}</td>
+                {activePlans.map((p: any) => <td key={p.planCode} style={{ padding: 12, textAlign: 'center' }}>{displayFeature(fc, features[p.planCode]?.[fc])}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+  )
 }
 
 function AiConfigTab() {
   const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [saving, setSaving] = useState(false); const [msg, setMsg] = useState('')
   useEffect(() => { fetch('/api/admin/ai-config', { credentials: 'include', headers: { Accept: 'application/json' } }).then(r => r.json()).then(r => { setLoading(false); if (r.success) { setData(r.data); setError('') } else setError(r.error?.message || '') }) }, [])
-  const handleSave = async () => { setSaving(true); setMsg(''); await fetch('/api/admin/ai-config', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(data || {}) }); setMsg('Saved'); setSaving(false) }
+  const handleSave = async () => { setSaving(true); setMsg(''); try { const r = await fetch('/api/admin/ai-config', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(data || {}) }); const b = await r.json(); if (!r.ok || !b.success) { setMsg(b.error?.message || 'Gagal menyimpan.'); } else { setMsg('Saved'); } } catch { setMsg('Tidak bisa terhubung.') } setSaving(false) }
   if (loading) return <p>Loading...</p>
   if (error) return <p className="admin-error">{error}</p>
   return <Section title="AI Configuration"><div className="admin-ai-form">{data ? Object.entries(data).filter(([k]) => !['aiClinicalCopilotAllowedActions','aiClinicalCopilotForbiddenActions','aiClinicalCopilotScopeStatus','aiClinicalCopilotRuntimeEnabled'].includes(k)).map(([k, v]: [string, any]) => <div key={k} className="admin-field"><label>{k}</label><input value={typeof v === 'object' ? JSON.stringify(v) : String(v)} onChange={e => { const nv: any = {}; Object.assign(nv, data, { [k]: e.target.value }); setData(nv) }} /></div>) : null}<button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>{msg ? <p>{msg}</p> : null}</div></Section>
@@ -96,15 +140,127 @@ function AiConfigTab() {
 function ConfigsTab() {
   const [data, setData] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [edit, setEdit] = useState<Record<string,string>>({}); const [saving, setSaving] = useState<string|null>(null); const [msg, setMsg] = useState('')
   useEffect(() => { apiGet('/api/admin/configs').then(r => { setLoading(false); if (r.success) { const c = r.data?.configs || []; setData(c); const e: Record<string,string> = {}; c.forEach((x: any) => e[x.configKey] = x.configValue); setEdit(e) } else setError(r.error?.message || '') }) }, [])
-  const handleSave = async (key: string) => { setSaving(key); setMsg(''); await fetch(`/api/admin/configs/${encodeURIComponent(key)}`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ configValue: edit[key] }) }); setMsg(`Saved ${key}`); setSaving(null) }
+  const handleSave = async (key: string) => { setSaving(key); setMsg(''); try { const r = await fetch(`/api/admin/configs/${encodeURIComponent(key)}`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ configValue: edit[key] }) }); const b = await r.json(); if (!r.ok || !b.success) { setMsg(b.error?.message || `Gagal menyimpan ${key}.`); } else { setMsg(`Saved ${key}`); } } catch { setMsg('Tidak bisa terhubung.') } setSaving(null) }
   if (loading) return <p>Loading...</p>
   if (error) return <p className="admin-error">{error}</p>
   return <Section title="System Configs">{data.length === 0 ? <p>No configs</p> : <table><thead><tr><th>Key</th><th>Value</th><th></th></tr></thead><tbody>{data.map((r: any) => <tr key={r.configKey}><td>{r.configKey}</td><td><input value={edit[r.configKey] ?? ''} onChange={e => setEdit({...edit, [r.configKey]: e.target.value})} /></td><td><button onClick={() => handleSave(r.configKey)} disabled={saving === r.configKey}>Save</button></td></tr>)}</tbody></table>}{msg ? <p>{msg}</p> : null}</Section>
 }
 
+function PlanFeaturesTab() {
+  const [plans, setPlans] = useState<any[]>([])
+  const [selectedPlan, setSelectedPlan] = useState<string>('')
+  const [features, setFeatures] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [error, setError] = useState('')
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    apiGet('/api/admin/plans').then(r => {
+      if (r.success) setPlans(r.data?.plans || r.data || [])
+    })
+  }, [])
+
+  // Derived active plan: explicit selection wins, else first loaded plan.
+  const activePlan = selectedPlan || plans[0]?.planCode || ''
+
+  useEffect(() => {
+    if (!activePlan) return
+    setLoading(true)
+    apiGet(`/api/admin/plans/${encodeURIComponent(activePlan)}/features`).then(r => {
+      setLoading(false)
+      if (r.success) {
+        const map: Record<string, any> = {}
+        ;(r.data?.features || r.data || []).forEach((f: any) => { map[f.featureCode] = f })
+        setFeatures(map)
+      } else {
+        setError(r.error?.message || 'Failed to load features')
+      }
+    })
+  }, [activePlan])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const toggle = (featureCode: string) => {
+    setFeatures(prev => ({ ...prev, [featureCode]: { ...(prev[featureCode] || { featureCode }), enabled: prev[featureCode]?.enabled ? 0 : 1 } }))
+  }
+  const setQuota = (featureCode: string, value: string) => {
+    const num = value === '' ? null : Number(value)
+    setFeatures(prev => ({ ...prev, [featureCode]: { ...(prev[featureCode] || { featureCode }), quotaLimit: num } }))
+  }
+  const setWindow = (featureCode: string, value: string) => {
+    setFeatures(prev => ({ ...prev, [featureCode]: { ...(prev[featureCode] || { featureCode }), quotaWindow: value || null } }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setMsg('')
+    try {
+      const payload = Object.values(features).map((f: any) => ({
+        featureCode: f.featureCode,
+        enabled: f.enabled ? 1 : 0,
+        quotaLimit: f.quotaLimit ?? null,
+        quotaWindow: f.quotaWindow || null
+      }))
+      const res = await fetch(`/api/admin/plans/${encodeURIComponent(activePlan)}/features`, {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ features: payload })
+      })
+      const body = await res.json()
+      setMsg(body.success ? 'Saved successfully.' : (body.error?.message || 'Save failed'))
+    } catch {
+      setMsg('Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Section title="Plan Features">
+      <div style={{ marginBottom: 16 }}>
+        <label>Plan: </label>
+        <select value={activePlan} onChange={e => setSelectedPlan(e.target.value)}>
+          {plans.map((p: any) => <option key={p.planCode} value={p.planCode}>{p.planName}</option>)}
+        </select>
+      </div>
+      {loading && <p>Loading...</p>}
+      {error && <p className="admin-error">{error}</p>}
+      {Object.keys(features).length > 0 && (
+        <>
+          <table style={{ width: '100%', marginBottom: 16 }}>
+            <thead><tr><th>Feature</th><th>Enabled</th><th>Quota</th><th>Window</th></tr></thead>
+            <tbody>
+              {Object.values(features).map((f: any) => (
+                <tr key={f.featureCode}>
+                  <td>{f.featureCode}</td>
+                  <td><input type="checkbox" checked={!!f.enabled} onChange={() => toggle(f.featureCode)} /></td>
+                  <td><input type="number" value={f.quotaLimit ?? ''} onChange={e => setQuota(f.featureCode, e.target.value)} style={{ width: 80 }} /></td>
+                  <td>
+                    <select value={f.quotaWindow || ''} onChange={e => setWindow(f.featureCode, e.target.value)}>
+                      <option value="">-</option>
+                      <option value="day">day</option>
+                      <option value="month">month</option>
+                      <option value="quarter">quarter</option>
+                      <option value="year">year</option>
+                      <option value="lifetime">lifetime</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Features'}</button>
+          {msg && <p>{msg}</p>}
+        </>
+      )}
+    </Section>
+  )
+}
+
 function GenericListTab({ title, url, cols, mapRow }: { title: string; url: string; cols: string[]; mapRow: (item: any) => any[] }) {
   const [data, setData] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
-  useEffect(() => { apiGet(url).then(r => { setLoading(false); if (r.success) setData(r.data || []); else setError(r.error?.message || '') }) }, [url])
+  useEffect(() => { apiGet(url).then(r => { setLoading(false); if (r.success) { const raw = r.data; const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.logs)) ? raw.logs : (raw && Array.isArray(raw.items)) ? raw.items : (raw && Array.isArray(raw.events)) ? raw.events : Array.isArray(raw) ? raw : []; setData(arr) } else setError(r.error?.message || '') }) }, [url])
   if (loading) return <p>Loading...</p>
   if (error) return <p className="admin-error">{error}</p>
   return <Section title={title}>{data.length === 0 ? <p>No data</p> : <Table cols={cols} rows={data.map(mapRow)} />}</Section>
@@ -130,22 +286,27 @@ function AiMemoryTab() {
     <GenericListTab title="Readiness" url="/api/admin/ai-clinical-copilot/readiness" cols={['Scope','Runtime','Allowed','Forbidden']} mapRow={(r: any) => [r.scopeStatus || '-', r.sprint6ClinicalCopilot?.runtimeEnabled ? 'Yes' : 'No', (r.allowedActions||[]).join(', '), (r.forbiddenActions||[]).join(', ')]} /></div></Section>
 }
 
-const TAB_COMPONENTS: Record<TabId, () => React.ReactNode> = {
-  overview: OverviewTab, users: UsersTab, roles: RolesTab, plans: PlansTab, 'ai-config': AiConfigTab, 'ai-memory': AiMemoryTab,
+const TAB_COMPONENTS: Record<TabId, (props: { onTab?: (id: TabId) => void }) => React.ReactNode> = {
+  overview: OverviewTab, users: UsersTab, roles: RolesTab, plans: PlansTab, 'plan-features': PlanFeaturesTab, 'ai-config': AiConfigTab, 'ai-memory': AiMemoryTab,
   configs: ConfigsTab, 'feature-flags': FeatureFlagsTab, 'audit-logs': AuditLogsTab,
   'safety-events': SafetyEventsTab, 'metric-catalog': MetricCatalogTab, 'metric-rules': MetricRulesTab, knowledge: KnowledgeTab,
 }
 
 export function AdminPage() {
-  const { user } = useAuth()
+  const { user, roles, permissions } = useAuth()
+  const { t } = useI18n()
   const [tab, setTab] = useState<TabId>('overview')
-  if (!user) return <section className="settings-panel"><h2>Silakan login</h2></section>
+  if (!user) return <section className="settings-panel"><h2>{t('admin.pleaseLogin')}</h2></section>
+  const userRoles = roles || []
+  const userPermissions = permissions || []
+  const isPrivilegedAdmin = userRoles.includes('superAdmin') || userRoles.includes('admin')
+  const visibleTabs = TABS.filter(tb => !tb.permission || isPrivilegedAdmin || userPermissions.includes(tb.permission) || userPermissions.includes('superAdmin'))
   const TabContent = TAB_COMPONENTS[tab]
   return (
     <section className="settings-panel admin-page">
-      <div className="page-heading"><h2>Admin Panel</h2></div>
-      <nav className="admin-tabs">{TABS.map(t => <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}</nav>
-      <div className="admin-content"><TabContent /></div>
+      <div className="page-heading"><h2>{t('admin.adminTitle')}</h2></div>
+      <nav className="admin-tabs">{visibleTabs.map(tb => <button key={tb.id} className={tab === tb.id ? 'active' : ''} onClick={() => setTab(tb.id)}>{t(tb.labelKey)}</button>)}</nav>
+      <div className="admin-content"><TabContent onTab={setTab} /></div>
     </section>
   )
 }

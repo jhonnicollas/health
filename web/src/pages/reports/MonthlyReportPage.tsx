@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
+import { downloadCsv } from '../../utils/csv'
 
 const METRIC_LABEL_DEF: Record<string, { label: string; def: string }> = {
   spo2: { label: 'SpO2', def: MEDICAL_GLOSSARY.spo2 },
@@ -46,8 +47,8 @@ export function MonthlyReportPage() {
 
   useEffect(() => {
     fetch('/api/reports/monthly', { credentials: 'include' })
-      .then((r) => r.json() as Promise<ApiResp<MonthlyData>>)
-      .then((d) => { if (d.success && d.data) setData(d.data) })
+      .then((r) => { if (!r.ok) return null; return r.json() as Promise<ApiResp<MonthlyData>> })
+      .then((d) => { if (d && d.success && d.data) setData(d.data) })
   }, [])
 
   async function analyzeWithAi() {
@@ -89,6 +90,9 @@ export function MonthlyReportPage() {
           <p>Period summary for routine evaluation.</p>
         </div>
         <div className="page-heading-actions">
+          <button onClick={() => downloadCsv(`laporan-bulanan.csv`, data.metrics.map(m => ({ Metrik: m.metricCode, Rata_rata: m.avg, Minimum: m.min, Maksimum: m.max, Terbaru: m.latest, Jumlah_Data: m.cnt })), ['Metrik', 'Rata_rata', 'Minimum', 'Maksimum', 'Terbaru', 'Jumlah_Data'])} className="btn-secondary">
+            <span className="material-symbols-outlined">download</span> Download CSV
+          </button>
           <button onClick={analyzeWithAi} disabled={aiLoading} className="btn-primary">
             {aiLoading ? <><span className="spinner" /> Menganalisa...</> : <><span className="material-symbols-outlined">auto_awesome</span> Analisa dengan AI</>}
           </button>

@@ -1,0 +1,40 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+
+const steps = [
+  { num: "1", titleKey: "workflow.1", descKey: "workflow.1.desc" },
+  { num: "2", titleKey: "workflow.2", descKey: "workflow.2.desc" },
+  { num: "3", titleKey: "workflow.3", descKey: "workflow.3.desc" },
+  { num: "4", titleKey: "workflow.4", descKey: "workflow.4.desc" },
+  { num: "5", titleKey: "workflow.5", descKey: "workflow.5.desc" },
+  { num: "6", titleKey: "workflow.6", descKey: "workflow.6.desc" },
+  { num: "7", titleKey: "workflow.7", descKey: "workflow.7.desc" },
+];
+---
+
+<section id="workflow" class="section-padding" style="background-color: var(--color-bg-soft);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "workflow.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "workflow.subtitle")}</p>
+    </div>
+    <div class="max-w-2xl mx-auto space-y-6">
+      {steps.map((step) => (
+        <div class="flex gap-4 items-start">
+          <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style="background-color: var(--color-primary); color: var(--color-primary-foreground);">{step.num}</div>
+          <div>
+            <h3 class="font-semibold mb-1" style="color: var(--color-text);">{t(locale, step.titleKey)}</h3>
+            <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, step.descKey)}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,38 @@
+---
+export interface Props {
+  title: string;
+  description: string;
+  canonical?: string;
+  ogImage?: string;
+  ogType?: string;
+  publishedTime?: string;
+  modifiedTime?: string;
+}
+
+const { title, description, canonical, ogImage, ogType = "website", publishedTime, modifiedTime } = Astro.props;
+const siteUrl = "https://isehat.biz.id";
+const fullOgImage = ogImage ? `${siteUrl}${ogImage}` : `${siteUrl}/images/og-default.png`;
+const fullCanonical = canonical || new URL(Astro.url.pathname, siteUrl).href;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title} | iSehat</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={fullCanonical} />
+
+<meta property="og:title" content={`${title} | iSehat`} />
+<meta property="og:description" content={description} />
+<meta property="og:type" content={ogType} />
+<meta property="og:url" content={fullCanonical} />
+<meta property="og:image" content={fullOgImage} />
+<meta property="og:site_name" content="iSehat" />
+{publishedTime && <meta property="article:published_time" content={publishedTime} />}
+{modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={`${title} | iSehat`} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={fullOgImage} />
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />

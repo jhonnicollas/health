@@ -109,14 +109,15 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
     const loadDashboard = async () => {
       try {
         const response = await fetch('/api/dashboard/today', { credentials: 'include' })
+        if (!response.ok) { setError('Gagal memuat dashboard.'); return }
         const result = await response.json()
         if (result.success) {
           setData(result.data)
         } else {
           setError(result.error?.message || 'Failed to load dashboard')
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Network error')
+      } catch {
+        setError('Tidak bisa terhubung ke server.')
       } finally {
         setLoading(false)
       }
@@ -127,11 +128,13 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
         const results: ComparisonData[] = []
         for (const code of codes) {
           const res = await fetch(`/api/dashboard/comparison?metricCode=${code}`, { credentials: 'include' })
+          if (!res.ok) continue
           const body = await res.json()
           if (body.success && body.data) results.push(body.data)
         }
         setComparisons(results.filter(c => c.todayValue !== null))
       } catch {
+        setError('Tidak bisa terhubung ke server.')
         setComparisons([])
       }
     }

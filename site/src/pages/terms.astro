@@ -1,0 +1,46 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "id" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id${Astro.url.pathname}`,
+  en: `https://isehat.biz.id/en${Astro.url.pathname}`,
+};
+---
+
+<BaseLayout title={t(locale, "terms.title")} description="Ketentuan layanan iSehat. Syarat dan ketentuan penggunaan layanan iSehat." locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 prose" style="color: var(--color-text);">
+      <h1 class="text-4xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "terms.title")}</h1>
+      <p class="text-sm mb-6" style="color: var(--color-text-muted);">Terakhir diperbarui: Juni 2026</p>
+
+      <h2>1. Penerimaan Ketentuan</h2>
+      <p>Dengan menggunakan iSehat, Anda menyetujui ketentuan ini. Jika Anda tidak setuju, mohon untuk tidak menggunakan layanan kami.</p>
+
+      <h2>2. Deskripsi Layanan</h2>
+      <p>iSehat adalah aplikasi pendamping kesehatan harian yang membantu mencatat, memahami, dan membagikan data kesehatan dari alat kesehatan rumahan. iSehat BUKAN alat diagnosis, BUKAN pengganti dokter, dan TIDAK memberikan resep obat.</p>
+
+      <h2>3. Tanggung Jawab Pengguna</h2>
+      <p>Anda bertanggung jawab atas data yang Anda input. Selalu verifikasi data sebelum disimpan. Jangan mengandalkan iSehat untuk keputusan medis darurat.</p>
+
+      <h2>4. Batasan Medis</h2>
+      <p>iSehat tidak memberikan diagnosis, resep obat, perubahan dosis, atau keputusan medis. Status dan interpretasi kesehatan ditentukan oleh aturan terstruktur, bukan AI. Selalu konsultasikan dengan dokter untuk keputusan medis.</p>
+
+      <h2>5. Privasi dan Consent</h2>
+      <p>Data kesehatan Anda adalah data sensitif. Akses keluarga dan caregiver memerlukan persetujuan eksplisit Anda. Lihat <a href="/privacy" style="color: var(--color-primary);">Kebijakan Privasi</a> untuk detail.</p>
+
+      <h2>6. Paket dan Harga</h2>
+      <p>iSehat menawarkan paket Gratis dan Premium. Harga dan fitur dapat berubah. Perubahan harga akan diumumkan sebelumnya.</p>
+
+      <h2>7. Batasan Tanggung Jawab</h2>
+      <p>iSehat disediakan "sebagaimana adanya". Kami tidak menjamin keakuratan, kelengkapan, atau keandalan untuk keputusan medis. Risiko penggunaan layanan ada pada pengguna.</p>
+
+      <h2>8. Perubahan Ketentuan</h2>
+      <p>Kami dapat mengubah ketentuan ini dari waktu ke waktu. Perubahan akan diumumkan di website ini.</p>
+
+      <h2>9. Kontak</h2>
+      <p>Pertanyaan? Hubungi kami melalui <a href="/contact" style="color: var(--color-primary);">halaman kontak</a>.</p>
+    </div>
+  </section>
+</BaseLayout>

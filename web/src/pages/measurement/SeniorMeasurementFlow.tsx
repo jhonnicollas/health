@@ -22,22 +22,22 @@ export function SeniorMeasurementFlow() {
 
   useEffect(() => {
     async function loadCatalog() {
-      try {
-        const res = await fetch('/api/metrics/catalog', { credentials: 'include' })
-        const body = (await res.json()) as {
-          success: boolean
-          data?: { metrics: Array<{ metricCode: string; metricName: string; unit: string; physicalMin: number | null; physicalMax: number | null }> }
-        }
-        if (body.success && body.data?.metrics?.length) {
-          setFlow(body.data.metrics.map(m => ({
-            code: m.metricCode,
-            label: m.metricName,
-            unit: m.unit,
-            min: m.physicalMin ?? 0,
-            max: m.physicalMax ?? 999
-          })))
-        }
-      } catch { /* fallback to default */ }
+      // Resilient fetch: fall back to default flow if catalog endpoint is unreachable.
+      const res = await fetch('/api/metrics/catalog', { credentials: 'include' }).catch(() => null)
+      if (!res) return
+      const body = (await res.json().catch(() => null)) as {
+        success: boolean
+        data?: { metrics: Array<{ metricCode: string; metricName: string; unit: string; physicalMin: number | null; physicalMax: number | null }> }
+      } | null
+      if (body && body.success && body.data?.metrics?.length) {
+        setFlow(body.data.metrics.map(m => ({
+          code: m.metricCode,
+          label: m.metricName,
+          unit: m.unit,
+          min: m.physicalMin ?? 0,
+          max: m.physicalMax ?? 999
+        })))
+      }
     }
     void loadCatalog()
   }, [])
@@ -100,7 +100,7 @@ export function SeniorMeasurementFlow() {
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <a className="btn-primary" href={sessionId ? `/symptoms?sessionId=${sessionId}` : '/symptoms'} style={{ textDecoration: 'none' }}>Ya, catat keluhan</a>
             <button className="btn-secondary" onClick={async () => {
-              try { await fetch('/api/symptoms/prompt-dismissals', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceSessionId: sessionId, reason: 'noSymptoms' }) }) } catch {}
+              try { await fetch('/api/symptoms/prompt-dismissals', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceSessionId: sessionId, reason: 'noSymptoms' }) }) } catch { void 0 /* best-effort log */ }
               setPromptSymptom(false); setDone(true)
             }}>Tidak, selesai</button>
           </div>

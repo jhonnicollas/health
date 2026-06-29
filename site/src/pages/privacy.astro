@@ -1,0 +1,48 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "id" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id${Astro.url.pathname}`,
+  en: `https://isehat.biz.id/en${Astro.url.pathname}`,
+};
+---
+
+<BaseLayout title={t(locale, "privacy.title")} description="Kebijakan privasi iSehat. Data kesehatan adalah data sensitif dan dilindungi." locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 prose" style="color: var(--color-text);">
+      <h1 class="text-4xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "privacy.title")}</h1>
+      <p class="text-sm mb-6" style="color: var(--color-text-muted);">Terakhir diperbarui: Juni 2026</p>
+
+      <h2>1. Pendahuluan</h2>
+      <p>iSehat menghormati privasi Anda. Kebijakan ini menjelaskan bagaimana kami menangani data di website publik isehat.biz.id.</p>
+
+      <h2>2. Data yang Dikumpulkan Website Publik</h2>
+      <p>Website publik isehat.biz.id TIDAK mengumpulkan data kesehatan personal. Website ini adalah situs informasi dan edukasi.</p>
+      <p>Jika Anda menggunakan formulir kontak atau newsletter, kami hanya mengumpulkan informasi yang Anda berikan secara sukarela (nama, email, pesan).</p>
+
+      <h2>3. Data Kesehatan</h2>
+      <p>Data kesehatan pengguna disimpan terpisah di lingkungan aplikasi yang terlindungi (app.isehat.biz.id), BUKAN di website publik ini. Data kesehatan adalah data sensitif dan dilindungi sesuai kebijakan aplikasi.</p>
+
+      <h2>4. Cookie dan Pelacakan</h2>
+      <p>Website ini menggunakan localStorage untuk menyimpan preferensi tema (light/dark/warm). Tidak ada cookie pelacakan yang digunakan saat ini.</p>
+      <p>Jika kami menambahkan analytics atau pixel di masa depan, kami akan memperbarui kebijakan ini dan meminta persetujuan Anda terlebih dahulu.</p>
+
+      <h2>5. Family dan Caregiver Access</h2>
+      <p>Akses keluarga dan caregiver ke data kesehatan memerlukan persetujuan (consent) eksplisit dari pengguna utama. Akses tanpa persetujuan tidak diperkenankan.</p>
+
+      <h2>6. Keamanan Data</h2>
+      <p>Kami menerapkan langkah-langkah keamanan yang wajar untuk melindungi data. Namun, tidak ada sistem yang sepenuhnya bebas risiko. Kami terus meningkatkan keamanan.</p>
+
+      <h2>7. Hak Anda</h2>
+      <p>Anda berhak meminta akses, koreksi, atau penghapusan data yang Anda berikan melalui website publik ini. Hubungi kami melalui halaman kontak.</p>
+
+      <h2>8. Perubahan Kebijakan</h2>
+      <p>Kami dapat memperbarui kebijakan ini dari waktu ke waktu. Perubahan signifikan akan diumumkan di website ini.</p>
+
+      <h2>9. Kontak</h2>
+      <p>Jika Anda memiliki pertanyaan tentang privasi, hubungi kami melalui <a href="/contact" style="color: var(--color-primary);">halaman kontak</a>.</p>
+    </div>
+  </section>
+</BaseLayout>

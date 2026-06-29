@@ -41,7 +41,7 @@ export function MonthlyDashboard() {
 
   useEffect(() => {
     fetch('/api/dashboard/monthly', { credentials: 'include' })
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error('Gagal memuat dashboard bulanan.'); return r.json() })
       .then((d: { success: boolean; data?: MonthlyPayload; error?: { message?: string } }) => {
         if (d.success && d.data) {
           setMetrics(d.data.metrics)

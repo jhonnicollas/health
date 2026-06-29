@@ -1,0 +1,40 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+import { APP_SIGNUP_URL } from "@/data/navigation";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+---
+
+<section class="section-padding" style="background-color: var(--color-bg-soft);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "family.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "family.subtitle")}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+      <div class="card text-center">
+        <div class="text-3xl mb-3">👨‍👩‍👧</div>
+        <h3 class="font-semibold mb-2" style="color: var(--color-text);">{t(locale, "family.link")}</h3>
+        <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "family.link.desc")}</p>
+      </div>
+      <div class="card text-center">
+        <div class="text-3xl mb-3">🔔</div>
+        <h3 class="font-semibold mb-2" style="color: var(--color-text);">{t(locale, "family.alert")}</h3>
+        <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "family.alert.desc")}</p>
+      </div>
+      <div class="card text-center">
+        <div class="text-3xl mb-3">🤝</div>
+        <h3 class="font-semibold mb-2" style="color: var(--color-text);">{t(locale, "family.consent")}</h3>
+        <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "family.consent.desc")}</p>
+      </div>
+    </div>
+    <div class="text-center mt-8">
+      <a href="/use-cases/keluarga" class="btn-secondary">{t(locale, "family.learn")}</a>
+    </div>
+  </div>
+</section>

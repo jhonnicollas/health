@@ -1,0 +1,44 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import CTASection from "@/components/common/CTASection.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "id" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id${Astro.url.pathname}`,
+  en: `https://isehat.biz.id/en${Astro.url.pathname}`,
+};
+---
+
+<BaseLayout title={t(locale, "usecase.bg.title")} description={t(locale, "usecase.bg.subtitle")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "usecase.bg.title")}</h1>
+      <p class="text-lg mb-8" style="color: var(--color-text-muted);">{t(locale, "usecase.bg.subtitle")}</p>
+
+      <div class="space-y-8">
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📸 {t(locale, "usecase.bg.photo")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.bg.photo.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">✋ {t(locale, "usecase.bg.manual")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.bg.manual.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">⏱️ {t(locale, "usecase.bg.fasting")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.bg.fasting.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📈 {t(locale, "usecase.bg.trend")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.bg.trend.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📄 {t(locale, "usecase.bg.report")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.bg.report.desc")}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <CTASection locale={locale} />
+</BaseLayout>

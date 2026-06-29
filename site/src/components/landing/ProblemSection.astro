@@ -1,0 +1,37 @@
+---
+import type { Locale } from "@/i18n/utils";
+import { t } from "@/i18n/translations";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+
+const problems = [
+  { icon: "📝", titleKey: "problem.manual", descKey: "problem.manual.desc" },
+  { icon: "🤷", titleKey: "problem.paham", descKey: "problem.paham.desc" },
+  { icon: "👨‍👩‍👧", titleKey: "problem.jauh", descKey: "problem.jauh.desc" },
+  { icon: "⚕️", titleKey: "problem.dokter", descKey: "problem.dokter.desc" },
+  { icon: "💊", titleKey: "problem.obat", descKey: "problem.obat.desc" },
+  { icon: "🧊", titleKey: "problem.air", descKey: "problem.air.desc" },
+];
+---
+
+<section class="section-padding">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "problem.title")}</h2>
+      <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "problem.subtitle")}</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+      {problems.map((p) => (
+        <div class="card">
+          <div class="text-2xl mb-3">{p.icon}</div>
+          <h3 class="font-semibold mb-2" style="color: var(--color-text);">{t(locale, p.titleKey)}</h3>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, p.descKey)}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

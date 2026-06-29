@@ -1,0 +1,45 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import FeatureCard from "@/components/common/FeatureCard.astro";
+import { productionCapabilities } from "@/data/productionCapabilities";
+import { t } from "@/i18n/translations";
+
+const locale = "id" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id${Astro.url.pathname}`,
+  en: `https://isehat.biz.id/en${Astro.url.pathname}`,
+};
+
+const features = [
+  { icon: "📝", title: t(locale, "features.catatan"), desc: t(locale, "features.catatan.desc"), category: "coreCapture", cta: t(locale, "device.title"), ctaHref: "/#devices" },
+  { icon: "👁️", title: t(locale, "features.aivision"), desc: t(locale, "features.aivision.desc"), safety: t(locale, "features.aivision.safety"), category: "coreCapture" },
+  { icon: "📊", title: t(locale, "features.rule"), desc: t(locale, "features.rule.desc"), safety: t(locale, "features.rule.safety"), category: "healthIntelligence" },
+  { icon: "📈", title: t(locale, "features.dashboard"), desc: t(locale, "features.dashboard.desc"), category: "healthIntelligence" },
+  { icon: "📄", title: t(locale, "features.report"), desc: t(locale, "features.report.desc"), category: "advanced" },
+  { icon: "👨‍👩‍👧", title: t(locale, "features.family"), desc: t(locale, "features.family.desc"), category: "monitoring", cta: t(locale, "nav.usecase"), ctaHref: "/use-cases/keluarga" },
+  { icon: "🚨", title: t(locale, "features.emergency"), desc: t(locale, "features.emergency.desc"), safety: t(locale, "features.emergency.safety"), category: "monitoring" },
+  { icon: "💊", title: t(locale, "features.medication"), desc: t(locale, "features.medication.desc"), category: "dailyCompanion" },
+  { icon: "📋", title: t(locale, "features.symptom"), desc: t(locale, "features.symptom.desc"), safety: t(locale, "features.symptom.safety"), category: "dailyCompanion" },
+  { icon: "💧", title: t(locale, "features.hydration"), desc: t(locale, "features.hydration.desc"), category: "dailyCompanion" },
+  { icon: "🔒", title: t(locale, "features.cycle"), desc: t(locale, "features.cycle.desc"), safety: t(locale, "features.cycle.safety"), category: "dailyCompanion" },
+  { icon: "📱", title: t(locale, "features.pwa"), desc: t(locale, "features.pwa.desc"), category: "advanced" },
+  { icon: "🤖", title: t(locale, "features.aiclinical"), desc: t(locale, "features.aiclinical.desc"), category: "commercial", safety: t(locale, "features.aiclinical.safety") },
+  { icon: "🏢", title: t(locale, "features.admin"), desc: t(locale, "features.admin.desc"), category: "commercial" },
+];
+---
+
+<BaseLayout title={t(locale, "features.title")} description={t(locale, "features.subtitle")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-3xl mx-auto text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "features.title")}</h1>
+        <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "features.subtitle")}</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {features.map((f) => (
+          <FeatureCard title={f.title} description={f.desc} icon={f.icon} safety={f.safety} cta={f.cta} ctaHref={f.ctaHref} />
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>

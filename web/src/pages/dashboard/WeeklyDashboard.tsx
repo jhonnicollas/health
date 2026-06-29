@@ -42,7 +42,7 @@ export function WeeklyDashboard() {
 
   useEffect(() => {
     fetch('/api/dashboard/weekly', { credentials: 'include' })
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error('Gagal memuat dashboard mingguan.'); return r.json() })
       .then((d: { success: boolean; data?: WeeklyPayload; error?: { message?: string } }) => {
         if (d.success && d.data) {
           setMetrics(d.data.metrics)

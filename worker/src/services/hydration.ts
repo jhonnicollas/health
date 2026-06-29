@@ -92,6 +92,18 @@ export class HydrationService {
     return r.results || []
   }
 
+  static async getFilteredLogs(db: D1Database, userId: number, from: string, to: string, source?: string, minAmount?: number, maxAmount?: number, limit = 200): Promise<WaterIntakeLog[]> {
+    let sql = 'SELECT id, userId, amountMl, loggedAt, logDate, source, notes FROM HL_waterIntakeLogs WHERE userId = ? AND logDate >= ? AND logDate <= ?'
+    const params: (string | number)[] = [userId, from, to]
+    if (source) { sql += ' AND source = ?'; params.push(source) }
+    if (minAmount !== undefined && !Number.isNaN(minAmount)) { sql += ' AND amountMl >= ?'; params.push(minAmount) }
+    if (maxAmount !== undefined && !Number.isNaN(maxAmount)) { sql += ' AND amountMl <= ?'; params.push(maxAmount) }
+    sql += ' ORDER BY loggedAt DESC LIMIT ?'
+    params.push(Math.min(limit, 200))
+    const r = await db.prepare(sql).bind(...params).all<any>()
+    return r.results || []
+  }
+
   static async checkOverhydration(db: D1Database, userId: number, dateStr: string, totalMl: number): Promise<{ triggered: boolean; safetyEventId?: number }> {
     if (totalMl <= OVERHYDRATION_THRESHOLD_ML) return { triggered: false }
     const existing = await db.prepare("SELECT id FROM HL_safetyEvents WHERE userId = ? AND eventType = 'overhydrationWarning' AND date(createdAt) = date(?) LIMIT 1").bind(userId, dateStr).first<any>()

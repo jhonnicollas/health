@@ -1,0 +1,77 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { getPricingPlans } from "@/data/pricing";
+import { t } from "@/i18n/translations";
+
+const locale = "id" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id${Astro.url.pathname}`,
+  en: `https://isehat.biz.id/en${Astro.url.pathname}`,
+};
+---
+
+<BaseLayout title={t(locale, "pricingPage.title")} description={t(locale, "pricingPage.subtitle")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-3xl mx-auto text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4" style="color: var(--color-text);">{t(locale, "pricingPage.title")}</h1>
+        <p class="text-lg" style="color: var(--color-text-muted);">{t(locale, "pricingPage.subtitle")}</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {getPricingPlans(locale).map((plan) => (
+          <div class:list={["card relative", plan.highlight && "ring-2"]} style={plan.highlight ? "border-color: var(--color-primary);" : ""}>
+            {plan.highlight && (
+              <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold" style="background-color: var(--color-primary); color: var(--color-primary-foreground);">{t(locale, "pricing.populer")}</div>
+            )}
+            <h3 class="font-bold text-xl mb-1" style="color: var(--color-text);">{plan.name}</h3>
+            <div class="mb-1">
+              <span class="text-2xl font-bold" style="color: var(--color-primary);">{plan.price}</span>
+              {plan.period && <span class="text-sm" style="color: var(--color-text-muted);">{plan.period}</span>}
+            </div>
+            <p class="text-sm mb-4" style="color: var(--color-text-muted);">{plan.description}</p>
+            <ul class="space-y-2 mb-6">
+              {plan.features.map((f) => (
+                <li class="flex items-start gap-2 text-sm" style="color: var(--color-text-muted);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="flex-shrink-0 mt-0.5" style="color: var(--color-success);"><polyline points="20 6 9 17 4 12"/></svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <a href={plan.name === "Gratis" || plan.name === "Free" ? "https://app.isehat.biz.id/register" : "#"} class:list={["w-full text-center block", plan.highlight ? "btn-primary" : "btn-secondary"]}>{plan.cta}</a>
+          </div>
+        ))}
+      </div>
+
+      <div class="max-w-4xl mx-auto mt-16">
+        <h2 class="text-2xl font-bold mb-6 text-center" style="color: var(--color-text);">{t(locale, "pricingPage.comparison")}</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm" style="color: var(--color-text);">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--color-border);">
+                <th class="text-left py-3 px-4" style="color: var(--color-text);">Fitur</th>
+                <th class="text-center py-3 px-4" style="color: var(--color-text);">Gratis</th>
+                <th class="text-center py-3 px-4" style="color: var(--color-primary);">Premium</th>
+                <th class="text-center py-3 px-4" style="color: var(--color-text);">Family</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Pencatatan pengukuran</td><td class="text-center">✓</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">AI Vision quota</td><td class="text-center">Terbatas</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Riwayat</td><td class="text-center">7 hari</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Dashboard (semua)</td><td class="text-center">Harian</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Doctor-ready PDF</td><td class="text-center">—</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Telegram reminder</td><td class="text-center">—</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Family/caregiver</td><td class="text-center">—</td><td class="text-center">—</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Medication tracker</td><td class="text-center">—</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Hydration tracker</td><td class="text-center">—</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Cycle tracking</td><td class="text-center">—</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">AI report / insight</td><td class="text-center">—</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+              <tr style="border-bottom: 1px solid var(--color-border);"><td class="py-3 px-4">Export data</td><td class="text-center">—</td><td class="text-center">✓</td><td class="text-center">✓</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs mt-4 text-center" style="color: var(--color-text-muted);">✓ = tersedia. — = tidak tersedia di paket ini.</p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

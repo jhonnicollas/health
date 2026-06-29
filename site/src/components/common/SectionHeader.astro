@@ -1,0 +1,21 @@
+---
+export interface Props {
+  title?: string;
+  subtitle?: string;
+  center?: boolean;
+}
+
+const { title = "", subtitle = "", center = true } = Astro.props;
+---
+
+<div class="section-padding">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    {title && (
+      <div class:list={["mb-12", center && "text-center"]}>
+        <h2 class="text-3xl md:text-4xl font-bold" style="color: var(--color-text);">{title}</h2>
+        {subtitle && <p class="mt-4 text-lg max-w-2xl" class:list={[center && "mx-auto"]} style="color: var(--color-text-muted);">{subtitle}</p>}
+      </div>
+    )}
+    <slot />
+  </div>
+</div>

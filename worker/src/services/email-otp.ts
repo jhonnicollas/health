@@ -48,7 +48,8 @@ export const EmailOtpService = {
     const ttl = envNumber(env, 'EMAIL_OTP_TTL_SECONDS', DEFAULT_TTL)
     const otp = EmailOtpService.generateOtp()
     const salt = crypto.randomUUID()
-    const pepper = (env as any)?.ENCRYPTION_KEY || 'fallback-dev-pepper'
+    const pepper = (env as any)?.ENCRYPTION_KEY
+    if (!pepper) throw new Error('ENCRYPTION_KEY tidak dikonfigurasi.')
     const otpHash = await EmailOtpService.hashOtp(otp, salt, pepper)
     const expiresAt = new Date(Date.now() + ttl * 1000).toISOString()
 
@@ -80,15 +81,17 @@ export const EmailOtpService = {
     if (now > Date.parse(row.expiresAt)) return { valid: false, error: 'OTP_EXPIRED' }
     if (row.failedAttempts >= maxAttempts) return { valid: false, error: 'OTP_TOO_MANY_ATTEMPTS' }
 
-    const pepper = (env as any)?.ENCRYPTION_KEY || 'fallback-dev-pepper'
+    const pepper = (env as any)?.ENCRYPTION_KEY
+    if (!pepper) throw new Error('ENCRYPTION_KEY tidak dikonfigurasi.')
     const computed = await EmailOtpService.hashOtp(params.otp, row.salt, pepper)
 
-    if (computed !== row.otpHash) {
+    if (!CryptoService.timingSafeEqual(computed, row.otpHash)) {
       await db.prepare('UPDATE HL_emailOtpChallenges SET failedAttempts = failedAttempts + 1 WHERE id = ?').bind(row.id).run()
       return { valid: false, error: 'OTP_INVALID' }
     }
 
-    await db.prepare('UPDATE HL_emailOtpChallenges SET consumedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(row.id).run()
+    const consumedResult = await db.prepare('UPDATE HL_emailOtpChallenges SET consumedAt = CURRENT_TIMESTAMP WHERE id = ? AND consumedAt IS NULL').bind(row.id).run()
+    if ((consumedResult.meta as any).changes === 0) return { valid: false, error: 'OTP_CONSUMED' }
     return { valid: true, userId: row.userId, normalizedEmail: row.normalizedEmail }
   },
 
@@ -114,7 +117,8 @@ export const EmailOtpService = {
     const ttl = envNumber(env, 'EMAIL_OTP_TTL_SECONDS', DEFAULT_TTL)
     const otp = EmailOtpService.generateOtp()
     const newSalt = crypto.randomUUID()
-    const pepper = (env as any)?.ENCRYPTION_KEY || 'fallback-dev-pepper'
+    const pepper = (env as any)?.ENCRYPTION_KEY
+    if (!pepper) throw new Error('ENCRYPTION_KEY tidak dikonfigurasi.')
     const otpHash = await EmailOtpService.hashOtp(otp, newSalt, pepper)
     const expiresAt = new Date(Date.now() + ttl * 1000).toISOString()
 

@@ -74,7 +74,7 @@ function HistoryPage() {
       <div className="page-heading">
         <div>
           <h2 id="history-title" className="page-heading-with-help">
-            Measurement History
+            Riwayat Pengukuran
             <button
               type="button"
               className="medical-term-info page-heading-help"
@@ -85,12 +85,39 @@ function HistoryPage() {
               <span className="material-symbols-outlined">help</span>
             </button>
           </h2>
-          <p>Log lengkap semua pengukuran dengan rekomendasi.</p>
+          <p>Log lengkap semua sesi pengukuran (tekanan darah, SpO₂, gula darah, suhu, berat badan) dengan status dan rekomendasi. Klik bukti foto untuk melihat detail.</p>
         </div>
-        <span className="status-chip">{sessions.length} sessions</span>
+        <span className="status-chip">{sessions.length} sesi</span>
       </div>
 
-      {loading ? <p>Loading history...</p> : null}
+      {sessions.length > 0 && (() => {
+        const allValues = sessions.flatMap(s => s.values)
+        const abnormal = allValues.filter(v => v.severity !== 'normal' && v.severity !== undefined)
+        const metrics = new Set(allValues.map(v => v.metricCode))
+        const latest = sessions[0]
+        return (
+          <div className="history-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 16 }}>
+            <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#6b7280' }}>Total Sesi</p>
+              <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900 }}>{sessions.length}</p>
+            </div>
+            <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#6b7280' }}>Metrik Diukur</p>
+              <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900 }}>{metrics.size}</p>
+            </div>
+            <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#fef3f2', border: '1px solid #fecaca' }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#dc2626' }}>Hasil Abnormal</p>
+              <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900, color: '#dc2626' }}>{abnormal.length}</p>
+            </div>
+            <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#16a34a' }}>Pengukuran Terakhir</p>
+              <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 800 }}>{formatDateTimeShort(latest.measuredAt).date}</p>
+            </div>
+          </div>
+        )
+      })()}
+
+      {loading ? <p>Memuat riwayat...</p> : null}
       {error ? <p className="form-message error" role="status">{error}</p> : null}
       {deleteMsg ? <p className={`form-message ${deleteMsg.includes('dihapus') ? 'success' : 'error'}`} role="status">{deleteMsg}</p> : null}
       {!loading && sessions.length === 0 ? <p>No measurement history yet.</p> : null}

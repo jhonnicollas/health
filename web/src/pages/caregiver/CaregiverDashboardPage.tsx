@@ -52,6 +52,10 @@ export function CaregiverDashboardPage() {
     setLoading(true)
     try {
       const res = await fetch('/api/family/caregiver/dashboard', { credentials: 'include' })
+      if (!res.ok) {
+        setError(res.status >= 500 ? 'Server error. Coba lagi nanti.' : 'Gagal memuat dashboard caregiver.')
+        return
+      }
       const body = (await res.json()) as ApiResp<{ profiles: Profile[] }>
       if (!body.success) {
         setError(body.error?.message ?? 'Failed.')
@@ -73,6 +77,10 @@ export function CaregiverDashboardPage() {
     setMonitor(null)
     try {
       const res = await fetch(`/api/caregiver/monitor/${ownerUserId}`, { credentials: 'include' })
+      if (!res.ok) {
+        setError(res.status >= 500 ? 'Server error. Coba lagi nanti.' : 'Gagal memuat detail.')
+        return
+      }
       const body = (await res.json()) as ApiResp<Monitor>
       if (!body.success) {
         setError(body.error?.message ?? 'Failed to load details.')

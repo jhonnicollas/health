@@ -1,0 +1,73 @@
+---
+import { t } from "@/i18n/translations";
+import { localeNames } from "@/i18n/utils";
+import type { Locale } from "@/i18n/utils";
+import { socialLinks } from "@/data/socialLinks";
+
+export interface Props {
+  locale?: Locale;
+}
+
+const { locale = "id" } = Astro.props;
+
+const footerNav = [
+  { label: t(locale, "nav.fitur"), href: locale === "en" ? "/en/features" : "/features" },
+  { label: t(locale, "nav.harga"), href: locale === "en" ? "/en/pricing" : "/pricing" },
+  { label: t(locale, "nav.blog"), href: locale === "en" ? "/en/blog" : "/blog" },
+  { label: t(locale, "nav.usecase"), href: locale === "en" ? "/en/use-cases/keluarga" : "/use-cases/keluarga" },
+  { label: t(locale, "nav.tentang"), href: locale === "en" ? "/en/about" : "/about" },
+  { label: t(locale, "nav.kontak"), href: locale === "en" ? "/en/contact" : "/contact" },
+];
+---
+
+<footer style="background-color: var(--color-bg-soft); border-top: 1px solid var(--color-border);">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div>
+        <a href={locale === "en" ? "/en" : "/"} class="flex items-center gap-2 font-bold text-xl mb-4" style="color: var(--color-primary);">
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="currentColor"/><path d="M8 14h4l2-4 3 8 2-4h3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          iSehat
+        </a>
+        <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "footer.tagline")}</p>
+      </div>
+
+      <div>
+        <h3 class="font-semibold mb-3" style="color: var(--color-text);">{t(locale, "nav.fitur")}</h3>
+        <ul class="space-y-2">
+          {footerNav.map((item) => (
+            <li><a href={item.href} class="text-sm transition-colors hover:opacity-80" style="color: var(--color-text-muted);">{item.label}</a></li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="font-semibold mb-3" style="color: var(--color-text);">{t(locale, "footer.legal")}</h3>
+        <ul class="space-y-2">
+          <li><a href={locale === "en" ? "/en/privacy" : "/privacy"} class="text-sm" style="color: var(--color-text-muted);">{t(locale, "footer.privacy")}</a></li>
+          <li><a href={locale === "en" ? "/en/terms" : "/terms"} class="text-sm" style="color: var(--color-text-muted);">{t(locale, "footer.terms")}</a></li>
+          <li><a href={locale === "en" ? "/en/disclaimer" : "/disclaimer"} class="text-sm" style="color: var(--color-text-muted);">{t(locale, "footer.disclaimer")}</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="font-semibold mb-3" style="color: var(--color-text);">{t(locale, "footer.app")}</h3>
+        <ul class="space-y-2">
+          <li><a href="https://app.isehat.biz.id/login" class="text-sm" style="color: var(--color-text-muted);">{t(locale, "nav.masuk")}</a></li>
+          <li><a href="https://app.isehat.biz.id/register" class="text-sm" style="color: var(--color-primary); font-weight: 600;">{t(locale, "nav.daftar")}</a></li>
+        </ul>
+        <div class="flex gap-3 mt-4">
+          {Object.entries(socialLinks).filter(([, url]) => url).map(([name, url]) => (
+            <a href={url} target="_blank" rel="noopener noreferrer" class="text-sm" style="color: var(--color-text-muted);" aria-label={name}>{name}</a>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8 pt-6 text-center text-xs" style="border-top: 1px solid var(--color-border); color: var(--color-text-muted);">
+      <p class="medical-disclaimer mb-3 text-left" style="font-size: 0.75rem;">
+        {t(locale, "disclaimer.site")}
+      </p>
+      <p>&copy; {new Date().getFullYear()} iSehat. All rights reserved.</p>
+    </div>
+  </div>
+</footer>

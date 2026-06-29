@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from 'react'
 import type { ReactNode } from 'react'
@@ -14,9 +15,10 @@ import type { AuthContextValue, AuthResponse, AuthState } from './auth'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(emptyAuthState)
   const [loading, setLoading] = useState(true)
+  const booted = useRef(false)
 
   const refresh = useCallback(async () => {
-    setLoading(true)
+    if (!booted.current) setLoading(true)
 
     try {
       const response = await fetch('/api/auth/me', {
@@ -35,12 +37,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setState(emptyAuthState)
     } finally {
+      booted.current = true
       setLoading(false)
     }
   }, [])
 
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    } catch { /* ignore */ }
+    setState(emptyAuthState)
+  }, [])
+
+  // ponytail: global 401 interceptor via fetch patch. upgrade to service worker if we need offline support.
   useEffect(() => {
-    // Auth bootstrap synchronizes React state with the external HTTP-only session cookie.
+    const origFetch = window.fetch
+    window.fetch = async function patchedFetch(...args: Parameters<typeof fetch>) {
+      const res = await origFetch.apply(this, args)
+      if (res.status === 401) setState(emptyAuthState)
+      return res
+    }
+    return () => { window.fetch = origFetch }
+  }, [])
+
+  useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh()
   }, [refresh])
@@ -56,9 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...state,
       loading,
       refresh,
-      setAuthenticated: setState
+      setAuthenticated: setState,
+      logout
     }),
-    [loading, refresh, state]
+    [loading, refresh, state, logout]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

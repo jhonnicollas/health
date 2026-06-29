@@ -1,0 +1,18 @@
+---
+export interface Props {
+  items: string[];
+  label: string;
+}
+
+const { items, label } = Astro.props;
+---
+
+<nav class="text-sm mb-4" style="color: var(--color-text-muted);" aria-label="Breadcrumb">
+  <span>{label}:</span>
+  {items.map((item, i) => (
+    <span>
+      {i > 0 && <span class="mx-1">/</span>}
+      <span>{item}</span>
+    </span>
+  ))}
+</nav>

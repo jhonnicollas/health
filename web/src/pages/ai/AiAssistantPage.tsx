@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../../i18n'
+import { translateErrorCode } from '../../api/translateError'
 
 type VitalSnapshot = {
   metricCode: string
@@ -28,7 +30,7 @@ type AiAssistantResponse = {
     dataSufficiencyScore?: number
     scoreReason?: string
   }
-  error?: { message: string }
+  error?: { message: string; code?: string }
 }
 
 type ChatMessage = {
@@ -40,12 +42,13 @@ type ChatMessage = {
 }
 
 function AiAssistantPage() {
-  const [question, setQuestion] = useState('Saran makan malam untuk hipertensi')
+  const { t, locale } = useI18n()
+  const [question, setQuestion] = useState(t('ai.defaultQuestion'))
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Halo. Saya bisa membantu merangkum data vital terbaru dan memberi edukasi gaya hidup umum yang aman.'
+      content: t('ai.welcomeMsg')
     }
   ])
   const [vitals, setVitals] = useState<VitalSnapshot[]>([])
@@ -56,12 +59,13 @@ function AiAssistantPage() {
   const [error, setError] = useState<string | null>(null)
   const [recommendations, setRecommendations] = useState<AiRecommendation[]>([])
   const [recsLoading, setRecsLoading] = useState(true)
+  const [recsError, setRecsError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/ai/recommendations?limit=10', { credentials: 'include' })
-      .then(r => r.json() as Promise<{ success: boolean; data?: { recommendations: AiRecommendation[] }; error?: { message: string } }>)
-      .then(body => { if (body.success && body.data?.recommendations) setRecommendations(body.data.recommendations) })
-      .catch(() => {})
+      .then(r => { if (!r.ok) { setRecsError(t('ai.recLoadFailed')); return null } return r.json() as Promise<{ success: boolean; data?: { recommendations: AiRecommendation[] }; error?: { message: string } }> })
+      .then(body => { if (body && body.success && body.data?.recommendations) setRecommendations(body.data.recommendations) })
+      .catch(() => { setRecsError(t('ai.connError')) })
       .finally(() => setRecsLoading(false))
   }, [])
 
@@ -85,9 +89,13 @@ function AiAssistantPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: trimmedQuestion })
       })
+      if (!res.ok) {
+        setError(t('ai.aiFailed'))
+        return
+      }
       const body = (await res.json()) as AiAssistantResponse
       if (!res.ok || !body.success || !body.data) {
-        setError(body.error?.message ?? 'AI assistant failed to respond.')
+        setError(body.error?.code ? translateErrorCode(body.error.code, locale, body.error.message) : t('ai.aiFailed'))
         return
       }
       setVitals(body.data.vitals)
@@ -104,7 +112,7 @@ function AiAssistantPage() {
         }
       ])
     } catch {
-      setError('Could not connect to server.')
+      setError(t('ai.connError'))
     } finally {
       setLoading(false)
     }
@@ -114,20 +122,20 @@ function AiAssistantPage() {
     <section className="settings-panel ai-assistant-panel" aria-labelledby="ai-title">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">AI Assistant</p>
-          <h2 id="ai-title">Safe Health Chat</h2>
-          <p>LLM uses latest vital context, but does not provide diagnosis or medication dosage.</p>
+          <p className="eyebrow">{t('ai.assistantEyebrow')}</p>
+          <h2 id="ai-title">{t('ai.assistantTitle')}</h2>
+          <p>{t('ai.assistantSubtitle')}</p>
         </div>
-        <span className="status-chip">Rule-first</span>
+        <span className="status-chip">{t('ai.ruleFirst')}</span>
       </div>
 
       <div className="ai-context-banner">
         <div>
-          <p className="eyebrow">Current Health Context</p>
-          <h3>{vitals.length > 0 ? `${vitals.length} latest vitals injected` : 'Vitals context ready'}</h3>
-          <p>Responses use this context only for education. Medical status still follows the rule engine.</p>
+          <p className="eyebrow">{t('ai.currentContext')}</p>
+          <h3>{vitals.length > 0 ? `${vitals.length} ${t('ai.vitalsInjected')}` : t('ai.vitalsReady')}</h3>
+          <p>{t('ai.contextEduNote')}</p>
         </div>
-        {vitals.length === 0 ? <span className="status-chip">No vitals yet</span> : (
+        {vitals.length === 0 ? <span className="status-chip">{t('ai.noVitals')}</span> : (
           <div className="vital-strip" aria-label="Latest vitals">
             {vitals.map((value) => (
               <span key={`${value.metricCode}-${value.finalValue}`}>
@@ -139,39 +147,39 @@ function AiAssistantPage() {
       </div>
 
       <div className="ai-safety-note" role="note">
-        AI hanya memberi edukasi umum. AI tidak membuat diagnosis, tidak menentukan tingkat keparahan, dan tidak mengubah dosis obat.
+        {t('ai.safetyNote')}
       </div>
 
       {dataSufficiencyScore !== null && (
         <div className="settings-card" style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setContextTraceOpen(!contextTraceOpen)}>
-            <h3 style={{ font: 'var(--typHeadlineSm)', margin: 0 }}>Context Trace</h3>
+            <h3 style={{ font: 'var(--typHeadlineSm)', margin: 0 }}>{t('ai.contextTrace')}</h3>
             <span style={{ fontSize: 12 }}>{contextTraceOpen ? '▲' : '▼'}</span>
           </div>
           {contextTraceOpen && (
             <div style={{ marginTop: 8 }}>
-              <p>Data Sufficiency: <strong>{dataSufficiencyScore}/100</strong></p>
+              <p>{t('ai.dataSufficiency')} <strong>{dataSufficiencyScore}/100</strong></p>
               {scoreReason && <p style={{ fontSize: 13, color: '#666' }}>{scoreReason}</p>}
-              <p style={{ fontSize: 12, marginTop: 4 }}>Vector context: <span className="status-chip">Unavailable (Sprint 5 infrastructure only)</span></p>
+              <p style={{ fontSize: 12, marginTop: 4 }}>{t('ai.vectorContext')} <span className="status-chip">{t('ai.vectorUnavailable')}</span></p>
             </div>
           )}
         </div>
       )}
 
       <div className="settings-card" style={{ marginTop: 8 }}>
-        <h3 style={{ font: 'var(--typHeadlineSm)', margin: '0 0 8px' }}>Sprint 6 AI Readiness</h3>
-        <p style={{ fontSize: 13 }}>AI Clinical Copilot is deferred to Sprint 6. Current infrastructure prepares memory and context trace.</p>
-        <a href="/ai-memory" style={{ fontSize: 13, color: '#3182ce' }}>Manage AI Memory →</a>
+        <h3 style={{ font: 'var(--typHeadlineSm)', margin: '0 0 8px' }}>{t('ai.sprint6Readiness')}</h3>
+        <p style={{ fontSize: 13 }}>{t('ai.sprint6Note')}</p>
+        <a href="/ai-memory" style={{ fontSize: 13, color: '#3182ce' }}>{t('ai.manageMemory')}</a>
       </div>
 
       {recommendations.length > 0 || !recsLoading ? (
         <div className="settings-card" style={{ marginTop: 16 }}>
           <h3 style={{ font: 'var(--typHeadlineSm)', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>history</span>
-            Recommendation History
+            {t('ai.recHistory')}
           </h3>
-          {recsLoading ? <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>Loading...</p> : null}
-          {!recsLoading && recommendations.length === 0 ? <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>No recommendations yet.</p> : null}
+          {recsLoading ? <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>{t('ai.loading')}</p> : null}
+          {!recsLoading && recommendations.length === 0 ? <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextMuted)' }}>{recsError || t('ai.noRecs')}</p> : null}
           {recommendations.map(rec => (
             <div key={rec.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--colorBorderSoft)' }}>
               <p style={{ font: 'var(--typBodySm)', margin: '0 0 4px' }}>{rec.summaryText}</p>
@@ -189,7 +197,7 @@ function AiAssistantPage() {
         {messages.map((message) => (
           <article className={`chat-bubble ${message.role}`} key={message.id}>
             <div className="chat-meta">
-              <span>{message.role === 'user' ? 'You' : 'HL AI'}</span>
+              <span>{message.role === 'user' ? t('ai.you') : t('ai.hlAi')}</span>
               {message.model ? <span>{message.usedFallback ? 'fallback' : message.model}</span> : null}
             </div>
             <p>{message.content}</p>
@@ -197,15 +205,15 @@ function AiAssistantPage() {
         ))}
         {loading ? (
           <article className="chat-bubble assistant typing">
-            <div className="chat-meta"><span>HL AI</span><span>typing</span></div>
-            <p>Menyiapkan jawaban aman...</p>
+            <div className="chat-meta"><span>{t('ai.hlAi')}</span><span>{t('ai.typing')}</span></div>
+            <p>{t('ai.preparingAnswer')}</p>
           </article>
         ) : null}
       </div>
 
       <div className="settings-card ai-compose-card">
         <label>
-          Question
+          {t('ai.question')}
           <textarea
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(event) => {
@@ -219,7 +227,7 @@ function AiAssistantPage() {
           />
         </label>
         <button disabled={loading || !question.trim()} onClick={() => void ask()} type="button">
-          {loading ? 'Sending...' : 'Send'}
+          {loading ? t('ai.sending') : t('ai.send')}
         </button>
       </div>
 

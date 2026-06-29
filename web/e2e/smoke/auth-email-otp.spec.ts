@@ -1,14 +1,24 @@
 import { test, expect } from '@playwright/test'
+
+const BASE = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
+const IS_LOCAL = BASE.includes('localhost') || BASE.includes('127.0.0.1')
 import { attachGlobalFailureGates, expectAppNotBlank } from '../support/global-gates'
 import { expectNoSecretLikeText } from '../support/selectors'
 
 const GATE_OPTS = {
-  allowConsoleError: [/Failed to fetch/i, /NetworkError/i, /proxy/i, /401/i, /403/i, /aborted/i, /ERR_ABORTED/i, /sesi/i],
+  // 400 is expected when /api/auth/register/verify receives an intentionally invalid OTP.
+  // Other 4xx (401, 403) are also expected from auth endpoints with missing/closed sessions.
+  // The gate strips a noise filter for HTTP load failures, not a regression assertion filter.
+  allowConsoleError: [/Failed to fetch/i, /NetworkError/i, /proxy/i, /400/i, /401/i, /403/i, /aborted/i, /ERR_ABORTED/i, /sesi/i],
   allowApi404: [/\/api\/dev\/test-email-outbox/],
   allowFailedApiRequests: [/\/api\/dev\/test-email-outbox/, /\/api\/auth/],
 }
 
 test.describe('Auth Email OTP', () => {
+  if (!IS_LOCAL) {
+    test.skip('OTP tests require local email test infrastructure', () => {})
+    return
+  }
   test('register: shows OTP step after form submit', async ({ page }) => {
     const assertNoGlobalFailures = attachGlobalFailureGates(page, GATE_OPTS)
 
