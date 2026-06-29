@@ -1,17 +1,22 @@
--- HL Health Companion schema for Cloudflare D1 / SQLite
--- Existing database binding:
--- DB = multi_Ai_db
--- Existing R2 binding:
--- LOGS = multi-apps-ai-bucket
---
+-- HL Health Companion — Unified D1 Schema (Sprint 1–5 + S5X hardening)
+-- Target: Cloudflare D1 / SQLite
+-- R2 bucket: multi-apps-ai-bucket (binding LOGS)
+-- Queue: telegram-submit-summary (binding TELEGRAM_QUEUE)
 -- Naming rules:
--- 1. Table names use prefix HL_
--- 2. No extra underscore in table names after HL_
--- 3. Field names use camelCase
--- 4. Original image is not stored; only compressed watermarked final attachment is stored in R2
+--   Table prefix: HL_
+--   No extra underscore after HL_
+--   Field names: camelCase
+--   JSON columns: payloadJson, summaryJson, dataJson, metadataJson, configurationJson
+-- This file is a merge of:
+--   - Sprint 1–4 baseline (archive/docs_legacy_2025_sprint1-5/07-schema.sql)
+--   - Sprint 5 additive schema (docs/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql)
+--   - S5X migrations (worker/migrations/001_s5x_auth_email_otp.sql, 002_s5x_whatsapp_profile.sql)
 
 PRAGMA foreign_keys = ON;
 
+-- ---------------------------------------------------------
+-- Migration tracker
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_schemaMigrations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   migrationName TEXT NOT NULL UNIQUE,
@@ -23,12 +28,33 @@ CREATE TABLE IF NOT EXISTS HL_schemaMigrations (
 -- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_systemConfigs (
     configKey TEXT PRIMARY KEY,
-    configValue TEXT NOT NULL,
-    dataType TEXT NOT NULL, -- 'number', 'boolean', 'string', 'json'
+    configValue TEXT NOT NULL DEFAULT '',
+    dataType TEXT NOT NULL DEFAULT 'string' CHECK (dataType IN ('string','number','boolean','json')),
     description TEXT,
-    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS HL_configMetadata (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  configKey TEXT NOT NULL UNIQUE,
+  category TEXT NOT NULL CHECK (category IN ('ai','auth','billing','telegram','system','security','feature','hydration','cycle','education','vectorize')),
+  isSecret INTEGER NOT NULL DEFAULT 0 CHECK (isSecret IN (0,1)),
+  storageMode TEXT NOT NULL DEFAULT 'd1' CHECK (storageMode IN ('d1','env','secret','reference')),
+  envVarName TEXT,
+  masked INTEGER NOT NULL DEFAULT 0 CHECK (masked IN (0,1)),
+  readPolicy TEXT NOT NULL DEFAULT 'admin.config.read',
+  writePolicy TEXT NOT NULL DEFAULT 'admin.config.update',
+  description TEXT,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (configKey) REFERENCES HL_systemConfigs(configKey) ON DELETE CASCADE
+);
+
+-- ---------------------------------------------------------
+-- 1. Users, Sessions, Profiles, Consents
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
@@ -40,7 +66,26 @@ CREATE TABLE IF NOT EXISTS HL_users (
   active INTEGER NOT NULL DEFAULT 1,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  lastLoginAt TEXT
+  lastLoginAt TEXT,
+  emailVerifiedAt TEXT,
+  emailVerificationMethod TEXT
+);
+
+CREATE TABLE IF NOT EXISTS HL_emailOtpChallenges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER,
+  normalizedEmail TEXT NOT NULL,
+  otpHash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  purpose TEXT NOT NULL CHECK(purpose IN ('register', 'login')),
+  failedAttempts INTEGER NOT NULL DEFAULT 0,
+  expiresAt TEXT NOT NULL,
+  consumedAt TEXT,
+  resendCount INTEGER NOT NULL DEFAULT 0,
+  lastResendAt TEXT,
+  ipHash TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS HL_sessions (
@@ -67,6 +112,7 @@ CREATE TABLE IF NOT EXISTS HL_userProfiles (
   emergencyConsent INTEGER NOT NULL DEFAULT 0,
   aiConsent INTEGER NOT NULL DEFAULT 1,
   dataShareConsent INTEGER NOT NULL DEFAULT 0,
+  whatsappNumber TEXT,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
@@ -84,6 +130,211 @@ CREATE TABLE IF NOT EXISTS HL_userConsents (
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
 );
 
+-- ---------------------------------------------------------
+-- 2. RBAC (Sprint 5 Foundation)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_roles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  roleCode TEXT NOT NULL UNIQUE,
+  roleName TEXT NOT NULL,
+  description TEXT,
+  systemRole INTEGER NOT NULL DEFAULT 0 CHECK (systemRole IN (0,1)),
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS HL_permissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  permissionCode TEXT NOT NULL UNIQUE,
+  permissionName TEXT NOT NULL,
+  category TEXT NOT NULL,
+  description TEXT,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS HL_rolePermissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  roleCode TEXT NOT NULL,
+  permissionCode TEXT NOT NULL,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(roleCode, permissionCode),
+  FOREIGN KEY (roleCode) REFERENCES HL_roles(roleCode) ON DELETE CASCADE,
+  FOREIGN KEY (permissionCode) REFERENCES HL_permissions(permissionCode) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_userRoles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  roleCode TEXT NOT NULL,
+  assignedBy INTEGER,
+  assignedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revokedAt TEXT,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  UNIQUE(userId, roleCode),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (assignedBy) REFERENCES HL_users(id) ON DELETE SET NULL,
+  FOREIGN KEY (roleCode) REFERENCES HL_roles(roleCode) ON DELETE RESTRICT
+);
+
+-- ---------------------------------------------------------
+-- 3. Plans, Subscriptions, Billing (Sprint 5 Foundation)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_plans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  planCode TEXT NOT NULL UNIQUE,
+  planName TEXT NOT NULL,
+  billingInterval TEXT NOT NULL CHECK (billingInterval IN ('free','monthly','quarterly','yearly','manual')),
+  durationDays INTEGER,
+  priceAmount INTEGER NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'IDR',
+  trialDays INTEGER NOT NULL DEFAULT 0,
+  description TEXT,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  sortOrder INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS HL_planFeatures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  planCode TEXT NOT NULL,
+  featureCode TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+  quotaLimit INTEGER,
+  quotaWindow TEXT CHECK (quotaWindow IS NULL OR quotaWindow IN ('day','month','quarter','year','lifetime')),
+  metadataJson TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(planCode, featureCode),
+  FOREIGN KEY (planCode) REFERENCES HL_plans(planCode) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  planCode TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('active','trialing','pastDue','canceled','expired','paused')),
+  currentPeriodStart TEXT,
+  currentPeriodEnd TEXT,
+  cancelAtPeriodEnd INTEGER NOT NULL DEFAULT 0 CHECK (cancelAtPeriodEnd IN (0,1)),
+  provider TEXT NOT NULL DEFAULT 'manual' CHECK (provider IN ('manual','stripe','midtrans','xendit')),
+  providerCustomerId TEXT,
+  providerSubscriptionId TEXT,
+  providerPlanId TEXT,
+  metadataJson TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (planCode) REFERENCES HL_plans(planCode) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS HL_paymentEvents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL CHECK (provider IN ('manual','stripe','midtrans','xendit')),
+  eventType TEXT NOT NULL,
+  providerEventId TEXT NOT NULL,
+  userId INTEGER,
+  subscriptionId INTEGER,
+  payloadJson TEXT,
+  processed INTEGER NOT NULL DEFAULT 0 CHECK (processed IN (0,1)),
+  processedAt TEXT,
+  errorMessage TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(provider, providerEventId),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE SET NULL,
+  FOREIGN KEY (subscriptionId) REFERENCES HL_subscriptions(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS HL_billingCheckoutSessions (
+  id TEXT PRIMARY KEY,
+  userId INTEGER NOT NULL,
+  planCode TEXT NOT NULL,
+  provider TEXT NOT NULL CHECK (provider IN ('manual','mock','xendit')),
+  mode TEXT NOT NULL,
+  merchantRef TEXT NOT NULL UNIQUE,
+  providerCheckoutId TEXT,
+  checkoutUrl TEXT,
+  amount INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'IDR',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','failed','expired','cancelled')),
+  successUrl TEXT,
+  cancelUrl TEXT,
+  paidAt TEXT,
+  expiresAt TEXT,
+  metadataJson TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (planCode) REFERENCES HL_plans(planCode) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS HL_usageCounters (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  featureCode TEXT NOT NULL,
+  usageWindow TEXT NOT NULL,
+  usedCount INTEGER NOT NULL DEFAULT 0 CHECK (usedCount >= 0),
+  quotaLimitSnapshot INTEGER,
+  resetAt TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(userId, featureCode, usageWindow),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_featureFlags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  flagCode TEXT NOT NULL UNIQUE,
+  flagName TEXT NOT NULL,
+  description TEXT,
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0,1)),
+  targetRoleCode TEXT,
+  targetPlanCode TEXT,
+  metadataJson TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (targetRoleCode) REFERENCES HL_roles(roleCode) ON DELETE SET NULL,
+  FOREIGN KEY (targetPlanCode) REFERENCES HL_plans(planCode) ON DELETE SET NULL
+);
+
+-- ---------------------------------------------------------
+-- 4. OAuth (Sprint 5A)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_oauthAccounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  provider TEXT NOT NULL CHECK (provider IN ('google')),
+  providerSubject TEXT NOT NULL,
+  providerEmail TEXT NOT NULL,
+  providerEmailVerified INTEGER NOT NULL DEFAULT 0 CHECK (providerEmailVerified IN (0,1)),
+  linkedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lastLoginAt TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(provider, providerSubject),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_oauthStates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stateHash TEXT NOT NULL UNIQUE,
+  nonceHash TEXT,
+  provider TEXT NOT NULL CHECK (provider IN ('google')),
+  mode TEXT NOT NULL DEFAULT 'login' CHECK (mode IN ('login','link')),
+  returnTo TEXT,
+  userId INTEGER,
+  expiresAt TEXT NOT NULL,
+  consumedAt TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+-- ---------------------------------------------------------
+-- 5. Device & Metric Catalog
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_devices (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   deviceCode TEXT NOT NULL UNIQUE,
@@ -154,6 +405,9 @@ CREATE TABLE IF NOT EXISTS HL_metricRules (
   FOREIGN KEY (metricCode) REFERENCES HL_metricCatalog(metricCode) ON DELETE CASCADE
 );
 
+-- ---------------------------------------------------------
+-- 6. Measurements
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_measurementDrafts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER NOT NULL,
@@ -230,8 +484,6 @@ CREATE TABLE IF NOT EXISTS HL_measurementAttachments (
   FOREIGN KEY (metricCode) REFERENCES HL_metricCatalog(metricCode) ON DELETE RESTRICT
 );
 
--- Table to store most recent measurement values for quick autofill of rarely-changing metrics
--- metrics that rarely change frequently: bodyWeight, waistCircumference, bodyTemperature, spo2
 CREATE TABLE IF NOT EXISTS HL_lastMeasurements (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER NOT NULL,
@@ -244,6 +496,9 @@ CREATE TABLE IF NOT EXISTS HL_lastMeasurements (
   UNIQUE(userId, deviceCode, metricCode)
 );
 
+-- ---------------------------------------------------------
+-- 7. AI Extractions / Recommendations
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_aiExtractions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER NOT NULL,
@@ -281,6 +536,84 @@ CREATE TABLE IF NOT EXISTS HL_aiRecommendations (
   FOREIGN KEY (sessionId) REFERENCES HL_measurementSessions(id) ON DELETE CASCADE
 );
 
+-- Sprint 5C AI infrastructure
+CREATE TABLE IF NOT EXISTS HL_vectorDocuments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  vectorId TEXT NOT NULL UNIQUE,
+  namespace TEXT NOT NULL,
+  sourceType TEXT NOT NULL CHECK (sourceType IN ('measurement','symptom','alert','safetyEvent','hydration','cycle','medication','fasting','pattern','report','education','sprint6ClinicalPrep')),
+  sourceId TEXT NOT NULL,
+  contentHash TEXT NOT NULL,
+  textPreview TEXT,
+  metadataJson TEXT,
+  embeddingModel TEXT,
+  indexedAt TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','indexed','failed','deleted','skipped')),
+  errorMessage TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(userId, sourceType, sourceId, contentHash),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_aiContextQueries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  queryText TEXT NOT NULL,
+  sourceTypesJson TEXT,
+  topK INTEGER NOT NULL DEFAULT 8 CHECK (topK > 0),
+  minScore REAL,
+  resultJson TEXT,
+  usedVectorContext INTEGER NOT NULL DEFAULT 0 CHECK (usedVectorContext IN (0,1)),
+  fallbackReason TEXT,
+  durationMs INTEGER,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_aiRecommendationContexts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  recommendationId INTEGER NOT NULL,
+  userId INTEGER NOT NULL,
+  aiContextQueryId INTEGER,
+  vectorContextJson TEXT,
+  patternScore INTEGER CHECK (patternScore IS NULL OR (patternScore >= 1 AND patternScore <= 100)),
+  scoreReason TEXT,
+  usedVectorContext INTEGER NOT NULL DEFAULT 0 CHECK (usedVectorContext IN (0,1)),
+  disclaimer TEXT,
+  usedFallback INTEGER NOT NULL DEFAULT 0 CHECK (usedFallback IN (0,1)),
+  modelName TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (recommendationId) REFERENCES HL_aiRecommendations(id) ON DELETE CASCADE,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (aiContextQueryId) REFERENCES HL_aiContextQueries(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS HL_aiMemoryJobs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  jobType TEXT NOT NULL CHECK (jobType IN ('rebuild','delete','backfill','indexSource')),
+  sourceTypesJson TEXT,
+  rangeStart TEXT,
+  rangeEnd TEXT,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','processing','completed','failed','canceled')),
+  estimatedDocuments INTEGER,
+  processedDocuments INTEGER NOT NULL DEFAULT 0,
+  failedDocuments INTEGER NOT NULL DEFAULT 0,
+  errorMessage TEXT,
+  requestedBy INTEGER,
+  startedAt TEXT,
+  completedAt TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (requestedBy) REFERENCES HL_users(id) ON DELETE SET NULL
+);
+
+-- ---------------------------------------------------------
+-- 8. Alerts & Notifications (measurement-centric)
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER NOT NULL,
@@ -314,19 +647,6 @@ CREATE TABLE IF NOT EXISTS HL_notifications (
   errorMessage TEXT,
   sentAt TEXT,
   createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS HL_telegramLinks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  userId INTEGER NOT NULL UNIQUE,
-  telegramChatId TEXT,
-  telegramUsername TEXT,
-  verificationCodeHash TEXT,
-  verified INTEGER NOT NULL DEFAULT 0,
-  enabled INTEGER NOT NULL DEFAULT 0,
-  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
 );
 
@@ -371,6 +691,9 @@ CREATE TABLE IF NOT EXISTS HL_reminderSettings (
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
 );
 
+-- ---------------------------------------------------------
+-- 9. Family, Emergency, Caregiver
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_familyLinks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ownerUserId INTEGER NOT NULL,
@@ -414,6 +737,59 @@ CREATE TABLE IF NOT EXISTS HL_emergencyContacts (
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS HL_familyPermissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  familyLinkId INTEGER NOT NULL,
+  permissionCode TEXT NOT NULL,
+  allowed INTEGER NOT NULL DEFAULT 0 CHECK (allowed IN (0,1)),
+  grantedBy INTEGER,
+  grantedAt TEXT,
+  revokedAt TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(familyLinkId, permissionCode),
+  FOREIGN KEY (familyLinkId) REFERENCES HL_familyLinks(id) ON DELETE CASCADE,
+  FOREIGN KEY (grantedBy) REFERENCES HL_users(id) ON DELETE SET NULL
+);
+
+-- ---------------------------------------------------------
+-- 10. Telegram
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_telegramLinks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL UNIQUE,
+  telegramChatId TEXT,
+  telegramUsername TEXT,
+  verificationCodeHash TEXT,
+  verified INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_telegramCallbackEvents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  callbackQueryId TEXT NOT NULL UNIQUE,
+  userId INTEGER,
+  telegramChatId TEXT,
+  telegramMessageId TEXT,
+  callbackData TEXT NOT NULL,
+  eventType TEXT NOT NULL CHECK (eventType IN ('hydrationQuickAdd','unknown')),
+  amountMl INTEGER,
+  status TEXT NOT NULL DEFAULT 'received' CHECK (status IN ('received','processed','rejected','failed','duplicate')),
+  waterIntakeLogId INTEGER,
+  rejectionReason TEXT,
+  payloadJson TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  processedAt TEXT,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE SET NULL,
+  FOREIGN KEY (waterIntakeLogId) REFERENCES HL_waterIntakeLogs(id) ON DELETE SET NULL
+);
+
+-- ---------------------------------------------------------
+-- 11. Medication, Fasting, Badges, Streaks, Reports
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_medications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER NOT NULL,
@@ -524,6 +900,9 @@ CREATE TABLE IF NOT EXISTS HL_reportShares (
   FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
 );
 
+-- ---------------------------------------------------------
+-- 12. Patterns & Knowledge Base
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_patternInsights (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER NOT NULL,
@@ -549,6 +928,9 @@ CREATE TABLE IF NOT EXISTS HL_knowledgeArticles (
   updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ---------------------------------------------------------
+-- 13. Audit & Rate Limiting
+-- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS HL_auditLogs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId INTEGER,
@@ -571,12 +953,201 @@ CREATE TABLE IF NOT EXISTS HL_apiRateLimits (
   UNIQUE (rateKey, routeKey, windowStart)
 );
 
--- Indexes
+-- ---------------------------------------------------------
+-- 14. Education (Sprint 5A)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_educationCards (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  topicType TEXT NOT NULL CHECK (topicType IN ('metric','symptom','hydration','cycle','ai','medication','fasting','report','system')),
+  topicCode TEXT NOT NULL,
+  title TEXT NOT NULL,
+  shortText TEXT,
+  whyItMatters TEXT,
+  howToUse TEXT,
+  normalMeaning TEXT,
+  warningMeaning TEXT,
+  actionText TEXT,
+  redFlagText TEXT,
+  sourceLabel TEXT,
+  contentMarkdown TEXT,
+  minimumPlanCode TEXT,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  sortOrder INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(topicType, topicCode),
+  FOREIGN KEY (minimumPlanCode) REFERENCES HL_plans(planCode) ON DELETE SET NULL
+);
 
+CREATE TABLE IF NOT EXISTS HL_userEducationProgress (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  topicType TEXT NOT NULL,
+  topicCode TEXT NOT NULL,
+  firstSeenAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lastSeenAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  acknowledgedAt TEXT,
+  seenCount INTEGER NOT NULL DEFAULT 1 CHECK (seenCount >= 0),
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(userId, topicType, topicCode),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+-- ---------------------------------------------------------
+-- 15. Symptoms & Safety Events (Sprint 5A)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_symptomLogs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  sourceSessionId INTEGER,
+  symptomDateTime TEXT NOT NULL,
+  quickSymptomsJson TEXT,
+  bodyArea TEXT,
+  painScale INTEGER CHECK (painScale IS NULL OR (painScale >= 1 AND painScale <= 10)),
+  painSeverity TEXT CHECK (painSeverity IS NULL OR painSeverity IN ('mild','moderate','severe')),
+  mood TEXT CHECK (mood IS NULL OR mood IN ('normal','sad','angry','anxious','happy','tired','other')),
+  startedAt TEXT,
+  durationMinutes INTEGER CHECK (durationMinutes IS NULL OR durationMinutes >= 0),
+  description TEXT,
+  redFlagsJson TEXT,
+  isRedFlag INTEGER NOT NULL DEFAULT 0 CHECK (isRedFlag IN (0,1)),
+  safetyEventId INTEGER,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (sourceSessionId) REFERENCES HL_measurementSessions(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS HL_safetyEvents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  sourceType TEXT NOT NULL CHECK (sourceType IN ('measurement','symptom','cycle','hydration','ai','system','telegram','billing')),
+  sourceId TEXT,
+  eventType TEXT NOT NULL,
+  severity TEXT NOT NULL CHECK (severity IN ('info','warning','high','critical','emergency')),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  ruleCode TEXT,
+  metadataJson TEXT,
+  acknowledged INTEGER NOT NULL DEFAULT 0 CHECK (acknowledged IN (0,1)),
+  acknowledgedBy INTEGER,
+  acknowledgedAt TEXT,
+  notificationStatus TEXT CHECK (notificationStatus IS NULL OR notificationStatus IN ('pending','sent','failed','skipped','queued')),
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (acknowledgedBy) REFERENCES HL_users(id) ON DELETE SET NULL
+);
+
+-- ---------------------------------------------------------
+-- 16. Hydration (Sprint 5B)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_hydrationSettings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL UNIQUE,
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+  reminderEnabled INTEGER NOT NULL DEFAULT 1 CHECK (reminderEnabled IN (0,1)),
+  operatingStart TEXT NOT NULL DEFAULT '09:00',
+  operatingEnd TEXT NOT NULL DEFAULT '18:00',
+  telegramQuickAddEnabled INTEGER NOT NULL DEFAULT 1 CHECK (telegramQuickAddEnabled IN (0,1)),
+  customBaseTargetMl INTEGER,
+  isPregnant INTEGER NOT NULL DEFAULT 0 CHECK (isPregnant IN (0,1)),
+  isLactating INTEGER NOT NULL DEFAULT 0 CHECK (isLactating IN (0,1)),
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_hydrationTargets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  targetDate TEXT NOT NULL,
+  targetMl INTEGER NOT NULL CHECK (targetMl > 0),
+  baseTargetMl INTEGER NOT NULL CHECK (baseTargetMl > 0),
+  bodyWeightKg REAL,
+  bodyTemperatureC REAL,
+  isPregnant INTEGER NOT NULL DEFAULT 0 CHECK (isPregnant IN (0,1)),
+  isLactating INTEGER NOT NULL DEFAULT 0 CHECK (isLactating IN (0,1)),
+  reasonJson TEXT,
+  calculatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(userId, targetDate),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_waterIntakeLogs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  amountMl INTEGER NOT NULL CHECK (amountMl > 0 AND amountMl <= 3000),
+  loggedAt TEXT NOT NULL,
+  logDate TEXT NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('web','telegram','system','import')),
+  telegramMessageId TEXT,
+  telegramCallbackId TEXT,
+  notes TEXT,
+  overLimitAtInsert INTEGER NOT NULL DEFAULT 0 CHECK (overLimitAtInsert IN (0,1)),
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+-- ---------------------------------------------------------
+-- 17. Cycle Tracking (Sprint 5D)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS HL_cycleSettings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL UNIQUE,
+  cycleLengthDays INTEGER NOT NULL DEFAULT 28 CHECK (cycleLengthDays > 0 AND cycleLengthDays <= 120),
+  periodLengthDays INTEGER NOT NULL DEFAULT 5 CHECK (periodLengthDays > 0 AND periodLengthDays <= 15),
+  lastPeriodStart TEXT,
+  isPregnant INTEGER NOT NULL DEFAULT 0 CHECK (isPregnant IN (0,1)),
+  isLactating INTEGER NOT NULL DEFAULT 0 CHECK (isLactating IN (0,1)),
+  isMenopause INTEGER NOT NULL DEFAULT 0 CHECK (isMenopause IN (0,1)),
+  predictionPaused INTEGER NOT NULL DEFAULT 0 CHECK (predictionPaused IN (0,1)),
+  pauseReason TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_cycleLogs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  logDate TEXT NOT NULL,
+  hasPeriodFlow INTEGER NOT NULL DEFAULT 0 CHECK (hasPeriodFlow IN (0,1)),
+  flowIntensity TEXT CHECK (flowIntensity IS NULL OR flowIntensity IN ('spotting','medium','heavy')),
+  mood TEXT CHECK (mood IS NULL OR mood IN ('normal','sad','angry','anxious','happy','tired','other')),
+  physicalSymptomsJson TEXT,
+  unprotected INTEGER NOT NULL DEFAULT 0 CHECK (unprotected IN (0,1)),
+  contraceptionGuardrailAcknowledgedAt TEXT,
+  notes TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(userId, logDate),
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS HL_cycleGuardrailAcknowledgements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  guardrailType TEXT NOT NULL CHECK (guardrailType IN ('outsideFertileWindow','unprotected','calendarMethod')),
+  relatedDate TEXT,
+  messageVersion TEXT NOT NULL DEFAULT 'sprint5.v1',
+  acknowledgedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  metadataJson TEXT,
+  createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES HL_users(id) ON DELETE CASCADE
+);
+
+-- ---------------------------------------------------------
+-- 18. Indexes (Sprint 1–5)
+-- ---------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idxHLUsersEmail ON HL_users(email);
 CREATE INDEX IF NOT EXISTS idxHLSessionsUser ON HL_sessions(userId);
 CREATE INDEX IF NOT EXISTS idxHLSessionsToken ON HL_sessions(sessionTokenHash);
 CREATE INDEX IF NOT EXISTS idxHLProfilesUser ON HL_userProfiles(userId);
+CREATE INDEX IF NOT EXISTS idx_emailOtpChallenges_normalizedEmail ON HL_emailOtpChallenges(normalizedEmail);
+CREATE INDEX IF NOT EXISTS idx_emailOtpChallenges_expiresAt ON HL_emailOtpChallenges(expiresAt);
 
 CREATE INDEX IF NOT EXISTS idxHLMetricRulesLookup ON HL_metricRules(metricCode, sex, minValue, maxValue, active);
 CREATE INDEX IF NOT EXISTS idxHLMetricCatalogCode ON HL_metricCatalog(metricCode);
@@ -600,6 +1171,7 @@ CREATE INDEX IF NOT EXISTS idxHLNotificationsStatus ON HL_notifications(status, 
 CREATE INDEX IF NOT EXISTS idxHLFamilyOwner ON HL_familyLinks(ownerUserId);
 CREATE INDEX IF NOT EXISTS idxHLFamilyLinked ON HL_familyLinks(linkedUserId);
 CREATE INDEX IF NOT EXISTS idxHLFamilyInvitesToken ON HL_familyInvites(inviteTokenHash);
+CREATE INDEX IF NOT EXISTS idxHLFamilyPermissionsLink ON HL_familyPermissions(familyLinkId, permissionCode, allowed);
 
 CREATE INDEX IF NOT EXISTS idxHLMedicationsUser ON HL_medications(userId);
 CREATE INDEX IF NOT EXISTS idxHLMedicationLogsUserDate ON HL_medicationLogs(userId, takenAt);
@@ -611,8 +1183,65 @@ CREATE INDEX IF NOT EXISTS idxHLPatternInsightsUserDate ON HL_patternInsights(us
 CREATE INDEX IF NOT EXISTS idxHLAuditUserDate ON HL_auditLogs(userId, createdAt);
 CREATE INDEX IF NOT EXISTS idxHLRateLimitsLookup ON HL_apiRateLimits(rateKey, routeKey, windowStart);
 
--- Seed data is maintained separately in seed.sql and seed-rules.generated.sql
--- Run those files after applying this schema.
+CREATE INDEX IF NOT EXISTS idxHLRolesCode ON HL_roles(roleCode);
+CREATE INDEX IF NOT EXISTS idxHLPermissionsCode ON HL_permissions(permissionCode);
+CREATE INDEX IF NOT EXISTS idxHLRolePermissionsRole ON HL_rolePermissions(roleCode);
+CREATE INDEX IF NOT EXISTS idxHLRolePermissionsPermission ON HL_rolePermissions(permissionCode);
+CREATE INDEX IF NOT EXISTS idxHLUserRolesUserActive ON HL_userRoles(userId, active);
+CREATE INDEX IF NOT EXISTS idxHLUserRolesRoleActive ON HL_userRoles(roleCode, active);
 
-INSERT OR IGNORE INTO HL_schemaMigrations (migrationName)
-VALUES ('20260620InitialHealthCompanionSchema');
+CREATE INDEX IF NOT EXISTS idxHLPlansCode ON HL_plans(planCode);
+CREATE INDEX IF NOT EXISTS idxHLPlanFeaturesPlan ON HL_planFeatures(planCode, enabled);
+CREATE INDEX IF NOT EXISTS idxHLPlanFeaturesFeature ON HL_planFeatures(featureCode, enabled);
+CREATE INDEX IF NOT EXISTS idxHLSubscriptionsUserStatus ON HL_subscriptions(userId, status, currentPeriodEnd);
+CREATE INDEX IF NOT EXISTS idxHLSubscriptionsProvider ON HL_subscriptions(provider, providerSubscriptionId);
+CREATE INDEX IF NOT EXISTS idxHLPaymentEventsProvider ON HL_paymentEvents(provider, providerEventId);
+CREATE INDEX IF NOT EXISTS idxHLUsageCountersUserFeature ON HL_usageCounters(userId, featureCode, usageWindow);
+CREATE INDEX IF NOT EXISTS idxHLFeatureFlagsEnabled ON HL_featureFlags(flagCode, enabled);
+CREATE INDEX IF NOT EXISTS idxHLConfigMetadataCategory ON HL_configMetadata(category, isSecret, active);
+CREATE INDEX IF NOT EXISTS idxHLConfigMetadataPolicy ON HL_configMetadata(readPolicy, writePolicy);
+
+CREATE INDEX IF NOT EXISTS idxHLOauthAccountsUser ON HL_oauthAccounts(userId);
+CREATE INDEX IF NOT EXISTS idxHLOauthAccountsProviderSubject ON HL_oauthAccounts(provider, providerSubject);
+CREATE INDEX IF NOT EXISTS idxHLOauthStatesExpires ON HL_oauthStates(expiresAt, consumedAt);
+CREATE INDEX IF NOT EXISTS idxHLEducationCardsTopic ON HL_educationCards(topicType, topicCode, active);
+CREATE INDEX IF NOT EXISTS idxHLUserEducationProgressUser ON HL_userEducationProgress(userId, topicType, topicCode);
+CREATE INDEX IF NOT EXISTS idxHLSymptomLogsUserDate ON HL_symptomLogs(userId, symptomDateTime);
+CREATE INDEX IF NOT EXISTS idxHLSymptomLogsSourceSession ON HL_symptomLogs(sourceSessionId);
+CREATE INDEX IF NOT EXISTS idxHLSymptomLogsRedFlag ON HL_symptomLogs(userId, isRedFlag, symptomDateTime);
+CREATE INDEX IF NOT EXISTS idxHLSafetyEventsUserDate ON HL_safetyEvents(userId, createdAt);
+CREATE INDEX IF NOT EXISTS idxHLSafetyEventsTypeSeverity ON HL_safetyEvents(eventType, severity, createdAt);
+
+CREATE INDEX IF NOT EXISTS idxHLHydrationSettingsUser ON HL_hydrationSettings(userId);
+CREATE INDEX IF NOT EXISTS idxHLHydrationTargetsUserDate ON HL_hydrationTargets(userId, targetDate);
+CREATE INDEX IF NOT EXISTS idxHLWaterIntakeLogsUserDate ON HL_waterIntakeLogs(userId, logDate, loggedAt);
+CREATE INDEX IF NOT EXISTS idxHLWaterIntakeLogsTelegramCallback ON HL_waterIntakeLogs(telegramCallbackId);
+
+CREATE INDEX IF NOT EXISTS idxHLVectorDocumentsUserSource ON HL_vectorDocuments(userId, sourceType, sourceId);
+CREATE INDEX IF NOT EXISTS idxHLVectorDocumentsNamespace ON HL_vectorDocuments(namespace, status, indexedAt);
+CREATE INDEX IF NOT EXISTS idxHLVectorDocumentsStatus ON HL_vectorDocuments(status, createdAt);
+CREATE INDEX IF NOT EXISTS idxHLAiContextQueriesUserDate ON HL_aiContextQueries(userId, createdAt);
+CREATE INDEX IF NOT EXISTS idxHLAiRecommendationContextsRecommendation ON HL_aiRecommendationContexts(recommendationId);
+CREATE INDEX IF NOT EXISTS idxHLAiMemoryJobsUserStatus ON HL_aiMemoryJobs(userId, status, createdAt);
+
+CREATE INDEX IF NOT EXISTS idxHLCycleSettingsUser ON HL_cycleSettings(userId);
+CREATE INDEX IF NOT EXISTS idxHLCycleLogsUserDate ON HL_cycleLogs(userId, logDate);
+CREATE INDEX IF NOT EXISTS idxHLCycleGuardrailUserDate ON HL_cycleGuardrailAcknowledgements(userId, relatedDate, guardrailType);
+
+CREATE INDEX IF NOT EXISTS idxHLTelegramCallbackEventsStatus ON HL_telegramCallbackEvents(status, createdAt);
+CREATE INDEX IF NOT EXISTS idxHLTelegramCallbackEventsUser ON HL_telegramCallbackEvents(userId, createdAt);
+
+-- ---------------------------------------------------------
+-- 19. Migration markers
+-- ---------------------------------------------------------
+INSERT OR IGNORE INTO HL_schemaMigrations (migrationName) VALUES
+('20260620InitialHealthCompanionSchema'),
+('20260624Sprint5FullReleaseProgramSchemaFinalAiSprint6Ready'),
+('20250901_s5x_auth_email_otp'),
+('20250902_s5x_whatsapp_profile');
+
+-- ---------------------------------------------------------
+-- Secret Safety Rule
+-- ---------------------------------------------------------
+-- D1 stores only metadata/secret references. Real secrets live in Cloudflare Secrets/Environment.
+-- No plaintext API keys, OAuth client secrets, webhook secrets, bot tokens, VAPID keys in D1.

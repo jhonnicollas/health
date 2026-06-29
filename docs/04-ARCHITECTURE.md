@@ -1,1648 +1,657 @@
 # ARCHITECTURE — HL Health Companion
 
+> **Dokumen ini dibuat berdasarkan audit langsung terhadap source code di repo (worker/, web/, docs/03.SQL_SCHEMA_*, docs_sprint5/04.SQL_SEED_*, worker/migrations/*).**
+> Status: **Sprint 1–5 selesai, Sprint 5F (foundation hardening) & S5X (auth/billing/i18n) delivered, Sprint 6 AI Clinical Copilot di-defer.**
+> Dokumen lama: lihat `archive/docs_legacy_2025_sprint1-5/04-ARCHITECTURE.md`.
+
+---
+
 ## 1. Overview
 
-HL Health Companion is a full web health-monitoring application built on the Cloudflare stack.
+HL Health Companion adalah aplikasi kesehatan digital yang berjalan 100% di stack Cloudflare. Pengguna dapat:
 
-The system helps users record health measurements from home health devices by taking or uploading photos, extracting values with Workers AI Vision when possible, allowing manual override, validating values with rule-based medical thresholds, saving final verified data, sending Telegram notifications, generating reports, and building dashboards for the user and caregiver.
+1. Login (email/password lokal, OTP email, OAuth Google) lalu menyelesaikan onboarding profile.
+2. Mengukur tanda vital (tekanan darah, glukosa, kolesterol, asam urat, SpO2, berat, dll) lewat foto, upload, atau input manual.
+3. Mendapat ekstraksi nilai via **Workers AI Vision** (`@cf/meta/llama-3.2-11b-vision-instruct`), dengan **manual override** wajib.
+4. Validasi nilai lewat **`HL_metricRules`** (rule-first, AI-assisted).
+5. Submit pengukuran, simpan lampiran (compressed + watermarked webp) ke **R2**, dan broadcast via **Telegram** (submit summary & emergency alert).
+6. Melihat dashboard (today / weekly / monthly / comparison / daily-health-hub) dan laporan (daily / weekly / monthly / doctor-ready 30 hari, share token).
+7. Mengatur keluarga/caregiver (RBAC), kontak darurat (encrypted, dengan consent), pengingat minum obat, pattern detection (sleep↔BP, weight↔BP, medication).
+8. Menggunakan fitur Sprint 5: Hydration tracker, Cycle tracking (dengan guardrail), AI Assistant (premium, dengan medical safety filter), Education cards, Symptom logging, Family-sensitive permissions, Xendit/Mock billing, AI Memory (Vectorize-ready infrastructure).
 
-The application is designed as:
+Prinsip desain:
 
 ```text
-Rule-first
-AI-assisted
-Manual-verification-first
-Cloudflare-native
-Free-tier-conscious
-Mobile-first
-PWA-ready
+Rule-first, AI-assisted        — severity/emergency SELALU dari HL_metricRules.
+Manual-verification-first      — setiap nilai AI wajib bisa di-override.
+Cloudflare-native              — Workers + D1 + R2 + Queues + Cron + Workers AI + Vectorize-ready.
+Free-tier-conscious            — kompres + watermark di client, no original image, OCR rate-limited.
+Mobile-first, PWA-ready        — Service worker + manifest + bottom-nav + FAB.
+Medical-safety                 — AI tidak boleh diagnose/prescribe/ubah dosis; semua red flag deterministic server-side.
+Privacy-by-design              — sensitive field encrypted (AES-GCM `enc:v1:`); no plaintext secret di D1/log/bundle.
 ```
 
 ---
 
-## 2. Product Scope
+## 2. Stack & Bindings
 
-The platform supports health tracking for:
+### 2.1 Runtime
 
-```text
-Pulse oximeter
-Blood pressure monitor
-Sinocare GCU glucose/cholesterol/uric acid device
-Thermometer
-Body scale
-Manual sleep duration
-Manual waist circumference
-```
+| Layer | Tech | Source |
+|---|---|---|
+| Frontend | React 19 + Vite + TypeScript | `web/` (npm workspaces) |
+| PWA | `public/manifest.json` + `public/sw.js` + bottom-nav | `web/src/App.tsx`, `web/src/main.tsx` |
+| API Gateway | Hono.js di Cloudflare Workers | `worker/src/index.ts` (6400 LOC) + `routes-*.ts` |
+| Database | Cloudflare D1 → `DB` binding `isehat_db` | `worker/wrangler.toml` |
+| Object storage | Cloudflare R2 → `LOGS` binding `multi-apps-ai-bucket` | `worker/wrangler.toml` |
+| Queue producer/consumer | `TELEGRAM_QUEUE` → `telegram-submit-summary`; `AI_MEMORY_QUEUE` → `ai-memory-jobs` | `worker/wrangler.toml` |
+| Scheduler | Cloudflare Cron Triggers (`scheduledHandler`) | `worker/src/routes-extra.ts` |
+| AI Vision | `@cf/meta/llama-3.2-11b-vision-instruct` (Workers AI binding `AI`) | configurable via `HL_systemConfigs` |
+| AI Text | 9router OpenAI-compatible, 3-model fallback | `HL_systemConfigs.aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, `aiTextApiKey` |
+| Auth | HTTP-only cookie `hlSession` + `D1` `HL_sessions` | `routes-extra.ts::getCurrentSession` |
+| OAuth | Google OAuth 2.0 (`/api/auth/google*`) | `routes-auth.ts` |
+| Email | Email OTP via `email-otp.ts` + `email-sender.ts` | `routes-auth.ts` |
 
-Supported health metrics:
-
-```text
-spo2
-heartRate
-systolic
-diastolic
-bloodPressurePulse
-glucoseFasting
-glucosePostMeal
-cholesterolTotal
-uricAcid
-bodyWeight
-bmi
-waistCircumference
-bodyTemperature
-sleepDuration
-height
-```
-
----
-
-## 2. Design Principles
-
-### 2.6 No Hardcoded Configurations
-
-Semua konfigurasi sistem yang bisa berubah (seperti batas memori 2MB, timeout AI 5000ms, limit API) **TIDAK BOLEH** di-hardcode di dalam kode.
-Semuanya harus dibaca dari tabel `HL_systemConfigs` di D1. Untuk menghindari pengurasan kuota baca D1 (Cloudflare free tier), Worker harus melakukan *caching* (in-memory KV / Cache API) terhadap konfigurasi ini dengan masa berlaku tertentu (misalnya 5 menit).
-
-### 2.7 Sensitive Data Encryption
-
-Sensitive user data is encrypted at rest with AES-GCM using the Worker secret `ENCRYPTION_KEY`. Encrypted values keep the existing schema columns and use the `enc:v1:` prefix. Read paths decrypt automatically, while legacy plaintext remains readable until migrated. Covered fields include Telegram chat IDs, emergency contact names/phones/Telegram IDs, medication log notes, and measurement session notes.
-
----
-
-## 3. Required Cloudflare Stack
-
-```text
-Frontend: React SPA / Vite / PWA
-Hosting: Cloudflare Pages or Workers Static Assets
-API Gateway: Hono.js on Cloudflare Workers
-Runtime: Cloudflare Workers TypeScript
-Database: Cloudflare D1 binding DB
-Object Storage: Cloudflare R2 binding LOGS
-AI Vision: Cloudflare Workers AI Vision model
-AI Text: OpenAI-compatible provider configured in `HL_systemConfigs` (`aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, optional `aiTextApiKey`)
-Async: Cloudflare Queues
-Scheduler: Cloudflare Cron Triggers
-Deployment: Wrangler
-Notification: Telegram Bot API + Browser Push
-PDF: HTML to PDF worker flow or external-compatible rendering strategy
-```
-
-Existing bindings:
+### 2.2 Bindings (no new DB / R2 bucket — reuse existing)
 
 ```toml
+# worker/wrangler.toml
+name = "hl-health-companion-api"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+workers_dev = true
+
 [[d1_databases]]
 binding = "DB"
-database_name = "multi_Ai_db"
-database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"
+database_name = "isehat_db"
+database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
 
 [[r2_buckets]]
 binding = "LOGS"
 bucket_name = "multi-apps-ai-bucket"
+
+[[queues.producers]]
+queue = "telegram-submit-summary"
+binding = "TELEGRAM_QUEUE"
+
+[[queues.producers]]
+queue = "ai-memory-jobs"
+binding = "AI_MEMORY_QUEUE"
+
+[[queues.consumers]]
+queue = "telegram-submit-summary"
+max_batch_size = 10
+max_batch_timeout = 5
+
+[[queues.consumers]]
+queue = "ai-memory-jobs"
+max_batch_size = 5
+max_batch_timeout = 10
+
+[vars]
+EMAIL_PROVIDER = "resend"
+EMAIL_FROM = "iSehat <otp@mail.isehat.biz.id>"
+EMAIL_OTP_TTL_SECONDS = "600"
+EMAIL_OTP_MAX_ATTEMPTS = "5"
+EMAIL_OTP_RESEND_COOLDOWN_SECONDS = "60"
+EMAIL_OTP_MAX_RESENDS = "3"
+EMAIL_OTP_TEST_MODE = "false"
+AI_TEXT_API_BASE = "https://9router.krpmerch.biz.id/v1"
+AI_TEXT_MODEL = "oc/deepseek-v4-flash-free"
+BILLING_PROVIDER = "xendit_test"
+XENDIT_MODE = "test"
+XENDIT_BASE_URL = "https://api.xendit.co"
+BILLING_CURRENCY = "IDR"
+BILLING_SUCCESS_URL = "https://app.isehat.biz.id/billing/success"
+BILLING_CANCEL_URL = "https://app.isehat.biz.id/billing/cancel"
+VAPID_PUBLIC_KEY = "BJazmolj-Nf6eACLfCesD92Uobws77I6X0ADanxIEpc-BBcRATkbBBJwZWxj_A7IIkt042qYKdEkR3jP1myvcRA"
+VAPID_SUBJECT = "mailto:admin@isehat.biz.id"
+# VAPID_PRIVATE_KEY must be set via: wrangler secret put VAPID_PRIVATE_KEY
 ```
 
-No new database should be created.
+### 2.3 Secrets (Cloudflare env, NEVER di D1 / seed / log)
+
+```text
+ENCRYPTION_KEY              — AES-GCM key (≥16 char) untuk data sensitif.
+CRON_SECRET                 — bearer token untuk /api/internal/cron/*.
+TELEGRAM_BOT_TOKEN          — fallback kalau HL_systemConfigs.telegramBotToken kosong.
+VAPID_PRIVATE_KEY           — Web Push (optional).
+GOOGLE_OAUTH_CLIENT_ID      — Google OAuth (Spring 5A).
+GOOGLE_OAUTH_CLIENT_SECRET  — Google OAuth.
+OAUTH_REDIRECT_BASE_URL     — base URL callback.
+XENDIT_SECRET_KEY           — billing (Spring 5F/X).
+XENDIT_WEBHOOK_SECRET       — billing webhook verification.
+EMAIL_SMTP_* / SENDGRID_*   — email OTP delivery (configurable).
+```
+
+D1 menyimpan HANYA **referensi/metadata** (`HL_configMetadata.storageMode ∈ {'d1','env','secret','reference'}`). Plaintext secret TIDAK boleh ada di `HL_systemConfigs`.
 
 ---
 
-## 4. Naming Constraints
-
-Database naming rules:
+## 3. Naming Conventions
 
 ```text
 Table prefix: HL_
 No extra underscore after HL_
 Field names: camelCase
+Constraint ENUMs: lower camel or kebab-case as defined in CHECK
+JSON columns: payloadJson / summaryJson / dataJson / metadataJson / configurationJson
 ```
 
-Valid examples:
+Valid: `HL_users`, `HL_userProfiles`, `HL_measurementSessions`, `userId`, `createdAt`, `finalValue`, `manualOverride`.
+Invalid: `users`, `HL_user_profiles`, `created_at`, `manual_override`, `HL_educationViews` (dilarang — lihat `HL_userEducationProgress`).
 
-```text
-HL_users
-HL_userProfiles
-HL_measurementSessions
-HL_measurementValues
-HL_metricRules
-userId
-createdAt
-finalValue
-manualOverride
-```
+---
 
-Invalid examples:
+## 4. High-Level Architecture
 
-```text
-users
-health_users
-HL_user_profiles
-created_at
-manual_override
+```mermaid
+flowchart LR
+  subgraph Client["PWA (web/)"]
+    UI[React 19 SPA]
+    SW[service worker]
+    OCR[client-side compressor/watermark]
+    UI --> SW
+    UI --> OCR
+  end
+
+  subgraph Pages["Cloudflare Pages (functions/api/[[path]].ts)"]
+    Proxy["/api/* proxy → Worker"]
+  end
+
+  subgraph Worker["Cloudflare Worker (worker/src/)"]
+    Hono[Hono.js]
+    AuthMW[Session Middleware<br/>hlSession cookie]
+    Routes[Route Modules<br/>index.ts, routes-*.ts]
+    Svc[Services<br/>rbac, entitlements, billing, ai-memory, cycle, hydration, telegram-callback, web-push, education, symptom, crypto, audit, oauth, email-otp, config]
+    Hono --> AuthMW --> Routes --> Svc
+  end
+
+  subgraph Data["Cloudflare Storage"]
+    D1[(D1: isehat_db<br/>68 tables HL_*)]
+    R2[(R2: multi-apps-ai-bucket<br/>LOGS)]
+  end
+
+  subgraph AI["AI Layer"]
+    WAI[Workers AI Vision<br/>llama-3.2-11b-vision-instruct]
+    TextAI[9router OpenAI-compatible<br/>3-model fallback]
+  end
+
+  subgraph Outbound["Notifications"]
+    TG[Telegram Bot API]
+    Push[Web Push VAPID]
+    Email[Email SMTP/SendGrid]
+  end
+
+  subgraph Async["Async & Schedule"]
+    Queue[telegram-submit-summary queue]
+    Cron[Cloudflare Cron Triggers]
+  end
+
+  Client <--> Proxy
+  Proxy <--> Hono
+  Routes <--> D1
+  Routes <--> R2
+  Routes --> WAI
+  Routes --> TextAI
+  Routes --> Queue
+  Queue --> TG
+  Svc --> TG
+  Svc --> Push
+  Svc --> Email
+  Cron --> Svc
 ```
 
 ---
 
-## 5. High-Level Architecture
+## 5. Project Layout (Actual)
 
-```mermaid
-flowchart TD
-  User[User Browser / PWA] --> Frontend[React SPA]
-  Frontend --> Hono[Hono.js API on Cloudflare Workers]
-
-  Hono --> Auth[Auth Middleware]
-  Auth --> Routes[API Routes]
-
-  Routes --> D1[(D1 DB: multi_Ai_db)]
-  Routes --> R2[(R2 LOGS Bucket)]
-  Routes --> AI[Workers AI]
-  Routes --> Queues[Cloudflare Queues]
-
-  Queues --> NotifyWorker[Notification Worker]
-  Queues --> RecWorker[Recommendation Worker]
-  Queues --> PdfWorker[PDF Worker]
-  Queues --> ReminderWorker[Reminder Worker]
-
-  NotifyWorker --> Telegram[Telegram Bot API]
-  NotifyWorker --> BrowserPush[Browser Push]
-  RecWorker --> AIText[Workers AI Text LLM]
-  PdfWorker --> R2
-  ReminderWorker --> Telegram
-
-  Cron[Cron Triggers] --> ReminderWorker
-  Cron --> MaintenanceWorker[Maintenance Jobs]
-  MaintenanceWorker --> D1
+```text
+health/
+├── docs/                              # dokumen final (file ini)
+│   ├── 04-ARCHITECTURE.md             # file ini
+│   ├── 05-api-contract.md             # API contract
+│   ├── 06-design-system.md            # design system
+│   ├── 07-schema.sql                  # Sprint 1-4 baseline D1 schema
+│   ├── 08-seed.sql                    # Sprint 1-4 baseline seed
+│   ├── 03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql  # Sprint 5 additive schema
+│   ├── 01.PRD_SPRINT5_…               # PRD Sprint 5 final revised
+│   └── 02.PRD_USER_STORIES_…          # user stories Sprint 5
+├── docs_sprint5/                      # working file Sprint 5 (planning/seed)
+│   ├── 04.SQL_SEED_SPRINT5_FINAL_…    # Sprint 5 seed (roles, plans, features, configs)
+│   ├── 08.TASK_PLAN_SPRINT5_…         # task plan + mockup
+│   ├── 09–11                          # test, stress, TDD plan
+│   ├── AUDIT_SPRINT5*.md              # audit reports per phase
+│   └── Frontend/                      # mockup HTML (admin, premium, education, audit)
+├── archive/
+│   ├── docs_legacy_2025_sprint1-5/    # arsip dokumen lama yang sudah usang
+│   ├── WORK_LOG_Sprint1-4.md          # log Sprint 1-4
+│   └── Frontend-not-used/             # frontend lama yang sudah tidak dipakai
+├── worker/                            # Cloudflare Worker (Hono)
+│   ├── wrangler.toml                  # binding DB / LOGS / queue
+│   ├── migrations/                    # additive D1 migrations
+│   │   ├── 001_s5x_auth_email_otp.sql
+│   │   └── 002_s5x_whatsapp_profile.sql
+│   ├── scripts/                       # seed-metric-rules, e2e-uat
+│   ├── src/
+│   │   ├── index.ts                   # 6400 LOC — semua route Sprint 1-5 (auth, profile, measurements, dashboard, AI, reports, kb, alerts, notifications, reminders, family, emergency, medications, fasting, badges, streaks, patterns, settings, telegram, kb, dev)
+│   │   ├── routes-admin.ts            # /api/admin/dashboard/summary, /api/plans, /api/me/subscribe (75 LOC)
+│   │   ├── routes-ai.ts               # /api/ai/{context/query,context-package,memory/status,memory/rebuild,memory,disclaimer/enforce} + admin AI (142 LOC)
+│   │   ├── routes-auth.ts             # /api/auth/{google,register/start|verify,login/start|verify,otp/resend,change-password} + /api/education/cards, /api/symptoms/*, /api/dashboard/daily-health (505 LOC)
+│   │   ├── routes-cycle.ts            # /api/cycle/* + /api/family-links/:id/permissions/{cycle,sensitive-health} (180 LOC)
+│   │   ├── routes-extra.ts            # /api/emergency/contacts/:id/consent, /api/family/access-check, /api/patterns/generate/*, /api/emergency/contacts/notify, /api/internal/cron/reminders, /api/medications/adherence, /api/reports/*, /api/fasting/*, /api/streaks, /api/badges, /api/measurements/drafts|/:id, /api/dashboard/comparison, /api/ai/recommendations, /api/kb/:slug, /api/settings/consent, /api/dev/seed-test-data, /api/patterns (1096 LOC) + scheduledHandler
+│   │   ├── routes-hydration.ts        # /api/hydration/{settings,today,logs,history,logs/:logId} (134 LOC)
+│   │   ├── routes-telegram.ts         # /api/webhook/telegram/water, /api/telegram/water-webhook, /api/internal/cron/hydration-reminders (212 LOC)
+│   │   ├── services/                  # 22 service modules
+│   │   │   ├── ai-memory.ts           # buildContextPackage, calculateDataSufficiency, enforceDisclaimer, logQuery, logRebuildJob
+│   │   │   ├── audit.ts               # writeAudit
+│   │   │   ├── billing/               # checkout-session, subscription-activation, config, provider (mock + xendit)
+│   │   │   ├── config.ts              # getSystemConfig{Number,String,Boolean,JSON}, cache TTL 5 min
+│   │   │   ├── crypto.ts              # AES-GCM encrypt/decrypt (enc:v1: prefix)
+│   │   │   ├── cycle.ts               # cycle calendar computation, fertility window, guardrail
+│   │   │   ├── education.ts           # getCards, acknowledgeCard
+│   │   │   ├── email-otp.ts           # generate, hash (PBKDF2), verify, rate limit
+│   │   │   ├── email-sender.ts        # SMTP / SendGrid adapter
+│   │   │   ├── entitlements.ts        # requireEntitlement(plan feature)
+│   │   │   ├── hydration.ts           # daily target calculation, overhydration check
+│   │   │   ├── oauth.ts               # Google OAuth state, exchange, link
+│   │   │   ├── rbac.ts                # requirePermission(userId, code)
+│   │   │   ├── symptom.ts             # red flag detection
+│   │   │   ├── telegram-callback.ts   # callback query parse, quick-add
+│   │   │   ├── telegram-client.ts     # sendMessage helper
+│   │   │   ├── telegram-config.ts     # resolve bot token from systemConfig
+│   │   │   └── web-push.ts            # VAPID send to subscriptions
+│   │   ├── i18n/                      # locale, error-codes, email-templates, disclaimer-templates
+│   │   ├── shared-types/constants.ts  # enum constants (severities, statuses, alert types, role codes, etc)
+│   │   └── types.ts                   # Env, Bindings, ApiError, ApiSuccess
+│   └── test/                          # 22 test files (vitest-style .mjs)
+│       ├── audit-service.test.mjs
+│       ├── config-service.test.mjs
+│       ├── email-otp.test.mjs
+│       ├── entitlements-service.test.mjs
+│       ├── rbac-service.test.mjs
+│       ├── register.test.mjs
+│       ├── sprint5-*.test.mjs         # 5A, 5B, 5C, 5D, 5E, 5F, 5X integration & unit
+│       └── sprint5-types.test.mjs
+├── web/                               # React 19 PWA
+│   ├── index.html                     # SPA shell
+│   ├── vite.config.ts                 # proxy /api → worker
+│   ├── playwright.config.ts           # E2E
+│   ├── functions/api/                 # Pages Functions (mirrors worker routes — production proxy)
+│   ├── public/
+│   │   ├── manifest.json              # PWA manifest
+│   │   ├── sw.js                      # service worker
+│   │   ├── icon-192.svg / icon-512.svg
+│   │   └── favicon.svg
+│   ├── frontend_stitch/               # legacy Stitch mockup HTML (referensi)
+│   ├── e2e/smoke/                     # Playwright smoke (auth, admin, i18n, sprint5a-e, regression)
+│   └── src/
+│       ├── main.tsx                   # bootstrap + SW register + installPrompt capture
+│       ├── App.tsx                    # 510 LOC — SPA shell: AuthProvider → I18nProvider → ToastProvider → AppRoutes
+│       │                              # NAV_GROUPS (Dashboard, Measurements, Reports, Health Tracking, Lifestyle, AI, Family, Education, Settings, Admin), 47 routes
+│       ├── pages/                     # 47 page files (auth, dashboard, measurement, reports, settings, etc)
+│       ├── components/                # 22 components (auth/, dashboard/, measurement/, shared/, i18n/)
+│       ├── context/                   # AuthContext + useAuth
+│       ├── hooks/                     # useAiExtract, useEntitlements
+│       ├── utils/                     # apiRetry, bmiCalculator, csv, dateFormat, imageCompressor, validation, watermark
+│       ├── api/                       # translateError
+│       ├── lib/api.ts                 # fetch wrapper
+│       ├── i18n/                      # index.tsx + locales/{auth, ai, alerts, billing, caregiver, common, cycle, dashboard, doctor, emergency, errors, family, fasting, hydration, kb, medications, nav, onboarding, patterns, reminders, reports, settings, symptom}.ts
+│       ├── types/constants.ts         # FE-side enums
+│       └── styles/                    # senior-mode.css, high-contrast.css
+├── functions/api/[[path]].ts          # Pages Function — proxies /api/* to Worker origin
+├── site/                              # Astro public marketing site (blog, pricing, features)
+├── stress/                            # k6-style stress scripts
+└── package.json                       # monorepo workspaces (web, worker)
 ```
 
 ---
 
 ## 6. Core Principles
 
-## 6.1 Rule First, AI Assisted
+### 6.1 Rule First, AI Assisted
 
-Medical status is always calculated from rules, not directly from AI.
+Severity/emergency SELALU dari `HL_metricRules` (lihat `worker/src/index.ts::measurements/submit`). AI text (9router) dipakai untuk **narrative, summary, comparison** saja; AI vision untuk ekstraksi nilai. Pipeline:
 
 ```text
 finalValue
-→ physical validation
-→ HL_metricRules lookup
-→ status/severity/emergencyLevel
-→ popup interpretation
-→ optional AI narrative
+  → physical validation (HL_metricCatalog.physicalMin/Max)
+  → HL_metricRules lookup by (metricCode, sex, ageMin/Max, minValue/maxValue, status)
+  → status / severity / emergencyLevel
+  → HL_alerts row (kalau severity ∈ {warning,high,critical,emergency})
+  → HL_safetyEvents row (Sprint 5 non-metric guardrails — symptom red flag, overhydration, cycle irregularity)
+  → in-app notification + Telegram + optional caregiver
 ```
 
-AI is allowed to help explain, summarize, or compare data. AI must not diagnose, prescribe medication, or override rule-based severity.
+AI Vision timeout: configurable di `HL_systemConfigs.aiVisionTimeoutMs` (default 5000). Timeout / parse-fail → fallback manual input; TIDAK memblokir submit. AI Text mengikuti model fallback order di `aiTextModels` (comma-separated atau JSON array). `FORBIDDEN_PHRASES` di `index.ts` (resep obat, dosis, dll) — kalau AI output mengandung kata terlarang → replaced dengan fallback safe + `safetyStatus='filtered'`.
 
----
+### 6.2 Original Image Is Not Stored
 
-## 6.2 Original Image Is Not Stored
-
-Original photo is used only for temporary extraction.
+Alur upload lampiran di `routes-extra.ts` + frontend `AttachmentUploader.tsx`:
 
 ```text
 User takes photo
-→ Browser preview/compress for extraction
-→ Workers AI reads temporary file
-→ Response fills text boxes
-→ User verifies or edits value
-→ User submits final values
-→ Browser creates final compressed watermarked evidence image
-→ Worker stores final evidence image only
+  → FE kompres (webp, quality 50) + watermark (timestamp + username)
+  → POST /api/measurements/attachments/upload (multipart)
+  → Worker maxUploadSizeBytes check (configurable)
+  → R2 put HL/users/{userId}/measurements/{sessionId}/{metricCode}-{ts}.webp
+  → HL_measurementAttachments row (watermarked=1, compressed=1, compressionQuality=50)
+  → HL_measurementSessions.hasAttachment=1
 ```
 
-Forbidden:
+Dilarang keras: simpan original ke R2, simpan base64 ke D1, simpan unwatermarked image.
+
+### 6.3 Onboarding Profile Gate
+
+User baru WAJIB `POST /api/profile/onboarding` sebelum akses dashboard (`App.tsx::AppRoutes`). Worker:
+
+1. Validasi `hlSession` cookie.
+2. Validasi fields (sex ∈ male/female/other, heightCm > 0, birthDate valid, timezone valid).
+3. Upsert `HL_userProfiles`, `HL_userConsents` (aiConsent, dataShareConsent, emergencyConsent), `HL_users.displayName`.
+4. Append `HL_auditLogs` action=`profileOnboardingComplete`.
+5. FE panggil `GET /api/auth/me` lagi → `requiresOnboarding=false` → redirect ke `/dashboard`.
+
+### 6.4 Free-Tier Efficiency
 
 ```text
-Saving original photo to R2
-Saving base64 image to D1
-Saving unwatermarked evidence image
+Client-side image compression + watermark       (web/src/utils/imageCompressor, watermark)
+Configurable AI Vision timeout                  (HL_systemConfigs.aiVisionTimeoutMs)
+Configurable OCR rate limit                     (HL_systemConfigs.ocrRateLimitMax, ocrRateLimitWindowMin)
+Dashboard uses 48h window + JS-side tz filter   (routes/index.ts::dashboard/today)
+Configurable cron secret + cron batch           (routes-extra.ts::scheduledHandler)
+Sensitive data encrypted at rest                (services/crypto.ts, ENCRYPTION_KEY)
+Sprint 5 safety events use HL_safetyEvents      (bukan HL_alerts)
+Sprint 5 AI context fields use HL_aiRecommendationContexts  (bukan ALTER HL_aiRecommendations)
 ```
 
-## 6.2.1 Onboarding Profile Gate
+### 6.5 Sensitive Data Encryption
 
-New users must complete `POST /api/profile/onboarding` before reaching the
-dashboard. The Worker authenticates the existing `hlSession` cookie, validates
-profile fields, writes `HL_userProfiles`, records AI consent in
-`HL_userConsents`, updates `HL_users.displayName`, and appends a
-`profileOnboardingComplete` audit log. The frontend refreshes
-`GET /api/auth/me` after success so `requiresOnboarding` becomes `false` and the
-SPA continues to `/dashboard`.
+`worker/src/services/crypto.ts` — AES-GCM via `ENCRYPTION_KEY` (SHA-256 derived key). Format ciphertext: `enc:v1:{base64url(iv)}:{base64url(cipher)}`. Legacy plaintext tetap readable sampai di-migrasi. Encrypted fields (saat ini):
 
-After onboarding, `GET /api/profile`, `PUT /api/profile`, and
-`PUT /api/settings/ui` operate only on the authenticated user's existing
-`HL_userProfiles` row. Profile updates validate height and timezone, UI updates
-validate theme/accessibility enums, and both write `HL_auditLogs` entries. The
-React app applies `profile.theme` to `data-theme` and
-`profile.accessibilityMode` to `data-accessibility` on the document root after
-auth refresh.
+```text
+HL_telegramLinks.telegramChatId
+HL_emergencyContacts.contactName, contactPhone, telegramChatId
+HL_medicationLogs.note
+HL_measurementSessions.notes (where applicable)
+```
+
+### 6.6 No Hardcoded Configurations
+
+Semua angka yang bisa berubah baca dari `HL_systemConfigs` lewat `services/config.ts` (TTL 5 menit, in-memory `Map<DB, Map<key, {value, expiresAt}>>`):
+
+```text
+aiVisionTimeoutMs               — AI Vision timeout (default 5000)
+aiTextEndpoint                  — base URL OpenAI-compatible
+aiTextModels                    — JSON array atau comma-separated
+aiTextDefaultModel              — default model name
+aiTextApiKey                    — bearer token (D1 reference only; real secret di env)
+maxUploadSizeBytes              — batas upload lampiran (default 2 MB)
+ocrRateLimitMax                 — OCR per user per window
+ocrRateLimitWindowMin           — window (menit)
+telegramBotToken                — bot token (reference)
+telegramBotActive               — '1'/'0' toggle
+clinicalCopilotEnabled          — Sprint 5 SELALU false; Sprint 6 toggle
+```
+
+Cache invalidation: `invalidateSystemConfig(db)` dipanggil setelah admin update.
 
 ---
 
-## 6.3 Fast Path First
+## 7. Main User Flows
 
-AI must never block the user.
-
-```text
-AI extraction timeout: configurable via DB
-If timeout: manual input fallback
-If parse fails: manual input fallback
-If AI unavailable: manual input fallback
-```
-
-OCR is synchronous for user interaction and not queued by default.
-
----
-
-## 6.4 Free Tier Efficiency
-
-The architecture is optimized to reduce D1 writes, R2 storage, AI calls, and queue overhead.
-
-```text
-Client-side image compression
-Client-side watermarking
-No original image storage
-No automatic AI retry
-Report PDF only on demand
-Queues only for async non-blocking jobs
-Dashboard uses indexed range queries
-AI recommendations use compact summary JSON
-```
-
----
-
-## 7. Main User Flow
+### 7.1 Capture a Measurement
 
 ```mermaid
 sequenceDiagram
   participant U as User
-  participant FE as Frontend PWA
-  participant API as Hono Worker API
-  participant AI as Workers AI Vision
-  participant D1 as D1 DB
+  participant FE as PWA
+  participant API as Worker (Hono)
+  participant WAI as Workers AI Vision
+  participant D1 as D1
   participant R2 as R2 LOGS
-  participant Q as Queues
   participant TG as Telegram
 
-  U->>FE: Login
+  U->>FE: Login (email/password OR /auth/google OR /auth/register/start+verify)
   FE->>API: POST /api/auth/login
-  API->>D1: Validate user/session
-  API-->>FE: Session cookie
+  API->>D1: Validate HL_sessions + HL_users
+  API-->>FE: Set-Cookie hlSession
 
-  U->>FE: Select measurement checklist
-  U->>FE: Take/upload photo
-  FE->>FE: Resize/compress preview
-  FE->>API: POST /api/measurements/extract
-  API->>AI: Extract numbers with 5s timeout
+  U->>FE: /onboarding (first time only)
+  FE->>API: POST /api/profile/onboarding
+  API->>D1: HL_userProfiles + HL_userConsents + HL_users.displayName + HL_auditLogs
 
-  alt AI success <= 5s
-    AI-->>API: JSON metrics
-    API->>D1: Log HL_aiExtractions
-    API-->>FE: rawAiValue metrics
-    FE->>U: Fill text boxes
-  else AI timeout/fail
-    API->>D1: Log timeout/failure
-    API-->>FE: Manual fallback
-    FE->>U: Manual input
+  U->>FE: /measurements/new → SelectMetricPage
+  U->>FE: Choose device (oximeter/BP/glucometer/etc) → check metric
+  U->>FE: Take photo OR upload OR manual
+  FE->>FE: compress + watermark (webp q=50)
+  FE->>API: POST /api/measurements/extract  (image base64 + metricGroup)
+  API->>WAI: vision inference (timeout = aiVisionTimeoutMs)
+  alt success
+    WAI-->>API: JSON values
+    API->>D1: HL_aiExtractions (success=1)
+    API-->>FE: rawAiValue per metric
+  else timeout / fail
+    API->>D1: HL_aiExtractions (success=0, timeout=1)
+    API-->>FE: empty + fallback hint
   end
 
-  U->>FE: Edit/verify final values
+  U->>FE: Review + edit values (ManualOverrideInput)
   FE->>API: POST /api/measurements/validate
-  API->>D1: Read HL_metricRules
-  API-->>FE: Popup interpretation
+  API->>D1: HL_metricRules lookup → status/severity/emergencyLevel
+  API-->>FE: rule interpretation popup
 
-  U->>FE: Confirm submit
-  FE->>FE: Generate compressed watermarked attachment
+  U->>FE: Confirm + Submit
   FE->>API: POST /api/measurements/submit
-  API->>D1: Insert session + values + alerts
-  API->>R2: Store final evidence only
-  API->>D1: Insert attachment metadata
-  API->>Q: Queue Telegram + recommendation
-  API-->>FE: Submit success
-  Q->>TG: Send after-submit notification
+  API->>D1: HL_measurementSessions + HL_measurementValues + HL_aiRecommendations
+  API->>API: if severity in [warning,high,critical,emergency] → HL_alerts
+  API->>API: HL_streaks + HL_userBadges (gamification, idempotent)
+  API->>R2: enqueue telegram-submit-summary
+  API-->>FE: success
+
+  R2->>TG: bot.sendMessage to user (summary)
+  opt severity == emergency
+    R2->>TG: bot.sendMessage to emergency contacts (consent-gated)
+  end
 ```
 
----
-
-## 8. Application Modules
-
-## 8.1 Frontend Modules
-
-```text
-Auth UI
-Onboarding UI
-Measurement capture UI
-Camera/upload component
-Image compression service
-Watermark canvas service
-Manual override form
-Interpretation popup
-Dashboard today/weekly/monthly
-Reports page
-AI assistant page
-Telegram settings page
-Family/caregiver page
-Medication tracker
-Fasting timer
-Gamification
-Accessibility mode
-PWA service worker
-```
-
-## 8.2 Backend Modules
-
-```text
-Auth service
-Session service
-Profile service
-Metric catalog service
-Measurement service
-AI extraction service
-Rules engine
-Attachment service
-Dashboard query service
-AI recommendation service
-Telegram service
-Notification service
-Family RBAC service
-Emergency alert service
-Medication service
-Fasting service
-Report service
-Pattern insight service
-Gamification service
-Knowledge base service
-Audit log service
-Rate limit service
-```
-
----
-
-## 9. Suggested Repository Structure
-
-```text
-hl-health-companion/
-├── apps/
-│   ├── web/
-│   │   ├── src/
-│   │   │   ├── app/
-│   │   │   ├── components/
-│   │   │   ├── features/
-│   │   │   ├── hooks/
-│   │   │   ├── lib/
-│   │   │   ├── pwa/
-│   │   │   └── styles/
-│   │   ├── public/
-│   │   └── package.json
-│   └── worker/
-│       ├── src/
-│       │   ├── index.ts
-│       │   ├── env.ts
-│       │   ├── routes/
-│       │   ├── middleware/
-│       │   ├── services/
-│       │   ├── repositories/
-│       │   ├── validators/
-│       │   ├── queues/
-│       │   ├── cron/
-│       │   ├── ai/
-│       │   ├── utils/
-│       │   └── types/
-│       ├── migrations/
-│       │   └── schema.sql
-│       ├── wrangler.toml
-│       └── package.json
-├── docs/
-│   ├── PRD.md
-│   ├── UserStories.md
-│   ├── api-contract.md
-│   └── ARCHITECTURE.md
-└── package.json
-```
-
----
-
-## 10. Worker Runtime Architecture
-
-## 10.1 Hono App Layout
-
-```text
-index.ts
-→ create Hono app
-→ request id middleware
-→ security headers middleware
-→ auth middleware
-→ rate limit middleware
-→ route registration
-→ queue handlers
-→ scheduled handlers
-→ error handler
-```
-
-Example route grouping:
-
-```text
-routes/auth.ts
-routes/profile.ts
-routes/metrics.ts
-routes/measurements.ts
-routes/dashboard.ts
-routes/ai.ts
-routes/telegram.ts
-routes/notifications.ts
-routes/family.ts
-routes/alerts.ts
-routes/medications.ts
-routes/fasting.ts
-routes/reports.ts
-routes/patterns.ts
-routes/kb.ts
-routes/settings.ts
-routes/export.ts
-```
-
-## 10.2 Environment Interface
-
-```ts
-export interface Env {
-  DB: D1Database;
-  LOGS: R2Bucket;
-  AI: Ai;
-  TELEGRAM_BOT_TOKEN: string;
-  SESSION_SECRET: string;
-  ENCRYPTION_SECRET: string;
-  NOTIFICATION_QUEUE?: Queue;
-  RECOMMENDATION_QUEUE?: Queue;
-  PDF_QUEUE?: Queue;
-  REMINDER_QUEUE?: Queue;
-}
-```
-
----
-
-## 11. wrangler.toml Reference
-
-```toml
-name = "hl-health-companion"
-main = "src/index.ts"
-compatibility_date = "2026-06-20"
-
-[ai]
-binding = "AI"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "multi_Ai_db"
-database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"
-
-[[r2_buckets]]
-binding = "LOGS"
-bucket_name = "multi-apps-ai-bucket"
-
-# Queue bindings are optional at early sprint stage.
-# Add them when queues are created.
-# [[queues.producers]]
-# binding = "NOTIFICATION_QUEUE"
-# queue = "hl-notification-queue"
-#
-# [[queues.consumers]]
-# queue = "hl-notification-queue"
-# max_batch_size = 10
-# max_batch_timeout = 5
-
-# [triggers]
-# crons = ["*/30 * * * *", "0 1 * * *"]
-```
-
----
-
-## 12. Database Architecture
-
-Primary database: Cloudflare D1 database `multi_Ai_db`.
-
-The schema is normalized around sessions and values.
-
-```text
-HL_users
-  └── HL_userProfiles
-  └── HL_sessions
-  └── HL_measurementSessions
-        └── HL_measurementValues
-        └── HL_measurementAttachments
-        └── HL_alerts
-        └── HL_aiRecommendations
-```
-
-### 12.1 Core Tables
-
-```text
-HL_users
-HL_sessions
-HL_userProfiles
-HL_userConsents
-HL_devices
-HL_metricCatalog
-HL_deviceMetrics
-HL_metricRules
-HL_measurementDrafts
-HL_measurementSessions
-HL_measurementValues
-HL_measurementAttachments
-HL_aiExtractions
-HL_aiRecommendations
-HL_alerts
-HL_notifications
-HL_auditLogs
-```
-
-The measurement checklist is catalog-driven. `GET /api/metrics/catalog` reads
-`HL_devices`, `HL_deviceMetrics`, and `HL_metricCatalog`, then the frontend
-renders active device/metric rows without a hardcoded metric whitelist.
-
-### 12.2 Notification and Sharing Tables
-
-```text
-HL_telegramLinks
-HL_pushSubscriptions
-HL_notificationSettings
-HL_reminderSettings
-HL_familyLinks
-HL_familyInvites
-HL_emergencyContacts
-```
-
-### 12.3 Advanced Feature Tables
-
-```text
-HL_medications
-HL_medicationSchedules
-HL_medicationLogs
-HL_fastingSessions
-HL_badges
-HL_userBadges
-HL_streaks
-HL_reports
-HL_reportShares
-HL_patternInsights
-HL_knowledgeArticles
-HL_apiRateLimits
-```
-
----
-
-## 13. Data Ownership Model
-
-Every user-owned row must contain `userId` where possible.
-
-Owner-scoped tables:
-
-```text
-HL_userProfiles
-HL_measurementSessions
-HL_measurementValues
-HL_measurementAttachments
-HL_aiExtractions
-HL_aiRecommendations
-HL_alerts
-HL_notifications
-HL_telegramLinks
-HL_pushSubscriptions
-HL_notificationSettings
-HL_reminderSettings
-HL_emergencyContacts
-HL_medications
-HL_medicationLogs
-HL_fastingSessions
-HL_userBadges
-HL_streaks
-HL_reports
-HL_patternInsights
-HL_auditLogs
-```
-
-Access rule:
-
-```text
-Default: user can access only own userId rows.
-Caregiver: access only if HL_familyLinks is active and permission allows it.
-Doctor viewer: access only report share link, not full dashboard.
-Emergency contact: receives alert only, no full dashboard by default.
-```
-
----
-
-## 14. R2 Storage Architecture
-
-Bucket binding:
-
-```text
-LOGS = multi-apps-ai-bucket
-```
-
-### 14.1 Evidence Image Path
-
-```text
-HL/users/{userId}/measurements/{sessionId}/{metricCode}-{attachmentId}.webp
-```
-
-### 14.2 Report Path
-
-```text
-HL/users/{userId}/reports/doctorReady30d-{reportId}.pdf
-```
-
-### 14.3 Storage Rules
-
-```text
-R2 bucket is private
-No public object URL
-All access requires owner/caregiver permission check
-Stream through Worker or generate short signed URL
-Store only final compressed watermarked images
-Never store raw original image
-```
-
----
-
-## 15. Measurement Data Model
-
-A measurement session is one event, and it can contain many values.
-
-Example:
-
-```text
-Session: 2026-06-20 20:15
-Values:
-- spo2 = 98 %
-- heartRate = 73 bpm
-- systolic = 142 mmHg
-- diastolic = 91 mmHg
-- bodyWeight = 78.4 kg
-- bmi = 27.1 index
-```
-
-This avoids creating separate tables for each metric and makes dashboards easier.
-
----
-
-## 16. Measurement Submit Flow Internals
+### 7.2 Hydration Quick-Add (Telegram)
 
 ```mermaid
-flowchart TD
-  Submit[POST /api/measurements/submit] --> Auth[Auth Check]
-  Auth --> Parse[Parse Multipart Payload]
-  Parse --> Validate[Physical Range Validation]
-  Validate --> Rule[HL_metricRules Evaluation]
-  Rule --> Emergency{Emergency?}
-  Emergency -->|Yes| CreateAlert[Create HL_alerts]
-  Emergency -->|No| SkipAlert[Skip Alert]
-  CreateAlert --> SaveSession[Insert HL_measurementSessions]
-  SkipAlert --> SaveSession
-  SaveSession --> SaveValues[Batch Insert HL_measurementValues]
-  SaveValues --> UploadR2[Upload Final Evidence to R2]
-  UploadR2 --> SaveAttachments[Insert HL_measurementAttachments]
-  SaveAttachments --> Audit[Insert HL_auditLogs]
-  Audit --> QueueNotify[Queue Telegram Summary]
-  QueueNotify --> QueueReco[Queue AI Recommendation]
-  QueueReco --> UpdateStreak[Update HL_streaks]
-  UpdateStreak --> Response[Return Success]
+sequenceDiagram
+  participant U as User (Telegram)
+  participant TG as Telegram Bot API
+  participant API as Worker
+  participant D1 as D1
+
+  U->>TG: Bot inline button (+250ml)
+  TG->>API: POST /api/webhook/telegram/water (callback_query)
+  API->>API: resolve bot token, verify origin
+  API->>D1: HL_telegramCallbackEvents (received)
+  API->>D1: HL_waterIntakeLogs (amountMl=250, source=telegram, telegramCallbackId=…)
+  API->>D1: HL_hydrationTargets lookup → if over limit → HL_safetyEvents (severity=warning, sourceType=hydration)
+  API->>TG: answerCallbackQuery + editMessage ("+250ml ✓ 1250/2000")
 ```
 
-Submit should be transactional for D1 operations where possible. R2 upload and D1 insert order should be handled carefully:
+### 7.3 Doctor-Ready PDF (HTML to R2)
 
-```text
-Option A:
-1. Upload R2 objects
-2. Insert D1 rows
-3. If D1 fails, delete uploaded R2 objects best effort
+```mermaid
+sequenceDiagram
+  participant FE as PWA
+  participant API as Worker
+  participant D1 as D1
+  participant R2 as R2 LOGS
+  participant Doc as Doctor (share link)
 
-Option B:
-1. Insert D1 session/values
-2. Upload R2 objects
-3. Insert attachments
-4. If R2 fails, mark session hasAttachment false or return retryable error
-```
-
-Recommended for Sprint 1: Option A with best-effort cleanup.
-
----
-
-## 17. AI Vision Architecture
-
-### 17.1 AI Extraction Path
-
-```text
-POST /api/measurements/extract
-→ auth check
-→ rate limit check
-→ validate deviceCode and selectedMetricCodes
-→ read image into memory
-→ call Workers AI Vision with strict JSON prompt
-→ timeout at configured limit
-→ parse JSON
-→ validate against physical range
-→ write HL_aiExtractions log
-→ return metrics to frontend
-```
-
-### 17.2 Prompt Strategy
-
-Use device-specific prompts.
-
-```text
-oximeter prompt
-bloodPressure prompt
-sinocareGcu prompt
-thermometer prompt
-bodyScale prompt
-```
-
-Never use one generic prompt for all devices.
-
-### 17.3 AI Output Contract
-
-```json
-{
-  "deviceCode": "yuwellYx106",
-  "metrics": [
-    {
-      "metricCode": "spo2",
-      "rawAiValue": 98,
-      "unit": "%",
-      "confidence": 0.89
-    }
-  ],
-  "needsManualReview": false
-}
-```
-
-### 17.4 Failure Handling
-
-```text
-Timeout → manual fallback
-No JSON → manual fallback
-Invalid value → manual fallback
-Low confidence → fill value but mark needsManualReview true
+  FE->>API: POST /api/reports/doctor-ready (entitlement: feature.doctorPdf.generate)
+  API->>D1: HL_measurementValues WHERE measuredAt BETWEEN now-30d AND now
+  API->>R2: put HL/users/{userId}/reports/{ts}.html (text/html)
+  API->>D1: HL_reports (status=ready, summaryJson)
+  API-->>FE: { reportId }
+  FE->>API: POST /api/reports/{id}/share { recipientLabel, expiresInHours }
+  API->>D1: HL_reportShares (sha256(shareToken))
+  API-->>FE: { shareUrl: /api/reports/share/{token} }
+  Doc->>API: GET /api/reports/share/{token} (no auth)
+  API->>D1: HL_reportShares lookup → expired? → 404
+  API->>R2: get r2Key → return HTML
 ```
 
 ---
 
-## 18. AI Recommendation Architecture
-
-AI recommendation runs after submit and should not block the user.
+## 8. RBAC, Plans, and Entitlements
 
 ```text
-Submit success
-→ queue generateRecommendation
-→ worker builds compact summary
-→ calls Workers AI text model
-→ safety filter response
-→ save to HL_aiRecommendations
+HL_users ──< HL_userRoles >── HL_roles
+                          └──< HL_rolePermissions >── HL_permissions
+
+HL_users ──< HL_subscriptions >── HL_plans
+                          └──< HL_planFeatures >── (featureCode)
+
+HL_usageCounters (userId, featureCode, usageWindow, usedCount, quotaLimitSnapshot, resetAt)
+
+services/rbac.ts::requirePermission(userId, code)            → checks HL_userRoles + HL_rolePermissions
+services/entitlements.ts::requireEntitlement(db, userId, featureCode)
+                                                              → checks HL_subscriptions.status + HL_planFeatures + HL_usageCounters
 ```
 
-### 18.1 Summary Input
+Roles (seeded, systemRole=1):
+`user`, `support`, `admin`, `superAdmin`, `billingAdmin`, `aiConfigAdmin`, `medicalReviewer`.
 
-Text AI provider configuration is DB-backed. Worker resolves `aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, and optional `aiTextApiKey` from `HL_systemConfigs`. The current seed points to the 9router OpenAI-compatible endpoint and tries the configured model list in order before falling back to deterministic safe text.
+Plans (seeded): `free`, `premiumMonthly`, `premiumQuarterly`, `premiumYearly`, `familyPremium`.
 
-The LLM should receive only compact, relevant data:
+Fitur yang di-gate per-plan (lihat `docs_sprint5/04.SQL_SEED_…`):
 
-```json
-{
-  "today": {},
-  "threeDayComparison": {},
-  "sevenDayComparison": {},
-  "ruleStatuses": [],
-  "emergencyFlags": []
-}
-```
+| Feature | free | premiumMonthly | familyPremium |
+|---|---|---|---|
+| `feature.symptomLog.use` | ✓ unlimited | ✓ | ✓ |
+| `feature.hydration.use` | basic | advanced | advanced |
+| `feature.aiAssistant.use` | 3 / month | 100 / month | 100 / month |
+| `feature.aiReport.use` | ✗ | 30 / month | 30 / month |
+| `feature.doctorPdf.generate` | ✗ | 10 / month | 10 / month |
+| `feature.vectorMemory.use` | ✗ | ✓ (infra only, Sprint 6 ready) | ✓ |
+| `feature.aiClinicalCopilot.use` | ✗ | ✗ (Sprint 6 placeholder) | ✗ |
+| `feature.telegramReminder.use` | ✗ | ✓ | ✓ |
+| `feature.familyDashboard.use` | ✗ | ✗ | ✓ |
+| `feature.cycleTracking.use` | ✗ | ✓ | ✓ |
+| `feature.advancedHistory.use` | 30 day retention | unlimited | unlimited |
+| `feature.exportFull.use` | ✗ | ✓ | ✓ |
+| `feature.medicationReminder.use` | 3 lifetime | unlimited | unlimited |
+| `feature.fastingInsight.use` | ✗ | ✓ | ✓ |
 
-### 18.2 Safety Filter
+API `ENTITLEMENT_REQUIRED` (403) ketika user Free akses fitur paid.
 
-Reject or fallback if AI output contains:
+---
+
+## 9. Medical & Privacy Safety (Sprint 5 Hard Boundaries)
 
 ```text
-hard diagnosis
-medication prescription
-dosage change instruction
-claim of certainty
-panic-inducing emergency statement not supported by rules
+Sprint 5 non-metric safety events  → HL_safetyEvents  (BUKAN HL_alerts).
+Sprint 5 AI context fields         → HL_aiRecommendationContexts (BUKAN ALTER HL_aiRecommendations).
+Education progress                 → HL_userEducationProgress (BUKAN HL_educationViews).
+No plaintext secret                → D1 / seed / frontend / API response / log / audit metadata.
+Real secrets                       → Cloudflare Secrets / Env. D1 hanya configured/masked/envVarName/secretRef.
+Admin mutations                    → HL_auditLogs(userId, action, entityType, entityId, metadataJson).
+Auth, RBAC, entitlement, quota, family permission,
+cycle eligibility, webhook, cron, red flag, disclaimer  → semua server-side.
+Sprint 1-4 behavior                → tetap backward compatible.
+```
+
+Forbidden table names (unless explicitly in final docs):
+
+```text
+HL_educationViews
+HL_userPreferences (untuk education progress)
+actorId/targetType/targetId in HL_auditLogs
+plaintext Google / OAuth / Telegram / AI / Billing / Internal secrets
+```
+
+AI medical behavior:
+
+```text
+AI TIDAK BOLEH: decide emergency, diagnose definitif, prescribe, change medication dosage,
+                claim replace doctors, satu-satunya sumber medical severity/guardrail.
+
+WAJIB deterministic:
+  - Measurement status/severity  → dari HL_metricRules flow.
+  - Symptom red flag             → deterministic server-side (services/symptom.ts).
+  - Overhydration                → warning-only, BUKAN diagnosis.
+  - Cycle contraception guardrail→ blocking UI (bukan toast-only).
+  - AI medical output            → WAJIB server-side disclaimer (i18n/disclaimer-templates.ts).
+```
+
+Sensitive data (require owner OR explicit family permission OR restricted admin permission + audit):
+
+```text
+symptom detail, red flag detail, cycle, pregnancy, lactation, menopause,
+AI memory, doctor report detail, caregiver access, support/admin sensitive access.
 ```
 
 ---
 
-## 19. Rules Engine Architecture
-
-Rules are stored in:
+## 10. AI Infrastructure
 
 ```text
-HL_metricRules
+Workers AI Vision
+  binding AI (default @cf/meta/llama-3.2-11b-vision-instruct)
+  configurable via HL_systemConfigs.aiVisionModel
+  timeout configurable via aiVisionTimeoutMs
+
+9router Text AI (OpenAI-compatible)
+  endpoint = HL_systemConfigs.aiTextEndpoint
+  models   = HL_systemConfigs.aiTextModels (JSON array atau comma-separated)
+  default  = HL_systemConfigs.aiTextDefaultModel
+  apiKey   = HL_systemConfigs.aiTextApiKey (reference; real key di Cloudflare Secret)
+
+Safety
+  FORBIDDEN_PHRASES list (worker/src/index.ts) → replace dengan safe fallback
+  enforceDisclaimer(service) → append server-side medical disclaimer (i18n)
+
+Memory (Sprint 5C infrastructure, runtime deferred ke Sprint 6)
+  HL_vectorDocuments   — vectorize-ready index (status pending/indexed/failed/deleted/skipped)
+  HL_aiContextQueries  — log setiap query context
+  HL_aiRecommendationContexts — 1:1 ke HL_aiRecommendations (patternScore 1-100, scoreReason, usedFallback, modelName, disclaimer)
+  HL_aiMemoryJobs      — rebuild/delete/backfill/indexSource job queue
+  services/ai-memory.ts::buildContextPackage / calculateDataSufficiency / logQuery / logRebuildJob
 ```
 
-### 19.1 Rule Lookup
-
-Input:
-
-```text
-metricCode
-finalValue
-unit
-sex
-age
-```
-
-Lookup algorithm:
-
-```text
-1. Validate physicalMin/physicalMax from HL_metricCatalog
-2. Find active HL_metricRules by metricCode
-3. Prefer exact sex rule if requiresSex
-4. Fallback to sex = all
-5. Filter ageMin <= age <= ageMax
-6. Filter minValue <= finalValue <= maxValue
-7. Sort by rulePriority ASC
-8. Return first rule
-9. If no rule found, return fallback status info
-```
-
-### 19.2 Blood Pressure Composite Handling
-
-Systolic and diastolic are stored separately but displayed together.
-
-Composite status should use highest severity between:
-
-```text
-systolic severity
-diastolic severity
-```
-
-Emergency if either:
-
-```text
-systolic emergencyLevel = emergency
-diastolic emergencyLevel = emergency
-```
+Sprint 5C **TIDAK** membangun AI Clinical Copilot runtime. Flag `clinicalCopilotEnabled` di config SELALU `false` di Sprint 5. Endpoint `/api/ai/assistant` dengan `clinicalCopilotMode: true` → respond `403 AI_CLINICAL_COPILOT_DEFERRED`.
 
 ---
 
-## 20. Notification Architecture
-
-### 20.1 Channels
+## 11. Deployment
 
 ```text
-inApp
-telegram
-browser
-email optional later
+1. cd worker
+2. npx tsc -p tsconfig.json
+3. npm test
+4. wrangler d1 execute isehat_db --remote --file=../docs/07-schema.sql
+5. wrangler d1 execute isehat_db --remote --file=../docs/08-seed.sql
+6. wrangler d1 execute isehat_db --remote --file=../docs/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+7. wrangler d1 execute isehat_db --remote --file=../docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+8. wrangler d1 execute isehat_db --remote --file=./migrations/001_s5x_auth_email_otp.sql
+9. wrangler d1 execute isehat_db --remote --file=./migrations/002_s5x_whatsapp_profile.sql
+10. wrangler d1 execute isehat_db --remote --command="PRAGMA foreign_key_check;"
+11. wrangler deploy
+12. cd ../web && npm run build && wrangler pages deploy dist
 ```
 
-### 20.2 Telegram After Submit
+Deployed URLs:
 
-Every successful submit can enqueue Telegram summary if enabled.
+| App | URL |
+|---|---|
+| Worker API | `https://hl-health-companion-api.indiehomesungairaya.workers.dev` |
+| Pages Frontend | `https://app.isehat.biz.id` |
 
-```text
-Measurement submit
-→ create HL_notifications pending
-→ queue telegramSubmitSummary
-→ queue consumer sends Telegram
-→ update HL_notifications status sent/failed
-```
-
-Submit response must not wait more than 1000 ms for notification logic.
-
-### 20.3 Emergency Alert
-
-Emergency is rule-based.
-
-```text
-Metric severity emergency
-→ create HL_alerts
-→ show emergency modal on frontend
-→ send Telegram to user
-→ send Telegram to emergency contacts with consent
-→ log HL_notifications
-```
+Pages proxy `/api/*` → Worker via `functions/api/[[path]].ts`. `worker/wrangler.toml` uses `app.isehat.biz.id` for billing success/cancel URLs and `mail.isehat.biz.id` for the Resend email sender domain.
 
 ---
 
-## 21. Queue Architecture
-
-### 21.1 Queues
-
-```text
-notificationQueue
-recommendationQueue
-pdfQueue
-reminderQueue
-```
-
-### 21.2 Queue Usage
-
-| Queue | Purpose | Blocking? |
-|---|---|---:|
-| `notificationQueue` | Telegram, browser, in-app notification | No |
-| `recommendationQueue` | AI recommendations after submit | No |
-| `pdfQueue` | Doctor Ready PDF generation | No |
-| `reminderQueue` | Scheduled reminders | No |
-
-OCR extraction is not queued by default because user expects immediate response.
-
----
-
-## 22. Cron Architecture
-
-### 22.1 Reminder Cron
-
-Runs periodically to process due reminders.
-
-```text
-Find enabled HL_reminderSettings
-Check user timezone and scheduleTime
-Create HL_notifications
-Queue notification events
-```
-
-### 22.2 Maintenance Cron
-
-Runs daily.
-
-```text
-Expire old measurement drafts
-Expire family invites
-Expire fasting sessions
-Create missed medication logs if required
-Clean old rate-limit windows
-R2 orphan cleanup: delete R2 objects older than 24 hours with no matching HL_measurementAttachments row
-```
-
----
-
-## 23. Dashboard Query Architecture
-
-### 23.1 Today Dashboard
-
-Query latest values per metric for one day.
-
-Indexes used:
-
-```text
-idxHLMeasurementSessionsUserDate
-idxHLMeasurementValuesUserMetricDate
-idxHLAlertsUserDate
-```
-
-### 23.2 Weekly Dashboard
-
-Query 7-day series grouped by date and metric.
-
-```text
-rangeStart = local week start
-rangeEnd = rangeStart + 7 days
-```
-
-### 23.3 Monthly Dashboard
-
-Query 30-day or calendar month summary.
-
-Aggregates:
-
-```text
-average
-min
-max
-latest
-measurementCount
-alertCount
-```
-
----
-
-## 24. Reports Architecture
-
-### 24.1 Daily/Weekly/Monthly Reports
-
-Reports are generated dynamically from D1 and do not need to be saved by default.
-
-### 24.2 Doctor Ready PDF
-
-Doctor Ready PDF is generated on demand and saved to R2.
-
-```text
-POST /api/reports/doctorReady30d
-→ create HL_reports pending
-→ queue pdf generation
-→ render HTML report
-→ convert to PDF
-→ upload to R2
-→ update HL_reports ready
-```
-
-### 24.3 PDF Contents
-
-```text
-User profile
-30-day summary
-Metric tables
-Charts
-Alert log
-Medication log
-AI summary safe text
-Attachment thumbnails if enabled
-Disclaimer
-```
-
----
-
-## 25. Family and Caregiver Architecture
-
-Family sharing is role-based and consent-based.
-
-```text
-Owner invites caregiver/viewer/emergencyContact/doctorViewer
-Invite token stored as hash
-Recipient accepts
-HL_familyLinks becomes active
-Permissions are checked on every caregiver request
-```
-
-### 25.1 Permission Matrix
-
-| Role | View Dashboard | Input Data | Edit Data | Receive Alert | Download PDF |
-|---|---:|---:|---:|---:|---:|
-| owner | yes | yes | yes | yes | yes |
-| caregiver | yes | optional | limited | yes | optional |
-| viewer | yes | no | no | optional | no |
-| emergencyContact | limited | no | no | yes | no |
-| doctorViewer | report only | no | no | no | share only |
-
----
-
-## 26. Medication Architecture
-
-Medication tracking is informational only.
-
-```text
-HL_medications = master list
-HL_medicationSchedules = schedule times
-HL_medicationLogs = taken/skipped/missed events
-```
-
-AI may compare medication adherence with health metrics but must not suggest dosage changes.
-
----
-
-## 27. Fasting Timer Architecture
-
-Fasting sessions are user-owned.
-
-```text
-Start fasting
-→ create HL_fastingSessions active
-→ targetAt = startedAt + targetHours
-→ reminder cron detects target reached
-→ send notification
-→ user stops or cancels
-```
-
-Allowed fasting types:
-
-```text
-glucoseFasting
-cholesterolTotal
-uricAcid
-general
-```
-
----
-
-## 28. Gamification Architecture
-
-Gamification must encourage consistency without encouraging excessive measurement.
-
-Rules:
-
-```text
-One streak increment per day max
-Multiple measurements in one day do not increase streak multiple times
-Badge deduped by UNIQUE(userId, badgeCode)
-```
-
-Tables:
-
-```text
-HL_streaks
-HL_badges
-HL_userBadges
-```
-
----
-
-## 29. Pattern Detection Architecture
-
-Pattern detection is not causal inference.
-
-Allowed wording:
-
-```text
-berhubungan
-cenderung
-berdasarkan data tercatat
-pola yang terlihat
-```
-
-Forbidden wording:
-
-```text
-menyebabkan secara pasti
-terbukti menyebabkan
-diagnosis final
-```
-
-Minimum data threshold:
-
-```text
-At least 14 days for sleep vs blood pressure
-At least 14 days for medication vs metric
-At least 14 days for weight vs blood pressure
-```
-
-Tables:
-
-```text
-HL_patternInsights
-HL_measurementValues
-HL_medicationLogs
-```
-
----
-
-## 30. PWA Architecture
-
-PWA requirements:
-
-```text
-manifest.json
-service worker
-install prompt
-offline shell
-camera input support
-cached static assets
-browser notification permission flow
-local draft storage
-sync draft when online
-```
-
-Offline behavior:
-
-```text
-App shell works offline
-Measurement draft saved to IndexedDB with locally generated draftId
-Submit requires online
-When online returns, user is prompted to sync
-Sync uses POST /api/measurements/sync with draftId array
-Backend uses draftId for idempotency to prevent duplicate submissions
-Drafts with status submitted are skipped on re-sync
-```
-
----
-
-## 31. Accessibility Architecture
-
-Accessibility modes:
-
-```text
-normal
-senior
-highContrast
-```
-
-Senior mode:
-
-```text
-large font
-large buttons
-one metric per screen
-reduced navigation
-high readability
-simple language
-```
-
-High contrast mode:
-
-```text
-strong contrast
-clear focus state
-no low-contrast chart labels
-large tap targets
-```
-
----
-
-## 32. Security Architecture
-
-### 32.1 Auth Security
-
-```text
-Store passwordHash only
-Store sessionTokenHash only
-Use HTTP-only secure cookie
-Rotate session on login
-Revoke session on logout
-Rate limit login
-```
-
-### 32.2 Data Security
-
-```text
-All user-owned queries filter by userId
-RBAC enforced for caregiver access
-R2 objects private
-No public health URLs
-Signed/proxied downloads only
-Audit sensitive actions
-```
-
-### 32.3 Sensitive Fields
-
-Should be encrypted or protected at application level:
-
-```text
-telegramChatId
-contactPhone
-contactEmail
-medication notes
-personal notes
-push subscription keys
-```
-
-### 32.4 Audit Events
-
-Log these actions:
-
-```text
-register
-login
-logout
-profileUpdate
-measurementSubmit
-measurementDelete
-manualOverride
-telegramConnect
-familyInvite
-familyAccept
-familyRevoke
-emergencyAlert
-reportGenerate
-reportShare
-accountDeleteRequest
-```
-
----
-
-## 33. Rate Limiting Architecture
-
-Use lightweight D1-backed rate windows in:
-
-```text
-HL_apiRateLimits
-```
-
-Recommended route groups:
-
-```text
-authLogin
-measurementExtract
-aiRecommendation
-reportGenerate
-telegramTest
-exportCsv
-```
-
-For free tier, prefer coarse windows:
-
-```text
-10 minutes
-1 hour
-1 day
-```
-
----
-
-## 34. Image Processing Architecture
-
-### 34.1 Client-Side Processing
-
-The browser is responsible for:
-
-```text
-resize to max 1280 px
-compress quality around 50%
-prefer webp
-fallback jpeg
-apply watermark on canvas
-send final image only after submit
-```
-
-### 34.2 Server-Side Validation
-
-The Worker validates:
-
-```text
-fileType is image/webp or image/jpeg or image/png
-fileSize max configured limit (e.g. 2 MB) to prevent Worker memory overflow
-attachment metadata matches payload
-watermarked flag true
-compressed flag true
-```
-
-The Worker cannot fully prove watermark content unless image analysis is added. For MVP, trust client plus audit. For stronger compliance later, add server-side watermark verification or generate watermark in Worker/WASM.
-
----
-
-## 35. API Layer Design
-
-### 35.1 Middleware Order
-
-```text
-requestId
-securityHeaders
-cors if needed
-authParser
-rateLimit
-bodyLimit max configured limit
-routeHandler
-errorHandler
-```
-
-### 35.2 Repository Pattern
-
-Use repositories to isolate D1 SQL:
-
-```text
-userRepository
-profileRepository
-metricRepository
-measurementRepository
-attachmentRepository
-alertRepository
-notificationRepository
-familyRepository
-reportRepository
-```
-
-### 35.3 Service Pattern
-
-Use services for business logic:
-
-```text
-authService
-measurementService
-rulesEngine
-aiExtractionService
-aiRecommendationService
-attachmentService
-telegramService
-notificationService
-reportService
-```
-
----
-
-## 36. Error Handling
-
-All API errors should use a consistent shape.
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Input tidak valid.",
-    "details": []
-  },
-  "meta": {
-    "requestId": "req_...",
-    "durationMs": 123
-  }
-}
-```
-
-Do not expose:
-
-```text
-SQL query text
-stack traces
-secret values
-telegram bot token
-session token
-hashed token
-```
-
----
-
-## 37. Deployment Architecture
-
-### 37.1 Local Development
-
-```bash
-npm install
-wrangler d1 execute multi_Ai_db --local --file=./migrations/schema.sql
-wrangler dev
-```
-
-### 37.2 Remote D1 Migration
-
-```bash
-wrangler d1 execute multi_Ai_db --file=./migrations/schema.sql
-```
-
-### 37.3 Secrets
-
-```bash
-wrangler secret put SESSION_SECRET
-wrangler secret put ENCRYPTION_SECRET
-wrangler secret put TELEGRAM_BOT_TOKEN
-```
-
-### 37.4 Deployment
-
-```bash
-wrangler deploy
-```
-
----
-
-## 38. Sprint Architecture Roadmap
-
-## Sprint 1 — Core Capture Full Feature
-
-Architecture focus:
-
-```text
-Auth
-Onboarding
-Metric catalog
-Measurement input
-AI extraction with timeout
-Manual override
-Validation
-Submit
-D1 persistence
-R2 final evidence
-Telegram after submit
-Daily dashboard
-Audit logs
-```
-
-## Sprint 2 — Health Intelligence Full Feature
-
-Architecture focus:
-
-```text
-Rules engine
-Popup interpretation
-AI recommendation queue
-3-day and 7-day comparison
-Weekly dashboard
-Monthly dashboard
-Reports
-Knowledge base
-AI safety guardrails
-```
-
-## Sprint 3 — Family & Alert System Full Feature
-
-Architecture focus:
-
-```text
-Telegram connection
-Emergency alerts
-Family/caregiver RBAC
-Reminder cron
-Browser push
-Medication tracker
-Caregiver dashboard
-Alert log
-```
-
-## Sprint 4 — Advanced Health Companion Full Feature
-
-Architecture focus:
-
-```text
-Doctor Ready PDF
-Report sharing
-Fasting timer
-Gamification
-Pattern insights
-Senior mode
-High contrast mode
-PWA installable
-Offline shell
-Export and privacy tools
-```
-
----
-
-## 39. Performance Targets
-
-| Area | Target |
-|---|---:|
-| AI extraction timeout | Configurable via DB |
-| Submit response without PDF | <= 2000 ms target |
-| Telegram push wait in submit | <= 1000 ms max, otherwise queue |
-| Dashboard today | <= 500 ms target |
-| Weekly dashboard | <= 1000 ms target |
-| R2 evidence file | compressed around 50% |
-| Original image storage | 0 |
-| PDF generation | async only |
-
----
-
-## 40. Free Tier Resource Strategy
-
-### D1
-
-```text
-Use indexes already in schema
-Avoid N+1 queries
-Batch inserts on submit
-Limit dashboard date ranges
-Archive/export manually if needed later
-```
-
-### R2
-
-```text
-No original images
-WebP preferred
-Quality 50
-PDF on demand only
-No duplicate evidence files
-```
-
-### Workers AI
-
-```text
-AI Vision only on explicit button click
-No auto-run when image selected
-No retry by default
-LLM recommendation queued and summary-based
-Pattern insights only when data threshold met
-```
-
-### Queues
-
-```text
-Use only for non-blocking work
-Batch notification processing
-Avoid queue for every tiny UI action
-```
-
----
-
-## 41. Critical Implementation Notes
-
-1. Measurement submit must work even if Workers AI is disabled.
-2. AI extraction must never store original images.
-3. Manual override is mandatory for all AI extracted values.
-4. Rules engine output must be deterministic and stored with measurement value.
-5. Emergency alert must be based on `severity = emergency` or `emergencyLevel = emergency` from rules.
-6. Telegram failure must not roll back measurement save.
-7. D1 schema must use `HL_` prefix and camelCase fields.
-8. R2 evidence must be compressed and watermarked before upload.
-9. Doctor Ready PDF must be generated on demand, not automatically every day.
-10. Pattern detection must avoid causal claims.
-
----
-
-## 42. Recommended First Build Order
-
-```text
-1. D1 schema apply
-2. Hono app skeleton
-3. Env binding verification
-4. Auth/register/login/session
-5. Onboarding profile
-6. Metrics catalog endpoint
-7. Measurement validate endpoint
-8. AI extract endpoint with timeout
-9. Measurement submit endpoint
-10. R2 evidence upload
-11. Telegram connect/test
-12. Telegram after-submit queue
-13. Dashboard today
-14. Weekly/monthly dashboard
-15. AI recommendation queue
-16. Family/emergency system
-17. PDF and PWA advanced features
-```
-
----
-
-## 43. Production UI Integration Notes - 2026-06-21
-
-The production frontend is deployed as Cloudflare Pages with Pages Functions under `web/functions/api/[[path]].ts`. Production deploys must run from the `web` directory so the Functions proxy is bundled:
-
-```bash
-npx wrangler pages deploy dist --cwd web --project-name hl-health-companion --commit-dirty=true
-```
-
-The proxy forwards `/api/*` from Pages to the Worker origin and rewrites cookies for the Pages domain. Deploying only `web/dist` from the repo root uploads static assets but omits the Functions proxy, which causes live `/api/*` calls to fail.
-
-The refactored Sprint 1-4 UI keeps business logic in existing pages and adds shell-level routes for measurement history, tracker, AI assistant, and senior mode. Medical safety remains rule-first: measurements submit final values to the rule engine, and AI assistant text only explains or suggests general safe lifestyle guidance using current vitals context.
+## 12. Multi-Agent Operating Rules (tetap)
+
+Lihat `AGENTS.md` (resume-safe, vibe-coding safe). Aturan penting untuk coding agent:
+
+1. Baca `AGENTS.md` + `HANDOFF.md` + 3–5 entry terakhir `WORK_LOG.md` sebelum edit.
+2. Source of truth order: SQL schema > seed > API contract > PRD > task plan.
+3. TDD: RED → GREEN → REFACTOR → SECURITY → LOG → NEXT.
+4. Update `WORK_LOG.md` + `HANDOFF.md` setiap task cycle.
+5. Sprint order: Foundation → 5A → 5B → 5C → 5D → 5E → 5F → 5X → Cross-Phase Release Gate.
+6. Sprint 6 deferred: AI Clinical Copilot runtime.

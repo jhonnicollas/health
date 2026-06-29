@@ -1,1376 +1,638 @@
-# HL Health Companion — Design System
+# DESIGN SYSTEM — HL Health Companion (HealthSync Pro)
 
-## 1. Purpose
-
-Design system ini menjadi standar UI/UX untuk aplikasi **HL Health Companion**, yaitu aplikasi web kesehatan personal dengan input foto/upload, manual override, popup interpretasi rule-based, AI recommendation, family/caregiver, emergency alert, report dokter, dan PWA.
-
-Design system ini dibuat untuk:
-
-1. Mobile-first dan responsif.
-2. Mudah digunakan oleh user umum dan lansia.
-3. Aman untuk konteks kesehatan.
-4. Cepat dan ringan untuk Cloudflare free tier.
-5. Konsisten pada semua sprint dan semua fitur.
+> **Sumber: audit langsung ke `web/src/index.css` (CSS variables & themes), `web/src/App.css` (6544 LOC utility classes), `web/src/App.tsx` (NAV structure), `web/src/components/*` (22 components), `web/src/pages/*` (47 pages), `web/src/i18n/locales/*` (24 locale files), `web/src/styles/{senior-mode,high-contrast}.css`.**
+> Dokumen lama: `archive/docs_legacy_2025_sprint1-5/06-design-system.md`.
 
 ---
 
-## 2. Design Principles
-
-### 2.1 Clarity First
-
-Semua layar harus langsung menjawab:
+## 1. Identitas Produk
 
 ```text
-Apa angka saya?
-Artinya apa?
-Apa yang harus saya lakukan?
-Apakah ini perlu perhatian segera?
-```
-
-Tidak boleh membuat user menebak status kesehatan dari chart atau istilah teknis.
-
-### 2.2 Manual Override Always Visible
-
-Karena AI Vision bisa salah membaca angka, semua field hasil ekstraksi harus editable dan menampilkan status:
-
-```text
-AI terbaca
-Diedit manual
-Input manual
-Belum terbaca
-```
-
-### 2.3 Rule-Based Status, AI-Assisted Narrative
-
-UI harus membedakan:
-
-```text
-Status angka = rules engine
-Narasi tambahan = AI assistant
-Keputusan final = user verifikasi
-```
-
-### 2.4 Senior-Friendly by Default
-
-Walaupun mode lansia adalah toggle khusus, semua UI dasar tetap harus:
-
-```text
-Font cukup besar
-Button mudah ditekan
-Kontras cukup tinggi
-Tidak padat informasi
-```
-
-### 2.5 Emergency Must Be Unmissable
-
-Status `emergency` tidak boleh ditampilkan hanya sebagai teks kecil. Harus muncul dalam modal khusus dengan tindakan yang jelas.
-
----
-
-## 3. Supported Themes
-
-Aplikasi memiliki 3 mode tema via `data-theme`:
-
-```text
-light (default — all values in :root)
-warm (html[data-theme="warm"])
-dark (html[data-theme="dark"])
-```
-
-Dan 2 mode aksesibilitas via `data-accessibility`:
-
-```text
-senior (html[data-accessibility="senior"])
-highContrast (html[data-accessibility="highContrast"] — also triggered by data-theme="highContrast")
-```
-
-Field database:
-
-```text
-HL_userProfiles.theme
-HL_userProfiles.accessibilityMode
-```
-
-Theme values:
-
-```text
-light
-warm
-dark
-```
-
-Accessibility values:
-
-```text
-normal
-senior
-highContrast
+Product name   : HealthSync Pro (tampilan FE) — sistem: HL Health Companion
+Type           : Health logging PWA (React 19 + Vite + TypeScript)
+Style          : Material-inspired, accessible, mobile-first
+Icon set       : Material Symbols Outlined (variable font, FILL 0/1)
+Font           : Inter (sans-serif), fallback system-ui
+Color space    : Custom design tokens via CSS variables (--color*)
 ```
 
 ---
 
-## 4. Color Tokens
+## 2. Theme System
 
-Source of truth: `web/src/index.css` — `:root` (shared), `html[data-theme]`, and `html[data-accessibility]`.
+Tiga tema warna + dua mode aksesibilitas. Di-set via attribute di `<html>` (`document.documentElement.dataset.theme` / `dataset.accessibility`) — di-toggle dari topbar atau via `PUT /api/profile` (`theme`, `accessibilityMode`).
 
-### 4.1 Base Token Names (`:root`)
+### 2.1 Color Themes (`html[data-theme="..."]`)
 
-Shared tokens across all themes. Most color/surface/primary values are defined here as defaults:
+#### 2.1.1 Light (default)
 
 ```css
-:root {
-  /* Surface / Background */
-  --colorBackground: #f7f9fb;
-  --colorSurface: #f2f4f6;
-  --colorSurfaceElevated: #ffffff;
-  --colorSurfaceContainer: #eceef0;
-  --colorSurfaceHigh: #e6e8ea;
-  --colorSurfaceDim: #d8dadc;
-  --colorSurfaceHighest: #e0e3e5;
-  --colorTextPrimary: #191c1e;
-  --colorTextSecondary: #424656;
-  --colorTextMuted: #737687;
-  --colorBorder: #c2c6d9;
-  --colorBorderSoft: #e0e3e5;
-  --colorPrimary: #0061ff;
-  --colorPrimaryStrong: #004bca;
-  --colorPrimaryContainer: #0061ff;
-  --colorOnPrimaryContainer: #f1f2ff;
-  --colorPrimaryText: #ffffff;
-  --colorFocus: #0061ff;
-  --colorSecondaryContainer: #d0e1fb;
-  --colorOnSecondaryContainer: #54647a;
-  --colorTertiary: #005c85;
-  --colorTertiaryContainer: #0076a9;
-  --colorOnTertiaryContainer: #eaf4ff;
-  --colorErrorContainer: #ffdad6;
-  --colorOnErrorContainer: #93000a;
-  --colorInverseSurface: #2d3133;
-  --colorInverseOnSurface: #eff1f3;
+--colorBackground: #f7f9fb;
+--colorSurface: #f2f4f6;
+--colorSurfaceElevated: #ffffff;
+--colorSurfaceContainer: #eceef0;
+--colorSurfaceHigh: #e6e8ea;
+--colorSurfaceDim: #d8dadc;
+--colorSurfaceHighest: #e0e3e5;
+--colorTextPrimary: #191c1e;
+--colorTextSecondary: #424656;
+--colorTextMuted: #737687;
+--colorBorder: #c2c6d9;
+--colorBorderSoft: #e0e3e5;
+--colorPrimary: #0061ff;          /* brand blue */
+--colorPrimaryStrong: #004bca;
+--colorPrimaryContainer: #0061ff;
+--colorPrimaryText: #ffffff;
+--colorOnPrimaryContainer: #f1f2ff;
+--colorSecondaryContainer: #d0e1fb;
+--colorOnSecondaryContainer: #54647a;
+--colorTertiary: #005c85;
+--colorTertiaryContainer: #0076a9;
+--colorOnTertiaryContainer: #eaf4ff;
+--colorErrorContainer: #ffdad6;
+--colorOnErrorContainer: #93000a;
+--colorInverseSurface: #2d3133;
+--colorInverseOnSurface: #eff1f3;
+```
 
-  /* Status (semantic) */
-  --colorStatusNormal: #168244;
-  --colorStatusInfo: #005c85;
-  --colorStatusWarning: #9a6700;
-  --colorStatusHigh: #b45309;
-  --colorStatusCritical: #ba1a1a;
-  --colorStatusEmergency: #7f1d1d;
+#### 2.1.2 Warm (sage / earthy)
 
-  /* Overlay */
-  --colorOverlay: rgba(15, 23, 42, 0.56);
+```css
+--colorBackground: #f9faf7;
+--colorSurface: #f1f4ed;
+--colorPrimary: #2d6a4f;          /* sage green */
+--colorPrimaryStrong: #1b4332;
+--colorPrimaryContainer: #2d6a4f;
+--colorOnPrimaryContainer: #d8e8d0;
+--colorSecondaryContainer: #d4e0c8;
+--colorTertiary: #4a6741;
+```
 
-  /* Shadows */
-  --shadowCard: 0px 4px 6px -1px rgba(0, 0, 0, 0.05);
-  --shadowSoft: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
-  --shadowModal: 0px 10px 15px -3px rgba(0, 0, 0, 0.1);
+#### 2.1.3 Dark
 
-  /* Spacing */
-  --space1: 0.25rem;
-  --space2: 0.5rem;
-  --space3: 0.75rem;
-  --space4: 1rem;
-  --space5: 1.25rem;
-  --space6: 1.5rem;
-  --space8: 2rem;
-  --space10: 2.5rem;
+```css
+--colorBackground: #101418;
+--colorSurface: #171c22;
+--colorSurfaceElevated: #1d232b;
+--colorSurfaceContainer: #252c35;
+--colorPrimary: #7fb1ff;
+--colorPrimaryText: #07111f;
+--colorPrimaryContainer: #7fb1ff;
+--colorOnPrimaryContainer: #00174b;
+--colorTextPrimary: #f4f7fa;
+--colorTextSecondary: #c8d0dc;
+--colorTextMuted: #9aa7b8;
+--colorBorder: #3d4654;
+```
 
-  /* Radius */
-  --radiusSm: 2px;
-  --radiusMd: 4px;
-  --radiusLg: 8px;
-  --radiusXl: 12px;
-  --radiusFull: 999px;
+#### 2.1.4 HighContrast (override semua + pakai accent `#facc15`)
 
-  /* Layout */
-  --sidebarWidth: 280px;
-  --containerMaxWidth: 1440px;
-  --marginDesktop: 32px;
-  --marginTablet: 24px;
-  --marginMobile: 16px;
-  --gutter: 24px;
+```css
+--colorBackground: #000000;
+--colorSurface: #000000;
+--colorTextPrimary: #ffffff;
+--colorTextSecondary: #ffffff;
+--colorTextMuted: #facc15;
+--colorBorder: #ffffff;
+--colorBorderSoft: #ffffff;
+--colorPrimary: #facc15;
+--colorPrimaryText: #000000;
+--colorPrimaryContainer: #facc15;
+--colorOnPrimaryContainer: #000000;
+--colorTertiary: #00ccff;
+--colorTertiaryContainer: #006688;
+--colorStatusNormal: #00ff66;
+--colorStatusInfo: #00ccff;
+--colorStatusWarning: #ffff00;
+--colorStatusHigh: #ff9900;
+--colorStatusCritical: #ff3333;
+--colorStatusEmergency: #ff0000;
+```
 
-  /* Typography — shorthand: font-weight font-size/line-height font-family */
-  --typHeadlineXl: 700 36px/44px Inter, sans-serif;
-  --typHeadlineLg: 600 28px/36px Inter, sans-serif;
-  --typHeadlineLgMobile: 600 24px/32px Inter, sans-serif;
-  --typHeadlineMd: 600 20px/28px Inter, sans-serif;
-  --typBodyLg: 400 18px/28px Inter, sans-serif;
-  --typBodyMd: 400 16px/24px Inter, sans-serif;
-  --typBodySm: 400 14px/20px Inter, sans-serif;
-  --typLabelMd: 600 14px/20px Inter, sans-serif;
-  --typLabelSm: 500 12px/16px Inter, sans-serif;
+### 2.2 Accessibility Modes (`html[data-accessibility="..."]`)
 
-  /* Font stacks */
-  --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --heading: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+| Mode | Behavior |
+|---|---|
+| `normal` (default) | base styling |
+| `senior` | `html { font-size: 19px; }` (lebih besar), `SeniorAppShell`取代 sidebar/topbar dengan bottom-nav penuh |
+| `highContrast` | swap ke tema high-contrast otomatis |
+
+Disimpan di `HL_userProfiles.accessibilityMode ∈ ('normal','senior','highContrast')`.
+
+---
+
+## 3. Design Tokens
+
+### 3.1 Spacing scale
+
+```text
+--space1  = 0.25rem (4px)
+--space2  = 0.5rem  (8px)
+--space3  = 0.75rem (12px)
+--space4  = 1rem    (16px)
+--space5  = 1.25rem (20px)
+--space6  = 1.5rem  (24px)
+--space8  = 2rem    (32px)
+--space10 = 2.5rem  (40px)
+```
+
+### 3.2 Radius
+
+```text
+--radiusSm: 2px
+--radiusMd: 4px     (default input, button)
+--radiusLg: 8px     (cards, modals)
+--radiusXl: 12px    (large surfaces)
+--radiusFull: 999px (avatar, badge)
+```
+
+### 3.3 Shadows
+
+```text
+--shadowSoft : 0px 1px 2px 0px rgba(0,0,0,0.05);
+--shadowCard : 0px 4px 6px -1px rgba(0,0,0,0.05);
+--shadowModal: 0px 10px 15px -3px rgba(0,0,0,0.10);
+```
+
+Dark theme override: `--shadowCard: 0 18px 36px rgba(0,0,0,0.30);`
+
+### 3.4 Typography
+
+```text
+--typHeadlineXl:      700 36px/44px Inter
+--typHeadlineLg:      600 28px/36px Inter
+--typHeadlineLgMobile:600 24px/32px Inter
+--typHeadlineMd:      600 20px/28px Inter
+--typBodyLg:          400 18px/28px Inter
+--typBodyMd:          400 16px/24px Inter
+--typBodySm:          400 14px/20px Inter
+--typLabelMd:         600 14px/20px Inter
+--typLabelSm:         500 12px/16px Inter
+```
+
+Mobile-first `clamp()`: `h1 { font-size: clamp(1.65rem, 1.3rem + 1vw, 2.25rem); }`
+
+### 3.5 Layout constants
+
+```text
+--sidebarWidth: 280px
+--containerMaxWidth: 1440px
+--marginDesktop: 32px
+--marginTablet:  24px
+--marginMobile:  16px
+--gutter:        24px
+```
+
+### 3.6 Status colors (semantic)
+
+```text
+--colorStatusNormal:    #168244 (hijau)
+--colorStatusInfo:      #005c85 (biru)
+--colorStatusWarning:   #9a6700 (kuning tua)
+--colorStatusHigh:      #b45309 (oranye tua)
+--colorStatusCritical:  #ba1a1a (merah)
+--colorStatusEmergency: #7f1d1d (merah gelap)
+```
+
+Dipakai untuk badge severity, alert chips, status pill.
+
+---
+
+## 4. Iconography
+
+**Library:** Material Symbols Outlined (Google Fonts CDN).
+
+```css
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.material-symbols-outlined.fill {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
 }
 ```
 
-### 4.2 Warm Theme
+Icon dipakai di `App.tsx` sebagai string. Contoh: `local_hospital`, `dashboard`, `monitor_heart`, `water_drop`, `psychology`, `family_restroom`, `smart_toy`, `emergency`, `notifications`, `elderly`, `contrast`, `dark_mode`, `light_mode`, `wb_sunny`.
 
-```css
-html[data-theme="warm"] {
-  --colorBackground: #f9faf7;
-  --colorSurface: #f1f4ed;
-  --colorSurfaceElevated: #ffffff;
-  --colorSurfaceContainer: #e9eee2;
-  --colorSurfaceHigh: #e3e8d9;
-  --colorSurfaceDim: #d5d9cc;
-  --colorSurfaceHighest: #dce0d2;
-  --colorTextPrimary: #1b1d17;
-  --colorTextSecondary: #42483c;
-  --colorTextMuted: #707767;
-  --colorBorder: #c8cebf;
-  --colorBorderSoft: #ddd9cc;
-  --colorPrimary: #2d6a4f;
-  --colorPrimaryStrong: #1b4332;
-  --colorPrimaryContainer: #2d6a4f;
-  --colorOnPrimaryContainer: #d8e8d0;
-  --colorSecondaryContainer: #d4e0c8;
-  --colorOnSecondaryContainer: #3d4a30;
-  --colorTertiary: #4a6741;
-  --colorTertiaryContainer: #6e8b60;
-  --colorOnTertiaryContainer: #e2eed8;
-  --colorErrorContainer: #ffdad6;
-  --colorOnErrorContainer: #93000a;
-  --colorInverseSurface: #2a2c22;
-  --colorInverseOnSurface: #eff1e6;
-}
-```
+Penggunaan:
 
-### 4.3 Dark Theme
-
-```css
-html[data-theme="dark"] {
-  --colorBackground: #101418;
-  --colorSurface: #171c22;
-  --colorSurfaceElevated: #1d232b;
-  --colorSurfaceContainer: #252c35;
-  --colorSurfaceHigh: #2c343f;
-  --colorSurfaceDim: #12161c;
-  --colorSurfaceHighest: #303a45;
-  --colorTextPrimary: #f4f7fa;
-  --colorTextSecondary: #c8d0dc;
-  --colorTextMuted: #9aa7b8;
-  --colorBorder: #3d4654;
-  --colorBorderSoft: #2f3743;
-  --colorPrimary: #7fb1ff;
-  --colorPrimaryStrong: #a8c8ff;
-  --colorPrimaryText: #07111f;
-  --colorPrimaryContainer: #7fb1ff;
-  --colorOnPrimaryContainer: #00174b;
-  --colorSecondaryContainer: #3d4654;
-  --colorOnSecondaryContainer: #c8d0dc;
-  --colorTertiary: #89ceff;
-  --colorTertiaryContainer: #005c85;
-  --colorOnTertiaryContainer: #eaf4ff;
-  --colorErrorContainer: #93000a;
-  --colorOnErrorContainer: #ffdad6;
-  --colorInverseSurface: #e6e8ea;
-  --colorInverseOnSurface: #191c1e;
-  --shadowCard: 0 18px 36px rgba(0, 0, 0, 0.3);
-}
-```
-
-### 4.4 High Contrast (data-theme OR data-accessibility)
-
-Applied via both `html[data-theme="highContrast"]` and `html[data-accessibility="highContrast"]`:
-
-```css
-html[data-theme="highContrast"],
-html[data-accessibility="highContrast"] {
-  --colorBackground: #000000;
-  --colorSurface: #000000;
-  --colorSurfaceElevated: #111111;
-  --colorSurfaceContainer: #1a1a1a;
-  --colorSurfaceHigh: #222222;
-  --colorSurfaceDim: #000000;
-  --colorSurfaceHighest: #2a2a2a;
-  --colorTextPrimary: #ffffff;
-  --colorTextSecondary: #ffffff;
-  --colorTextMuted: #facc15;
-  --colorBorder: #ffffff;
-  --colorBorderSoft: #ffffff;
-  --colorPrimary: #facc15;
-  --colorPrimaryStrong: #facc15;
-  --colorPrimaryText: #000000;
-  --colorPrimaryContainer: #facc15;
-  --colorOnPrimaryContainer: #000000;
-  --colorSecondaryContainer: #333333;
-  --colorOnSecondaryContainer: #ffffff;
-  --colorTertiary: #00ccff;
-  --colorTertiaryContainer: #006688;
-  --colorOnTertiaryContainer: #ccffff;
-  --colorErrorContainer: #333333;
-  --colorOnErrorContainer: #ff3333;
-  --colorInverseSurface: #f0f0f0;
-  --colorInverseOnSurface: #000000;
-  --colorStatusNormal: #00ff66;
-  --colorStatusInfo: #00ccff;
-  --colorStatusWarning: #ffff00;
-  --colorStatusHigh: #ff9900;
-  --colorStatusCritical: #ff3333;
-  --colorStatusEmergency: #ff0000;
-}
+```jsx
+<Icon name="dashboard" />
+<Icon name="local_hospital" className="fill" />
 ```
 
 ---
 
-## 5. Status Severity System
+## 5. Layout & Shell
 
-Severity wajib mengikuti value dari database:
+### 5.1 App Shell (`App.tsx`)
 
-```text
-normal
-info
-warning
-high
-critical
-emergency
+```mermaid
+graph TB
+  A[main.app-page]
+  A --> B[aside.app-sidebar 280px]
+  A --> C[div.app-main]
+  C --> D[.mobile-topbar visible mobile only]
+  C --> E[.app-topbar search + actions]
+  C --> F[.app-content-area]
+  F --> G[header.app-header]
+  F --> H[section.app-content]
+  A --> I[button.mobile-add-fab]
+  A --> J[button.ai-fab]
+  A --> K[nav.app-bottom-nav visible mobile only]
 ```
 
-### 5.1 Visual Mapping
+#### 5.1.1 Sidebar (`aside.app-sidebar`)
 
-| Severity | Visual Style | UI Behavior |
+- Fixed width 280px, collapsible (`sidebar-collapsed` class + `localStorage.hl-sidebar-collapsed`).
+- Brand block: `local_hospital` icon + "HealthSync Pro" wordmark + collapse chevron + emergency support quick button.
+- Search box (`topbar-search-wrap` di desktop, di sidebar juga).
+- Nav groups (`nav-group`): expandable sections.
+- Footer: Welcome Tour, Help Center, Logout.
+
+#### 5.1.2 Topbar (`div.app-topbar`)
+
+- Search (`topbar-search`).
+- Live clock (`clock-date`, `clock-time`) — detik update tiap 1 detik.
+- `LanguageSwitcher` (compact).
+- Theme switcher (light/warm/dark) — inline PUT ke `/api/profile`.
+- Display mode switcher (normal/senior/highContrast) — inline PUT.
+- Notifications dropdown (bell + count badge) → fetch `/api/alerts?limit=5`.
+- User dropdown (displayName + initials avatar + menu).
+
+#### 5.1.3 Mobile bottom nav (`nav.app-bottom-nav`)
+
+5 item (filtered by `MOBILE_NAV_PATHS`):
+
+- `/dashboard` (Today)
+- `/measurements/new`
+- `/measurements/history`
+- `/alerts`
+- `/ai-assistant`
+
+Plus FAB (`button.mobile-add-fab` icon `add`) → `/measurements/new`, dan `button.ai-fab` icon `smart_toy` → `/ai-assistant`.
+
+#### 5.1.4 Senior Shell (`SeniorAppShell.tsx`)
+
+Dipakai kalau `profile.accessibilityMode === 'senior'`. Bottom-nav penuh, font-size `19px`, simplified icons.
+
+### 5.2 Page-level skeleton
+
+Setiap page (Today/Weekly/Monthly Dashboard, HydrationPage, dll.) memakai container `.app-content` + header `.app-header` + body. Contoh di `App.tsx`:
+
+```jsx
+<section className="app-content">
+  {routeBlocked
+    ? <UpgradePrompt feature={...} />
+    : renderRoute(appPath, navigate)}
+</section>
+```
+
+`UpgradePrompt` ditampilkan otomatis kalau user Free membuka route dengan `featureCode` (entitlement check).
+
+---
+
+## 6. Navigation Map (47 routes)
+
+```text
+NAV_GROUPS (10 groups)
+├── Dashboard
+│   ├── /dashboard                TodayDashboard
+│   ├── /dashboard/week           WeeklyDashboard
+│   └── /dashboard/month          MonthlyDashboard
+├── Measurements
+│   ├── /measurements/new         SelectMetricPage (FAB target)
+│   ├── /measurements/history     HistoryPage
+│   ├── /daily-health             DailyHealthHubPage
+│   ├── /measurements/senior      SeniorMeasurementFlow (hidden, accessibility)
+│   └── /history                  HistoryTimelinePage (paid: feature.advancedHistory.use)
+├── Reports
+│   ├── /reports/daily            DailyReportPage
+│   ├── /reports/weekly           WeeklyReportPage
+│   ├── /reports/monthly          MonthlyReportPage
+│   └── /reports/doctor           DoctorReportPage (paid)
+├── Health Tracking
+│   ├── /symptoms                 SymptomPage (feature.symptomLog.use)
+│   ├── /hydration                HydrationPage (feature.hydration.use)
+│   ├── /hydration/history        HydrationHistoryPage (hidden)
+│   ├── /hydration/settings       HydrationSettingsPage (hidden)
+│   └── /cycle                    CyclePage (paid: feature.cycleTracking.use)
+├── Lifestyle
+│   ├── /tracker                  TrackerPage (fasting + medication)
+│   ├── /fasting                  FastingPage
+│   ├── /medications              MedicationsPage
+│   ├── /patterns                 PatternsPage
+│   └── /reminders                RemindersPage
+├── AI & Insights
+│   ├── /ai-assistant             AiAssistantPage (feature.aiAssistant.use)
+│   └── /ai-memory                AiMemorySettingsPage (paid: feature.vectorMemory.use)
+├── Family & Safety
+│   ├── /family                   FamilyPage (paid: feature.familyDashboard.use)
+│   ├── /emergency                EmergencyContactsPage
+│   ├── /alerts                   AlertsPage
+│   └── /caregiver                CaregiverDashboardPage (linked-user)
+├── Education
+│   ├── /kb                       KnowledgeBasePage
+│   ├── /faq                      FaqPage
+│   └── /manual                   UserManualPage
+├── Settings
+│   ├── /settings/profile         ProfileSettingsPage
+│   ├── /settings/app             AppSettingsPage
+│   ├── /settings/billing         BillingSettingsPage
+│   ├── /settings/delete          ProfileDeletePage (hidden, privacy)
+│   ├── /telegram                 TelegramSettingsPage (paid)
+│   └── /premium/upgrade          PremiumUpgradePage (no-block path)
+├── Billing
+│   ├── /billing/success          BillingSuccessPage
+│   ├── /billing/cancel           BillingCancelPage
+│   └── /billing/mock-checkout    MockCheckoutPage
+├── Admin
+│   └── /admin                    AdminPage (adminOnly)
+└── Auth (no nav)
+    ├── /login                    LoginPage
+    ├── /register                 RegisterPage
+    └── /onboarding               OnboardingPage
+```
+
+PRO badge (`<span class="nav-badge pro-badge">PRO</span>`) muncul di nav item dengan `paidOnly: true` saat `planCode === 'free'`.
+
+---
+
+## 7. Component Inventory (22 file)
+
+### 7.1 Core / Shell
+
+| Component | File | Fungsi |
 |---|---|---|
-| `normal` | Hijau, tenang | Card biasa |
-| `info` | Biru, netral | Card biasa + info kecil |
-| `warning` | Kuning | Card diberi alert ringan |
-| `high` | Oranye | Card diberi warning jelas |
-| `critical` | Merah | Modal perhatian |
-| `emergency` | Merah gelap | Emergency modal wajib |
+| `ErrorBoundary` | `components/ErrorBoundary.tsx` | Class component, fallback UI generic |
+| `Toast` / `ToastProvider` | `components/Toast.tsx` | global toast (success/error/info), pakai context |
+| `SeniorAppShell` | `components/SeniorAppShell.tsx` | simplified layout untuk mode senior |
+| `WelcomeWizard` | `components/WelcomeWizard.tsx` | first-run tour, dismissable, flag di `localStorage.hl-welcome-seen` |
+| `UpgradePrompt` | `components/UpgradePrompt.tsx` | ditunjukkan saat entitlement gagal, CTA ke `/premium/upgrade` |
 
-### 5.2 Status Badge
+### 7.2 Auth
 
-Komponen badge:
+| Component | File | Fungsi |
+|---|---|---|
+| `OtpInput` | `components/auth/OtpInput.tsx` | 6-digit OTP input dengan auto-advance |
+| `EmailOtpVerificationStep` | `components/auth/EmailOtpVerificationStep.tsx` | step OTP verify dalam flow register/login |
 
-```tsx
-<StatusBadge severity="normal">Normal</StatusBadge>
-<StatusBadge severity="warning">Perlu Dipantau</StatusBadge>
-<StatusBadge severity="emergency">Darurat</StatusBadge>
-```
+### 7.3 i18n
 
-Rules:
+| Component | File | Fungsi |
+|---|---|---|
+| `LanguageSwitcher` | `components/i18n/LanguageSwitcher.tsx` | dropdown ID / EN, persist ke `me/preferences` |
 
-```text
-Badge harus punya text, bukan hanya warna.
-Badge harus readable di dark mode dan high contrast.
-Emergency badge harus pakai icon/text tambahan.
-```
+### 7.4 Dashboard
+
+| Component | File | Fungsi |
+|---|---|---|
+| `TrendBadge` | `components/dashboard/TrendBadge.tsx` (+ `.css`) | badge arrow up/down/sideways + delta color |
+
+### 7.5 Measurement
+
+| Component | File | Fungsi |
+|---|---|---|
+| `AttachmentUploader` | `components/measurement/AttachmentUploader.tsx` | capture/upload + kompres + watermark (webp q=50) |
+| `DynamicMetricForm` | `components/measurement/DynamicMetricForm.tsx` | render form sesuai selected metrics dari `/api/metrics/catalog` |
+| `InterpretationPopup` | `components/measurement/InterpretationPopup.tsx` (+ `.css`) | muncul setelah validate, show rule popup + recommendation |
+| `ManualOverrideInput` | `components/measurement/ManualOverrideInput.tsx` (+ `.css`) | input dengan flag `manualOverride=1` otomatis kalau diedit |
+
+### 7.6 Shared
+
+| Component | File | Fungsi |
+|---|---|---|
+| `EmergencyModal` | `components/shared/EmergencyModal.tsx` (+ `.css`) | triggered saat severity=emergency, link ke emergency contacts + telp 119 |
+
+### 7.7 Education & Medical
+
+| Component | File | Fungsi |
+|---|---|---|
+| `EducationBottomSheet` | `components/EducationBottomSheet.tsx` | tampilkan `HL_educationCards` di-dismissable |
+| `MedicalTerm` | `components/MedicalTerm.tsx` | inline tooltip untuk istilah medis (linked KB article) |
+| `UnitInfoModal` | `components/UnitInfoModal.tsx` | info unit (mmHg, bpm, %, mg/dL, mmol/L) |
+| `AttachmentViewer` | `components/AttachmentViewer.tsx` | preview attachment dari `/api/measurements/attachments/:id` |
 
 ---
 
-## 6. Typography
+## 8. i18n (24 locale files)
 
-### 6.1 Font Family
+Lokasi: `web/src/i18n/locales/*.ts` (TS modules export `id` & `en` translation maps).
 
-Gunakan system font agar ringan:
+```text
+admin.ts            alerts.ts          auth.ts            billing.ts
+caregiver.ts        common.ts          cycle.ts           dashboard.ts
+doctor.ts           emergency.ts       errors.ts          family.ts
+fasting.ts          hydration.ts       kb.ts              medications.ts
+nav.ts              onboarding.ts      patterns.ts        reminders.ts
+reports.ts          settings.ts        symptom.ts         measurement.ts
+ai.ts
+```
+
+API: `I18nProvider` + `useI18n()` (dari `web/src/i18n/index.tsx`) — expose `{ t, locale, setLocale }`. Locale default `id`, fallback `en`.
+
+Persist: `localStorage.hl-locale` + `HL_userProfiles.timezone` + `me/preferences`.
+
+---
+
+## 9. Accessibility (a11y)
+
+- Semantic HTML: `<main>`, `<aside>`, `<nav>`, `<section>`, `<header>`, `<button>`, `<label>`.
+- Focus ring: `*:focus-visible { outline: 3px solid var(--colorFocus); outline-offset: 3px; }`.
+- Min touch target: `button { min-height: 44px; }`.
+- Font size: `html[data-accessibility="senior"] { font-size: 19px; }`.
+- High contrast theme: `html[data-accessibility="highContrast"]` atau `html[data-theme="highContrast"]`.
+- ARIA labels: `aria-label`, `aria-current="page"`, `aria-hidden`, `aria-expanded`.
+- Material icons: `aria-hidden="true"` (dekoratif).
+
+---
+
+## 10. PWA
+
+Lokasi: `web/public/`.
+
+```text
+manifest.json   — name, short_name, theme_color #0061ff, background_color #f7f9fb,
+                  display: standalone, start_url: /, icons: 192 & 512
+sw.js           — service worker (caching strategy: stale-while-revalidate untuk static,
+                  network-first untuk /api)
+icon-192.svg / icon-512.svg / favicon.svg
+```
+
+`main.tsx` mendaftarkan SW + clear stale cache `hl-*` / `health*`. `beforeinstallprompt` event di-capture ke `window.__hlInstallPrompt` untuk "Add to Home Screen" prompt.
+
+---
+
+## 11. Responsive Breakpoints
+
+Tidak pakai Tailwind. Media queries di `App.css`:
 
 ```css
-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+/* Desktop default (>1024px) */
+@media (max-width: 1024px) { /* tablet — adjust margins */ }
+@media (max-width: 768px)  { /* mobile — hide sidebar, show mobile-topbar + bottom-nav */ }
+@media (max-width: 480px)  { /* small mobile — reduce sizes */ }
 ```
 
-Jika tidak memasang Inter, browser tetap memakai system font.
-
-### 6.2 Font Tokens
-
-Actual implementation uses `--typ*` shorthand tokens (font-weight font-size/line-height font-family):
-
-```css
---typHeadlineXl: 700 36px/44px Inter, sans-serif;
---typHeadlineLg: 600 28px/36px Inter, sans-serif;
---typHeadlineLgMobile: 600 24px/32px Inter, sans-serif;
---typHeadlineMd: 600 20px/28px Inter, sans-serif;
---typBodyLg: 400 18px/28px Inter, sans-serif;
---typBodyMd: 400 16px/24px Inter, sans-serif;
---typBodySm: 400 14px/20px Inter, sans-serif;
---typLabelMd: 600 14px/20px Inter, sans-serif;
---typLabelSm: 500 12px/16px Inter, sans-serif;
-```
-
-Usage:
-
-```css
-font: var(--typBodyMd);
-font: var(--typHeadlineLg);
-```
-
-### 6.3 Senior Mode Font Scale
-
-Jika:
+Helper tokens:
 
 ```text
-HL_userProfiles.accessibilityMode = senior
-```
-
-maka `senior-mode.css` mengatur:
-
-```css
-html[data-accessibility="senior"] {
-  font-size: 19px;
-}
-```
-
-Semua nilai `rem` otomatis lebih besar karena root font-size berubah.
-
-### 6.4 Text Rules
-
-```text
-Judul halaman: 24–32px
-Metric value utama: 32–48px
-Label form: minimal 16px
-Input angka: minimal 20px
-Senior mode input angka: minimal 28px
+--marginDesktop: 32px
+--marginTablet:  24px
+--marginMobile:  16px
+--gutter:        24px
 ```
 
 ---
 
-## 7. Spacing and Radius
+## 12. Page Patterns
 
-### 7.1 Spacing Tokens
+### 12.1 Dashboard page
 
-```css
---space1: 0.25rem;
---space2: 0.5rem;
---space3: 0.75rem;
---space4: 1rem;
---space5: 1.25rem;
---space6: 1.5rem;
---space8: 2rem;
---space10: 2.5rem;
+```text
+.app-page > .app-main > .app-content-area
+  > header.app-header        (title + subtitle)
+  > section.app-content
+    > .page-grid
+      > .metric-card         (icon + title + value + TrendBadge)
+      > .session-card        (list sesi hari ini)
+      > .ai-insight-card     (dari HL_aiRecommendations.summaryText)
+      > .alerts-list
 ```
 
-### 7.2 Radius Tokens
+### 12.2 Form page
 
-```css
---radiusSm: 2px;
---radiusMd: 4px;
---radiusLg: 8px;
---radiusXl: 12px;
---radiusFull: 999px;
+```text
+DynamicMetricForm (selected metrics dari catalog)
+  > MetricGroup
+    > MetricField (per metricCode)
+      > Label + required badge
+      > ManualOverrideInput (numeric | date | time | enum)
+      > UnitInfoModal trigger
+      > InterpretationPopup (setelah validate)
+  > Submit button (sticky bottom on mobile)
 ```
 
-### 7.3 Layout Spacing
+### 12.3 List page (Hydration, Symptoms, Logs)
 
-```css
---marginMobile: 16px;
---marginTablet: 24px;
---marginDesktop: 32px;
---gutter: 24px;
---sidebarWidth: 280px;
---containerMaxWidth: 1440px;
+```text
+Header + add CTA
+Filter chips
+  > Calendar / Range picker
+  > Source filter
+List (cards)
+  > timestamp
+  > amount/value
+  > source badge (telegram | web | system)
+  > delete action (dengan confirm)
+Empty state
+  > "Belum ada data" + CTA pertama
 ```
 
 ---
 
-## 8. Layout System
-
-### 8.1 Breakpoints
+## 13. Status / Severity Patterns
 
 ```text
-xs: 360px
-sm: 640px
-md: 768px
-lg: 1024px
-xl: 1280px
+severity=normal    → chip hijau  (.severity-normal, --colorStatusNormal)
+severity=info      → chip biru   (--colorStatusInfo)
+severity=warning   → chip kuning (--colorStatusWarning)
+severity=high      → chip oranye (--colorStatusHigh)
+severity=critical  → chip merah (--colorStatusCritical)
+severity=emergency → chip merah gelap + EmergencyModal (--colorStatusEmergency)
 ```
 
-### 8.2 Main App Shell
+Dipakai di:
+- `HL_alerts.severity` (Sprint 1-4 measurement-centric)
+- `HL_safetyEvents.severity` (Sprint 5 non-metric guardrails)
+- `HL_measurementValues.severity`
+- Notification dropdown di topbar (icon + color).
+- TrendBadge (up/down/sideways).
 
-Mobile:
+---
+
+## 14. Microinteractions
+
+- Theme switcher & display-mode switcher → optimistic DOM update + PUT `/api/profile`, fallback ke `refresh()` kalau 200.
+- Welcome Wizard dismiss → `localStorage.hl-welcome-seen = 'true'`.
+- Sidebar collapse → `localStorage.hl-sidebar-collapsed`.
+- Search di topbar → prefix match ke NAV_LINKS (labelKey / shortLabel / path).
+- Toast auto-dismiss ~3s; manual close button.
+- FAB selalu accessible dari semua page (overlay di luar content area).
+
+---
+
+## 15. Dark Mode + Senior Mode Integration
 
 ```text
-Top bar
-Content
-Bottom navigation
-```
+1. User pilih theme di topbar (light/warm/dark)
+   → document.documentElement.dataset.theme = thm
+   → fetch('/api/profile', PUT { theme, ... })
+   → kalau 200: refresh() user state
 
-Desktop:
+2. User pilih accessibility (normal/senior/highContrast)
+   → document.documentElement.dataset.accessibility = m
+   → fetch('/api/profile', PUT { accessibilityMode, ... })
 
-```text
-Sidebar navigation
-Top utility bar
-Main content
-Right insight panel optional
-```
+3. Saat reload, App.tsx baca profile.theme/accessibilityMode dan set dataset SEBELUM render.
 
-### 8.3 Page Width
+4. Kalau accessibilityMode === 'senior'
+   → App.tsx render <SeniorAppShell> (bukan sidebar/topbar normal)
 
-```text
-Measurement form: max-width 760px
-Dashboard: max-width 1280px
-Report preview: max-width 960px
-Senior mode: max-width 720px and single-column only
+5. Kalau theme === 'highContrast' atau accessibility === 'highContrast'
+   → :root variables di-override sesuai blok di index.css
 ```
 
 ---
 
-## 9. Navigation
+## 16. Aset Visual
 
-### 9.1 Primary Navigation
-
-```text
-Dashboard
-Tambah Pengukuran
-Riwayat
-Report
-AI Assistant
-Medication
-Fasting
-Family
-Settings
-Knowledge Base
-```
-
-### 9.2 Senior Mode Navigation
-
-Senior mode hanya menampilkan menu utama:
-
-```text
-Beranda
-Tambah Data
-Darurat
-```
-
-Menu lain masuk ke:
-
-```text
-Lainnya
-```
+- **Brand icon**: `local_hospital` (Material Symbols, FILL=1).
+- **Logo type**: "HealthSync Pro" (`<h1>` Inter 700).
+- **Hero image** (di `site/`): `/public/images/blog/*`.
+- **Mockup HTML referensi**: `web/frontend_stitch/*.html` (legacy, tidak di-bundle).
+- **Mockup Sprint 5**: `docs_sprint5/Frontend/*.html` (admin, premium, education, audit).
+- **Site marketing**: `site/` (Astro 5 — public landing page, blog, pricing).
 
 ---
 
-## 10. Core Components
+## 17. CSS Architecture
 
-## 10.1 Button
+- **Single global**: `web/src/index.css` — design tokens (CSS variables), reset, typography, accessibility overrides.
+- **Single component bundle**: `web/src/App.css` (6544 LOC) — semua utility classes + component-specific (`.app-page`, `.app-sidebar`, `.nav-group`, `.metric-card`, `.severity-*`, dll).
+- **Component-scoped CSS** (hanya untuk kasus khusus):
+  - `components/dashboard/TrendBadge.css`
+  - `components/measurement/{InterpretationPopup,ManualOverrideInput}.css`
+  - `components/shared/EmergencyModal.css`
+- **Mode overrides**:
+  - `styles/senior-mode.css` (extra rule untuk senior shell)
+  - `styles/high-contrast.css` (extra rule untuk high-contrast)
 
-### Variants
-
-```text
-primary
-secondary
-ghost
-danger
-emergency
-success
-```
-
-### Sizes
-
-```text
-sm: height 36px
-md: height 44px
-lg: height 52px
-senior: height 64px
-```
-
-### Rules
-
-```text
-Primary button hanya satu per section.
-Emergency button harus jelas dan tidak berdampingan dengan aksi destruktif lain.
-Button disabled harus tetap terbaca.
-```
-
-Example:
-
-```tsx
-<Button variant="primary" size="lg">Submit Pengukuran</Button>
-<Button variant="secondary">Input Manual</Button>
-<Button variant="emergency">Hubungi Kontak Darurat</Button>
-```
+Tidak ada CSS-in-JS, tidak ada Tailwind, tidak ada preprocessor (Sass/Less). Konvensi: utility class flat + design tokens.
 
 ---
 
-## 10.2 Input Number
+## 18. Do & Don't
 
-Digunakan untuk semua metric numeric.
+✅ DO:
+- Pakai design tokens (`var(--colorPrimary)`) bukan hex literal.
+- Pakai Material Symbols via `<Icon name="..." />` helper.
+- Pakai semantic HTML (`<button>`, `<nav>`, `<main>`).
+- Pakai `data-theme` / `data-accessibility` untuk theming.
+- Pakai `min-height: 44px` pada interactive elements.
 
-Props:
-
-```ts
-type HealthNumberInputProps = {
-  metricCode: string;
-  label: string;
-  value: number | null;
-  unit: string;
-  min?: number;
-  max?: number;
-  source: 'ai' | 'manual' | 'edited' | 'empty';
-  onChange: (value: number | null) => void;
-}
-```
-
-UI wajib menampilkan:
-
-```text
-Label metric
-Input angka besar
-Unit
-Source indicator
-Validation message
-```
-
-Source indicator:
-
-```text
-AI terbaca
-Diedit manual
-Input manual
-Belum diisi
-```
+❌ DON'T:
+- Hardcode warna hex di component (pakai token).
+- Pakai emoji sebagai icon.
+- Pakai `<div onClick>`代替 `<button>`.
+- Set font-size literal di luar design tokens.
+- Pakai library icon lain (Material Symbols adalah standar).
+- Tambah CSS baru tanpa extend design tokens.
 
 ---
 
-## 10.3 Measurement Card
-
-Digunakan di halaman tambah pengukuran.
-
-Struktur:
-
-```text
-Header: metric/device title
-Attachment preview
-Button Baca Otomatis
-Input angka
-Validation status
-Interpretation preview
-```
-
-Sprint 1 dynamic cards are rendered by `DynamicMetricForm` from the selected
-metric checklist rows. Hidden cards must unmount when the related checkbox is
-unchecked, and calculated metrics render a disabled value field until BMI/other
-calculated logic is implemented.
-
-State:
-
-```text
-empty
-imageSelected
-aiReading
-aiSuccess
-aiTimeout
-manualInput
-validated
-error
-```
-
----
-
-## 10.4 Attachment Uploader
-
-Rules:
-
-```text
-Accept image only
-Support capture="environment"
-Preview wajib tampil
-Client compress sebelum upload final
-Original image tidak disimpan ke R2
-Watermark dilakukan sebelum final upload
-```
-
-UI actions:
-
-```text
-Ambil Foto
-Upload Gambar
-Ganti Foto
-Hapus Foto
-```
-
-Sprint 1 `AttachmentUploader` accepts only JPG/PNG/WebP, uses
-`capture="environment"` for native camera support, shows a local preview, and
-does not upload or persist original images.
-
----
-
-## 10.5 AI Extraction State
-
-State text:
-
-| State | Text |
-|---|---|
-| idle | `Belum dibaca otomatis` |
-| loading | `AI sedang membaca foto... maksimal 5 detik` |
-| success | `Angka berhasil dibaca. Silakan cek ulang.` |
-| timeout | `AI terlalu lama membaca foto. Silakan input manual.` |
-| failed | `AI belum bisa membaca foto ini. Silakan input manual.` |
-
----
-
-## 10.6 Health Status Card
-
-Digunakan di dashboard dan popup.
-
-Struktur:
-
-```text
-Metric name
-Value + unit
-Status badge
-Short explanation
-Last measured time
-```
-
-Example:
-
-```text
-SpO2
-98 %
-Normal
-Saturasi oksigen berada dalam rentang umum normal.
-Hari ini, 20:15
-```
-
----
-
-## 10.7 Interpretation Popup
-
-Popup muncul setelah validasi angka dan sebelum submit.
-
-Content:
-
-```text
-Title: Hasil Interpretasi
-Metric sections
-Status
-Arti angka
-Saran
-Source label
-Disclaimer
-CTA Submit
-CTA Edit Angka
-```
-
-Rules:
-
-```text
-Jika ada severity emergency, emergency section tampil paling atas.
-User harus bisa kembali edit angka.
-Submit hanya tersedia jika semua field valid.
-```
-
----
-
-## 10.8 Emergency Modal
-
-Emergency modal wajib blocking.
-
-Content:
-
-```text
-Judul: Peringatan Nilai Kritis
-Metric dan angka
-Arti umum
-Anjuran cek ulang
-Kapan cari bantuan medis
-Checkbox konfirmasi
-CTA: Saya Mengerti
-CTA: Hubungi Kontak Darurat
-CTA: Edit Angka
-```
-
-Rules:
-
-```text
-Tidak boleh hanya toast.
-Tidak boleh auto-dismiss.
-Tidak boleh dikirim ke emergency contact tanpa consent.
-```
-
----
-
-## 10.9 Dashboard Metric Card
-
-Props:
-
-```ts
-type DashboardMetricCardProps = {
-  metricCode: string;
-  label: string;
-  value: number | null;
-  unit: string;
-  status?: string;
-  severity?: string;
-  trend?: 'up' | 'down' | 'stable' | 'insufficient';
-  measuredAt?: string;
-}
-```
-
-Card harus menampilkan empty state jika belum ada data.
-
----
-
-## 10.10 Chart
-
-Gunakan chart ringan. Hindari chart terlalu kompleks.
-
-Chart types:
-
-```text
-Line chart for metric trend
-Bar chart for measurement adherence
-Simple dot chart for daily values
-```
-
-Rules:
-
-```text
-Chart harus punya ringkasan teks.
-Senior mode tidak boleh bergantung pada chart kecil.
-Chart harus bisa dibaca di dark mode dan high contrast.
-```
-
----
-
-## 11. Page Templates
-
-## 11.1 Login Page
-
-Layout:
-
-```text
-Logo/app name
-Email input
-Password input
-Login button
-Register link
-Privacy link
-```
-
----
-
-## 11.2 Onboarding Page
-
-Step layout:
-
-```text
-Step 1: Display name
-Step 2: Sex and birth date
-Step 3: Height and timezone
-Step 4: Theme and accessibility
-```
-
-Rules:
-
-```text
-Required fields harus jelas.
-Tidak boleh lanjut jika heightCm invalid.
-```
-
-Sprint 1 implementation note:
-
-```text
-Until the shared wizard shell exists, onboarding may render the four logical
-steps as one responsive form if required fields, inline validation, and large
-tap targets are preserved.
-```
-
-## 11.2.1 Profile Settings Page
-
-Profile settings can reuse the same form primitives as onboarding for Sprint 1.
-It must allow editing:
-
-```text
-heightCm
-timezone
-theme
-accessibilityMode
-```
-
-Saving theme and accessibility mode must refresh auth/profile state and apply
-the current values to document attributes:
-
-```text
-data-theme
-data-accessibility
-```
-
----
-
-## 11.3 New Measurement Page
-
-Main flow:
-
-```text
-Checklist metric
-Dynamic measurement cards
-Validate button
-Interpretation popup
-Submit button
-```
-
-Checklist metric renders active device groups and metric rows from
-`GET /api/metrics/catalog`. Each row shows unit/calculated state plus required
-photo, fasting, sex-profile, and optional flags.
-
-Mobile layout:
-
-```text
-One column
-Sticky submit bar
-Large input
-```
-
-Desktop layout:
-
-```text
-Main form left
-Live summary right
-```
-
----
-
-## 11.4 Dashboard Today
-
-Sections:
-
-```text
-Greeting summary
-Critical alert if any
-Today metric cards
-AI recommendation
-Quick actions
-```
-
----
-
-## 11.5 Weekly Dashboard
-
-Sections:
-
-```text
-7-day summary
-Trend cards
-Charts
-Alert summary
-Medication adherence
-```
-
----
-
-## 11.6 Monthly Dashboard
-
-Sections:
-
-```text
-30-day summary
-Average/min/max/latest
-Pattern insight preview
-Report generation CTA
-```
-
----
-
-## 11.7 Doctor Ready PDF Preview
-
-Layout:
-
-```text
-Profile summary
-30-day summary
-Charts
-Alert log
-Medication log
-AI summary
-Disclaimer
-Generate PDF button
-```
-
----
-
-## 12. Health Copywriting Rules
-
-### 12.1 Allowed Language
-
-```text
-berdasarkan data yang tercatat
-cenderung
-perlu dipantau
-cek ulang
-konsultasikan ke tenaga medis
-bukan diagnosis
-```
-
-### 12.2 Forbidden Language
-
-```text
-Anda pasti terkena penyakit X
-Anda harus minum obat X
-Hentikan obat Anda
-Ubah dosis obat
-Aplikasi ini menggantikan dokter
-```
-
-### 12.3 Emergency Copy Template
-
-```text
-Nilai ini masuk kategori kritis. Segera cek ulang posisi alat dan ulangi pengukuran. Jika hasil tetap sama atau disertai gejala seperti sesak, nyeri dada, lemas berat, kebingungan, bibir kebiruan, pingsan, atau keluhan berat lain, segera cari bantuan medis.
-```
-
----
-
-## 13. Form Validation UX
-
-### 13.1 Inline Validation
-
-Setiap input harus punya pesan validasi langsung.
-
-Example:
-
-```text
-SpO2 tidak boleh lebih dari 100%.
-Sistolik harus lebih besar dari diastolik.
-Suhu tubuh harus berada antara 30°C dan 45°C.
-```
-
-### 13.2 Submit Blocking
-
-Submit diblokir jika:
-
-```text
-Metric yang dipilih belum memiliki finalValue
-Attachment wajib belum tersedia
-Physical range invalid
-User belum mengkonfirmasi emergency modal
-```
-
----
-
-## 14. Accessibility
-
-### 14.1 Minimum Requirements
-
-```text
-Keyboard navigable
-Visible focus ring
-ARIA label untuk icon-only button
-Contrast minimal WCAG AA
-Touch target minimal 44x44px
-Senior mode touch target minimal 56x56px
-```
-
-### 14.2 Focus Ring
-
-```css
-:focus-visible {
-  outline: 3px solid var(--colorFocus);
-  outline-offset: 3px;
-}
-```
-
-### 14.3 Screen Reader Labels
-
-Example:
-
-```tsx
-<button aria-label="Ambil foto oximeter">Ambil Foto</button>
-<input aria-label="Nilai SpO2 dalam persen" />
-```
-
----
-
-## 15. PWA Design Rules
-
-### 15.1 Install Prompt
-
-Tampilkan install prompt secara halus setelah user memakai aplikasi minimal satu sesi.
-
-Text:
-
-```text
-Pasang aplikasi di HP agar lebih mudah mencatat pengukuran harian.
-```
-
-### 15.2 Offline Shell
-
-Offline page harus menampilkan:
-
-```text
-Status offline
-Draft lokal jika ada
-Tombol coba sinkronkan
-```
-
-### 15.3 Draft Sync UI
-
-State:
-
-```text
-Tersimpan lokal
-Menunggu sinkron
-Berhasil sinkron
-Gagal sinkron
-```
-
----
-
-## 16. Icons
-
-Gunakan icon outline ringan.
-
-Suggested icon mapping:
-
-| Feature | Icon |
-|---|---|
-| Dashboard | activity |
-| Measurement | plusCircle |
-| Oximeter | gauge |
-| Blood pressure | heartPulse |
-| Glucose | droplet |
-| Medication | pill |
-| Fasting | timer |
-| Report | fileText |
-| Family | users |
-| Emergency | siren |
-| Settings | settings |
-
----
-
-## 17. Toast and Alerts
-
-### 17.1 Toast Types
-
-```text
-success
-info
-warning
-error
-```
-
-### 17.2 Toast Rules
-
-```text
-Toast tidak boleh dipakai untuk emergency.
-Toast tidak boleh menutupi input angka.
-Toast maksimal 5 detik kecuali error.
-```
-
----
-
-## 18. Empty States
-
-### 18.1 Dashboard Empty
-
-```text
-Belum ada pengukuran hari ini.
-Mulai catat data kesehatan Anda dari menu Tambah Pengukuran.
-```
-
-### 18.2 Report Empty
-
-```text
-Belum cukup data untuk membuat report periode ini.
-Catat pengukuran beberapa hari lagi agar report lebih informatif.
-```
-
-### 18.3 AI Empty
-
-```text
-Belum ada rekomendasi AI. Rekomendasi akan muncul setelah Anda menyimpan pengukuran.
-```
-
----
-
-## 19. Loading States
-
-### 19.1 AI Loading
-
-```text
-AI sedang membaca foto... maksimal 5 detik.
-```
-
-Progress indicator tidak boleh menjanjikan persentase palsu.
-
-### 19.2 Submit Loading
-
-```text
-Menyimpan data pengukuran...
-```
-
-### 19.3 Report Loading
-
-```text
-Membuat report dokter 30 hari...
-```
-
----
-
-## 20. Error States
-
-### 20.1 AI Timeout
-
-```text
-AI terlalu lama membaca foto. Silakan input manual agar proses tetap cepat.
-```
-
-### 20.2 Upload Failed
-
-```text
-Attachment gagal diupload. Coba ulangi atau gunakan foto yang lebih kecil.
-```
-
-### 20.3 Telegram Failed
-
-```text
-Data berhasil disimpan, tetapi Telegram gagal dikirim. Anda bisa cek pengaturan notifikasi.
-```
-
----
-
-## 21. Component Naming
-
-Gunakan PascalCase untuk komponen React.
-
-Actual components in `web/src/`:
-
-```text
-AppShell
-SeniorAppShell
-BottomNavigation
-MeasurementChecklist
-DynamicMetricForm
-AttachmentUploader
-ManualOverrideInput
-TrendBadge
-InterpretationPopup
-EmergencyModal
-DashboardMetricCard
-TrendChart
-AiRecommendationCard
-ReportPreview
-SeniorModeToggle
-KnowledgeBaseLayout
-MedicationFastingTracker
-SettingsProfileForm
-NotificationList
-FamilyMemberCard
-```
-
-Icon system: Google Material Symbols Outlined, imported via CSS `@import` in index.css. Not outline SVGs.
-
----
-
-## 22. Styling Approach
-
-This project does **not** use Tailwind CSS. All styling is done with:
-
-- CSS custom properties defined in `web/src/index.css`
-- Component-specific CSS files (e.g., `ManualOverrideInput.css`, `InterpretationPopup.css`)
-- Layout styles in `web/src/App.css`
-- Accessibility overrides in `web/src/styles/senior-mode.css` and `web/src/styles/high-contrast.css`
-
-To use a design token in CSS:
-
-```css
-.my-component {
-  color: var(--colorTextPrimary);
-  background: var(--colorSurface);
-  border: 1px solid var(--colorBorder);
-  border-radius: var(--radiusMd);
-  padding: var(--space16);
-  font: var(--typBodyMd);
-}
-```
-
-To use a design token in React inline styles:
-
-```tsx
-<div style={{ color: 'var(--colorTextPrimary)', font: 'var(--typBodyMd)' }}>
-  Content
-</div>
-```
-
----
-
-## 23. QA Checklist
-
-Sebelum merge UI, pastikan:
-
-```text
-Mobile 360px aman
-Desktop 1280px aman
-Light theme aman (only theme implemented via data-theme)
-Warm theme aman (data-theme="warm")
-Dark theme aman (data-theme="dark")
-High contrast aman (data-accessibility="highContrast")
-Senior mode aman (data-accessibility="senior")
-Keyboard navigation aman
-Attachment preview aman
-AI timeout message jelas
-Manual override terlihat
-Emergency modal tidak bisa terlewat
-Submit tidak menyimpan original image
-TypeScript: cd web && npx tsc -b
-Lint: cd web && npm run lint
-Build: cd web && npm run build
-```
-
----
-
-## 24. Stitch Clinical Precision Alignment
-
-### 24.1 Design Tokens Source of Truth
-
-The Stitch design tokens are defined in `web/frontend_stitch/DESIGN.md` and applied via `web/src/index.css`.
-
-Production token values:
-
-```text
-Font: Inter (Google Fonts, loaded in index.html)
-Canvas: #f7f9fb
-Surface: #f2f4f6
-Surface/container: #eceef0
-Surface/container-high: #e6e8ea
-Surface/dim: #d8dadc
-Surface/elevated: #ffffff
-Primary: #0061ff
-Primary strong: #004bca
-On-primary-container: #f1f2ff
-Text primary: #191c1e
-Text secondary: #424656
-Text muted: #737687
-Outline: #c2c6d9
-Outline variant: #e0e3e5
-Border soft: #e0e3e5
-Status emergency: #7f1d1d
-Status critical: #ba1a1a
-Status high: #b45309
-Status warning: #9a6700
-Status info: #005c85
-Status normal: #168244
-Sidebar width: 280px
-Card shadow: 0px 4px 6px -1px rgba(0,0,0,0.05)
-Card radius: 4px (--radiusMd)
-Modal radius: 8px (--radiusLg)
-Status chip: pill only for semantic state (--radiusFull = 999px)
-```
-
----
-
-## 25. Senior Mode Production Shell
-
-When `data-accessibility="senior"`, the app uses `SeniorAppShell` component:
-
-Source: `web/src/components/SeniorAppShell.tsx` and `web/src/styles/senior-mode.css`.
-
-```text
-Primary tabs only: Home, Add Data, Emergency
-Desktop sidebar hidden
-Mobile bottom nav hidden
-Large tab buttons with high contrast state
-Emergency tab renders SOS long-press button
-Font size: 19px base (not rem)
-Card padding: 20px
-Input min-height: 56px
-Button min-height: 56px
-SOS long-press threshold: 900ms
-```
-
-Senior mode applies `data-accessibility="senior"` to `<html>`, which activates `senior-mode.css`:
-- Increases base font size to 19px
-- Increases card padding to 20px
-- Increases input/button min-height to 56px
-- Adds `.senior-shell`, `.senior-tabs`, `.senior-content` layout classes
+Lihat juga:
+- Schema: `docs/07-schema.sql`
+- API Contract: `docs/05-api-contract.md`
+- Architecture: `docs/04-ARCHITECTURE.md`
+- PRD Sprint 1–5: `docs/01-PRD_SPRINT1-5.md`

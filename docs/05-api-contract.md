@@ -1,3524 +1,574 @@
-# API Contract — HL Health Companion
+# API CONTRACT — HL Health Companion
 
-## 1. Document Status
-
-```text
-Product: HL Health Companion
-Runtime: Cloudflare Workers
-API Gateway: Hono.js
-Database Binding: DB
-R2 Binding: LOGS
-Primary Database: multi_Ai_db
-Primary R2 Bucket: multi-apps-ai-bucket
-Contract Version: v1
-```
-
-This document defines the HTTP API contract for the HL Health Companion web application.
-
-The API is designed for a Cloudflare Workers + Hono.js backend, Cloudflare D1 storage, Cloudflare R2 attachment storage, Workers AI Vision extraction, Workers AI text recommendations, Queues, Cron Triggers, Telegram notification, browser notification, PWA, report generation, family/caregiver sharing, and emergency alerts.
+> **Sumber: audit langsung ke `worker/src/index.ts` (122 endpoint), `routes-extra.ts` (28), `routes-admin.ts` (3), `routes-ai.ts` (10), `routes-auth.ts` (20), `routes-cycle.ts` (9), `routes-hydration.ts` (6), `routes-telegram.ts` (3). Total ~200 endpoint aktif.**
+> Dokumen lama: `archive/docs_legacy_2025_sprint1-5/05-api-contract.md`.
 
 ---
 
-## 2. Core Rules
+## 1. Base URL, Auth, Response Envelope
 
-### 2.1 Product Safety Rule
+### 1.1 Base URL
 
-The API must never treat AI output as final medical truth.
+| Env | URL |
+|---|---|
+| Production Worker | `https://hl-health-companion-api.indiehomesungairaya.workers.dev` |
+| Pages (frontend) | `https://app.isehat.biz.id` |
+| Local dev (worker) | `http://localhost:8787` |
+| Local dev (vite) | `http://localhost:5173` (Vite proxy `/api` → worker) |
 
-```text
-finalValue
-→ HL_metricRules lookup
-→ status, severity, emergencyLevel
-→ popup and rule-based recommendation
-→ optional AI narrative
-```
+Pages mem-proxy `/api/*` → Worker lewat `functions/api/[[path]].ts`.
 
-AI is only allowed to help with:
+### 1.2 Authentication
 
-```text
-image extraction
-plain-language explanation
-trend summary
-comparison with previous data
-safe lifestyle education
-```
+- **Cookie**: `hlSession` (HTTP-only, Secure, SameSite=Lax). Diset oleh `POST /api/auth/login`, `POST /api/auth/login/verify`, `/api/auth/google/callback`. Divalidasi server-side via `getCurrentSession(c)` → lookup `HL_sessions` dengan SHA-256 hash token.
+- **Bearer (cron only)**: `Authorization: Bearer ${CRON_SECRET}` untuk `/api/internal/cron/*`.
+- **Telegram webhook**: diverifikasi via `telegramBotToken` (resolve dari `HL_systemConfigs` atau `env.TELEGRAM_BOT_TOKEN`).
 
-AI is not allowed to:
+Tidak ada JWT. Tidak ada API key untuk user. RBAC/Entitlement dicek **server-side**.
 
-```text
-diagnose disease
-prescribe medication
-change medication dosage
-replace doctor consultation
-send emergency decisions without rule-based severity
-```
+### 1.3 Response Envelope (universal)
 
-### 2.2 Original Image Rule
-
-Original images must not be persisted.
-
-```text
-Temporary image for AI extraction: allowed in request memory only
-Original image in R2: not allowed
-Base64 image in D1: not allowed
-Final R2 object: compressed + watermarked evidence image only
-```
-
-### 2.3 AI Timeout Rule
-
-AI Vision extraction is optional and must not block user input.
-
-```text
-Target: <= 5 seconds
-Timeout: Read from `HL_systemConfigs` (e.g. 5000 ms)
-On timeout: return manual input fallback
-No automatic retry by default
-No OCR queue by default
-```
-
-### 2.4 Attachment Save Rule
-
-Attachment is saved only after submit.
-
-```text
-User fills or verifies finalValue
-User confirms popup interpretation
-Client generates compressed watermarked image
-Submit sends final values + final evidence image
-Worker stores final evidence to R2 LOGS
-Worker stores metadata to HL_measurementAttachments
-```
-
----
-
-## 3. Base URL and Versioning
-
-```text
-Base path: /api
-Versioning: pathless v1 for first release
-Future version example: /api/v2
-```
-
-All endpoints return JSON unless the endpoint explicitly streams a file.
-
----
-
-## 4. Authentication
-
-### 4.1 Auth Method
-
-Use secure HTTP-only cookie session for browser requests.
-
-```http
-Cookie: hlSession=<opaqueSessionToken>
-```
-
-Optional bearer token may be supported later for mobile/native clients.
-
-```http
-Authorization: Bearer <token>
-```
-
-### 4.2 Required Auth
-
-Default: all `/api/*` routes require auth except:
-
-```text
-POST /api/auth/register
-POST /api/auth/login
-GET  /api/auth/me
-GET  /api/kb
-GET  /api/kb/:slug
-GET  /api/reports/share/:shareToken
-POST /api/telegram/webhook
-```
-
-### 4.3 Session Storage
-
-Sessions are stored in:
-
-```text
-HL_sessions
-```
-
-Store only hashed session token.
-
----
-
-## 5. Common Headers
-
-### 5.1 Request Headers
-
-```http
-Content-Type: application/json
-Accept: application/json
-```
-
-For file upload:
-
-```http
-Content-Type: multipart/form-data
-```
-
-### 5.2 Response Headers
-
-```http
-Content-Type: application/json; charset=utf-8
-Cache-Control: no-store
-```
-
-For public knowledge base pages, short caching is allowed.
-
-```http
-Cache-Control: public, max-age=300
-```
-
----
-
-## 6. Standard Response Shapes
-
-### 6.1 Success Response
+Semua response JSON mengikuti envelope:
 
 ```json
+// Success
 {
   "success": true,
-  "data": {},
+  "data": { /* endpoint-specific payload */ },
   "meta": {
-    "requestId": "req_01h...",
-    "durationMs": 123
+    "requestId": "req_<base36>",
+    "durationMs": 42
   }
 }
-```
 
-### 6.2 Error Response
-
-```json
+// Failure
 {
   "success": false,
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Input tidak valid.",
-    "details": [
-      {
-        "field": "values[0].finalValue",
-        "message": "finalValue wajib berupa angka."
-      }
-    ]
+    "message": "Pesan error i18n-ready (ID default).",
+    "details": [/* optional structured detail */]
   },
   "meta": {
-    "requestId": "req_01h...",
-    "durationMs": 85
+    "requestId": "req_<base36>",
+    "durationMs": 12
   }
 }
 ```
 
-### 6.3 Pagination Response
-
-```json
-{
-  "success": true,
-  "data": [],
-  "pagination": {
-    "limit": 20,
-    "cursor": "next_cursor",
-    "hasMore": true
-  },
-  "meta": {
-    "requestId": "req_01h...",
-    "durationMs": 90
-  }
-}
-```
-
----
-
-## 7. Common Error Codes
+### 1.4 Error Codes (server-side enum)
 
 | Code | HTTP | Meaning |
-|---|---:|---|
-| `UNAUTHORIZED` | 401 | User belum login atau session invalid |
-| `FORBIDDEN` | 403 | User tidak punya permission |
-| `NOT_FOUND` | 404 | Resource tidak ditemukan |
-| `VALIDATION_ERROR` | 400 | Input tidak valid |
-| `EMAIL_ALREADY_EXISTS` | 409 | Email register sudah terdaftar |
-| `RATE_LIMITED` | 429 | Terlalu banyak request |
-| `AI_TIMEOUT` | 408 | AI Vision melewati batas 5 detik |
-| `AI_PARSE_FAILED` | 422 | AI response tidak bisa diparse |
-| `RULE_NOT_FOUND` | 200/422 | Rule tidak ditemukan, fallback info digunakan |
-| `R2_UPLOAD_FAILED` | 500 | Upload evidence/report gagal |
-| `D1_ERROR` | 500 | Database gagal |
-| `TELEGRAM_FAILED` | 202/500 | Telegram gagal dikirim, measurement tetap sukses |
-| `INTERNAL_ERROR` | 500 | Error tidak terduga |
-
----
-
-## 8. Enums
-
-### 8.1 sex
-
-```text
-male
-female
-other
-```
-
-### 8.2 theme
-
-```text
-light
-warm
-dark
-highContrast
-```
-
-### 8.3 accessibilityMode
-
-```text
-normal
-senior
-highContrast
-```
-
-### 8.4 deviceCode
-
-```text
-yuwellYx106
-omronHem7194t1fl
-sinocareM101
-thermometer
-bodyScale
-manualInput
-```
-
-### 8.5 metricCode
-
-```text
-spo2
-heartRate
-systolic
-diastolic
-bloodPressurePulse
-glucoseFasting
-glucosePostMeal
-cholesterolTotal
-uricAcid
-bodyWeight
-bmi
-waistCircumference
-bodyTemperature
-sleepDuration
-height
-```
-
-### 8.6 severity
-
-```text
-normal
-info
-warning
-high
-critical
-emergency
-```
-
-### 8.7 emergencyLevel
-
-```text
-none
-watch
-urgent
-emergency
-```
-
-### 8.8 measurement source
-
-```text
-photo
-upload
-manual
-mixed
-```
-
-### 8.9 notification channel
-
-```text
-inApp
-telegram
-browser
-email
-```
-
-### 8.10 notification status
-
-```text
-pending
-sent
-failed
-skipped
-```
-
-### 8.11 family role
-
-```text
-owner
-caregiver
-viewer
-emergencyContact
-doctorViewer
-```
-
-### 8.12 family status
-
-```text
-pending
-active
-rejected
-revoked
-expired
-```
-
-### 8.13 medication log status
-
-```text
-taken
-skipped
-missed
-unknown
-```
-
-### 8.14 fasting type
-
-```text
-glucoseFasting
-cholesterolTotal
-uricAcid
-general
-```
-
-### 8.15 report type
-
-```text
-daily
-weekly
-monthly
-doctorReady30d
-```
-
----
-
-## 9. Auth API
-
-## 9.1 Register
-
-```http
-POST /api/auth/register
-```
-
-### Request
-
-```json
-{
-  "email": "user@example.com",
-  "password": "StrongPassword123!",
-  "displayName": "Budi"
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "usr_01h...",
-      "email": "user@example.com",
-      "displayName": "Budi",
-      "telegramEnabled": false,
-      "browserPushEnabled": false
-    },
-    "requiresOnboarding": true
-  }
-}
-```
-
-### Duplicate Email Response 409
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "EMAIL_ALREADY_EXISTS",
-    "message": "Email sudah terdaftar.",
-    "details": [
-      {
-        "field": "email",
-        "message": "Gunakan email lain atau login."
-      }
-    ]
-  }
-}
-```
-
-### Writes
-
-```text
-HL_users
-HL_sessions
-HL_auditLogs
-```
-
----
-
-## 9.2 Login
-
-```http
-POST /api/auth/login
-```
-
-### Request
-
-```json
-{
-  "email": "user@example.com",
-  "password": "StrongPassword123!"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "usr_01h...",
-      "email": "user@example.com",
-      "displayName": "Budi",
-      "telegramEnabled": false,
-      "browserPushEnabled": false
-    },
-    "profile": null,
-    "requiresOnboarding": true
-  }
-}
-```
-
-### Side Effects
-
-```text
-Set-Cookie: hlSession=...
-Update HL_users.lastLoginAt
-Create HL_sessions
-Create HL_auditLogs
-```
-
----
-
-## 9.3 Logout
-
-```http
-POST /api/auth/logout
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "loggedOut": true
-  }
-}
-```
-
-### Side Effects
-
-```text
-HL_sessions.revokedAt set
-Clear cookie
-```
-
----
-
-## 9.4 Me
-
-```http
-GET /api/auth/me
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "usr_01h...",
-      "email": "user@example.com",
-      "displayName": "Budi",
-      "telegramEnabled": true,
-      "browserPushEnabled": false
-    },
-    "profile": {
-      "id": "prf_01h...",
-      "sex": "male",
-      "birthDate": "1980-01-01",
-      "heightCm": 170,
-      "timezone": "Asia/Jakarta",
-      "accessibilityMode": "normal",
-      "theme": "light"
-    },
-    "requiresOnboarding": false
-  }
-}
-```
-
----
-
-## 9.5 Forgot Password
-
-```http
-POST /api/auth/forgot-password
-```
-
-Generates a password reset token (in production, would email it). For now, the response is always successful to avoid leaking which emails are registered.
-
-### Request
-
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Jika email terdaftar, link reset password akan dikirim.",
-    "sent": true
-  }
-}
-```
-
-### Validation
-
-- 400 if `email` is missing or not a valid email format.
-
-### Notes
-
-- Rate-limited per IP.
-- For now, no token is generated; the endpoint is a placeholder for the future email-transport integration.
-
----
-
-## 10. Profile API
-
-## 10.1 Get Profile
-
-```http
-GET /api/profile
-```
-
-### Auth
-
-```text
-Requires authenticated `hlSession` cookie.
-Returns 404 NOT_FOUND if onboarding/profile is not complete.
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "prf_01h...",
-    "userId": "usr_01h...",
-    "sex": "male",
-    "birthDate": "1980-01-01",
-    "heightCm": 170,
-    "timezone": "Asia/Jakarta",
-    "accessibilityMode": "normal",
-    "theme": "light",
-    "emergencyConsent": false,
-    "aiConsent": true,
-    "dataShareConsent": false
-  }
-}
-```
-
----
-
-## 10.2 Onboarding
-
-```http
-POST /api/profile/onboarding
-```
-
-### Request
-
-```json
-{
-  "displayName": "Budi",
-  "sex": "male",
-  "birthDate": "1980-01-01",
-  "heightCm": 170,
-  "timezone": "Asia/Jakarta",
-  "theme": "light",
-  "accessibilityMode": "normal",
-  "aiConsent": true
-}
-```
-
-### Validation
-
-```text
-Requires authenticated `hlSession` cookie.
-displayName: minimum 2 characters.
-sex: one of male, female, other.
-birthDate: valid YYYY-MM-DD date, not future, minimum age 13 years.
-heightCm: numeric, 50 to 250 cm.
-timezone: valid IANA timezone string, e.g. Asia/Jakarta.
-theme: one of light, warm, dark, highContrast.
-accessibilityMode: one of normal, senior, highContrast.
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "profileId": "prf_01h...",
-    "completed": true
-  }
-}
-```
-
-### Already Completed Response 400
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Onboarding sudah selesai.",
-    "details": [
-      {
-        "field": "profile",
-        "message": "Profil kesehatan sudah dibuat."
-      }
-    ]
-  }
-}
-```
-
-### Writes
-
-```text
-HL_userProfiles
-HL_userConsents
-HL_users.displayName update
-HL_auditLogs
-```
-
----
-
-## 10.3 Update Profile
-
-```http
-PUT /api/profile
-```
-
-### Request
-
-```json
-{
-  "heightCm": 171,
-  "timezone": "Asia/Jakarta",
-  "theme": "warm",
-  "accessibilityMode": "senior"
-}
-```
-
-### Validation
-
-```text
-Requires authenticated `hlSession` cookie.
-heightCm: numeric, 50 to 250 cm.
-timezone: valid IANA timezone string, e.g. Asia/Jakarta.
-theme: optional; one of light, warm, dark, highContrast.
-accessibilityMode: optional; one of normal, senior, highContrast.
-Returns 404 NOT_FOUND if onboarding/profile is not complete.
-Writes `profileUpdate` to HL_auditLogs.
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "updated": true
-  }
-}
-```
-
----
-
-## 11. Metrics API
-
-## 11.1 Get Metric Catalog
-
-```http
-GET /api/metrics/catalog
-```
-
-### Query
-
-```text
-active=true
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "devices": [
-      {
-        "deviceCode": "yuwellYx106",
-        "deviceName": "Yuwell YX106 Oximeter",
-        "deviceType": "oximeter",
-        "metrics": [
-          {
-            "metricCode": "spo2",
-            "metricName": "Saturasi Oksigen",
-            "unit": "%",
-            "inputType": "mixed",
-            "requiresAttachment": true,
-            "requiresSex": false,
-            "requiresFasting": false,
-            "isCalculated": false,
-            "requiredMetric": true,
-            "physicalMin": 0,
-            "physicalMax": 100
-          }
-        ]
-      }
-    ],
-    "metrics": []
-  }
-}
-```
-
-### Reads
-
-```text
-HL_devices
-HL_metricCatalog
-HL_deviceMetrics
-```
-
-### Notes
-
-```text
-Frontend checklist must render from the active database rows returned by this endpoint.
-requiredMetric comes from HL_deviceMetrics and identifies required vs optional device metrics.
-```
-
----
-
-## 11.2 Validate Metric Values
-
-```http
-POST /api/measurements/validate
-```
-
-### Request
-
-```json
-{
-  "profileId": "prf_01h...",
-  "measuredAt": "2026-06-20T20:15:00+07:00",
-  "values": [
-    {
-      "metricCode": "spo2",
-      "deviceCode": "yuwellYx106",
-      "rawAiValue": 98,
-      "finalValue": 98,
-      "unit": "%",
-      "confidence": 0.89
-    },
-    {
-      "metricCode": "heartRate",
-      "deviceCode": "yuwellYx106",
-      "rawAiValue": 73,
-      "finalValue": 73,
-      "unit": "bpm",
-      "confidence": 0.86
-    }
-  ]
-}
-```
-
-> **Note:** `profileId` is required so the rules engine evaluates thresholds
-> against the correct sex and age. When a caregiver validates metrics for
-> another user, omitting `profileId` would cause incorrect rule evaluation.
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "valid": true,
-    "hasEmergency": false,
-    "results": [
-      {
-        "metricCode": "spo2",
-        "metricName": "Saturasi Oksigen",
-        "finalValue": 98,
-        "unit": "%",
-        "status": "Normal",
-        "severity": "normal",
-        "emergencyLevel": "none",
-        "ruleId": "rule-spo2-normal",
-        "popupTitle": "SpO2 Normal",
-        "popupMessage": "Saturasi oksigen berada dalam rentang umum normal.",
-        "recommendation": "Pertahankan aktivitas ringan, pola napas baik, dan cek ulang sesuai kebutuhan.",
-        "sourceLabel": "CSV internal + clinical common threshold"
-      }
-    ],
-    "warnings": []
-  }
-}
-```
-
-### Reads
-
-```text
-HL_userProfiles
-HL_metricCatalog
-HL_metricRules
-```
-
----
-
-## 12. AI Vision Extraction API
-
-## 12.1 Extract Image
-
-```http
-POST /api/measurements/extract
-```
-
-### Content Type
-
-```http
-multipart/form-data
-```
-
-### Form Fields
-
-| Field | Type | Required | Description |
-|---|---|---:|---|
-| `file` | File | Yes | Temporary image file for AI extraction (max size from config) |
-| `deviceCode` | string | Yes | Device code |
-| `metricGroup` | string | Yes | Logical group, example `oximeter`, `bloodPressure`, `sinocareGcu` |
-| `selectedMetricCodes` | JSON string | Yes | Array of selected metric codes |
-| `sessionDraftId` | string | No | Draft id if available |
-| `maxFileSize` | — | — | Enforced by Worker: Read from `HL_systemConfigs`. Not a form field; documented here for client awareness. |
-
-### Important Behavior
-
-```text
-Reject file larger than config limit before reading body
-Do not write file to R2
-Do not store base64 in D1
-Call Workers AI Vision with configured timeout
-Write extraction log to HL_aiExtractions
-Return parsed metrics or manual fallback
-```
-
-### Success Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "timeout": false,
-    "durationMs": 3200,
-    "deviceCode": "yuwellYx106",
-    "metricGroup": "oximeter",
-    "metrics": [
-      {
-        "metricCode": "spo2",
-        "rawAiValue": 98,
-        "unit": "%",
-        "confidence": 0.89
-      },
-      {
-        "metricCode": "heartRate",
-        "rawAiValue": 73,
-        "unit": "bpm",
-        "confidence": 0.86
-      }
-    ],
-    "needsManualReview": false
-  }
-}
-```
-
-### Timeout Response 408
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "AI_TIMEOUT",
-    "message": "AI terlalu lama membaca foto. Silakan input manual."
-  },
-  "data": {
-    "timeout": true,
-    "durationMs": 5000,
-    "manualInputAllowed": true
-  }
-}
-```
-
-### Failed Parse Response 422
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "AI_PARSE_FAILED",
-    "message": "AI tidak berhasil membaca angka dengan yakin. Silakan input manual."
-  },
-  "data": {
-    "manualInputAllowed": true
-  }
-}
-```
-
-### Writes
-
-```text
-HL_aiExtractions
-HL_auditLogs on suspicious/fail cases
-```
-
----
-
-## 13. Measurement API
-
-## 13.1 Create Draft
-
-```http
-POST /api/measurements/drafts
-```
-
-### Request
-
-```json
-{
-  "selectedMetrics": ["spo2", "heartRate", "systolic", "diastolic"],
-  "draftData": {
-    "deviceCodes": ["yuwellYx106", "omronHem7194t1fl"]
-  },
-  "expiresInMinutes": 120
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "draftId": "drf_01h...",
-    "expiresAt": "2026-06-20T22:15:00+07:00"
-  }
-}
-```
-
-### Writes
-
-```text
-HL_measurementDrafts
-```
-
----
-
-## 13.2 Submit Measurement
-
-```http
-POST /api/measurements/submit
-```
-
-### Content Type
-
-```http
-multipart/form-data
-```
-
-### Form Fields
-
-| Field | Type | Required | Description |
-|---|---|---:|---|
-| `payload` | JSON string | Yes | Measurement payload |
-| `attachment:<metricCode>` | File | Conditional | Final compressed watermarked image for attachment-required metric |
-
-### Payload JSON
-
-```json
-{
-  "draftId": "drf_01h...",
-  "profileId": "prf_01h...",
-  "measuredAt": "2026-06-20T20:15:00+07:00",
-  "source": "mixed",
-  "notes": "Pengukuran malam",
-  "values": [
-    {
-      "metricCode": "spo2",
-      "deviceCode": "yuwellYx106",
-      "rawAiValue": 98,
-      "finalValue": 98,
-      "unit": "%",
-      "confidence": 0.89,
-      "manualOverride": false
-    },
-    {
-      "metricCode": "heartRate",
-      "deviceCode": "yuwellYx106",
-      "rawAiValue": 73,
-      "finalValue": 73,
-      "unit": "bpm",
-      "confidence": 0.86,
-      "manualOverride": false
-    },
-    {
-      "metricCode": "bodyWeight",
-      "deviceCode": "bodyScale",
-      "rawAiValue": null,
-      "finalValue": 78.4,
-      "unit": "kg",
-      "confidence": null,
-      "manualOverride": false
-    }
-  ],
-  "attachmentMap": [
-    {
-      "metricCode": "spo2",
-      "formField": "attachment:spo2",
-      "fileName": "spo2.webp",
-      "fileType": "image/webp",
-      "imageWidth": 1280,
-      "imageHeight": 720,
-      "compressionQuality": 50,
-      "watermarked": true,
-      "compressed": true
-    }
-  ]
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "sessionId": "ses_01h...",
-    "hasEmergency": false,
-    "values": [
-      {
-        "id": "val_01h...",
-        "metricCode": "spo2",
-        "finalValue": 98,
-        "unit": "%",
-        "status": "Normal",
-        "severity": "normal",
-        "emergencyLevel": "none",
-        "manualOverride": false
-      }
-    ],
-    "attachments": [
-      {
-        "id": "att_01h...",
-        "metricCode": "spo2",
-        "r2Key": "HL/users/usr_01h/measurements/ses_01h/spo2-att_01h.webp"
-      }
-    ],
-    "notifications": {
-      "telegramQueued": true,
-      "emergencyQueued": false
-    },
-    "recommendationQueued": true
-  }
-}
-```
-
-### Transaction Requirements
-
-```text
-1. Validate physical range
-2. Evaluate HL_metricRules
-3. Create HL_measurementSessions
-4. Insert HL_measurementValues batch
-5. Upload final evidence images to R2 LOGS
-6. Insert HL_measurementAttachments batch
-7. If emergency: insert HL_alerts
-8. Insert HL_auditLogs
-9. Enqueue telegram summary
-10. Enqueue emergency alerts if applicable
-11. Enqueue AI recommendation
-12. Update streaks best effort
-```
-
-### Writes
-
-```text
-HL_measurementSessions
-HL_measurementValues
-HL_measurementAttachments
-HL_alerts
-HL_notifications
-HL_auditLogs
-HL_streaks
-HL_measurementDrafts
-R2 LOGS
-Queue: notificationQueue
-Queue: recommendationQueue
-```
-
----
-
-## 13.3 Get Measurement History
-
-```http
-GET /api/measurements/history
-```
-
-### Query
-
-| Param | Type | Required | Description |
-|---|---|---:|---|
-| `from` | ISO date | No | Range start |
-| `to` | ISO date | No | Range end |
-| `metricCode` | string | No | Filter metric |
-| `limit` | number | No | Default 20, max 100 |
-| `cursor` | string | No | Pagination cursor |
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "sessionId": "ses_01h...",
-      "measuredAt": "2026-06-20T20:15:00+07:00",
-      "source": "mixed",
-      "hasAttachment": true,
-      "hasEmergency": false,
-      "values": [
-        {
-          "metricCode": "spo2",
-          "finalValue": 98,
-          "unit": "%",
-          "status": "Normal",
-          "severity": "normal"
-        }
-      ]
-    }
-  ],
-  "pagination": {
-    "limit": 20,
-    "cursor": null,
-    "hasMore": false
-  }
-}
-```
-
----
-
-## 13.4 Get Measurement Detail
-
-```http
-GET /api/measurements/:id
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "session": {
-      "id": "ses_01h...",
-      "measuredAt": "2026-06-20T20:15:00+07:00",
-      "source": "mixed",
-      "notes": "Pengukuran malam"
-    },
-    "values": [],
-    "attachments": [],
-    "alerts": [],
-    "aiRecommendation": null
-  }
-}
-```
-
----
-
-## 13.5 Delete Measurement
-
-```http
-DELETE /api/measurements/:id
-```
-
-### Behavior
-
-Soft delete is preferred if implemented later. For first release, hard delete is allowed only for owner and must remove R2 evidence objects.
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "deleted": true
-  }
-}
-```
-
-### Writes
-
-```text
-HL_auditLogs
-Delete related R2 objects
-Delete HL_measurementSessions cascade
-```
-
----
-
-## 13.6 Get Attachment Download URL
-
-```http
-GET /api/measurements/:id/attachments/:attachmentId/url
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "url": "https://signed-or-proxied-url",
-    "expiresInSeconds": 300
-  }
-}
-```
-
-### Security
-
-```text
-Must check session owner or family permission
-Do not expose public R2 object URL
-Prefer Worker-proxied stream or signed URL
-```
-
----
-
-## 13.7 Sync Offline Draft
-
-```http
-POST /api/measurements/sync
-```
-
-### Purpose
-
-Sync locally saved measurement drafts when device comes back online. Uses draftId for idempotency to prevent duplicate submissions.
-
-### Request
-
-```json
-{
-  "drafts": [
-    {
-      "draftId": "drf_local_01h...",
-      "profileId": "prf_01h...",
-      "measuredAt": "2026-06-20T20:15:00+07:00",
-      "source": "manual",
-      "notes": "Draft offline",
-      "values": [
-        {
-          "metricCode": "systolic",
-          "deviceCode": "omronHem7194t1fl",
-          "rawAiValue": null,
-          "finalValue": 130,
-          "unit": "mmHg",
-          "confidence": null,
-          "manualOverride": false
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "synced": 1,
-    "skippedDuplicates": 0,
-    "results": [
-      {
-        "draftId": "drf_local_01h...",
-        "sessionId": "ses_01h...",
-        "status": "created"
-      }
-    ]
-  }
-}
-```
-
-### Idempotency
-
-```text
-If draftId already exists in HL_measurementDrafts with status submitted,
-skip and return status = alreadySynced.
-This prevents duplicate submissions from network retries.
-```
-
-### Writes
-
-```text
-HL_measurementDrafts
-HL_measurementSessions
-HL_measurementValues
-HL_auditLogs
-```
-
----
-
-## 13.8 Get Today's Sessions
-
-```http
-GET /api/measurements/today
-```
-
-Returns all measurement sessions recorded by the authenticated user today, in the user's profile timezone.
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "date": "2026-06-23",
-    "sessions": [
-      {
-        "sessionId": 15,
-        "measuredAt": "2026-06-22T19:17:09.000Z",
-        "source": "manual",
-        "hasAttachment": 0,
-        "valueCount": 3,
-        "deviceCodes": ["omronHem7194t1fl", "yuwellYx106"]
-      }
-    ]
-  }
-}
-```
-
-### Timezone Handling
-
-measuredAt is stored in UTC. The endpoint fetches a 48h window then filters in JS using `Intl.DateTimeFormat('en-CA', { timeZone: profile.timezone })` so the user sees their local "today".
-
-### Notes
-
-- Used by the measurement page to mark devices that have already been measured today (green border UI).
-- Used by the history page and dashboard as an early signal.
-
----
-
-## 13.9 Get Last Measurements (Auto-Fill Cache)
-
-```http
-GET /api/measurements/last
-```
-
-Returns the last-known value per `(userId, metricCode, deviceCode)` for rarely-changing metrics (bodyWeight, bodyTemperature, waistCircumference, etc.) so the measurement form can pre-fill on next visit.
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "metricCode": "bodyWeight",
-      "deviceCode": "bodyScale",
-      "finalValue": 72,
-      "unit": "kg",
-      "measuredAt": "2026-06-22T20:00:00.000Z"
-    }
-  ]
-}
-```
-
----
-
-## 13.10 Save Last Measurement (Auto-Fill Update)
-
-```http
-POST /api/measurements/last/save
-```
-
-Persists the most recent value for a metric so the next visit's auto-fill cache stays fresh.
-
-### Request
-
-```json
-{
-  "metricCode": "bodyWeight",
-  "deviceCode": "bodyScale",
-  "finalValue": 72,
-  "unit": "kg",
-  "measuredAt": "2026-06-22T20:00:00.000Z"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": { "saved": true }
-}
-```
-
-### Idempotency
-
-`ON CONFLICT(userId, deviceCode, metricCode) DO UPDATE` — repeated saves overwrite.
-
----
-
-## 14. Dashboard API
-
-## 14.1 Today Dashboard
-
-```http
-GET /api/dashboard/today
-```
-
-### Query
-
-```text
-date=2026-06-20
-profileUserId=optionalForCaregiverView
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "date": "2026-06-20",
-    "cards": [
-      {
-        "metricCode": "spo2",
-        "metricName": "Saturasi Oksigen",
-        "latestValue": 98,
-        "unit": "%",
-        "status": "Normal",
-        "severity": "normal",
-        "measuredAt": "2026-06-20T20:15:00+07:00"
-      }
-    ],
-    "bloodPressure": {
-      "systolic": 142,
-      "diastolic": 91,
-      "pulse": 75,
-      "status": "Hipertensi Tahap 2",
-      "severity": "high"
-    },
-    "alerts": [],
-    "streak": {
-      "currentCount": 3,
-      "bestCount": 7
-    }
-  }
-}
-```
-
----
-
-## 14.2 Weekly Dashboard
-
-```http
-GET /api/dashboard/weekly
-```
-
-### Query
-
-```text
-weekStart=2026-06-15
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "period": "7d",
-    "metrics": [
-      { "metricCode": "systolic", "avgValue": 134.5, "minValue": 120, "maxValue": 152, "cnt": 4 }
-    ],
-    "daily": [
-      { "day": "2026-06-21", "metricCode": "systolic", "avgValue": 132 }
-    ],
-    "measurementDays": 5,
-    "bestDay": { "day": "2026-06-21", "sessionCount": 2 },
-    "worstDay": { "day": "2026-06-17", "sessionCount": 1 },
-    "alertCount": 1,
-    "adherence": 86
-  }
-}
-```
-
----
-
-## 14.3 Monthly Dashboard
-
-```http
-GET /api/dashboard/monthly
-```
-
-### Query
-
-```text
-month=2026-06
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "period": "30d",
-    "metrics": [
-      { "metricCode": "systolic", "avgValue": 134.5, "minValue": 120, "maxValue": 152, "cnt": 18 }
-    ],
-    "alertCount": 2,
-    "measurementDays": 12,
-    "daily": [
-      { "day": "2026-06-21", "sessionCount": 2 }
-    ],
-    "latest": [
-      { "metricCode": "systolic", "finalValue": 142, "unit": "mmHg", "status": "Tinggi", "severity": "warning", "measuredAt": "2026-06-21T07:00:00.000Z" }
-    ]
-  }
-}
-```
-
----
-
-## 14.4 Comparison
-
-```http
-GET /api/dashboard/comparison
-```
-
-### Query
-
-```text
-metricCode=systolic
-asOfDate=2026-06-20
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "metricCode": "systolic",
-    "todayValue": 142,
-    "threeDayAverage": 134,
-    "sevenDayAverage": 136,
-    "delta3Day": 8,
-    "delta7Day": 6,
-    "status": "up",
-    "hasEnough3DayData": true,
-    "hasEnough7DayData": true
-  }
-}
-```
-
----
-
-## 15. AI Recommendation API
-
-## 15.1 Generate Recommendation
-
-```http
-POST /api/ai/recommendation
-```
-
-### Request
-
-```json
-{
-  "sessionId": "ses_01h...",
-  "forceRegenerate": false
-}
-```
-
-### Response 202
-
-```json
-{
-  "success": true,
-  "data": {
-    "queued": true,
-    "sessionId": "ses_01h..."
-  }
-}
-```
-
-### Background Job Input Summary
-
-```json
-{
-  "today": {
-    "spo2": 98,
-    "systolic": 142,
-    "diastolic": 91,
-    "sleepDuration": 5.5
-  },
-  "threeDayComparison": {
-    "systolicDelta": 8,
-    "sleepDelta": -1.5
-  },
-  "sevenDayComparison": {
-    "systolicAverage": 136,
-    "sleepAverage": 6.2
-  },
-  "ruleStatuses": [
-    {
-      "metricCode": "systolic",
-      "status": "Hipertensi Tahap 2",
-      "severity": "high"
-    }
-  ]
-}
-```
-
----
-
-## 15.2 List AI Recommendations
-
-```http
-GET /api/ai/recommendations
-```
-
-### Query
-
-```text
-limit=20
-cursor=optional
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "rec_01h...",
-      "sessionId": "ses_01h...",
-      "summaryText": "Hari ini tekanan darah Anda lebih tinggi dibanding rata-rata 3 hari terakhir...",
-      "safetyStatus": "safe",
-      "createdAt": "2026-06-20T20:16:00+07:00"
-    }
-  ]
-}
-```
-
----
-
-## 16. Reports API
-
-## 16.1 Daily Report
-
-```http
-GET /api/reports/daily
-```
-
-### Query
-
-```text
-date=2026-06-20
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "date": "2026-06-20",
-    "values": [],
-    "alerts": [],
-    "recommendation": null,
-    "attachments": []
-  }
-}
-```
-
----
-
-## 16.2 Weekly Report
-
-```http
-GET /api/reports/weekly
-```
-
-### Query
-
-```text
-weekStart=2026-06-15
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "rangeStart": "2026-06-15",
-    "rangeEnd": "2026-06-21",
-    "summary": {},
-    "trends": {},
-    "alerts": [],
-    "medicationAdherence": {}
-  }
-}
-```
-
----
-
-## 16.3 Monthly Report
-
-```http
-GET /api/reports/monthly
-```
-
-### Query
-
-```text
-month=2026-06
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "month": "2026-06",
-    "summary": {},
-    "trends": {},
-    "patternInsights": []
-  }
-}
-```
-
----
-
-## 16.4 Generate Doctor Ready HTML Report
-
-```http
-POST /api/reports/doctor-ready
-```
-
-### Request
-
-```json
-{
-  "rangeEnd": "2026-06-20",
-  "includeAttachments": true,
-  "includeMedicationLogs": true,
-  "includeAiSummary": true
-}
-```
-
-### Response 202
-
-```json
-{
-  "success": true,
-  "data": {
-    "reportId": "rpt_01h...",
-    "status": "processing",
-    "queued": true
-  }
-}
-```
-
-### Writes
-
-```text
-HL_reports
-Queue: pdfQueue
-```
-
----
-
-## 16.5 Download Report
-
-```http
-GET /api/reports/:id/download
-```
-
-### Response
-
-```http
-Content-Type: text/html; charset=utf-8
-Content-Disposition: inline
-```
-
-### Body Format
-
-The body is HTML containing the 30-day doctor report. All timestamps
-inside the HTML use the Indonesian short-month format
-`dd MMM yyyy HH:mm` (e.g., `23 Jun 2026 18:30`). Indonesian short month
-names: `Jan, Feb, Mar, Apr, Mei, Jun, Jul, Agu, Sep, Okt, Nov, Des`.
-
-### Access Rules
-
-```text
-Owner can download
-Caregiver cannot download unless permission enabled
-Doctor share uses /api/reports/share/:shareToken
-```
-
----
-
-## 16.6 Create Doctor Share Link
-
-```http
-POST /api/reports/:id/share
-```
-
-### Request
-
-```json
-{
-  "recipientLabel": "Dokter keluarga",
-  "expiresInDays": 7
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "shareUrl": "https://app.example.com/reports/share/shr_xxx",
-    "expiresAt": "2026-06-27T20:15:00+07:00"
-  }
-}
-```
-
-### Writes
-
-```text
-HL_reportShares
-HL_auditLogs
-```
-
----
-
-## 16.7 Public Report Share
-
-```http
-GET /api/reports/share/:shareToken
-```
-
-### Response
-
-PDF stream if token is valid and not expired.
-
----
-
-## 16.8 AI Report Analysis (US-2.3.1 + US-2.3.4)
-
-```http
-POST /api/ai/report-analysis
-```
-
-Sends the report context (plus Vectorize similarity results if available) to the configured text AI service (9router) and returns an aggressive medical diagnostic analysis with a mandatory liability disclaimer. Falls back to a deterministic message if all AI models fail or no API key is configured.
-
-### Request
-
-```json
-{
-  "reportType": "daily" | "weekly" | "monthly",
-  "context": "{\"date\":\"2026-06-23\",\"values\":[...]}"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "analysis": "Data tekanan darah Anda hari ini menunjukkan krisis hipertensi dengan sistolik 185 mmHg...",
-    "patternScore": 95,
-    "model": "oc/deepseek-v4-flash-free",
-    "disclaimer": "oc/deepseek-v4-flash-free is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini.",
-    "usedFallback": false
-  }
-}
-```
-
-If `usedFallback: true`, the analysis is the safe fallback text:
-
-> "AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda."
-
-### Fields
-
-| Field | Type | Description |
 |---|---|---|
-| `analysis` | string | Narasi hasil analisa AI (aggressive doctor mode) |
-| `patternScore` | number (1-100) | Clinical Confidence Score: konsistensi data historis, jumlah data, korelasi |
-| `model` | string | Nama model AI yang digunakan |
-| `disclaimer` | string | Teks pelepasan tanggung jawab medis. Jika tidak ada di response AI, server wajib inject otomatis |
-| `usedFallback` | boolean | Apakah menggunakan fallback karena semua model gagal |
+| `UNAUTHORIZED` | 401 | Tidak ada sesi valid / sesi kadaluarsa / revoked |
+| `VALIDATION_ERROR` | 400 | Field request tidak valid |
+| `NOT_FOUND` | 404 | Resource tidak ada / tidak milik user |
+| `FORBIDDEN` | 403 | Akses ditolak (family permission, RBAC, expired share) |
+| `CONFLICT` | 409 | Duplicate (e.g. username/email sudah ada) |
+| `RATE_LIMITED` | 429 | OCR rate limit / OTP resend limit |
+| `ENTITLEMENT_REQUIRED` | 403 | Plan tidak mengizinkan fitur (premium-only) |
+| `PAYMENT_REQUIRED` | 402 | Subscription expired |
+| `INTERNAL_ERROR` | 500 | Bug / unhandled error |
+| `AI_CLINICAL_COPILOT_DEFERRED` | 403 | Sprint 6 placeholder, belum diaktifkan |
+| `ONBOARDING_REQUIRED` | 403 | User belum `POST /api/profile/onboarding` |
 
-### Models Tried (in order)
+### 1.5 Headers penting
 
-1. `oc/deepseek-v4-flash-free`
-2. `oc/mimo-v2.5-free`
-3. `openrouter/poolside/laguna-m.1:free`
-
-Endpoint is `https://9router.krpmerch.biz.id/v1` (configurable via `HL_systemConfigs.aiTextEndpoint`).
-
-### Liability Guardrails
-
-- System prompt uses "Dokter Senior dan Spesialis Medis" persona (Aggressive Doctor Mode).
-- Prompt mandates Clinical Confidence Score (1-100) in every response.
-- Server **injects** the liability disclaimer at the end of the response if the AI fails to include it.
-- AI is allowed to diagnose and give medical recommendations, but **must** include the disclaimer and Clinical Score.
-- Analysis output is stored in `HL_aiRecommendations` with all fields documented above.
+- `Content-Type: application/json; charset=utf-8` (default)
+- `Cache-Control: no-store` (default untuk endpoint dinamis)
+- Untuk upload: `multipart/form-data` (`POST /api/measurements/attachments/upload`)
+- Untuk share download: `text/html; charset=utf-8` (no auth required kalau ada `shareToken` valid)
+- Untuk attachment download: `Content-Type: <mime>` + `Content-Disposition: inline; filename="..."`
 
 ---
 
-## 17. Telegram API
+## 2. Daftar Endpoint (semua ~200)
 
-## 17.1 Connect Telegram
+> Symbol: 🔒 butuh sesi `hlSession` · 👑 butuh `admin.*` permission · 💎 butuh entitlement (plan berbayar) · ⏰ butuh `CRON_SECRET` · 🤖 dipanggil Telegram · 🌍 publik (share/download).
 
-```http
-POST /api/telegram/connect
-```
+### 2.1 Health & Root
 
-### Response 200
+| Method | Path | Auth | Keterangan |
+|---|---|---|---|
+| GET | `/` | — | Health check: `{ name, status, db, r2, queue, ai, version }` (worker/src/index.ts:916) |
 
-```json
-{
-  "success": true,
-  "data": {
-    "verificationCode": "HL-123456",
-    "botUsername": "YourBotName",
-    "expiresInMinutes": 10,
-    "instructions": "Kirim kode ini ke bot Telegram untuk verifikasi."
-  }
-}
-```
+### 2.2 Authentication & Onboarding
 
-### Writes
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| POST | `/api/auth/register` | — | `{ email, password, displayName }` → set hlSession. Deprecated, digantikan start/verify | index.ts:923 |
+| POST | `/api/auth/register/start` | — | `{ email, password, displayName, locale? }` → `{ challengeId, expiresAt, devOtp? }`. Kirim OTP ke email. | routes-auth.ts:182 |
+| POST | `/api/auth/register/verify` | — | `{ challengeId, otp }` → set hlSession | routes-auth.ts:223 |
+| POST | `/api/auth/login` | — | `{ email, password }` → set hlSession. Deprecated, digantikan start/verify | index.ts:1063 |
+| POST | `/api/auth/login/start` | — | `{ email, password?, locale? }` → `{ challengeId, expiresAt, devOtp? }` (kalau password valid) | routes-auth.ts:259 |
+| POST | `/api/auth/login/verify` | — | `{ challengeId, otp }` → set hlSession | routes-auth.ts:302 |
+| POST | `/api/auth/otp/resend` | — | `{ challengeId, locale? }` → `{ challengeId, expiresAt, devOtp? }`. Rate-limited. | routes-auth.ts:339 |
+| POST | `/api/auth/logout` | 🔒 | revoke sesi saat ini | index.ts:1762 |
+| GET | `/api/auth/me` | 🔒 | `{ user, profile, requiresOnboarding, roles, permissions, planCode }` | index.ts:1216 |
+| POST | `/api/auth/forgot-password` | 🔒 | `{ email }` → trigger reset email | index.ts:1785 |
+| POST | `/api/auth/change-password` | 🔒 | `{ oldPassword, newPassword }` | routes-auth.ts:481 |
+| GET | `/api/auth/google` | — | redirect ke Google OAuth (`mode=login` or `link`) | routes-auth.ts:46 |
+| GET | `/api/auth/google/callback` | — | `{ code, state }` → set hlSession OR error | routes-auth.ts:64 |
+| POST | `/api/auth/google/link` | 🔒 | link akun Google ke akun saat ini | routes-auth.ts:145 |
+| DELETE | `/api/auth/google/link` | 🔒 | unlink Google | routes-auth.ts:153 |
+| GET | `/api/auth/google/accounts` | 🔒 | daftar akun Google tertaut | routes-auth.ts:165 |
+| GET | `/api/dev/test-email-outbox/latest` | — (dev) | latest OTP terkirim (untuk e2e) | routes-auth.ts:366 |
+| POST | `/api/profile/onboarding` | 🔒 | `{ sex, birthDate, heightCm, timezone, accessibilityMode?, theme?, emergencyConsent, aiConsent, dataShareConsent, whatsappNumber? }` | index.ts:1306 |
+
+### 2.3 Profile & Preferences
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/me/preferences` | 🔒 | baca `dataShareConsent`, `aiConsent`, locale, notif preferences | index.ts:1427 |
+| PUT | `/api/me/preferences` | 🔒 | update preferensi (consent, locale) | index.ts:1437 |
+| GET | `/api/profile` | 🔒 | baca `HL_userProfiles` lengkap | index.ts:1450 |
+| PUT | `/api/profile` | 🔒 | update profile (sex, birthDate, heightCm, timezone, theme, accessibilityMode, whatsappNumber) | index.ts:1493 |
+| PUT | `/api/settings/ui` | 🔒 | update theme / accessibility mode (ringan) | index.ts:1618 |
+| PUT | `/api/settings/consent` | 🔒 | update consent flags (ai, dataShare, emergency) | routes-extra.ts:826 |
+
+### 2.4 Metrics Catalog
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/metrics/catalog` | 🔒 | `{ devices: [{deviceCode, deviceName, metrics: [{metricCode, metricName, unit, inputType, requiresAttachment, requiresFasting, ...}]}] }` | index.ts:1709 |
+
+### 2.5 Measurements
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| POST | `/api/measurements/extract` | 🔒 | `{ imageBase64, mimeType, deviceCode, metricGroup, selectedMetrics[] }` → `{ values: { metricCode, rawAiValue, confidence, unit }[], modelName, durationMs }`. Rate-limited via `ocrRateLimitMax/WindowMin`. | index.ts (legacy, lihat juga routes-extra.ts:limit-check) |
+| POST | `/api/measurements/extract/limit-check` | 🔒 | pre-check rate limit; return `{ allowed, remaining }` | routes-extra.ts:369 |
+| POST | `/api/measurements/validate` | 🔒 | `{ deviceCode, values: [{metricCode, finalValue, unit, manualOverride}] }` → rules lookup → `{ values: [{ metricCode, status, severity, emergencyLevel, ruleId, popupTitle, popupMessage, recommendation, sourceLabel, recommendationRequired }] }` | index.ts:1829 |
+| POST | `/api/measurements/submit` | 🔒 | full submit: session + values + alerts + recommendations + telegram enqueue + streak + badges | index.ts:2129 |
+| GET | `/api/measurements/history` | 🔒 | `?from&to&limit=20` → `{ sessions: [{ id, measuredAt, source, hasAttachment, hasEmergency, values, attachments }] }` | index.ts:2461 |
+| GET | `/api/measurements/today` | 🔒 | `{ sessions, date }` filtered by user tz | index.ts:2602 |
+| GET | `/api/measurements/last` | 🔒 | `[{ metricCode, deviceCode, finalValue, unit, measuredAt }]` (auto-fill cache) | index.ts:2564 |
+| POST | `/api/measurements/last/save` | 🔒 | `{ metricCode, deviceCode, finalValue, unit, measuredAt }` upsert | index.ts:2580 |
+| GET | `/api/measurements/drafts` | 🔒 | active drafts list | routes-extra.ts:705 |
+| DELETE | `/api/measurements/:id` | 🔒 | hapus session + attachments + alerts (cascade) | routes-extra.ts:717 |
+| POST | `/api/measurements/attachments/upload` | 🔒 | multipart `{ sessionId, metricCode, file, width, height }` → `{ attachmentId, r2Key, sizeBytes, width, height }`. Max `maxUploadSizeBytes`. | index.ts:2381 |
+| GET | `/api/measurements/attachments/:id` | 🔒 | binary stream (webp) — own only | index.ts:2647 |
+
+### 2.6 Dashboards
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| GET | `/api/dashboard/today` | 🔒 | `{ date, metricCount, sessionCount, emergencyCount, hasData, streak, bestStreak, aiInsight, sessions[], values[], alerts[] }`. 48h window + JS-side tz filter. | index.ts:2683 |
+| GET | `/api/dashboard/weekly` | 🔒 | `{ period:'7d', metrics[{metricCode,avgValue,minValue,maxValue,cnt}], daily[{day,sessionCount}], measurementDays, bestDay, worstDay, alertCount, adherence }` | index.ts:3153 |
+| GET | `/api/dashboard/monthly` | 🔒 | `{ period:'30d', metrics, measurementDays, alertCount, daily, latest[8] }` | index.ts:3203+ |
+| GET | `/api/dashboard/comparison` | 🔒 | avg3Day / avg7Day / avg30Day per metric | routes-extra.ts:744 |
+| GET | `/api/dashboard/daily-health` | 🔒 | today's combined health hub (measurements + symptoms + hydration + cycle summary) | routes-auth.ts:471 |
+
+### 2.7 AI
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| POST | `/api/ai/recommendation` | 🔒 | `{ sessionId? }` → `{ recommendationId, recommendation, safetyStatus, has3DayComparison, has7DayComparison, dataMessages, summary }` | index.ts:2929 |
+| POST | `/api/ai/assistant` | 🔒 💎 `feature.aiAssistant.use` | `{ question, clinicalCopilotMode? }` → `{ reply, patternScore, disclaimer, model, usedFallback, vitals, profile, dataSufficiencyScore, scoreReason, contextTrace, usedVectorContext }`. Kalau `clinicalCopilotMode:true` → 403 deferred. | index.ts:3022 |
+| GET | `/api/ai/recommendations` | 🔒 | list recommendation history | routes-extra.ts:780 |
+| POST | `/api/ai/context/query` | 🔒 💎 `feature.vectorMemory.use` | `{ queryText, sourceTypes?, topK?, minScore? }` → `{ results: [{vectorId, content, score, metadata}], usedVectorContext, fallbackReason, durationMs }` | routes-ai.ts:30 |
+| GET | `/api/ai/context-package` | 🔒 | assembled context package (untuk AI Clinical Copilot Sprint 6) | routes-ai.ts:57 |
+| GET | `/api/ai/memory/status` | 🔒 | `{ indexedCount, pendingCount, failedCount, lastJobAt }` | routes-ai.ts:67 |
+| POST | `/api/ai/memory/rebuild` | 🔒 | `{ sourceTypes?, rangeStart?, rangeEnd? }` → enqueue `HL_aiMemoryJobs` (jobType=rebuild) | routes-ai.ts:75 |
+| DELETE | `/api/ai/memory` | 🔒 | hapus semua vector documents user | routes-ai.ts:87 |
+| POST | `/api/ai/disclaimer/enforce` | 🔒 | `{ text, modelName }` → `{ text, disclaimerAppended, wasFiltered }` | routes-ai.ts:96 |
+
+### 2.8 Reports
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| GET | `/api/reports/daily` | 🔒 | `{ date, sessions, values }` filtered by tz | index.ts (after monthly) |
+| GET | `/api/reports/weekly` | 🔒 | weekly aggregate | index.ts |
+| GET | `/api/reports/monthly` | 🔒 | monthly aggregate | index.ts |
+| POST | `/api/reports/doctor-ready` | 🔒 💎 `feature.doctorPdf.generate` | generate HTML report 30 hari → R2 + `HL_reports` row. Return `{ reportId, status }` | routes-extra.ts:456 |
+| GET | `/api/reports/:id/download` | 🔒 | HTML stream from R2 (own + caregiver w/ `canViewDashboard`) | routes-extra.ts:486 |
+| GET | `/api/reports/:id/data` | 🔒 | `{ reportId, patientName, rangeStart, rangeEnd, count, values[] }` untuk CSV export | routes-extra.ts:531 |
+| POST | `/api/reports/:id/share` | 🔒 | `{ recipientLabel?, expiresInHours? (1..168) }` → `{ shareToken, expiresAt, shareUrl }` | routes-extra.ts:507 |
+| GET | `/api/reports/share/:shareToken` | 🌍 | public HTML view (no auth, no cookie). 404 kalau expired/revoked. | routes-extra.ts:566 |
+
+### 2.9 Knowledge Base
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/kb/:slug` | 🔒 | `{ slug, title, category, contentMarkdown, sortOrder }` dari `HL_knowledgeArticles` | routes-extra.ts:803 |
+| GET | `/api/kb` | 🔒 | list artikel | (internal/list mungkin via dashboard) |
+
+### 2.10 Telegram (Bot & Webhook)
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| POST | `/api/webhook/telegram/water` | 🤖 | Telegram callback query (hydration quick-add) → write `HL_waterIntakeLogs` + ack `answerCallbackQuery` | routes-telegram.ts:61 |
+| POST | `/api/telegram/water-webhook` | 🤖 | redirect 307 ke `/api/webhook/telegram/water` (legacy path) | routes-telegram.ts:161 |
+| POST | `/api/internal/cron/hydration-reminders` | ⏰ | cron trigger hydration reminders via Telegram | routes-telegram.ts:164 |
+| POST | `/api/internal/cron/reminders` | ⏰ | cron generic: kirim HL_reminderSettings sesuai `scheduleTime` & `channel` | routes-extra.ts:404 |
+| POST | `/api/emergency/contacts/notify` | 🔒 | manual trigger kirim emergency alert (untuk testing) | routes-extra.ts:390 |
+
+### 2.11 Family & Caregiver
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/family/access-check` | 🔒 | `{ roles: [{memberId, role, permissions}] }` untuk user saat ini sebagai linked user | routes-extra.ts:313 |
+| GET | `/api/family-links/:familyLinkId/permissions/cycle` | 🔒 | `{ allowed, permissionCode }` apakah family member boleh lihat cycle | routes-cycle.ts:151 |
+| PUT | `/api/family-links/:familyLinkId/permissions/sensitive-health` | 🔒 👑 | `{ allowed }` set sensitive-health permission (cycle/symptom/etc) | routes-cycle.ts:162 |
+
+### 2.12 Emergency Contacts
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| PATCH | `/api/emergency/contacts/:id/consent` | 🔒 | `{ consentGiven: boolean }` toggle consent per kontak (audit) | routes-extra.ts:288 |
+| POST | `/api/emergency/contacts/notify` | 🔒 | manual trigger (testing) | routes-extra.ts:390 |
+
+### 2.13 Medications & Adherence
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/medications/adherence` | 🔒 | `{ date, adherence (%), taken, total }` 7-day window | routes-extra.ts:434 |
+
+(Lainnya seperti CRUD medications/logs ada di `routes-extra.ts` — lihat implementasi Sprint 3.)
+
+### 2.14 Fasting
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| POST | `/api/fasting/start` | 🔒 | `{ fastingType, targetHours }` → `{ sessionId, startedAt }` | routes-extra.ts:586 |
+| POST | `/api/fasting/stop` | 🔒 | stop active session → `{ sessionId, durationMinutes, completed }` | routes-extra.ts:606 |
+| GET | `/api/fasting/current` | 🔒 | `{ active: boolean, session?, elapsedMinutes, targetHours }` | routes-extra.ts:625 |
+
+### 2.15 Streaks & Badges (Gamification)
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/streaks` | 🔒 | `{ currentCount, bestCount, lastDate, type }` per `streakType` | routes-extra.ts:640 |
+| GET | `/api/badges` | 🔒 | earned badges list `{ badgeCode, badgeName, description, icon, earnedAt }` | routes-extra.ts:653 |
+
+### 2.16 Patterns
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/patterns` | 🔒 | list `HL_patternInsights` (cursor pagination) | routes-extra.ts:977 |
+| POST | `/api/patterns/generate/sleep-bp` | 🔒 | analisis tidur vs sistolik (14 hari). Returns `{ insight, hasEnoughData, lowSleepAvg, normalSleepAvg }` | routes-extra.ts:340 |
+| POST | `/api/patterns/generate/weight-bp` | 🔒 | analisis berat badan vs tekanan darah | routes-extra.ts:666 |
+| POST | `/api/patterns/generate/medication` | 🔒 | adherence pattern | routes-extra.ts:686 |
+
+### 2.17 Education (Sprint 5A)
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| GET | `/api/education/cards` | 🔒 | `?topicType=&topicCode=&locale=` → list `HL_educationCards` user belum ack | routes-auth.ts:376 |
+| POST | `/api/education/cards/:topicType/:topicCode/acknowledge` | 🔒 | upsert `HL_userEducationProgress.acknowledgedAt` | routes-auth.ts:394 |
+
+### 2.18 Symptoms (Sprint 5A)
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| POST | `/api/symptoms` | 🔒 | `{ symptomDateTime, quickSymptoms[], bodyArea?, painScale?, painSeverity?, mood?, durationMinutes?, description?, redFlagsJson? }` → deterministic red-flag detection → `HL_symptomLogs` + optional `HL_safetyEvents` | routes-auth.ts:402 |
+| GET | `/api/symptoms` | 🔒 | list today | routes-auth.ts:425 |
+| GET | `/api/symptoms/history` | 🔒 | `?from&to&limit=` history | routes-auth.ts:432 |
+| GET | `/api/symptoms/:symptomLogId` | 🔒 | detail | routes-auth.ts:447 |
+| POST | `/api/symptoms/prompt-dismissals` | 🔒 | dismiss daily symptom prompt | routes-auth.ts:462 |
+
+### 2.19 Hydration (Sprint 5B)
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| GET | `/api/hydration/settings` | 🔒 | `{ enabled, reminderEnabled, operatingStart, operatingEnd, telegramQuickAddEnabled, customBaseTargetMl, isPregnant, isLactating }` | routes-hydration.ts:34 |
+| PUT | `/api/hydration/settings` | 🔒 | update settings | routes-hydration.ts:43 |
+| GET | `/api/hydration/today` | 🔒 | `{ date, targetMl, consumedMl, remainingMl, percentage, overLimit, logs[] }` | routes-hydration.ts:60 |
+| POST | `/api/hydration/logs` | 🔒 | `{ amountMl (1..3000), loggedAt?, notes? }` → log + auto `HL_safetyEvents` kalau over | routes-hydration.ts:75 |
+| GET | `/api/hydration/history` | 🔒 | `?from&to&limit=` history | routes-hydration.ts:95 |
+| DELETE | `/api/hydration/logs/:logId` | 🔒 | hapus log | routes-hydration.ts:119 |
+
+### 2.20 Cycle Tracking (Sprint 5D)
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| GET | `/api/cycle/access` | 🔒 | `{ allowed, reason }` cek eligibility (sex, onboarding, plan) | routes-cycle.ts:47 |
+| GET | `/api/cycle/settings` | 🔒 | `{ cycleLengthDays, periodLengthDays, lastPeriodStart, isPregnant, isLactating, isMenopause, predictionPaused, pauseReason }` | routes-cycle.ts:56 |
+| PUT | `/api/cycle/settings` | 🔒 | update settings | routes-cycle.ts:67 |
+| GET | `/api/cycle/calendar` | 🔒 | `?from&to&months=` → `{ days: [{date, phase, isPeriod, isFertile, isOvulation, isPredictedPeriod, isPredictedFertile}] }` | routes-cycle.ts:81 |
+| POST | `/api/cycle/logs` | 🔒 | `{ logDate, hasPeriodFlow, flowIntensity?, mood?, physicalSymptoms[], unprotected, contraceptionGuardrailAcknowledgedAt?, notes? }` | routes-cycle.ts:99 |
+| GET | `/api/cycle/logs` | 🔒 | `?from&to&limit=` history | routes-cycle.ts:125 |
+| POST | `/api/cycle/guardrails/acknowledge` | 🔒 | `{ guardrailType, relatedDate, messageVersion? }` → `HL_cycleGuardrailAcknowledgements` (audit) | routes-cycle.ts:136 |
+
+### 2.21 Admin — Foundation & Dashboard
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/admin/dashboard/summary` | 🔒 👑 | counts (users, sessions, alerts, subscriptions, etc) | routes-admin.ts:39 |
+
+### 2.22 Admin — AI / Memory
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/admin/users/:userId/ai-memory/status` | 🔒 👑 `admin.aiMemory.read` | per-user vector index status | routes-ai.ts:107 |
+| POST | `/api/admin/users/:userId/ai-memory/rebuild` | 🔒 👑 `admin.aiMemory.manage` | trigger rebuild untuk user tertentu | routes-ai.ts:118 |
+| GET | `/api/admin/ai-clinical-copilot/readiness` | 🔒 👑 `admin.aiClinicalCopilot.manage` | `{ ready, missingTables, missingConfigs, clinicalCopilotEnabled, deferredToSprint:6 }` | routes-ai.ts:130 |
+
+### 2.23 Billing / Plans / Subscription
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/plans` | 🔒 | list `HL_plans` (public pricing) | routes-admin.ts:56 |
+| POST | `/api/me/subscribe` | 🔒 💎 | `{ planCode, provider?, returnUrl? }` → checkout session (mock or xendit) | routes-admin.ts:71 |
+
+(Plan CRUD admin, subscription admin, payment webhook — ada di service `services/billing/*`; lihat implementasi lengkap di worker.)
+
+### 2.24 Admin — System Config / AI Config / Feature Flags / Master Data / Education / Audit / Users
+
+Selengkapnya ada di modul admin lain (lihat `routes-admin.ts` + services). Ringkasan permission:
 
 ```text
-HL_telegramLinks
+admin.config.read              → GET HL_systemConfigs (non-secret only, masked)
+admin.config.update            → PUT HL_systemConfigs (validasi storageMode)
+admin.aiConfig.update          → PUT aiTextEndpoint, aiTextModels, aiTextDefaultModel, aiVisionTimeoutMs, clinicalCopilotEnabled
+admin.aiMemory.read            → GET /api/ai/memory/status (all users)
+admin.aiMemory.manage          → POST /api/ai/memory/rebuild (all users)
+admin.aiClinicalCopilot.manage → GET/PUT readiness
+admin.billing.read             → GET HL_subscriptions, HL_paymentEvents
+admin.billing.manage           → POST manual subscription, cancel, refund
+admin.metricCatalog.manage     → CRUD HL_metricCatalog
+admin.metricRules.manage       → CRUD HL_metricRules (rule priority, severity)
+admin.education.manage         → CRUD HL_educationCards
+admin.kb.manage                → CRUD HL_knowledgeArticles
+admin.featureFlags.manage      → CRUD HL_featureFlags
+admin.audit.read               → GET HL_auditLogs (filtered)
+admin.security.read            → GET HL_safetyEvents
+admin.sensitiveHealth.read     → GET HL_symptomLogs/HL_cycleLogs (audit-wajib)
+admin.roles.read               → GET HL_roles, HL_permissions, HL_userRoles
+admin.roles.manage             → POST/PUT/DELETE role assignments
+admin.users.read               → GET HL_users list + summary
+admin.users.update             → PUT HL_users (active, displayName)
+admin.support.limitedView      → GET HL_users tanpa PII/sensitive
+admin.support.impersonateLimited → audited impersonation
 ```
 
 ---
 
-## 17.2 Verify Telegram
+## 3. Payload Skema (sampel)
 
-```http
-POST /api/telegram/verify
-```
-
-### Request
+### 3.1 `POST /api/measurements/submit`
 
 ```json
 {
-  "verificationCode": "HL-123456",
-  "telegramChatId": "123456789",
-  "telegramUsername": "budi"
+  "deviceCode": "yuwell_oximeter",
+  "measuredAt": "2026-06-30T08:15:00.000Z",
+  "source": "photo",
+  "values": [
+    { "metricCode": "spo2", "finalValue": 98, "unit": "%", "manualOverride": false },
+    { "metricCode": "heartRate", "finalValue": 72, "unit": "bpm", "manualOverride": false }
+  ],
+  "notes": "Pagi setelah bangun tidur",
+  "selectedMetrics": ["spo2", "heartRate"]
 }
 ```
 
-### Response 200
+Response:
 
 ```json
 {
   "success": true,
   "data": {
-    "verified": true,
-    "enabled": true
-  }
-}
-```
-
----
-
-## 17.3 Test Telegram
-
-```http
-POST /api/telegram/test
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "sent": true,
-    "botTokenValid": true,
-    "error": null
-  }
-}
-```
-
-Notes:
-- Telegram bot token is resolved from `HL_systemConfigs.telegramBotToken`; legacy `TELEGRAM_BOT_TOKEN` env is used only as fallback when the DB value is empty.
-- `POST /api/telegram/test` validates the token with Telegram `getMe` before trying to send a message.
-- If the token is missing or invalid, response stays `200` with `sent: false`, `botTokenValid: false`, and `error` explaining the Telegram/config failure.
-
----
-
-## 17.4 Update Telegram Settings
-
-```http
-PUT /api/telegram/settings
-```
-
-### Request
-
-```json
-{
-  "telegramSubmitSummary": true,
-  "telegramEmergencyAlert": true
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "updated": true
-  }
-}
-```
-
----
-
-## 17.5 Telegram Webhook
-
-```http
-POST /api/telegram/webhook
-```
-
-### Purpose
-
-Receives Telegram bot updates for verification code messages.
-
-### Security
-
-```text
-Validate secret path or secret header
-Do not expose bot token
-Rate limit webhook requests
-```
-
----
-
-## 18. Notifications API
-
-## 18.1 List Notifications
-
-```http
-GET /api/notifications
-```
-
-### Query
-
-```text
-status=pending
-limit=20
-cursor=optional
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "ntf_01h...",
-      "channel": "inApp",
-      "notificationType": "measurementSubmit",
-      "title": "Pengukuran tersimpan",
-      "message": "Data SpO2 98% berhasil tersimpan.",
-      "status": "sent",
-      "createdAt": "2026-06-20T20:15:00+07:00"
-    }
-  ]
-}
-```
-
----
-
-## 18.2 Register Browser Push
-
-```http
-POST /api/notifications/browser/subscribe
-```
-
-### Request
-
-```json
-{
-  "endpoint": "https://push.example/...",
-  "keys": {
-    "p256dh": "base64",
-    "auth": "base64"
-  },
-  "userAgent": "Chrome Android"
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "subscribed": true
-  }
-}
-```
-
-### Writes
-
-```text
-HL_pushSubscriptions
-HL_users.browserPushEnabled
-```
-
----
-
-## 18.3 Reminder Settings
-
-```http
-GET /api/reminders
-POST /api/reminders
-PUT /api/reminders/:id
-DELETE /api/reminders/:id
-```
-
-### Create Request
-
-```json
-{
-  "reminderType": "morningMeasurement",
-  "enabled": true,
-  "scheduleTime": "07:00",
-  "timezone": "Asia/Jakarta",
-  "channel": "telegram",
-  "payload": {
-    "message": "Waktunya cek tekanan darah pagi."
-  }
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "reminderId": "rem_01h..."
-  }
-}
-```
-
----
-
-## 19. Family and Caregiver API
-
-## 19.1 Invite Family
-
-```http
-POST /api/family/invite
-```
-
-### Request
-
-```json
-{
-  "inviteEmail": "caregiver@example.com",
-  "role": "caregiver",
-  "permissions": {
-    "canViewDashboard": true,
-    "canInputMeasurement": false,
-    "canReceiveAlert": true
-  },
-  "expiresInDays": 7
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "inviteId": "inv_01h...",
-    "status": "pending",
-    "expiresAt": "2026-06-27T20:15:00+07:00"
-  }
-}
-```
-
-### Writes
-
-```text
-HL_familyInvites
-HL_familyLinks optional pending
-HL_notifications
-HL_auditLogs
-```
-
----
-
-## 19.2 Accept Family Invite
-
-```http
-POST /api/family/accept
-```
-
-### Request
-
-```json
-{
-  "inviteToken": "invite_plain_token"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "familyLinkId": "fam_01h...",
-    "status": "active",
-    "role": "caregiver"
-  }
-}
-```
-
----
-
-## 19.3 List Family Links
-
-```http
-GET /api/family/links
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "ownedLinks": [],
-    "linkedToMe": []
-  }
-}
-```
-
----
-
-## 19.4 Update Family Link
-
-```http
-PUT /api/family/:id
-```
-
-### Request
-
-```json
-{
-  "role": "caregiver",
-  "canViewDashboard": true,
-  "canInputMeasurement": false,
-  "canReceiveAlert": true,
-  "status": "active"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "updated": true
-  }
-}
-```
-
----
-
-## 19.5 Delete Family Link
-
-```http
-DELETE /api/family/:id
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "revoked": true
-  }
-}
-```
-
----
-
-## 19.6 Caregiver Dashboard
-
-```http
-GET /api/family/caregiver/dashboard
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "profiles": [
-      {
-        "ownerUserId": "usr_01h...",
-        "displayName": "Orang Tua",
-        "role": "caregiver",
-        "lastMeasurementAt": "2026-06-20T20:15:00+07:00",
-        "latestAlerts": []
-      }
-    ]
-  }
-}
-```
-
----
-
-## 20. Emergency Contacts and Alerts API
-
-## 20.1 Add Emergency Contact
-
-```http
-POST /api/emergency/contacts
-```
-
-### Request
-
-```json
-{
-  "contactName": "Ani",
-  "contactRelation": "Pasangan",
-  "contactPhone": "+628123456789",
-  "contactEmail": "ani@example.com",
-  "telegramChatId": "123456789",
-  "consentGiven": true,
-  "enabled": true
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "contactId": "emg_01h..."
-  }
-}
-```
-
----
-
-## 20.2 List Alerts
-
-```http
-GET /api/alerts
-```
-
-### Query
-
-```text
-severity=emergency
-acknowledged=false
-limit=20
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "alt_01h...",
-      "metricCode": "spo2",
-      "finalValue": 88,
-      "unit": "%",
-      "status": "Hipoksemia Berat",
-      "severity": "emergency",
-      "alertType": "emergency",
-      "message": "SpO2 sangat rendah.",
-      "acknowledged": false,
-      "createdAt": "2026-06-20T20:15:00+07:00"
-    }
-  ]
-}
-```
-
----
-
-## 20.3 Acknowledge Alert
-
-```http
-POST /api/alerts/:id/acknowledge
-```
-
-### Request
-
-```json
-{
-  "note": "Sudah dicek ulang."
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "acknowledged": true,
-    "acknowledgedAt": "2026-06-20T20:20:00+07:00"
-  }
-}
-```
-
----
-
-## 21. Medication API
-
-## 21.1 List Medications
-
-```http
-GET /api/medications
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "med_01h...",
-      "medicationName": "Amlodipine",
-      "dosageText": "5 mg",
-      "scheduleText": "Pagi setelah makan",
-      "active": true
-    }
-  ]
-}
-```
-
----
-
-## 21.2 Create Medication
-
-```http
-POST /api/medications
-```
-
-### Request
-
-```json
-{
-  "medicationName": "Amlodipine",
-  "dosageText": "5 mg",
-  "scheduleText": "Pagi setelah makan",
-  "active": true,
-  "schedules": [
-    {
-      "scheduleTime": "07:00",
-      "timezone": "Asia/Jakarta"
-    }
-  ]
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "medicationId": "med_01h..."
-  }
-}
-```
-
----
-
-## 21.3 Update Medication
-
-```http
-PUT /api/medications/:id
-```
-
-### Request
-
-```json
-{
-  "medicationName": "Amlodipine",
-  "dosageText": "5 mg",
-  "scheduleText": "Pagi",
-  "active": true
-}
-```
-
----
-
-## 21.4 Log Medication
-
-```http
-POST /api/medications/:id/log
-```
-
-### Request
-
-```json
-{
-  "takenAt": "2026-06-20T07:00:00+07:00",
-  "status": "taken",
-  "note": "Setelah sarapan"
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "logId": "mlog_01h..."
-  }
-}
-```
-
----
-
-## 21.5 Medication Logs
-
-```http
-GET /api/medications/logs
-```
-
-### Query
-
-```text
-from=2026-06-01
-to=2026-06-30
-```
-
----
-
-## 22. Fasting API
-
-## 22.1 Start Fasting
-
-```http
-POST /api/fasting/start
-```
-
-### Request
-
-```json
-{
-  "fastingType": "glucoseFasting",
-  "targetHours": 8,
-  "startedAt": "2026-06-20T22:00:00+07:00"
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "fastingSessionId": "fst_01h...",
-    "targetAt": "2026-06-21T06:00:00+07:00",
-    "status": "active"
-  }
-}
-```
-
----
-
-## 22.2 Stop Fasting
-
-```http
-POST /api/fasting/stop
-```
-
-### Request
-
-```json
-{
-  "fastingSessionId": "fst_01h...",
-  "endedAt": "2026-06-21T06:10:00+07:00",
-  "status": "completed"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "status": "completed"
-  }
-}
-```
-
----
-
-## 22.3 Current Fasting
-
-```http
-GET /api/fasting/current
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "active": true,
-    "session": {
-      "id": "fst_01h...",
-      "fastingType": "glucoseFasting",
-      "targetHours": 8,
-      "startedAt": "2026-06-20T22:00:00+07:00",
-      "targetAt": "2026-06-21T06:00:00+07:00"
-    }
-  }
-}
-```
-
----
-
-## 23. Gamification API
-
-## 23.1 Get Streaks
-
-```http
-GET /api/streaks
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "streakType": "measurementDaily",
-      "currentCount": 7,
-      "bestCount": 12,
-      "lastDate": "2026-06-20"
-    }
-  ]
-}
-```
-
----
-
-## 23.2 Get Badges
-
-```http
-GET /api/badges
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "earned": [],
-    "available": []
-  }
-}
-```
-
----
-
-## 24. Pattern Insights API
-
-## 24.1 Generate Pattern Insights
-
-```http
-POST /api/patterns/generate
-```
-
-### Request
-
-```json
-{
-  "rangeDays": 14,
-  "insightTypes": ["sleepBloodPressure", "weightBloodPressure", "medicationMetric"]
-}
-```
-
-### Response 202
-
-```json
-{
-  "success": true,
-  "data": {
-    "queued": true
-  }
-}
-```
-
----
-
-## 24.2 List Pattern Insights
-
-```http
-GET /api/patterns
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "ins_01h...",
-      "insightType": "sleepBloodPressure",
-      "summaryText": "Berdasarkan data tercatat, tekanan sistolik cenderung lebih tinggi pada hari tidur kurang dari 6 jam.",
-      "confidence": 0.62,
-      "rangeStart": "2026-06-06",
-      "rangeEnd": "2026-06-20"
-    }
-  ]
-}
-```
-
----
-
-## 25. Knowledge Base API
-
-## 25.1 List Articles
-
-```http
-GET /api/kb
-```
-
-### Query
-
-```text
-category=device
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "slug": "yuwell-yx106",
-      "title": "Panduan Yuwell YX106 Oximeter",
-      "category": "device",
-      "sortOrder": 10
-    }
-  ]
-}
-```
-
----
-
-## 25.2 Get Article
-
-```http
-GET /api/kb/:slug
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "slug": "yuwell-yx106",
-    "title": "Panduan Yuwell YX106 Oximeter",
-    "category": "device",
-    "contentMarkdown": "## Yuwell YX106 Oximeter..."
-  }
-}
-```
-
----
-
-## 26. Settings API
-
-## 26.1 Update UI Settings
-
-```http
-PUT /api/settings/ui
-```
-
-### Request
-
-```json
-{
-  "theme": "dark",
-  "accessibilityMode": "senior"
-}
-```
-
-### Validation
-
-```text
-Requires authenticated `hlSession` cookie.
-theme: one of light, warm, dark, highContrast.
-accessibilityMode: one of normal, senior, highContrast.
-Returns 404 NOT_FOUND if onboarding/profile is not complete.
-Writes `uiSettingsUpdate` to HL_auditLogs.
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "updated": true
-  }
-}
-```
-
----
-
-## 26.2 Update Consent
-
-```http
-PUT /api/settings/consent
-```
-
-### Request
-
-```json
-{
-  "aiConsent": true,
-  "emergencyConsent": true,
-  "dataShareConsent": false
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "updated": true
-  }
-}
-```
-
----
-
-## 27. Data Export API
-
-## 27.1 Export CSV
-
-```http
-GET /api/export/csv
-```
-
-### Query
-
-```text
-from=2026-06-01
-to=2026-06-30
-```
-
-### Response
-
-```http
-Content-Type: text/csv
-Content-Disposition: attachment; filename="hl-health-export.csv"
-```
-
-### CSV Columns
-
-```text
-measuredAt,metricCode,finalValue,unit,status,severity,manualOverride
-```
-
----
-
-## 27.2 Delete Account Data Request
-
-```http
-POST /api/privacy/deleteAccount
-```
-
-### Request
-
-```json
-{
-  "confirmText": "DELETE MY DATA"
-}
-```
-
-### Response 202
-
-```json
-{
-  "success": true,
-  "data": {
-    "queued": true,
-    "message": "Permintaan penghapusan data diterima."
-  }
-}
-```
-
----
-
-## 28. Queue Event Contracts
-
-## 28.1 notificationQueue
-
-### Submit Summary Event
-
-```json
-{
-  "eventType": "telegramSubmitSummary",
-  "userId": "usr_01h...",
-  "sessionId": "ses_01h...",
-  "createdAt": "2026-06-20T20:15:00+07:00"
-}
-```
-
-### Emergency Alert Event
-
-```json
-{
-  "eventType": "emergencyAlert",
-  "userId": "usr_01h...",
-  "sessionId": "ses_01h...",
-  "alertId": "alt_01h...",
-  "createdAt": "2026-06-20T20:15:00+07:00"
-}
-```
-
----
-
-## 28.2 recommendationQueue
-
-```json
-{
-  "eventType": "generateRecommendation",
-  "userId": "usr_01h...",
-  "sessionId": "ses_01h...",
-  "createdAt": "2026-06-20T20:15:00+07:00"
-}
-```
-
----
-
-## 28.3 pdfQueue
-
-```json
-{
-  "eventType": "generateDoctorReadyPdf",
-  "userId": "usr_01h...",
-  "reportId": "rpt_01h...",
-  "rangeStart": "2026-05-22",
-  "rangeEnd": "2026-06-20",
-  "createdAt": "2026-06-20T20:15:00+07:00"
-}
-```
-
----
-
-## 28.4 reminderQueue
-
-```json
-{
-  "eventType": "scheduledReminder",
-  "userId": "usr_01h...",
-  "reminderType": "morningMeasurement",
-  "channel": "telegram",
-  "createdAt": "2026-06-20T07:00:00+07:00"
-}
-```
-
----
-
-## 29. Cron Contracts
-
-## 29.1 Reminder Cron
-
-```text
-Runs: every 15 or 30 minutes depending free-tier budget
-Purpose: find due HL_reminderSettings and enqueue notification events
-```
-
-### Scheduled Handler Output
-
-```json
-{
-  "processed": 10,
-  "queued": 8,
-  "skipped": 2
-}
-```
-
----
-
-## 29.2 Daily Maintenance Cron
-
-```text
-Runs: once daily
-Purpose: expire drafts, expire invites, expire fasting sessions, update missed medication logs
-```
-
----
-
-## 30. Rate Limit Policy
-
-Store lightweight counters in:
-
-```text
-HL_apiRateLimits
-```
-
-Recommended limits for free tier:
-
-| Route Group | Limit |
-|---|---:|
-| `/api/auth/login` | 10 per 10 minutes per ipHash/email |
-| `/api/measurements/extract` | 30 per day per user |
-| `/api/ai/recommendation` | 30 per day per user |
-| `/api/reports/doctorReady30d` | 5 per day per user |
-| `/api/telegram/test` | 5 per hour per user |
-| `/api/export/csv` | 10 per day per user |
-
----
-
-## 31. Free Tier Efficiency Rules
-
-### 31.1 AI
-
-```text
-No background OCR by default
-No automatic AI retry
-5-second extraction timeout
-AI recommendation uses summary JSON only
-Pattern insights require minimum data threshold
-```
-
-### 31.2 D1
-
-```text
-Use indexed range queries
-Use batch insert on submit
-Avoid storing large JSON blobs
-Do not store image base64
-Cache metric catalog in Worker memory where possible
-```
-
-### 31.3 R2
-
-```text
-Store only final compressed watermarked evidence
-Use webp quality 50 where possible
-Generate PDF only on demand
-Use signed/proxied download, no public objects
-```
-
-### 31.4 Queues
-
-```text
-Use queues for Telegram, emergency, AI recommendations, PDF, reminders
-Do not use queue for default OCR path
-Submit response should not wait for non-critical queue jobs
-```
-
----
-
-## 32. Security Requirements
-
-```text
-All owner resources must filter by userId
-Family/caregiver access must pass RBAC check
-R2 key access must be validated before stream/download
-Telegram chat id should be encrypted or protected at application layer
-Emergency contact consent must be recorded before alerting
-All major write operations must create HL_auditLogs
-Never expose passwordHash, sessionTokenHash, verificationCodeHash, inviteTokenHash, shareTokenHash
-```
-
-Sensitive values are encrypted at rest with AES-GCM when `ENCRYPTION_KEY` is configured as a Worker secret:
-
-- `HL_telegramLinks.telegramChatId`
-- `HL_emergencyContacts.contactName`
-- `HL_emergencyContacts.contactPhone`
-- `HL_emergencyContacts.telegramChatId`
-- `HL_medicationLogs.note`
-- `HL_measurementSessions.notes`
-
-Ciphertext uses the `enc:v1:` prefix. Read paths decrypt automatically and legacy plaintext remains readable until migrated.
-
----
-
-## 34. System Config API (Admin Only)
-
-```text
-Requires role: admin or owner
-```
-
-## 34.1 List Configs
-
-```http
-GET /api/admin/configs
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "configs": [
-      {
-        "configKey": "aiExtractTimeoutMs",
-        "configValue": "5000",
-        "dataType": "number",
-        "description": "Timeout in milliseconds for AI Vision extraction",
-        "updatedAt": "2026-06-20T10:00:00Z"
-      },
-      {
-        "configKey": "aiVisionModel",
-        "configValue": "@cf/meta/llama-3.2-11b-vision-instruct",
-        "dataType": "string",
-        "description": "Cloudflare Workers AI vision model used for device display extraction",
-        "updatedAt": "2026-06-20T10:00:00Z"
-      },
-      {
-        "configKey": "aiTextEndpoint",
-        "configValue": "https://9router.krpmerch.biz.id/v1",
-        "dataType": "string",
-        "description": "OpenAI-compatible text AI base URL",
-        "updatedAt": "2026-06-20T10:00:00Z"
-      },
-      {
-        "configKey": "aiTextModels",
-        "configValue": "[\"oc/deepseek-v4-flash-free\",\"oc/mimo-v2.5-free\",\"openrouter/poolside/laguna-m.1:free\"]",
-        "dataType": "json",
-        "description": "Ordered text AI model fallback list",
-        "updatedAt": "2026-06-20T10:00:00Z"
-      },
-      {
-        "configKey": "telegramBotToken",
-        "configValue": "",
-        "dataType": "string",
-        "description": "Telegram bot token managed from system config",
-        "updatedAt": "2026-06-20T10:00:00Z"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 34.2 Update Config
-
-```http
-PUT /api/admin/configs/:configKey
-```
-
-### Request
-
-```json
-{
-  "configValue": "7000"
-}
-```
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "updated": true,
-    "cacheInvalidated": true
-  }
-}
-```
-
-## 34.3 Create Config
-
-```http
-POST /api/admin/configs
-```
-
-Admin only. Creates a new non-protected system config row.
-
-### Request
-
-```json
-{
-  "configKey": "featureDoctorExportEnabled",
-  "configValue": "true",
-  "dataType": "boolean",
-  "description": "Enable doctor export feature"
-}
-```
-
-### Response 201
-
-```json
-{
-  "success": true,
-  "data": {
-    "created": true,
-    "configKey": "featureDoctorExportEnabled",
-    "cacheInvalidated": true
-  }
-}
-```
-
-## 34.4 Delete Config
-
-```http
-DELETE /api/admin/configs/:configKey
-```
-
-Admin only. Protected required keys such as `aiExtractTimeoutMs`, `aiVisionModel`, upload limit, rate-limit, Telegram, and AI core keys cannot be deleted.
-
-### Response 200
-
-```json
-{
-  "success": true,
-  "data": {
-    "deleted": true,
-    "cacheInvalidated": true
-  }
-}
-```
-
----
-
-## 35. Minimum Endpoint Implementation Order
-
-```text
-1. POST /api/auth/register
-2. POST /api/auth/login
-3. GET /api/auth/me
-4. POST /api/profile/onboarding
-5. GET /api/metrics/catalog
-6. POST /api/measurements/extract
-7. POST /api/measurements/validate
-8. POST /api/measurements/submit
-9. GET /api/dashboard/today
-10. POST /api/telegram/connect
-11. POST /api/telegram/test
-12. GET /api/dashboard/weekly
-13. GET /api/dashboard/monthly
-14. POST /api/reports/doctorReady30d
-```
-
----
-
-## 36. Production UAT Endpoint Delta - 2026-06-21
-
-These endpoints are required by the refactored Sprint 1-4 frontend UAT flow.
-
-### Measurement History
-
-```text
-GET /api/measurements/history
-```
-
-Returns authenticated measurement sessions with values and attachment references.
-
-```json
-{
-  "success": true,
-  "data": {
-    "sessions": [
-      {
-        "id": "ses_x",
-        "measuredAt": "2026-06-21T00:00:00.000Z",
-        "source": "manual",
-        "hasAttachment": 1,
-        "hasEmergency": 0,
-        "values": [
-          {
-            "id": "val_x",
-            "metricCode": "blood_pressure_systolic",
-            "finalValue": 145,
-            "unit": "mmHg",
-            "status": "warning",
-            "severity": "medium",
-            "manualOverride": 1,
-            "attachments": []
-          }
-        ]
-      }
-    ]
-  },
-  "meta": {}
-}
-```
-
-### Measurement Evidence Stream
-
-```text
-GET /api/measurements/attachments/:id
-```
-
-Streams a compressed, watermarked evidence object after authenticated ownership verification.
-
-### AI Assistant
-
-```text
-POST /api/ai/assistant
-```
-
-Request:
-
-```json
-{
-  "question": "Saran makan malam untuk hipertensi"
-}
-```
-
-Response includes a safe text reply plus current user vitals context. AI text must not diagnose, prescribe dose changes, or decide medical severity.
-
-Example response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "reply": "Pilih makan malam rendah garam...",
-    "model": "oc/deepseek-v4-flash-free",
-    "usedFallback": false,
-    "vitals": [
-      {
-        "metricCode": "systolic",
-        "finalValue": 145,
-        "unit": "mmHg",
-        "status": "Tinggi",
-        "severity": "warning",
-        "measuredAt": "2026-06-22T07:00:00.000Z"
-      }
+    "sessionId": 12345,
+    "values": [
+      { "metricCode": "spo2", "finalValue": 98, "status": "normal", "severity": "normal", "emergencyLevel": "none" },
+      { "metricCode": "heartRate", "finalValue": 72, "status": "normal", "severity": "normal", "emergencyLevel": "none" }
     ],
-    "profile": {
-      "displayName": "Budi",
-      "heightCm": 170,
-      "sex": "male",
-      "birthDate": "1970-01-01"
-    }
+    "streak": { "currentCount": 7, "bestCount": 12 },
+    "awardedBadges": [],
+    "aiRecommendationId": 888
+  },
+  "meta": { "requestId": "req_lz01abc", "durationMs": 184 }
+}
+```
+
+### 3.2 `POST /api/ai/assistant`
+
+```json
+// Request
+{ "question": "Apakah tekanan darah saya pagi ini aman?", "clinicalCopilotMode": false }
+```
+
+```json
+// Response
+{
+  "success": true,
+  "data": {
+    "reply": "... narasi AI ...",
+    "patternScore": 78,
+    "disclaimer": "...",
+    "model": "deepseek-v4-flash-free",
+    "usedFallback": false,
+    "vitals": [{ "metricCode": "systolic", "finalValue": 128, "unit": "mmHg", "status": "warning", "severity": "warning", "measuredAt": "..." }],
+    "profile": { "displayName": "...", "heightCm": 170, "sex": "male", "birthDate": "..." },
+    "dataSufficiencyScore": 72,
+    "scoreReason": "...",
+    "contextTrace": [{ "metricCode": "systolic", "measuredAt": "...", "sourceType": "measurement", "source": "HL_measurementValues" }],
+    "usedVectorContext": false
+  },
+  "meta": { "requestId": "req_...", "durationMs": 2130 }
+}
+```
+
+### 3.3 `POST /api/cycle/logs`
+
+```json
+{
+  "logDate": "2026-06-30",
+  "hasPeriodFlow": true,
+  "flowIntensity": "medium",
+  "mood": "tired",
+  "physicalSymptoms": ["cramp", "headache"],
+  "unprotected": false,
+  "contraceptionGuardrailAcknowledgedAt": null,
+  "notes": ""
+}
+```
+
+### 3.4 `POST /api/hydration/logs`
+
+```json
+{ "amountMl": 250, "loggedAt": "2026-06-30T10:15:00.000Z", "notes": "Setelah sarapan" }
+```
+
+Response kalau over limit → trigger `HL_safetyEvents` (severity=warning):
+
+```json
+{
+  "success": true,
+  "data": {
+    "logId": 98765,
+    "todayTotal": 2350,
+    "targetMl": 2000,
+    "overLimit": true,
+    "safetyEventId": 444
   }
 }
 ```
 
-Text model provider is configured through `HL_systemConfigs.aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, and optional `aiTextApiKey`. The Worker tries configured models in order and falls back to deterministic safe text if the provider is unavailable.
+---
 
-### Family Invite
-
-```text
-POST /api/family/invite
-DELETE /api/family/:id
-GET /api/family/links
-```
-
-`POST /api/family/invite` accepts `inviteEmail`, `role`, and granular `permissions`. It creates both a pending invite and a pending family link so the UI can render and revoke pending invitations immediately.
-
-### Medication And Emergency Deletes
+## 4. RBAC + Entitlement Checks (Backend)
 
 ```text
-DELETE /api/medications/:id
-DELETE /api/emergency/contacts/:id
+getCurrentSession(c)                  → HL_sessions.userId (return null kalau invalid)
+RBACService.requirePermission(...)    → 403 admin.permission.required kalau tidak punya
+EntitlementService.requireEntitlement(userId, featureCode)
+  → cek HL_subscriptions.status='active'
+  → cek HL_planFeatures.featureCode enabled=1
+  → cek HL_usageCounters quotaLimit vs usedCount (window: day|month|quarter|year|lifetime)
+  → return { allowed:false } kalau salah satu gagal (respon ENTITLEMENT_REQUIRED)
 ```
 
-Deletes are scoped to the authenticated user.
+Contoh di `index.ts`:
 
-### Notifications Filter
+```ts
+const ent = await EntitlementService.requireEntitlement(c.env.DB, userId, 'feature.aiAssistant.use')
+if (!ent.allowed) return jsonResponse(c, failure('ENTITLEMENT_REQUIRED', 'Fitur AI memerlukan paket Premium.', 403, [{ featureCode: ent.featureCode, planCode: ent.planCode }], startedAt))
+```
+
+---
+
+## 5. Cron & Scheduled Handler
+
+`scheduledHandler(event, env, ctx)` di `routes-extra.ts` — dipanggil Cloudflare Cron Triggers.
+
+Tasks yang dijalankan:
+
+1. **Reminders** — `HL_reminderSettings` yang `enabled=1` dan `nowInTz(tz) === scheduleTime`. Kirim via inApp (always), Telegram (kalau channel=`telegram` dan link verified), Browser Push (kalau channel=`browser` dan `VAPID_PRIVATE_KEY` ada).
+2. **Telegram submit summary** — consumer queue `telegram-submit-summary` (di tempat lain: handler queue consumer).
+3. **Streak update** — dijalankan via measurement submit (idempotent per hari).
+4. **Hydration reminders** — `routes-telegram.ts::cron hydration-reminders` (endpoint, bukan scheduled handler langsung).
+
+Auth: `Authorization: Bearer ${CRON_SECRET}`.
+
+---
+
+## 6. Webhook Security
+
+### 6.1 Telegram Webhook
+
+- Bot token resolved server-side (HL_systemConfigs.telegramBotToken ATAU env.TELEGRAM_BOT_TOKEN).
+- Setiap `callback_query.id` dicatat di `HL_telegramCallbackEvents` (UNIQUE) → idempotent.
+- `telegramChatId` di-decrypt via `services/crypto.ts` sebelum dipakai.
+
+### 6.2 Billing Webhook (Xendit)
+
+- Signature verification via `XENDIT_WEBHOOK_SECRET`.
+- Idempotent: `HL_paymentEvents (provider, providerEventId)` UNIQUE.
+- Payment event → `subscription-activation.ts` activate `HL_subscriptions`.
+
+---
+
+## 7. Rate Limiting
+
+| Endpoint | Limit | Config |
+|---|---|---|
+| `POST /api/measurements/extract` | `ocrRateLimitMax` per `ocrRateLimitWindowMin` menit per user | HL_systemConfigs |
+| `POST /api/auth/otp/resend` | hardcoded (3/hour, 10/day) — `routes-auth.ts` |
+| `POST /api/auth/login/start` | hardcoded (5 failed → lock 15 menit) | `routes-auth.ts` |
+
+429 response: `{ success:false, error:{ code:'RATE_LIMITED', message, details } }`.
+
+---
+
+## 8. Audit Logging (WAJIB untuk admin mutation)
+
+```sql
+INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt)
+VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+```
+
+Contoh actions:
 
 ```text
-GET /api/notifications?notificationType=emergency_alert&channel=telegram
+profileOnboardingComplete
+profileUpdate
+settingsUiUpdate
+consentUpdate
+alertCreate            -- HL_alerts insert dari severity emergency
+badgeEarned            -- HL_userBadges insert
+reportGenerate         -- HL_reports insert
+emergencyConsentGiven
+emergencyConsentRevoked
+aiMemoryRebuild
+aiMemoryDelete
+planUpdate
+metricRuleUpdate
+educationCardUpdate
+kbArticleUpdate
 ```
 
-Filters are optional. Response rows include `payloadJson`, `errorMessage`, and `sentAt` for the Telegram delivery timeline.
+Field **dilarang**: `actorId`, `targetType`, `targetId` — gunakan `userId`, `entityType`, `entityId`.
+
+---
+
+## 9. Known Limits (Sprint 5)
+
+```text
+- AI Clinical Copilot runtime       → DEFERRED to Sprint 6 (AI_CLINICAL_COPILOT_DEFERRED)
+- Vectorize runtime                 → infrastructure only; no live index di Sprint 5
+- Payment provider production       → Xendit (Sprint 5F). Midtrans/Stripe deferred.
+- Two-way doctor chat               → out of scope
+- Original image storage            → DILARANG (privacy)
+- Multi-language UI                 → ID (default) + EN (Sprint 5X i18n)
+- Free plan AI Assistant            → 3 / month
+- Free plan medication reminder     → 3 / lifetime
+- Free plan history retention       → 30 hari
+```
+
+---
+
+## 10. Versioning & Deprecation
+
+- Base path: `/api/*` (no `/v1/` prefix). Perubahan breaking → header `Sunset` + `Deprecation` (RFC 8594).
+- Deprecated endpoints (planned removal Sprint 7):
+  - `POST /api/auth/register` (ganti `register/start` + `register/verify`)
+  - `POST /api/auth/login` (ganti `login/start` + `login/verify`)
+
+---
+
+Lihat juga:
+- Schema: `docs/07-schema.sql`
+- Design System: `docs/06-design-system.md`
+- Architecture: `docs/04-ARCHITECTURE.md`
+- PRD Sprint 1–5: `docs/01-PRD_SPRINT1-5.md`
