@@ -39,6 +39,7 @@ export function SymptomPage({ onNavigate }: { onNavigate?: (path: string) => voi
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [painScale, setPainScale] = useState(1)
   const [time, setTime] = useState(nowTime())
+  const [mood, setMood] = useState('')
   const [duration, setDuration] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -64,11 +65,15 @@ export function SymptomPage({ onNavigate }: { onNavigate?: (path: string) => voi
     setResult(null)
     setSubmitError(null)
 
-    const selectedLabels = Array.from(selected).map(id => SYMPTOM_PRESETS.find(s => s.id === id)?.labelKey).map(k => k ? t(k) : '').filter(Boolean)
-    const descriptionParts = [selectedLabels.join(', ')]
+    const quickSymptoms = Array.from(selected).map(id => {
+      const s = SYMPTOM_PRESETS.find(p => p.id === id)
+      return s ? t(s.labelKey) : ''
+    }).filter(Boolean)
+
+    const descriptionParts: string[] = []
     if (duration) descriptionParts.push(`Durasi: ${duration}`)
     if (notes) descriptionParts.push(notes)
-    const description = descriptionParts.filter(Boolean).join('. ')
+    const description = descriptionParts.filter(Boolean).join('. ') || undefined
 
     const bodyArea = SYMPTOM_PRESETS.find(s => selected.has(s.id))?.bodyArea || 'other'
     const dateTime = new Date().toISOString().slice(0, 11) + time + ':00'
@@ -78,7 +83,7 @@ export function SymptomPage({ onNavigate }: { onNavigate?: (path: string) => voi
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bodyArea, painScale, description, symptomDateTime: dateTime })
+        body: JSON.stringify({ bodyArea, painScale, description, symptomDateTime: dateTime, quickSymptoms, mood: mood || undefined })
       })
       const j = await r.json()
       setResult(j)
@@ -92,6 +97,7 @@ export function SymptomPage({ onNavigate }: { onNavigate?: (path: string) => voi
         setSelected(new Set())
         setPainScale(1)
         setTime(nowTime())
+        setMood('')
         setDuration('')
         setNotes('')
         setTimeout(() => onNavigate?.('/history'), 1500)
@@ -182,6 +188,16 @@ export function SymptomPage({ onNavigate }: { onNavigate?: (path: string) => voi
               <input type="time" value={time} onChange={e => setTime(e.target.value)} />
               <input type="text" value={duration} onChange={e => setDuration(e.target.value)} placeholder={t('symptom.durationPlaceholder')} />
             </div>
+            <select value={mood} onChange={e => setMood(e.target.value)} className="mood-select">
+              <option value="">{t('symptom.moodPlaceholder')}</option>
+              <option value="normal">{t('symptom.moodNormal')}</option>
+              <option value="sad">{t('symptom.moodSad')}</option>
+              <option value="anxious">{t('symptom.moodAnxious')}</option>
+              <option value="happy">{t('symptom.moodHappy')}</option>
+              <option value="tired">{t('symptom.moodTired')}</option>
+              <option value="angry">{t('symptom.moodAngry')}</option>
+              <option value="other">{t('symptom.moodOther')}</option>
+            </select>
             <textarea rows={4} value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('symptom.notesPlaceholder')} />
             <button type="submit" disabled={saving || selected.size === 0} className="symptom-save-btn">
               {saving ? t('symptom.saving') : t('symptom.save')}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
 import { formatDateID } from '../../utils/dateFormat'
 import { downloadCsv } from '../../utils/csv'
+import { useI18n } from '../../i18n'
 
 const METRIC_LABEL_DEF: Record<string, { label: string; def: string }> = {
   spo2: { label: 'SpO2', def: MEDICAL_GLOSSARY.spo2 },
@@ -40,6 +41,7 @@ type WeeklyData = {
 type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
 
 export function WeeklyReportPage() {
+  const { t } = useI18n()
   const [data, setData] = useState<WeeklyData | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
@@ -86,18 +88,18 @@ export function WeeklyReportPage() {
     <div className="report-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Reports</p>
-          <h2>Weekly Report</h2>
-          <p>Adherence: {data.adherence}%</p>
+          <p className="eyebrow">{t('reports.eyebrow')}</p>
+          <h2>{t('reports.weeklyTitle')}</h2>
+          <p>{t('reports.adherence')}: {data.adherence}%</p>
         </div>
         <div className="page-heading-actions">
           <button onClick={() => downloadCsv(`laporan-mingguan.csv`, data.metrics.map(m => ({ Metrik: m.metricCode, Rata_rata: m.avg, Minimum: m.min, Maksimum: m.max, Jumlah_Data: m.cnt })), ['Metrik', 'Rata_rata', 'Minimum', 'Maksimum', 'Jumlah_Data'])} className="btn-secondary">
-            <span className="material-symbols-outlined">download</span> Download CSV
+            <span className="material-symbols-outlined">download</span> {t('reports.downloadCsv')}
           </button>
           <button onClick={analyzeWithAi} disabled={aiLoading} className="btn-primary">
-            {aiLoading ? <><span className="spinner" /> Menganalisa...</> : <><span className="material-symbols-outlined">auto_awesome</span> Analisa dengan AI</>}
+            {aiLoading ? <><span className="spinner" /> {t('reports.analyzing')}</> : <><span className="material-symbols-outlined">auto_awesome</span> {t('reports.analyzeWithAi')}</>}
           </button>
-          <span className="status-chip">{data.metrics.length} metrics</span>
+          <span className="status-chip">{data.metrics.length} {t('reports.metrics')}</span>
         </div>
       </div>
       {aiError ? <div className="ai-summary ai-summary-error"><p>{aiError}</p></div> : null}
@@ -113,7 +115,7 @@ export function WeeklyReportPage() {
         <div className="summary-card"><span className="stat-kicker">Alerts</span><div className="big-value">{data.alertCount}</div><p>Rule-triggered alerts</p></div>
         <div className="summary-card"><span className="stat-kicker">Days</span><div className="big-value">{data.daysWithData}</div><p>Days with data</p></div>
       </div>
-      {data.metrics.length === 0 ? <p className="clinical-empty">Belum ada data pengukuran untuk laporan mingguan.</p> : (
+      {data.metrics.length === 0 ? <p className="clinical-empty">{t('reports.noData')}</p> : (
         <table className="report-table">
           <thead>
             <tr><th>Metric</th><th>Avg</th><th>Min</th><th>Max</th><th>N</th></tr>

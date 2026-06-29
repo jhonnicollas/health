@@ -1,0 +1,25 @@
+import { registerTranslations } from '../index'
+
+registerTranslations('patterns', {
+  eyebrow: { 'id-ID': 'Wawasan', 'en-US': 'Insights' },
+  title: { 'id-ID': 'Pola Kesehatan', 'en-US': 'Health Patterns' },
+  subtitle: { 'id-ID': 'Wawasan otomatis dari data Anda (bukan diagnosis, hanya ringkasan).', 'en-US': 'Automated insights from your data (not a diagnosis, only a summary).' },
+  minDays: { 'id-ID': 'Minimum 14 hari', 'en-US': '14 days minimum' },
+  sleepBpTitle: { 'id-ID': 'Pola Tidur vs Tekanan Darah (14 hari)', 'en-US': 'Sleep vs Blood Pressure Pattern (14 days)' },
+  sleepBpDesc: { 'id-ID': 'Membandingkan tekanan darah sistolik pada hari dengan tidur <6 jam vs >=7 jam.', 'en-US': 'Compares systolic BP on days with <6h sleep vs >=7h sleep.' },
+  weightBpTitle: { 'id-ID': 'Pola Berat Badan vs Tekanan Darah (14 hari)', 'en-US': 'Weight vs Blood Pressure Pattern (14 days)' },
+  medAdherenceTitle: { 'id-ID': 'Pola Kepatuhan Obat (14 hari)', 'en-US': 'Medication Adherence Pattern (14 days)' },
+  generate: { 'id-ID': 'Buat Insight', 'en-US': 'Generate Insight' },
+  generateSleepBp: { 'id-ID': 'Buat Insight Tidur-TD', 'en-US': 'Generate Sleep-BP Insight' },
+  generating: { 'id-ID': 'Membuat...', 'en-US': 'Generating...' },
+  patternHistory: { 'id-ID': 'Riwayat Pola', 'en-US': 'Pattern History' },
+  noInsights: { 'id-ID': 'Belum ada insight pola. Buat satu di atas.', 'en-US': 'No pattern insights yet. Generate one above.' },
+  loading: { 'id-ID': 'Memuat...', 'en-US': 'Loading...' },
+  loadFailed: { 'id-ID': 'Gagal memuat riwayat pola.', 'en-US': 'Failed to load pattern history.' },
+  generateFailed: { 'id-ID': 'Gagal membuat insight.', 'en-US': 'Failed to generate insight.' },
+  notEnoughData: { 'id-ID': 'Data kurang (minimum 14 hari).', 'en-US': 'Not enough data (minimum 14 days).' },
+  done: { 'id-ID': 'Selesai.', 'en-US': 'Done.' },
+  adherenceLabel: { 'id-ID': 'Kepatuhan', 'en-US': 'Adherence' },
+  conf: { 'id-ID': 'konf', 'en-US': 'conf' },
+  connError: { 'id-ID': 'Tidak bisa terhubung ke server.', 'en-US': 'Could not connect to server.' },
+})

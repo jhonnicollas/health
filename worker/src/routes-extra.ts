@@ -166,6 +166,35 @@ async function resolveTelegramBotToken(c: Context<{ Bindings: ExtraEnv }>): Prom
   return await getSystemConfigValue(c, 'telegramBotToken') || c.env.TELEGRAM_BOT_TOKEN || null
 }
 
+// Cron helpers — resolve Telegram bot token and decrypt sensitive values without Context
+async function resolveTelegramBotTokenCron(env: ExtraEnv): Promise<string | null> {
+  const active = await getSystemConfigValueCron(env, 'telegramBotActive')
+  if (active && !['1', 'true', 'yes', 'on', 'enabled'].includes(active.toLowerCase())) return null
+  return await getSystemConfigValueCron(env, 'telegramBotToken') || env.TELEGRAM_BOT_TOKEN || null
+}
+
+async function getSystemConfigValueCron(env: ExtraEnv, configKey: string): Promise<string | null> {
+  const row = await env.DB.prepare('SELECT configValue FROM HL_systemConfigs WHERE configKey = ? LIMIT 1').bind(configKey).first<{ configValue: string }>()
+  return row?.configValue?.trim() || null
+}
+
+async function decryptSensitiveCron(env: ExtraEnv, value: string | null | undefined): Promise<string | null> {
+  if (!value) return null
+  if (!value.startsWith('enc:v1:')) return value
+  const [, , ivText, cipherText] = value.split(':')
+  if (!ivText || !cipherText) return null
+  const secret = env.ENCRYPTION_KEY
+  if (!secret || secret.trim().length < 16) return null
+  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(secret))
+  const key = await crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['decrypt'])
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64UrlDecode(ivText) },
+    key,
+    base64UrlDecode(cipherText)
+  )
+  return textDecoder.decode(decrypted)
+}
+
 // US-3.3.2 Send emergency Telegram to emergency contacts
 export async function sendEmergencyToContacts(c: Context<{ Bindings: ExtraEnv }>, userId: number, severity: string, metricCode: string, finalValue: number, unit: string, message: string) {
   const profile = await c.env.DB.prepare('SELECT emergencyConsent FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ emergencyConsent: number }>()
@@ -972,21 +1001,76 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
 // GAP-17: single merged cron handler for all scheduled tasks
 export async function scheduledHandler(event: ScheduledController, env: ExtraEnv, _ctx: ExecutionContext) {
   const cronName = event.cron || 'hourly'
-  // Reminders
+  // Reminders — send via inApp, Telegram, or browser push depending on channel
   const now = new Date()
   const reminders = await env.DB.prepare(
-    "SELECT id, userId, reminderType, scheduleTime, timezone FROM HL_reminderSettings WHERE enabled = 1"
-  ).all<{ id: string; userId: string; reminderType: string; scheduleTime: string; timezone: string }>()
+    "SELECT id, userId, reminderType, scheduleTime, timezone, channel, payloadJson FROM HL_reminderSettings WHERE enabled = 1"
+  ).all<{ id: string; userId: string; reminderType: string; scheduleTime: string; timezone: string; channel: string; payloadJson: string | null }>()
   let fired = 0
+  let telegramSent = 0
+  let pushSent = 0
   for (const r of (reminders.results || [])) {
     const nowInTz = (() => {
       try { return new Intl.DateTimeFormat('en-GB', { timeZone: r.timezone || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false }).format(now) }
       catch { return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` }
     })()
     if (nowInTz !== r.scheduleTime) continue
+
+    // Parse payload for message
+    let reminderMessage = 'Waktunya melakukan pengukuran.'
+    let reminderTitle = `Pengingat: ${r.reminderType}`
+    try {
+      const payload = r.payloadJson ? JSON.parse(r.payloadJson) : {}
+      if (payload.message) reminderMessage = payload.message
+      if (payload.label) reminderTitle = payload.label
+    } catch { /* ignore */ }
+
+    // Always create in-app notification
     await env.DB.prepare(
       "INSERT INTO HL_notifications (userId, channel, notificationType, title, message, status, createdAt) VALUES (?, 'inApp', 'reminder', ?, ?, 'sent', CURRENT_TIMESTAMP)"
-    ).bind(r.userId, `Pengingat: ${r.reminderType}`, 'Waktunya melakukan pengukuran.').run()
+    ).bind(r.userId, reminderTitle, reminderMessage).run()
+
+    // Send via Telegram if channel is telegram and user has linked Telegram
+    if (r.channel === 'telegram') {
+      try {
+        const link = await env.DB.prepare('SELECT telegramChatId FROM HL_telegramLinks WHERE userId = ? AND verified = 1 AND enabled = 1').bind(r.userId).first<{ telegramChatId: string }>()
+        const botToken = await resolveTelegramBotTokenCron(env)
+        if (link?.telegramChatId && botToken) {
+          let chatId = link.telegramChatId
+          if (chatId.startsWith('enc:v1:')) {
+            const decrypted = await decryptSensitiveCron(env, chatId)
+            if (decrypted) chatId = decrypted
+          }
+          if (chatId) {
+            const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: chatId, text: `${reminderTitle}\n\n${reminderMessage}`, parse_mode: 'HTML' })
+            })
+            if (resp.ok) {
+              telegramSent++
+              await env.DB.prepare(
+                "INSERT INTO HL_notifications (userId, channel, notificationType, title, message, status, createdAt) VALUES (?, 'telegram', 'reminder', ?, ?, 'sent', CURRENT_TIMESTAMP)"
+              ).bind(r.userId, reminderTitle, reminderMessage).run()
+            }
+          }
+        }
+      } catch { /* ignore telegram error */ }
+    }
+
+    // Send via browser push if channel is browser and VAPID key is configured
+    if (r.channel === 'browser' && (env as any).VAPID_PRIVATE_KEY) {
+      try {
+        const { WebPushService } = await import('./services/web-push.js')
+        const result = await WebPushService.sendToUser(env.DB, Number(r.userId), {
+          title: reminderTitle,
+          body: reminderMessage,
+          url: '/'
+        }, (env as any).VAPID_PRIVATE_KEY)
+        pushSent += result.sent
+      } catch { /* ignore push error */ }
+    }
+
     fired++
   }
   // Fasting reminder (US-4.2.3)
@@ -1008,5 +1092,5 @@ export async function scheduledHandler(event: ScheduledController, env: ExtraEnv
   const staleDrafts = await env.DB.prepare(
     "DELETE FROM HL_measurementDrafts WHERE status = 'expired' AND createdAt < datetime('now', '-7 days')"
   ).run()
-  console.log(`cron ${cronName}: reminders=${fired} fasting=${fastingNotified} staleDraftsCleaned=${staleDrafts.meta?.changes ?? 0}`)
+  console.log(`cron ${cronName}: reminders=${fired} telegramSent=${telegramSent} pushSent=${pushSent} fasting=${fastingNotified} staleDraftsCleaned=${staleDrafts.meta?.changes ?? 0}`)
 }

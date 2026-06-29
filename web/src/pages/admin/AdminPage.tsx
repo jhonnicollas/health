@@ -1,16 +1,19 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from 'react'
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect */
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useToast } from '../../components/Toast'
 
-type TabId = 'overview' | 'users' | 'roles' | 'plans' | 'plan-features' | 'ai-config' | 'ai-memory' | 'configs' | 'feature-flags' | 'audit-logs' | 'safety-events' | 'metric-catalog' | 'metric-rules' | 'knowledge'
+type TabId = 'overview' | 'users' | 'roles' | 'plans' | 'plan-features' | 'subscriptions' | 'ai-config' | 'ai-memory' | 'configs' | 'feature-flags' | 'education' | 'audit-logs' | 'safety-events' | 'metric-catalog' | 'metric-rules' | 'knowledge'
 
-const TABS: { id: TabId; labelKey: string; permission?: string }[] = [
-  { id: 'overview', labelKey: 'admin.tabOverview' }, { id: 'users', labelKey: 'admin.tabUsers', permission: 'admin.users.read' }, { id: 'roles', labelKey: 'admin.tabRoles', permission: 'admin.roles.read' },
-  { id: 'plans', labelKey: 'admin.tabPlans', permission: 'admin.billing.read' }, { id: 'plan-features', labelKey: 'admin.tabPlanFeatures', permission: 'admin.billing.manage' }, { id: 'ai-config', labelKey: 'admin.tabAiConfig', permission: 'admin.aiConfig.update' }, { id: 'ai-memory', labelKey: 'admin.tabAiMemory', permission: 'admin.aiMemory.read' },
-  { id: 'configs', labelKey: 'admin.tabConfigs', permission: 'admin.config.read' }, { id: 'feature-flags', labelKey: 'admin.tabFeatureFlags', permission: 'admin.featureFlags.manage' }, { id: 'audit-logs', labelKey: 'admin.tabAudit', permission: 'admin.audit.read' },
-  { id: 'safety-events', labelKey: 'admin.tabSafety', permission: 'admin.security.read' }, { id: 'metric-catalog', labelKey: 'admin.tabMetrics', permission: 'admin.metricCatalog.manage' }, { id: 'metric-rules', labelKey: 'admin.tabRules', permission: 'admin.metricRules.manage' },
-  { id: 'knowledge', labelKey: 'admin.tabKb', permission: 'admin.education.manage' },
+const TABS: { id: TabId; label: string; permission?: string }[] = [
+  { id: 'overview', label: 'Overview' }, { id: 'users', label: 'Users', permission: 'admin.users.read' }, { id: 'roles', label: 'Roles', permission: 'admin.roles.read' },
+  { id: 'plans', label: 'Plans', permission: 'admin.billing.read' }, { id: 'plan-features', label: 'Plan Features', permission: 'admin.billing.manage' }, { id: 'subscriptions', label: 'Subscriptions', permission: 'admin.billing.read' },
+  { id: 'ai-config', label: 'AI Config', permission: 'admin.aiConfig.update' }, { id: 'ai-memory', label: 'AI Memory', permission: 'admin.aiMemory.read' },
+  { id: 'configs', label: 'Configs', permission: 'admin.config.read' }, { id: 'feature-flags', label: 'Feature Flags', permission: 'admin.featureFlags.manage' },
+  { id: 'education', label: 'Education', permission: 'admin.education.manage' },
+  { id: 'audit-logs', label: 'Audit Logs', permission: 'admin.audit.read' }, { id: 'safety-events', label: 'Safety Events', permission: 'admin.security.read' },
+  { id: 'metric-catalog', label: 'Metric Catalog', permission: 'admin.metricCatalog.manage' }, { id: 'metric-rules', label: 'Metric Rules', permission: 'admin.metricRules.manage' },
+  { id: 'knowledge', label: 'Knowledge Base', permission: 'admin.education.manage' },
 ]
 
 async function apiGet(url: string) {
@@ -19,27 +22,64 @@ async function apiGet(url: string) {
   return res.json()
 }
 
+async function apiMut(method: string, url: string, body?: unknown) {
+  const res = await fetch(url, { method, credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: body ? JSON.stringify(body) : undefined })
+  return res.json()
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <div className="admin-section"><h3>{title}</h3>{children}</div>
 }
 
-function Table({ cols, rows }: { cols: string[]; rows: any[][] }) {
-  return <table><thead><tr>{cols.map(c => <th key={c}>{c}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table>
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
+      <div className="modal-content" style={{ background: '#fff', borderRadius: 16, padding: 24, minWidth: 400, maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}><h2 style={{ margin: 0, fontSize: 18 }}>{title}</h2><button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20 }}>&times;</button></div>
+        {children}
+      </div>
+    </div>
+  )
 }
+
+function Loading() { return <p style={{ padding: '16px 0', color: 'var(--text-secondary)' }}>Loading...</p> }
+function ErrorMsg({ msg }: { msg: string }) { return <p className="admin-error">{msg}</p> }
+
+function useList<T = any>(url: string): { data: T[]; loading: boolean; error: string; refresh: () => void } {
+  const [data, setData] = useState<T[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [tick, setTick] = useState(0)
+  const refresh = useCallback(() => setTick(t => t + 1), [])
+  useEffect(() => {
+    setLoading(true)
+    apiGet(url).then(r => {
+      setLoading(false)
+      if (r.success) {
+        const raw = r.data
+        const arr = Array.isArray(raw) ? raw
+          : Array.isArray(raw?.logs) ? raw.logs
+          : Array.isArray(raw?.events) ? raw.events
+          : Array.isArray(raw?.items) ? raw.items
+          : Array.isArray(raw?.results) ? raw.results
+          : []
+        setData(arr); setError('')
+      }
+      else setError(r.error?.message || 'Gagal memuat.')
+    })
+  }, [url, tick])
+  return { data, loading, error, refresh }
+}
+
+/* ---- Overview ---- */
 
 function OverviewTab({ onTab }: { onTab?: (id: TabId) => void }) {
   const [metrics, setMetrics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   useEffect(() => {
-    apiGet('/api/admin/metrics').then(r => {
-      setLoading(false)
-      if (r.success) setMetrics(r.data)
-      else setError(r.error?.message || '')
-    })
+    apiGet('/api/admin/metrics').then(r => { setLoading(false); if (r.success) setMetrics(r.data) })
   }, [])
-  if (loading) return <p>Loading...</p>
-  if (error) return <p className="admin-error">{error}</p>
+  if (loading) return <Loading />
   const cards = metrics ? [
     { label: 'Users', value: metrics.users, trend: '+11% active', tone: 'success' },
     { label: 'Premium', value: metrics.subscriptions, trend: '24% conversion', tone: 'info' },
@@ -49,16 +89,16 @@ function OverviewTab({ onTab }: { onTab?: (id: TabId) => void }) {
   return (
     <Section title="Dashboard Metrics">
       <div className="admin-metric-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
-        {cards.map((card) => (
-          <div key={card.label} className="admin-metric-card" style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid var(--border, #e5e7eb)' }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary, #6b7280)' }}>{card.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 900, margin: '4px 0' }}>{card.value}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: card.tone === 'success' ? '#047857' : card.tone === 'info' ? '#0369a1' : card.tone === 'warning' ? '#b45309' : '#dc2626' }}>{card.trend}</div>
+        {cards.map(c => (
+          <div key={c.label} className="admin-metric-card" style={{ padding: 16, borderRadius: 12, background: '#fff', border: '1px solid var(--border, #e5e7eb)' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary, #6b7280)' }}>{c.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, margin: '4px 0' }}>{c.value}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: c.tone === 'success' ? '#047857' : c.tone === 'info' ? '#0369a1' : c.tone === 'warning' ? '#b45309' : '#dc2626' }}>{c.trend}</div>
           </div>
         ))}
       </div>
       <div className="admin-overview-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-        <button onClick={() => onTab?.('users')} className="admin-action-btn primary"><span className="material-symbols-outlined">manage_accounts</span>Manage Users</button>
+        <button onClick={() => onTab?.('users')} className="admin-action-btn"><span className="material-symbols-outlined">manage_accounts</span>Manage Users</button>
         <button onClick={() => onTab?.('plan-features')} className="admin-action-btn"><span className="material-symbols-outlined">workspace_premium</span>Plan Editor</button>
         <button onClick={() => onTab?.('audit-logs')} className="admin-action-btn"><span className="material-symbols-outlined">fact_check</span>Audit Logs</button>
       </div>
@@ -66,237 +106,674 @@ function OverviewTab({ onTab }: { onTab?: (id: TabId) => void }) {
   )
 }
 
+/* ---- Users ---- */
+
 function UsersTab() {
-  const [data, setData] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
-  useEffect(() => { apiGet('/api/admin/users').then(r => { setLoading(false); if (r.success) setData(r.data?.users || r.data || []); else setError(r.error?.message || '') }) }, [])
-  if (loading) return <p>Loading...</p>
-  if (error) return <p className="admin-error">{error}</p>
-  return <Section title="Users"><Table cols={['ID','Email','Status']} rows={data.map((u: any) => [u.id, u.email, u.status || 'active'])} /></Section>
-}
+  const { data, loading, error, refresh } = useList<any>('/api/admin/users?limit=100')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [search, setSearch] = useState('')
+  const [saving, setSaving] = useState(false)
 
-function RolesTab() {
-  const [data, setData] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
-  useEffect(() => { apiGet('/api/admin/roles').then(r => { setLoading(false); if (r.success) setData(r.data?.roles || r.data || []); else setError(r.error?.message || '') }) }, [])
-  if (loading) return <p>Loading...</p>
-  if (error) return <p className="admin-error">{error}</p>
-  return <Section title="Roles"><Table cols={['Code','Name','System','Active']} rows={data.map((r: any) => [r.roleCode, r.roleName, r.systemRole ? 'Yes' : 'No', r.active ? 'Yes' : 'No'])} /></Section>
-}
+  const filtered = search ? data.filter((u: any) => (u.email || '').toLowerCase().includes(search.toLowerCase()) || (u.displayName || '').toLowerCase().includes(search.toLowerCase())) : data
 
-function PlansTab() {
-  const [data, setData] = useState<any[]>([]); const [features, setFeatures] = useState<Record<string, any>>({}); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
-  useEffect(() => {
-    ;(async () => {
-      const r = await apiGet('/api/admin/plans')
-      setLoading(false)
-      if (r.success) {
-        const plans = r.data?.plans || r.data || []
-        setData(plans)
-        const featureMap: Record<string, any> = {}
-        await Promise.all(plans.map(async (p: any) => {
-          const fr = await apiGet(`/api/admin/plans/${encodeURIComponent(p.planCode)}/features`)
-          if (fr.success) featureMap[p.planCode] = (fr.data?.features || fr.data || []).reduce((acc: any, f: any) => { acc[f.featureCode] = f; return acc }, {})
-        }))
-        setFeatures(featureMap)
-      } else setError(r.error?.message || '')
-    })()
-  }, [])
-  if (loading) return <p>Loading...</p>
-  if (error) return <p className="admin-error">{error}</p>
-  const activePlans = data.filter((p: any) => p.active).sort((a: any, b: any) => (a.planCode === 'free' ? -1 : b.planCode === 'free' ? 1 : 0))
-  const featureCodes = [...new Set(Object.values(features).flatMap((m: any) => Object.keys(m || {})))]
-  const displayFeature = (_code: string, f?: any) => {
-    if (!f || !f.enabled) return <span style={{ color: 'var(--text-muted, #9ca3af)' }}>Off</span>
-    if (f.quotaLimit) return <span>{f.quotaLimit}/{f.quotaWindow || 'period'}</span>
-    return <span style={{ color: '#047857', fontWeight: 800 }}>On</span>
+  const handleEdit = async () => {
+    setSaving(true)
+    const r = await apiMut('PUT', `/api/admin/users/${editing.userId}/status`, { active: editing.active })
+    if (r.success) { toast.show('User berhasil diupdate.', 'success'); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal update user.', 'error')
+    setSaving(false)
   }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
   return (
-    <Section title="Plans, Features, Entitlement &amp; Quota">
-      <div className="admin-plans-table-wrap" style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border, #e5e7eb)', background: '#fff' }}>
-        <table className="admin-plans-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead><tr style={{ background: '#f8fafc' }}><th style={{ padding: 12, textAlign: 'left', borderBottom: '1px solid var(--border, #e5e7eb)' }}>Feature</th>{activePlans.map((p: any) => <th key={p.planCode} style={{ padding: 12, textAlign: 'center', borderBottom: '1px solid var(--border, #e5e7eb)' }}>{p.planName}</th>)}</tr></thead>
-          <tbody>
-            {featureCodes.map((fc) => (
-              <tr key={fc} style={{ borderBottom: '1px solid var(--border, #f3f4f6)' }}>
-                <td style={{ padding: 12, fontWeight: 800 }}>{fc}</td>
-                {activePlans.map((p: any) => <td key={p.planCode} style={{ padding: 12, textAlign: 'center' }}>{displayFeature(fc, features[p.planCode]?.[fc])}</td>)}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <Section title="Users">
+      <input className="input-field" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: 12, width: 280 }} />
+      <table><thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Active</th><th>Roles</th><th>Plan</th><th>Created</th><th></th></tr></thead>
+        <tbody>
+          {filtered.map((u: any) => (
+            <tr key={u.userId}>
+              <td>{u.userId}</td><td>{u.email}</td><td>{u.displayName}</td>
+              <td style={{ color: u.active ? '#047857' : '#dc2626' }}>{u.active ? 'Active' : 'Inactive'}</td>
+              <td>{(u.roles || []).join(', ')}</td><td>{u.subscription?.planCode || 'none'}</td>
+              <td>{u.createdAt?.slice(0, 10)}</td>
+              <td><button className="btn-primary" onClick={() => setEditing(u)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {editing && (
+        <Modal title={`User #${editing.userId}`} onClose={() => setEditing(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div><label>Email:</label> <strong>{editing.email}</strong></div>
+            <div><label>Roles:</label> <strong>{(editing.roles || []).join(', ') || 'none'}</strong></div>
+            <div><label>Plan:</label> <strong>{editing.subscription?.planCode || 'none'}</strong></div>
+            <div><label>Active:</label> <select value={editing.active ? 'active' : 'disabled'} onChange={e => setEditing({ ...editing, active: e.target.value === 'active' })}>
+              <option value="active">Active</option><option value="disabled">Disabled</option>
+            </select></div>
+            <button className="btn-primary" onClick={handleEdit} disabled={saving}>{saving ? 'Saving...' : 'Update Status'}</button>
+          </div>
+        </Modal>
+      )}
     </Section>
   )
 }
 
-function AiConfigTab() {
-  const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [saving, setSaving] = useState(false); const [msg, setMsg] = useState('')
-  useEffect(() => { fetch('/api/admin/ai-config', { credentials: 'include', headers: { Accept: 'application/json' } }).then(r => r.json()).then(r => { setLoading(false); if (r.success) { setData(r.data); setError('') } else setError(r.error?.message || '') }) }, [])
-  const handleSave = async () => { setSaving(true); setMsg(''); try { const r = await fetch('/api/admin/ai-config', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(data || {}) }); const b = await r.json(); if (!r.ok || !b.success) { setMsg(b.error?.message || 'Gagal menyimpan.'); } else { setMsg('Saved'); } } catch { setMsg('Tidak bisa terhubung.') } setSaving(false) }
-  if (loading) return <p>Loading...</p>
-  if (error) return <p className="admin-error">{error}</p>
-  return <Section title="AI Configuration"><div className="admin-ai-form">{data ? Object.entries(data).filter(([k]) => !['aiClinicalCopilotAllowedActions','aiClinicalCopilotForbiddenActions','aiClinicalCopilotScopeStatus','aiClinicalCopilotRuntimeEnabled'].includes(k)).map(([k, v]: [string, any]) => <div key={k} className="admin-field"><label>{k}</label><input value={typeof v === 'object' ? JSON.stringify(v) : String(v)} onChange={e => { const nv: any = {}; Object.assign(nv, data, { [k]: e.target.value }); setData(nv) }} /></div>) : null}<button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>{msg ? <p>{msg}</p> : null}</div></Section>
-}
+/* ---- Roles ---- */
 
-function ConfigsTab() {
-  const [data, setData] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [edit, setEdit] = useState<Record<string,string>>({}); const [saving, setSaving] = useState<string|null>(null); const [msg, setMsg] = useState('')
-  useEffect(() => { apiGet('/api/admin/configs').then(r => { setLoading(false); if (r.success) { const c = r.data?.configs || []; setData(c); const e: Record<string,string> = {}; c.forEach((x: any) => e[x.configKey] = x.configValue); setEdit(e) } else setError(r.error?.message || '') }) }, [])
-  const handleSave = async (key: string) => { setSaving(key); setMsg(''); try { const r = await fetch(`/api/admin/configs/${encodeURIComponent(key)}`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ configValue: edit[key] }) }); const b = await r.json(); if (!r.ok || !b.success) { setMsg(b.error?.message || `Gagal menyimpan ${key}.`); } else { setMsg(`Saved ${key}`); } } catch { setMsg('Tidak bisa terhubung.') } setSaving(null) }
-  if (loading) return <p>Loading...</p>
-  if (error) return <p className="admin-error">{error}</p>
-  return <Section title="System Configs">{data.length === 0 ? <p>No configs</p> : <table><thead><tr><th>Key</th><th>Value</th><th></th></tr></thead><tbody>{data.map((r: any) => <tr key={r.configKey}><td>{r.configKey}</td><td><input value={edit[r.configKey] ?? ''} onChange={e => setEdit({...edit, [r.configKey]: e.target.value})} /></td><td><button onClick={() => handleSave(r.configKey)} disabled={saving === r.configKey}>Save</button></td></tr>)}</tbody></table>}{msg ? <p>{msg}</p> : null}</Section>
-}
-
-function PlanFeaturesTab() {
-  const [plans, setPlans] = useState<any[]>([])
-  const [selectedPlan, setSelectedPlan] = useState<string>('')
-  const [features, setFeatures] = useState<Record<string, any>>({})
-  const [loading, setLoading] = useState(false)
+function RolesTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/roles')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
   const [saving, setSaving] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [error, setError] = useState('')
+  const [mode, setMode] = useState<'add'|'edit'|null>(null)
+  const [form, setForm] = useState<any>({})
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    apiGet('/api/admin/plans').then(r => {
-      if (r.success) setPlans(r.data?.plans || r.data || [])
-    })
-  }, [])
-
-  // Derived active plan: explicit selection wins, else first loaded plan.
-  const activePlan = selectedPlan || plans[0]?.planCode || ''
-
-  useEffect(() => {
-    if (!activePlan) return
-    setLoading(true)
-    apiGet(`/api/admin/plans/${encodeURIComponent(activePlan)}/features`).then(r => {
-      setLoading(false)
-      if (r.success) {
-        const map: Record<string, any> = {}
-        ;(r.data?.features || r.data || []).forEach((f: any) => { map[f.featureCode] = f })
-        setFeatures(map)
-      } else {
-        setError(r.error?.message || 'Failed to load features')
-      }
-    })
-  }, [activePlan])
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const toggle = (featureCode: string) => {
-    setFeatures(prev => ({ ...prev, [featureCode]: { ...(prev[featureCode] || { featureCode }), enabled: prev[featureCode]?.enabled ? 0 : 1 } }))
-  }
-  const setQuota = (featureCode: string, value: string) => {
-    const num = value === '' ? null : Number(value)
-    setFeatures(prev => ({ ...prev, [featureCode]: { ...(prev[featureCode] || { featureCode }), quotaLimit: num } }))
-  }
-  const setWindow = (featureCode: string, value: string) => {
-    setFeatures(prev => ({ ...prev, [featureCode]: { ...(prev[featureCode] || { featureCode }), quotaWindow: value || null } }))
-  }
+  const openNew = () => { setForm({ roleCode: '', roleName: '', systemRole: false, active: true }); setMode('add'); setEditing({}) }
+  const openEdit = (r: any) => { setForm({ ...r }); setMode('edit'); setEditing(r) }
 
   const handleSave = async () => {
     setSaving(true)
-    setMsg('')
-    try {
-      const payload = Object.values(features).map((f: any) => ({
-        featureCode: f.featureCode,
-        enabled: f.enabled ? 1 : 0,
-        quotaLimit: f.quotaLimit ?? null,
-        quotaWindow: f.quotaWindow || null
-      }))
-      const res = await fetch(`/api/admin/plans/${encodeURIComponent(activePlan)}/features`, {
-        method: 'PUT', credentials: 'include',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ features: payload })
-      })
-      const body = await res.json()
-      setMsg(body.success ? 'Saved successfully.' : (body.error?.message || 'Save failed'))
-    } catch {
-      setMsg('Save failed')
-    } finally {
-      setSaving(false)
-    }
+    const url = mode === 'add' ? '/api/admin/roles' : `/api/admin/roles/${encodeURIComponent(form.roleCode)}`
+    const r = await apiMut(mode === 'add' ? 'POST' : 'PUT', url, { roleName: form.roleName, active: form.active ? 1 : 0 })
+    if (r.success) { toast.show(mode === 'add' ? 'Role dibuat.' : 'Role diupdate.', 'success'); setMode(null); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Roles">
+      <button className="btn-primary" onClick={openNew} style={{ marginBottom: 12 }}>+ Add Role</button>
+      <table><thead><tr><th>Code</th><th>Name</th><th>System</th><th>Active</th><th></th></tr></thead>
+        <tbody>{data.map((r: any) => (
+          <tr key={r.roleCode}><td>{r.roleCode}</td><td>{r.roleName}</td><td>{r.systemRole ? 'Yes' : 'No'}</td><td style={{ color: r.active ? '#047857' : '#dc2626' }}>{r.active ? 'Yes' : 'No'}</td>
+            <td><button className="btn-primary" onClick={() => openEdit(r)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {editing && (
+        <Modal title={mode === 'add' ? 'New Role' : `Edit ${form.roleCode}`} onClose={() => { setMode(null); setEditing(null) }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div><label>Code:</label> <input className="input-field" value={form.roleCode} onChange={e => setForm({ ...form, roleCode: e.target.value })} disabled={mode === 'edit'} /></div>
+            <div><label>Name:</label> <input className="input-field" value={form.roleName || ''} onChange={e => setForm({ ...form, roleName: e.target.value })} /></div>
+            <div><label>Active:</label> <select value={form.active ? 'true' : 'false'} onChange={e => setForm({ ...form, active: e.target.value === 'true' })}><option value="true">Yes</option><option value="false">No</option></select></div>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
+}
+
+/* ---- Plans ---- */
+
+function PlansTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/plans')
+  const [features, setFeatures] = useState<Record<string, any>>({})
+  const [featuresLoading, setFeaturesLoading] = useState(true)
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [mode, setMode] = useState<'add'|'edit'|null>(null)
+  const [form, setForm] = useState<any>({})
+
+  useEffect(() => {
+    if (data.length === 0) return
+    setFeaturesLoading(true)
+    const fm: Record<string, any> = {}
+    Promise.all(data.map(async (p: any) => {
+      const fr = await apiGet(`/api/admin/plans/${encodeURIComponent(p.planCode)}/features`)
+      if (fr.success) fm[p.planCode] = (fr.data?.features || fr.data || []).reduce((acc: any, f: any) => { acc[f.featureCode] = f; return acc }, {})
+    })).then(() => { setFeatures(fm); setFeaturesLoading(false) })
+  }, [data])
+
+  const openNew = () => { setForm({ planCode: '', planName: '', billingInterval: 'monthly', priceAmount: 0, currency: 'IDR', active: true, trialDays: 0, sortOrder: 0 }); setMode('add'); setEditing({}) }
+  const openEdit = (p: any) => { setForm({ ...p, priceAmount: p.priceAmount ?? 0, trialDays: p.trialDays ?? 0, sortOrder: p.sortOrder ?? 0 }); setMode('edit'); setEditing(p) }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const url = mode === 'add' ? '/api/admin/plans' : `/api/admin/plans/${encodeURIComponent(form.planCode)}`
+    const r = await apiMut(mode === 'add' ? 'POST' : 'PUT', url, { planName: form.planName, billingInterval: form.billingInterval, priceAmount: Number(form.priceAmount), currency: form.currency, active: form.active, trialDays: Number(form.trialDays), sortOrder: Number(form.sortOrder) })
+    if (r.success) { toast.show(mode === 'add' ? 'Plan dibuat.' : 'Plan diupdate.', 'success'); setMode(null); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  const handleDelete = async (planCode: string) => {
+    if (!confirm(`Hapus plan ${planCode}? Plan akan dinonaktifkan.`)) return
+    const r = await apiMut('DELETE', `/api/admin/plans/${encodeURIComponent(planCode)}`)
+    if (r.success) { toast.show(`${planCode} dihapus.`, 'success'); refresh() }
+    else toast.show(r.error?.message || 'Gagal menghapus.', 'error')
+  }
+
+  const activePlans = data.filter((p: any) => p.active).sort((a: any, b: any) => (a.planCode === 'free' ? -1 : b.planCode === 'free' ? 1 : 0))
+  const featureCodes = [...new Set(Object.values(features).flatMap((m: any) => Object.keys(m || {})))]
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Plans, Features & Entitlement">
+      <button className="btn-primary" onClick={openNew} style={{ marginBottom: 12 }}>+ Add Plan</button>
+      <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+        <table style={{ fontSize: 12 }}><thead><tr><th>Code</th><th>Name</th><th>Interval</th><th>Price</th><th>Active</th><th>Sort</th><th></th></tr></thead>
+          <tbody>{data.map((p: any) => (
+            <tr key={p.planCode}><td>{p.planCode}</td><td>{p.planName}</td><td>{p.billingInterval}</td><td>{p.priceAmount} {p.currency}</td><td style={{ color: p.active ? '#047857' : '#9ca3af' }}>{p.active ? 'Yes' : 'No'}</td><td>{p.sortOrder}</td>
+              <td style={{ display: 'flex', gap: 4 }}><button className="btn-primary" onClick={() => openEdit(p)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button>
+              {p.planCode !== 'free' && <button className="btn-secondary" onClick={() => handleDelete(p.planCode)} style={{ fontSize: 12, padding: '2px 8px', color: '#dc2626' }}>Delete</button>}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {featuresLoading ? <Loading /> : (
+        <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border, #e5e7eb)', background: '#fff' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead><tr style={{ background: '#f8fafc' }}><th style={{ padding: 12, textAlign: 'left' }}>Feature</th>{activePlans.map((p: any) => <th key={p.planCode} style={{ padding: 12, textAlign: 'center' }}>{p.planName}</th>)}</tr></thead>
+            <tbody>
+              {featureCodes.map(fc => (
+                <tr key={fc} style={{ borderBottom: '1px solid var(--border, #f3f4f6)' }}>
+                  <td style={{ padding: 12, fontWeight: 800 }}>{fc}</td>
+                  {activePlans.map((p: any) => {
+                    const f = features[p.planCode]?.[fc]
+                    return <td key={p.planCode} style={{ padding: 12, textAlign: 'center' }}>{!f || !f.enabled ? <span style={{ color: '#9ca3af' }}>Off</span> : f.quotaLimit ? <span>{f.quotaLimit}/{f.quotaWindow || 'period'}</span> : <span style={{ color: '#047857', fontWeight: 800 }}>On</span>}</td>
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {editing && (
+        <Modal title={mode === 'add' ? 'New Plan' : `Edit ${form.planCode}`} onClose={() => { setMode(null); setEditing(null) }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div><label>Code:</label> <input className="input-field" value={form.planCode} onChange={e => setForm({ ...form, planCode: e.target.value })} disabled={mode === 'edit'} /></div>
+            <div><label>Name:</label> <input className="input-field" value={form.planName || ''} onChange={e => setForm({ ...form, planName: e.target.value })} /></div>
+            <div><label>Interval:</label> <select value={form.billingInterval} onChange={e => setForm({ ...form, billingInterval: e.target.value })}><option value="free">free</option><option value="monthly">monthly</option><option value="quarterly">quarterly</option><option value="yearly">yearly</option><option value="manual">manual</option></select></div>
+            <div><label>Price:</label> <input className="input-field" type="number" value={form.priceAmount} onChange={e => setForm({ ...form, priceAmount: e.target.value })} /></div>
+            <div><label>Trial Days:</label> <input className="input-field" type="number" value={form.trialDays} onChange={e => setForm({ ...form, trialDays: e.target.value })} /></div>
+            <div><label>Sort Order:</label> <input className="input-field" type="number" value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: e.target.value })} /></div>
+            <div><label>Active:</label> <select value={form.active ? 'true' : 'false'} onChange={e => setForm({ ...form, active: e.target.value === 'true' })}><option value="true">Yes</option><option value="false">No</option></select></div>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
+}
+
+/* ---- Plan Features ---- */
+
+function PlanFeaturesTab() {
+  const [plans, setPlans] = useState<any[]>([])
+  const [selectedPlan, setSelectedPlan] = useState('')
+  const [features, setFeatures] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const toast = useToast()
+
+  useEffect(() => { apiGet('/api/admin/plans').then(r => { if (r.success) setPlans(r.data?.plans || r.data || []) }) }, [])
+
+  const activePlan = selectedPlan || plans[0]?.planCode || ''
+  useEffect(() => {
+    if (!activePlan) return; setLoading(true)
+    apiGet(`/api/admin/plans/${encodeURIComponent(activePlan)}/features`).then(r => {
+      setLoading(false)
+      if (r.success) { const map: Record<string, any> = {}; (r.data?.features || r.data || []).forEach((f: any) => { map[f.featureCode] = f }); setFeatures(map) }
+      else setError(r.error?.message || 'Failed')
+    })
+  }, [activePlan])
+
+  const toggle = (fc: string) => setFeatures(prev => ({ ...prev, [fc]: { ...(prev[fc] || { featureCode: fc }), enabled: prev[fc]?.enabled ? 0 : 1 } }))
+  const setQ = (fc: string, v: string) => setFeatures(prev => ({ ...prev, [fc]: { ...(prev[fc] || { featureCode: fc }), quotaLimit: v === '' ? null : Number(v) } }))
+  const setW = (fc: string, v: string) => setFeatures(prev => ({ ...prev, [fc]: { ...(prev[fc] || { featureCode: fc }), quotaWindow: v || null } }))
+
+  const handleSave = async () => {
+    setSaving(true)
+    const payload = Object.values(features).map((f: any) => ({ featureCode: f.featureCode, enabled: f.enabled ? 1 : 0, quotaLimit: f.quotaLimit ?? null, quotaWindow: f.quotaWindow || null }))
+    const r = await apiMut('PUT', `/api/admin/plans/${encodeURIComponent(activePlan)}/features`, { features: payload })
+    if (r.success) toast.show('Features tersimpan.', 'success')
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
   }
 
   return (
     <Section title="Plan Features">
       <div style={{ marginBottom: 16 }}>
         <label>Plan: </label>
-        <select value={activePlan} onChange={e => setSelectedPlan(e.target.value)}>
-          {plans.map((p: any) => <option key={p.planCode} value={p.planCode}>{p.planName}</option>)}
-        </select>
+        <select value={activePlan} onChange={e => setSelectedPlan(e.target.value)}>{plans.map((p: any) => <option key={p.planCode} value={p.planCode}>{p.planName}</option>)}</select>
       </div>
-      {loading && <p>Loading...</p>}
-      {error && <p className="admin-error">{error}</p>}
+      {loading && <Loading />}{error && <ErrorMsg msg={error} />}
       {Object.keys(features).length > 0 && (
         <>
           <table style={{ width: '100%', marginBottom: 16 }}>
             <thead><tr><th>Feature</th><th>Enabled</th><th>Quota</th><th>Window</th></tr></thead>
             <tbody>
               {Object.values(features).map((f: any) => (
-                <tr key={f.featureCode}>
-                  <td>{f.featureCode}</td>
+                <tr key={f.featureCode}><td>{f.featureCode}</td>
                   <td><input type="checkbox" checked={!!f.enabled} onChange={() => toggle(f.featureCode)} /></td>
-                  <td><input type="number" value={f.quotaLimit ?? ''} onChange={e => setQuota(f.featureCode, e.target.value)} style={{ width: 80 }} /></td>
-                  <td>
-                    <select value={f.quotaWindow || ''} onChange={e => setWindow(f.featureCode, e.target.value)}>
-                      <option value="">-</option>
-                      <option value="day">day</option>
-                      <option value="month">month</option>
-                      <option value="quarter">quarter</option>
-                      <option value="year">year</option>
-                      <option value="lifetime">lifetime</option>
-                    </select>
-                  </td>
+                  <td><input type="number" value={f.quotaLimit ?? ''} onChange={e => setQ(f.featureCode, e.target.value)} style={{ width: 80 }} /></td>
+                  <td><select value={f.quotaWindow || ''} onChange={e => setW(f.featureCode, e.target.value)}><option value="">-</option><option value="day">day</option><option value="month">month</option><option value="quarter">quarter</option><option value="year">year</option><option value="lifetime">lifetime</option></select></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Features'}</button>
-          {msg && <p>{msg}</p>}
+          <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Features'}</button>
         </>
       )}
     </Section>
   )
 }
 
-function GenericListTab({ title, url, cols, mapRow }: { title: string; url: string; cols: string[]; mapRow: (item: any) => any[] }) {
-  const [data, setData] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
-  useEffect(() => { apiGet(url).then(r => { setLoading(false); if (r.success) { const raw = r.data; const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.logs)) ? raw.logs : (raw && Array.isArray(raw.items)) ? raw.items : (raw && Array.isArray(raw.events)) ? raw.events : Array.isArray(raw) ? raw : []; setData(arr) } else setError(r.error?.message || '') }) }, [url])
-  if (loading) return <p>Loading...</p>
-  if (error) return <p className="admin-error">{error}</p>
-  return <Section title={title}>{data.length === 0 ? <p>No data</p> : <Table cols={cols} rows={data.map(mapRow)} />}</Section>
+/* ---- Subscriptions ---- */
+
+function SubscriptionsTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/subscriptions?limit=50')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<Record<string, any>>({})
+
+  const openEdit = (s: any) => { setForm({ ...s, cancelAtPeriodEnd: s.cancelAtPeriodEnd ? '1' : '0' }); setEditing(s) }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const r = await apiMut('PUT', `/api/admin/subscriptions/${editing.id}`, { planCode: form.planCode, status: form.status, cancelAtPeriodEnd: form.cancelAtPeriodEnd === '1' })
+    if (r.success) { toast.show('Subscription diupdate.', 'success'); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Subscriptions">
+      <table><thead><tr><th>ID</th><th>UserID</th><th>Plan</th><th>Status</th><th>Provider</th><th>Period Start</th><th>Period End</th><th>Cancel</th><th></th></tr></thead>
+        <tbody>{data.map((s: any) => (
+          <tr key={s.id}><td>{s.id}</td><td>{s.userId}</td><td>{s.planCode}</td><td>{s.status}</td><td>{s.provider}</td><td>{s.currentPeriodStart?.slice(0, 10)}</td><td>{s.currentPeriodEnd?.slice(0, 10)}</td><td>{s.cancelAtPeriodEnd ? 'Yes' : 'No'}</td>
+            <td><button className="btn-primary" onClick={() => openEdit(s)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {editing && (
+        <Modal title={`Subscription #${editing.id}`} onClose={() => setEditing(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div><label>Plan:</label> <input className="input-field" value={form.planCode || ''} onChange={e => setForm({ ...form, planCode: e.target.value })} /></div>
+            <div><label>Status:</label> <select value={form.status || ''} onChange={e => setForm({ ...form, status: e.target.value })}><option value="active">active</option><option value="expired">expired</option><option value="cancelled">cancelled</option><option value="trial">trial</option></select></div>
+            <div><label>Cancel at period end:</label> <select value={form.cancelAtPeriodEnd || '0'} onChange={e => setForm({ ...form, cancelAtPeriodEnd: e.target.value })}><option value="0">No</option><option value="1">Yes</option></select></div>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
 }
 
-function FeatureFlagsTab() { return <GenericListTab title="Feature Flags" url="/api/admin/feature-flags" cols={['Code','Name','Enabled','Target']} mapRow={(f: any) => [f.flagCode, f.flagName, f.enabled ? 'Yes' : 'No', f.targetPlanCode || f.targetRoleCode || '-']} /> }
-function AuditLogsTab() { return <GenericListTab title="Audit Logs" url="/api/admin/audit-logs" cols={['ID','User','Action','Entity','Created']} mapRow={(l: any) => [l.id, l.userId, l.action, `${l.entityType}:${l.entityId}`, l.createdAt]} /> }
-function SafetyEventsTab() { return <GenericListTab title="Safety Events" url="/api/admin/safety-events" cols={['ID','User','Type','Severity','Title','Created']} mapRow={(e: any) => [e.id, e.userId, e.eventType, e.severity, e.title, e.createdAt]} /> }
-function MetricCatalogTab() { return <GenericListTab title="Metric Catalog" url="/api/admin/metric-catalog" cols={['Code','Name','Category','Unit','Active']} mapRow={(m: any) => [m.metricCode, m.metricName, m.category, m.unit, m.active ? 'Yes' : 'No']} /> }
-function MetricRulesTab() { return <GenericListTab title="Metric Rules" url="/api/admin/metric-rules" cols={['Code','Metric','Severity','Range','Active']} mapRow={(r: any) => [r.ruleCode, r.metricCode, r.severity, `${r.minValue} - ${r.maxValue}`, r.active ? 'Yes' : 'No']} /> }
-function KnowledgeTab() { return <GenericListTab title="Knowledge Articles" url="/api/admin/knowledge-articles" cols={['Slug','Title','Category','Active']} mapRow={(a: any) => [a.slug, a.title, a.category, a.active ? 'Yes' : 'No']} /> }
+/* ---- AI Config ---- */
+
+function AiConfigTab() {
+  const [data, setData] = useState<any>(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState('')
+  const toast = useToast()
+  useEffect(() => { fetch('/api/admin/ai-config', { credentials: 'include', headers: { Accept: 'application/json' } }).then(r => r.json()).then(r => { setLoading(false); if (r.success) setData(r.data); else setError(r.error?.message || '') }) }, [])
+  const handleSave = async () => { setSaving(true); const r = await apiMut('PUT', '/api/admin/ai-config', data || {}); if (r.success) toast.show('AI Config tersimpan.', 'success'); else toast.show(r.error?.message || 'Gagal.', 'error'); setSaving(false) }
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  const skip = new Set(['aiClinicalCopilotAllowedActions', 'aiClinicalCopilotForbiddenActions', 'aiClinicalCopilotScopeStatus', 'aiClinicalCopilotRuntimeEnabled'])
+  return (
+    <Section title="AI Configuration">
+      <div className="admin-ai-form">
+        {data ? Object.entries(data).filter(([k]) => !skip.has(k)).map(([k, v]: [string, any]) => (
+          <div key={k} className="admin-field"><label>{k}</label><input value={typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')} onChange={e => { const nv: any = {}; Object.assign(nv, data, { [k]: e.target.value }); setData(nv) }} /></div>
+        )) : null}
+        <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+      </div>
+    </Section>
+  )
+}
+
+/* ---- System Configs ---- */
+
+function ConfigsTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/configs')
+  const [edit, setEdit] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<string | null>(null)
+  const toast = useToast()
+
+  useEffect(() => { const e: Record<string, string> = {}; data.forEach((x: any) => e[x.configKey] = x.configValue || ''); setEdit(e) }, [data])
+
+  const handleSave = async (key: string) => {
+    setSaving(key)
+    const r = await apiMut('PUT', `/api/admin/configs/${encodeURIComponent(key)}`, { configValue: edit[key] })
+    if (r.success) toast.show(`${key} tersimpan.`, 'success')
+    else toast.show(r.error?.message || `Gagal menyimpan ${key}.`, 'error')
+    setSaving(null); refresh()
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="System Configs">
+      {data.length === 0 ? <p>No configs.</p> : (
+        <table><thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+          <tbody>{data.map((r: any) => (
+            <tr key={r.configKey}><td>{r.configKey}</td><td><input className="input-field" value={edit[r.configKey] ?? ''} onChange={e => setEdit({ ...edit, [r.configKey]: e.target.value })} style={{ width: 300 }} /></td>
+              <td><button className="btn-primary" onClick={() => handleSave(r.configKey)} disabled={saving === r.configKey}>Save</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </Section>
+  )
+}
+
+/* ---- Feature Flags ---- */
+
+function FeatureFlagsTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/feature-flags')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<any>({})
+
+  const openEdit = (f: any) => { setForm({ ...f, enabled: !!f.enabled }); setEditing(f) }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const r = await apiMut('PUT', `/api/admin/feature-flags/${encodeURIComponent(form.flagCode)}`, { enabled: form.enabled, targetPlanCode: form.targetPlanCode || null, targetRoleCode: form.targetRoleCode || null })
+    if (r.success) { toast.show(`${form.flagCode} diupdate.`, 'success'); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Feature Flags">
+      <table><thead><tr><th>Code</th><th>Name</th><th>Enabled</th><th>Target Plan</th><th>Target Role</th><th></th></tr></thead>
+        <tbody>{data.map((f: any) => (
+          <tr key={f.flagCode}><td>{f.flagCode}</td><td>{f.flagName}</td><td style={{ color: f.enabled ? '#047857' : '#9ca3af' }}>{f.enabled ? 'Yes' : 'No'}</td><td>{f.targetPlanCode || '-'}</td><td>{f.targetRoleCode || '-'}</td>
+            <td><button className="btn-primary" onClick={() => openEdit(f)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {editing && (
+        <Modal title={`Edit ${form.flagCode}`} onClose={() => setEditing(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div><label>Enabled:</label> <select value={form.enabled ? 'true' : 'false'} onChange={e => setForm({ ...form, enabled: e.target.value === 'true' })}><option value="true">Yes</option><option value="false">No</option></select></div>
+            <div><label>Target Plan:</label> <input className="input-field" value={form.targetPlanCode || ''} onChange={e => setForm({ ...form, targetPlanCode: e.target.value || null })} /></div>
+            <div><label>Target Role:</label> <input className="input-field" value={form.targetRoleCode || ''} onChange={e => setForm({ ...form, targetRoleCode: e.target.value || null })} /></div>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
+}
+
+/* ---- Education ---- */
+
+function EducationTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/education/cards?limit=100')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<any>({})
+
+  const openEdit = (e: any) => { setForm({ ...e }); setEditing(e) }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const r = await apiMut('PUT', `/api/admin/education/cards/${encodeURIComponent(form.topicType)}/${encodeURIComponent(form.topicCode)}`, { title: form.title, shortText: form.shortText, active: form.active })
+    if (r.success) { toast.show('Education card tersimpan.', 'success'); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Education Cards">
+      <table><thead><tr><th>Topic Type</th><th>Topic Code</th><th>Title</th><th>Active</th><th>Sort</th><th></th></tr></thead>
+        <tbody>{data.map((e: any) => (
+          <tr key={e.id}><td>{e.topicType}</td><td>{e.topicCode}</td><td>{e.title}</td><td style={{ color: e.active ? '#047857' : '#9ca3af' }}>{e.active ? 'Yes' : 'No'}</td><td>{e.sortOrder}</td>
+            <td><button className="btn-primary" onClick={() => openEdit(e)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {editing && (
+        <Modal title={`Edit ${editing.topicType}/${editing.topicCode}`} onClose={() => setEditing(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div><label>Title:</label> <input className="input-field" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
+            <div><label>Short Text:</label> <textarea className="input-field" rows={3} value={form.shortText || ''} onChange={e => setForm({ ...form, shortText: e.target.value })} /></div>
+            <div><label>Active:</label> <select value={form.active ? 'true' : 'false'} onChange={e => setForm({ ...form, active: e.target.value === 'true' })}><option value="true">Yes</option><option value="false">No</option></select></div>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
+}
+
+/* ---- Metric Catalog ---- */
+
+function MetricCatalogTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/metric-catalog?limit=100')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<any>({})
+
+  const openEdit = (m: any) => { setForm({ ...m }); setEditing(m) }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const payload: any = {}
+    for (const k of ['metricName', 'category', 'unit', 'inputType', 'requiresAttachment', 'requiresSex', 'requiresFasting', 'isCalculated', 'physicalMin', 'physicalMax', 'sortOrder', 'active']) {
+      if (form[k] !== undefined) payload[k] = form[k]
+    }
+    const r = await apiMut('PUT', `/api/admin/metric-catalog/${encodeURIComponent(form.metricCode)}`, payload)
+    if (r.success) { toast.show(`${form.metricCode} tersimpan.`, 'success'); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Metric Catalog">
+      <table><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Unit</th><th>Active</th><th></th></tr></thead>
+        <tbody>{data.map((m: any) => (
+          <tr key={m.metricCode}><td>{m.metricCode}</td><td>{m.metricName}</td><td>{m.category}</td><td>{m.unit}</td><td style={{ color: m.active ? '#047857' : '#9ca3af' }}>{m.active ? 'Yes' : 'No'}</td>
+            <td><button className="btn-primary" onClick={() => openEdit(m)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {editing && (
+        <Modal title={`Edit ${form.metricCode}`} onClose={() => setEditing(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {['metricName', 'category', 'unit', 'inputType'].map(k => (
+              <div key={k}><label>{k}:</label> <input className="input-field" value={form[k] ?? ''} onChange={e => setForm({ ...form, [k]: e.target.value })} /></div>
+            ))}
+            {['physicalMin', 'physicalMax', 'sortOrder'].map(k => (
+              <div key={k}><label>{k}:</label> <input className="input-field" type="number" value={form[k] ?? ''} onChange={e => setForm({ ...form, [k]: e.target.value === '' ? null : Number(e.target.value) })} /></div>
+            ))}
+            {['requiresAttachment', 'requiresSex', 'requiresFasting', 'isCalculated', 'active'].map(k => (
+              <div key={k}><label>{k}:</label> <select value={form[k] ? 'true' : 'false'} onChange={e => setForm({ ...form, [k]: e.target.value === 'true' })}><option value="true">Yes</option><option value="false">No</option></select></div>
+            ))}
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
+}
+
+/* ---- Metric Rules ---- */
+
+function MetricRulesTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/metric-rules?limit=100')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<any>({})
+
+  const openEdit = (r: any) => { setForm({ ...r }); setEditing(r) }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const payload: any = {}
+    for (const k of ['ruleName', 'metricCode', 'sex', 'status', 'severity', 'minValue', 'maxValue', 'popupTitle', 'popupMessage', 'recommendation', 'sourceLabel', 'active']) {
+      if (form[k] !== undefined) payload[k] = form[k]
+    }
+    const r = await apiMut('PUT', `/api/admin/metric-rules/${encodeURIComponent(form.ruleCode)}`, payload)
+    if (r.success) { toast.show(`${form.ruleCode} tersimpan.`, 'success'); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Metric Rules">
+      <table><thead><tr><th>Code</th><th>Name</th><th>Metric</th><th>Severity</th><th>Range</th><th>Active</th><th></th></tr></thead>
+        <tbody>{data.map((r: any) => (
+          <tr key={r.ruleCode}><td>{r.ruleCode}</td><td>{r.ruleName}</td><td>{r.metricCode}</td><td>{r.severity}</td><td>{r.minValue} - {r.maxValue}</td><td style={{ color: r.active ? '#047857' : '#9ca3af' }}>{r.active ? 'Yes' : 'No'}</td>
+            <td><button className="btn-primary" onClick={() => openEdit(r)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {editing && (
+        <Modal title={`Edit ${form.ruleCode}`} onClose={() => setEditing(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '60vh', overflow: 'auto' }}>
+            {['ruleName', 'metricCode', 'sex', 'status', 'severity', 'popupTitle', 'popupMessage', 'recommendation', 'sourceLabel'].map(k => (
+              <div key={k}><label>{k}:</label> <input className="input-field" value={form[k] ?? ''} onChange={e => setForm({ ...form, [k]: e.target.value })} /></div>
+            ))}
+            {['minValue', 'maxValue'].map(k => (
+              <div key={k}><label>{k}:</label> <input className="input-field" type="number" value={form[k] ?? ''} onChange={e => setForm({ ...form, [k]: e.target.value === '' ? null : Number(e.target.value) })} /></div>
+            ))}
+            <div><label>active:</label> <select value={form.active ? 'true' : 'false'} onChange={e => setForm({ ...form, active: e.target.value === 'true' })}><option value="true">Yes</option><option value="false">No</option></select></div>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
+}
+
+/* ---- Knowledge Base ---- */
+
+function KnowledgeTab() {
+  const { data, loading, error, refresh } = useList<any>('/api/admin/knowledge-articles?limit=100')
+  const toast = useToast()
+  const [editing, setEditing] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<any>({})
+
+  const openEdit = (a: any) => { setForm({ ...a }); setEditing(a) }
+
+  const handleSave = async () => {
+    setSaving(true)
+    const payload: any = {}
+    for (const k of ['title', 'category', 'contentMarkdown', 'active']) { if (form[k] !== undefined) payload[k] = form[k] }
+    const r = await apiMut('PUT', `/api/admin/knowledge-articles/${encodeURIComponent(form.slug)}`, payload)
+    if (r.success) { toast.show(`${form.slug} tersimpan.`, 'success'); setEditing(null); refresh() }
+    else toast.show(r.error?.message || 'Gagal.', 'error')
+    setSaving(false)
+  }
+
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Knowledge Base">
+      <table><thead><tr><th>Slug</th><th>Title</th><th>Category</th><th>Active</th><th></th></tr></thead>
+        <tbody>{data.map((a: any) => (
+          <tr key={a.slug}><td>{a.slug}</td><td>{a.title}</td><td>{a.category}</td><td style={{ color: a.active ? '#047857' : '#9ca3af' }}>{a.active ? 'Yes' : 'No'}</td>
+            <td><button className="btn-primary" onClick={() => openEdit(a)} style={{ fontSize: 12, padding: '2px 8px' }}>Edit</button></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {editing && (
+        <Modal title={`Edit ${form.slug}`} onClose={() => setEditing(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div><label>Title:</label> <input className="input-field" value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
+            <div><label>Category:</label> <input className="input-field" value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })} /></div>
+            <div><label>Content (Markdown):</label> <textarea className="input-field" rows={6} value={form.contentMarkdown || ''} onChange={e => setForm({ ...form, contentMarkdown: e.target.value })} /></div>
+            <div><label>Active:</label> <select value={form.active ? 'true' : 'false'} onChange={e => setForm({ ...form, active: e.target.value === 'true' })}><option value="true">Yes</option><option value="false">No</option></select></div>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </Modal>
+      )}
+    </Section>
+  )
+}
+
+/* ---- AI Memory ---- */
 
 function AiMemoryTab() {
   const [targetUid, setTargetUid] = useState('')
   const [status, setStatus] = useState<any>(null); const [loading, setLoading] = useState(false); const [rebuilding, setRebuilding] = useState(false); const [msg, setMsg] = useState('')
-  const loadStatus = async (uid: string) => { if (!uid) return; setLoading(true); const r = await (await fetch(`/api/admin/users/${uid}/ai-memory/status`, { credentials: 'include' })).json(); setLoading(false); if (r.success) setStatus(r.data); else setMsg(r.error?.message || 'Access denied') }
-  const handleRebuild = async () => { if (!targetUid) return; setRebuilding(true); setMsg(''); const r = await (await fetch(`/api/admin/users/${targetUid}/ai-memory/rebuild`, { method: 'POST', credentials: 'include' })).json(); if (r.success) setMsg(`Rebuild queued. Job #${r.data.jobId}`); else setMsg(r.error?.message || 'Failed'); setRebuilding(false) }
-  return <Section title="AI Memory Admin"><div><label>User ID: <input value={targetUid} onChange={e => setTargetUid(e.target.value)} /></label><button onClick={() => loadStatus(targetUid)}>Check Status</button></div>
-    {loading && <p>Loading...</p>}{msg && <p>{msg}</p>}
-    {status && <div><p>Namespace: <code>{status.namespace || '-'}</code></p><p>Documents: {status.documentCount ?? 0} | Indexed: {status.indexedCount ?? 0} | Pending: {status.pendingCount ?? 0}</p>
-    <p>Sprint 6: <code>{status.sprint6ClinicalCopilot?.scopeStatus || 'deferred'}</code></p><button onClick={handleRebuild} disabled={rebuilding}>{rebuilding ? 'Rebuilding...' : 'Rebuild Memory'}</button></div>}
-    <div style={{marginTop:16}}><h4>Clinical Copilot Readiness</h4>
-    <GenericListTab title="Readiness" url="/api/admin/ai-clinical-copilot/readiness" cols={['Scope','Runtime','Allowed','Forbidden']} mapRow={(r: any) => [r.scopeStatus || '-', r.sprint6ClinicalCopilot?.runtimeEnabled ? 'Yes' : 'No', (r.allowedActions||[]).join(', '), (r.forbiddenActions||[]).join(', ')]} /></div></Section>
+  const toast = useToast()
+
+  const loadStatus = async (uid: string) => { if (!uid) return; setLoading(true); const r = await apiGet(`/api/admin/users/${uid}/ai-memory/status`); setLoading(false); if (r.success) setStatus(r.data); else setMsg(r.error?.message || 'Access denied') }
+  const handleRebuild = async () => { if (!targetUid) return; setRebuilding(true); setMsg(''); const r = await apiMut('POST', `/api/admin/users/${targetUid}/ai-memory/rebuild`); if (r.success) { toast.show(`Rebuild queued. Job #${r.data.jobId}`, 'success') } else setMsg(r.error?.message || 'Failed'); setRebuilding(false) }
+
+  return (
+    <Section title="AI Memory Admin">
+      <div style={{ marginBottom: 16 }}><label>User ID: <input className="input-field" value={targetUid} onChange={e => setTargetUid(e.target.value)} style={{ width: 120 }} /></label><button className="btn-primary" onClick={() => loadStatus(targetUid)} style={{ marginLeft: 8 }}>Check Status</button></div>
+      {loading && <Loading />}{msg && <p>{msg}</p>}
+      {status && <div><p>Namespace: <code>{status.namespace || '-'}</code></p><p>Documents: {status.documentCount ?? 0} | Indexed: {status.indexedCount ?? 0} | Pending: {status.pendingCount ?? 0}</p>
+        <p>Sprint 6: <code>{status.sprint6ClinicalCopilot?.scopeStatus || 'deferred'}</code></p><button className="btn-primary" onClick={handleRebuild} disabled={rebuilding}>{rebuilding ? 'Rebuilding...' : 'Rebuild Memory'}</button></div>}
+    </Section>
+  )
 }
 
-const TAB_COMPONENTS: Record<TabId, (props: { onTab?: (id: TabId) => void }) => React.ReactNode> = {
-  overview: OverviewTab, users: UsersTab, roles: RolesTab, plans: PlansTab, 'plan-features': PlanFeaturesTab, 'ai-config': AiConfigTab, 'ai-memory': AiMemoryTab,
-  configs: ConfigsTab, 'feature-flags': FeatureFlagsTab, 'audit-logs': AuditLogsTab,
-  'safety-events': SafetyEventsTab, 'metric-catalog': MetricCatalogTab, 'metric-rules': MetricRulesTab, knowledge: KnowledgeTab,
+/* ---- Audit & Safety (read-only) ---- */
+
+function AuditLogsTab() {
+  const { data, loading, error } = useList<any>('/api/admin/audit-logs?limit=100')
+  const [search, setSearch] = useState('')
+  const filtered = search ? data.filter((l: any) => (l.action || '').toLowerCase().includes(search) || (l.entityType || '').toLowerCase().includes(search)) : data
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Audit Logs">
+      <input className="input-field" placeholder="Search action/entity..." value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: 12, width: 280 }} />
+      <table style={{ fontSize: 12 }}><thead><tr><th>ID</th><th>User</th><th>Action</th><th>Entity</th><th>Created</th></tr></thead>
+        <tbody>{filtered.map((l: any) => <tr key={l.id}><td>{l.id}</td><td>{l.userId}</td><td>{l.action}</td><td>{l.entityType}:{l.entityId}</td><td>{l.createdAt}</td></tr>)}</tbody>
+      </table>
+    </Section>
+  )
 }
+
+function SafetyEventsTab() {
+  const { data, loading, error } = useList<any>('/api/admin/safety-events?limit=50')
+  if (loading) return <Loading />
+  if (error) return <ErrorMsg msg={error} />
+  return (
+    <Section title="Safety Events">
+      <table style={{ fontSize: 12 }}><thead><tr><th>ID</th><th>User</th><th>Type</th><th>Severity</th><th>Title</th><th>Created</th></tr></thead>
+        <tbody>{data.map((e: any) => <tr key={e.id}><td>{e.id}</td><td>{e.userId}</td><td>{e.eventType}</td><td>{e.severity}</td><td>{e.title}</td><td>{e.createdAt}</td></tr>)}</tbody>
+      </table>
+    </Section>
+  )
+}
+
+/* ---- Tab Components ---- */
+
+const TAB_COMPONENTS: Record<TabId, (props: { onTab?: (id: TabId) => void }) => React.ReactNode> = {
+  overview: OverviewTab, users: UsersTab, roles: RolesTab, plans: PlansTab, 'plan-features': PlanFeaturesTab, subscriptions: SubscriptionsTab,
+  'ai-config': AiConfigTab, 'ai-memory': AiMemoryTab, configs: ConfigsTab, 'feature-flags': FeatureFlagsTab, education: EducationTab,
+  'audit-logs': AuditLogsTab, 'safety-events': SafetyEventsTab, 'metric-catalog': MetricCatalogTab, 'metric-rules': MetricRulesTab, knowledge: KnowledgeTab,
+}
+
+/* ---- Page ---- */
 
 export function AdminPage() {
   const { user, roles, permissions } = useAuth()
-  const { t } = useI18n()
   const [tab, setTab] = useState<TabId>('overview')
-  if (!user) return <section className="settings-panel"><h2>{t('admin.pleaseLogin')}</h2></section>
+  if (!user) return <section className="settings-panel"><h2>Please login</h2></section>
   const userRoles = roles || []
   const userPermissions = permissions || []
   const isPrivilegedAdmin = userRoles.includes('superAdmin') || userRoles.includes('admin')
@@ -304,8 +781,8 @@ export function AdminPage() {
   const TabContent = TAB_COMPONENTS[tab]
   return (
     <section className="settings-panel admin-page">
-      <div className="page-heading"><h2>{t('admin.adminTitle')}</h2></div>
-      <nav className="admin-tabs">{visibleTabs.map(tb => <button key={tb.id} className={tab === tb.id ? 'active' : ''} onClick={() => setTab(tb.id)}>{t(tb.labelKey)}</button>)}</nav>
+      <div className="page-heading"><h2>Admin Panel</h2></div>
+      <nav className="admin-tabs">{visibleTabs.map(tb => <button key={tb.id} className={tab === tb.id ? 'active' : ''} onClick={() => setTab(tb.id)}>{tb.label}</button>)}</nav>
       <div className="admin-content"><TabContent onTab={setTab} /></div>
     </section>
   )

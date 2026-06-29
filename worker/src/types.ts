@@ -23,6 +23,9 @@ export interface Env {
   EMAIL_OTP_RESEND_COOLDOWN_SECONDS?: string
   EMAIL_OTP_MAX_RESENDS?: string
   EMAIL_OTP_TEST_MODE?: string
+  VAPID_PUBLIC_KEY?: string
+  VAPID_PRIVATE_KEY?: string
+  VAPID_SUBJECT?: string
 }
 
 export type ApiErrorCode =
@@ -70,13 +73,16 @@ export type OnboardingInput = {
   theme?: unknown
   accessibilityMode?: unknown
   aiConsent?: unknown
+  whatsappNumber?: unknown
 }
 
 export type ProfileUpdateInput = {
+  displayName?: unknown
   heightCm?: unknown
   timezone?: unknown
   theme?: unknown
   accessibilityMode?: unknown
+  whatsappNumber?: unknown
 }
 
 export type UiSettingsInput = {
@@ -106,6 +112,7 @@ export type ProfileRow = {
   emergencyConsent: number
   aiConsent: number
   dataShareConsent: number
+  whatsappNumber: string | null
 }
 
 export type MetricCatalogRow = {

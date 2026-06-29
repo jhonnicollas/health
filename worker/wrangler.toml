@@ -46,4 +46,7 @@ XENDIT_BASE_URL = "https://api.xendit.co"
 BILLING_CURRENCY = "IDR"
 BILLING_SUCCESS_URL = "https://app.isehat.biz.id/billing/success"
 BILLING_CANCEL_URL = "https://app.isehat.biz.id/billing/cancel"
+VAPID_PUBLIC_KEY = "BJazmolj-Nf6eACLfCesD92Uobws77I6X0ADanxIEpc-BBcRATkbBBJwZWxj_A7IIkt042qYKdEkR3jP1myvcRA"
+VAPID_SUBJECT = "mailto:admin@isehat.biz.id"
+# VAPID_PRIVATE_KEY must be set via: wrangler secret put VAPID_PRIVATE_KEY
 

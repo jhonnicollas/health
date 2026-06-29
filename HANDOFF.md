@@ -1,16 +1,19 @@
 # HANDOFF.md — Sprint 5 Real Verified State
 
-## Current State — 2026-06-28 04:00 UTC
+## Current State — 2026-06-28 04:10 UTC
 
 ```text
 Sprint: Sprint 5 Full (Foundation + 5A + 5B + 5C + 5D + 5E + S5X + SECURITY AUDIT FIX + I18N + UI/UX BATCH 1 & 2)
-Status: UI/UX BATCH 2 COMPLETE — Profile/App Settings split, HydrationHistory polish, BillingSettings polish, Test Data Seed, DoctorReport CSV export
+Status: DEPLOYED — Batch 2 + all prior changes live on production
+Commit: a119b82
 Worker: https://hl-health-companion-api.indiehomesungairaya.workers.dev
-Pages:  https://46ab078d.hl-health-companion.pages.dev
+Pages:  https://3f634104.hl-health-companion.pages.dev
+Custom: https://app.isehat.biz.id
 Tests:  336/336 PASS
 tsc:    Worker PASS, Web PASS
 eslint: 0 new errors (10 pre-existing)
 vite:   Build PASS
+Smoke:  Worker 200, Pages 200, /api/auth/me 401, /api/plans 200, /api/admin/configs 401 — ALL PASS
 ```
 
 ## S5X Final Summary

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
 import { formatDateID } from '../../utils/dateFormat'
 import { downloadCsv } from '../../utils/csv'
+import { useI18n } from '../../i18n'
 
 const METRIC_LABEL_DEF: Record<string, { label: string; def: string }> = {
   spo2: { label: 'SpO2', def: MEDICAL_GLOSSARY.spo2 },
@@ -53,6 +54,7 @@ type DailyData = {
 type ApiResp<T> = { success: boolean; data?: T; error?: { message: string } }
 
 export function DailyReportPage() {
+  const { t } = useI18n()
   const [data, setData] = useState<DailyData | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
@@ -99,18 +101,18 @@ export function DailyReportPage() {
     <div className="report-page">
         <div className="page-heading">
           <div>
-            <p className="eyebrow">Reports</p>
-            <h2>Daily Report</h2>
+            <p className="eyebrow">{t('reports.eyebrow')}</p>
+            <h2>{t('reports.dailyTitle')}</h2>
             <p>{formatDateID(data.date)}</p>
           </div>
         <div className="page-heading-actions">
           <button onClick={() => downloadCsv(`laporan-harian-${data.date}.csv`, data.values.map(v => ({ Tanggal: data.date, Metrik: v.metricCode, Nilai: v.finalValue, Unit: v.unit, Status: v.status })), ['Tanggal', 'Metrik', 'Nilai', 'Unit', 'Status'])} className="btn-secondary">
-            <span className="material-symbols-outlined">download</span> Download CSV
+            <span className="material-symbols-outlined">download</span> {t('reports.downloadCsv')}
           </button>
           <button onClick={analyzeWithAi} disabled={aiLoading} className="btn-primary">
-            {aiLoading ? <><span className="spinner" /> Menganalisa...</> : <><span className="material-symbols-outlined">auto_awesome</span> Analisa dengan AI</>}
+            {aiLoading ? <><span className="spinner" /> {t('reports.analyzing')}</> : <><span className="material-symbols-outlined">auto_awesome</span> {t('reports.analyzeWithAi')}</>}
           </button>
-          <span className="status-chip">{data.values.length} values</span>
+          <span className="status-chip">{data.values.length} {t('reports.values')}</span>
         </div>
       </div>
       {aiError ? <div className="ai-summary ai-summary-error"><p>{aiError}</p></div> : null}
@@ -120,7 +122,7 @@ export function DailyReportPage() {
           <p>{aiAnalysis}</p>
         </div>
       ) : null}
-      {data.values.length === 0 ? <p className="clinical-empty">Belum ada data pengukuran.</p> : (
+      {data.values.length === 0 ? <p className="clinical-empty">{t('reports.noData')}</p> : (
         <div className="report-card-grid">
           {[...data.values].sort((a, b) => (METRIC_SORT_ORDER[a.metricCode] || 99) - (METRIC_SORT_ORDER[b.metricCode] || 99)).map((v, i) => (
             <article key={`${v.metricCode}-${i}`} className="report-detail-card">

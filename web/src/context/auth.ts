@@ -19,6 +19,7 @@ export type Profile = {
   emergencyConsent?: boolean
   aiConsent?: boolean
   dataShareConsent?: boolean
+  whatsappNumber?: string | null
 } | null
 
 export type AuthState = {

@@ -39,6 +39,15 @@ registerTranslations('symptom', {
   moderate: { 'id-ID': 'Sedang', 'en-US': 'Moderate' },
   severe: { 'id-ID': 'Berat', 'en-US': 'Severe' },
   verySevere: { 'id-ID': 'Sangat Berat', 'en-US': 'Very Severe' },
+  // Mood
+  moodPlaceholder: { 'id-ID': 'Mood...', 'en-US': 'Mood...' },
+  moodNormal: { 'id-ID': 'Normal', 'en-US': 'Normal' },
+  moodSad: { 'id-ID': 'Sedih', 'en-US': 'Sad' },
+  moodAnxious: { 'id-ID': 'Cemas', 'en-US': 'Anxious' },
+  moodHappy: { 'id-ID': 'Senang', 'en-US': 'Happy' },
+  moodTired: { 'id-ID': 'Lelah', 'en-US': 'Tired' },
+  moodAngry: { 'id-ID': 'Marah', 'en-US': 'Angry' },
+  moodOther: { 'id-ID': 'Lainnya', 'en-US': 'Other' },
   // Emergency modal
   emergencyCall: { 'id-ID': 'Hubungi Kontak Darurat', 'en-US': 'Call Emergency Contact' },
   emergencyContinue: { 'id-ID': 'Saya mengerti, lanjutkan', 'en-US': 'I understand, continue' },

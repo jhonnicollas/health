@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
+import { useI18n } from '../../i18n'
 
 type Comparison = {
   avg3day: number | null
@@ -100,6 +101,7 @@ type ComparisonData = {
 }
 
 export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: string) => void }) {
+  const { t } = useI18n()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -109,7 +111,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
     const loadDashboard = async () => {
       try {
         const response = await fetch('/api/dashboard/today', { credentials: 'include' })
-        if (!response.ok) { setError('Gagal memuat dashboard.'); return }
+        if (!response.ok) { setError(t('dashboard.loadFailed')); return }
         const result = await response.json()
         if (result.success) {
           setData(result.data)
@@ -117,7 +119,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
           setError(result.error?.message || 'Failed to load dashboard')
         }
       } catch {
-        setError('Tidak bisa terhubung ke server.')
+        setError(t('dashboard.connError'))
       } finally {
         setLoading(false)
       }
@@ -134,7 +136,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
         }
         setComparisons(results.filter(c => c.todayValue !== null))
       } catch {
-        setError('Tidak bisa terhubung ke server.')
+        setError(t('dashboard.connError'))
         setComparisons([])
       }
     }
@@ -143,19 +145,19 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
   }, [])
 
   if (loading) {
-    return <div className="dashboard-loading clinical-empty">Loading dashboard...</div>
+    return <div className="dashboard-loading clinical-empty">{t('dashboard.loadingDashboard')}</div>
   }
 
   if (error) {
-    return <div className="dashboard-error clinical-empty">Error: {error}</div>
+    return <div className="dashboard-error clinical-empty">{t('dashboard.errorPrefix')} {error}</div>
   }
 
   if (!data || !data.hasData) {
     return (
       <div className="dashboard-empty clinical-empty">
-        <h2>Today</h2>
-        <p>No measurements recorded today.</p>
-        <p>Start logging your health measurements.</p>
+        <h2>{t('nav.today')}</h2>
+        <p>{t('dashboard.noMeasurementsToday')}</p>
+        <p>{t('dashboard.startLogging')}</p>
       </div>
     )
   }
@@ -192,28 +194,28 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
             <span className="material-symbols-outlined fill">local_fire_department</span>
           </div>
           <div className="streak-info">
-            <h3>Streak: {data.streak ?? data.sessionCount} Days!</h3>
-            <p>Best Streak: {data.bestStreak ?? data.sessionCount} Days</p>
+            <h3>{t('dashboard.streakPrefix')} {data.streak ?? data.sessionCount} {t('dashboard.streakDays')}</h3>
+            <p>{t('dashboard.bestStreak')} {data.bestStreak ?? data.sessionCount} {t('dashboard.bestStreakDays')}</p>
           </div>
         </div>
         <div className="bento-ai-insight">
           <div className="ai-insight-label">
             <span className="material-symbols-outlined" aria-hidden="true">smart_toy</span>
-            <span>AI CLINICAL INSIGHT</span>
+            <span>{t('dashboard.aiClinicalInsight')}</span>
           </div>
-          <p>{data.aiInsight ?? 'Your vitals are being tracked. Continue logging for personalized insights.'}</p>
+          <p>{data.aiInsight ?? t('dashboard.aiInsightDefault')}</p>
         </div>
       </div>
 
       <div className="dashboard-tabs">
-        <button className="tab-btn active" type="button" onClick={() => onNavigateTab?.('/dashboard')}>Today</button>
-        <button className="tab-btn" type="button" onClick={() => onNavigateTab?.('/dashboard/week')}>Weekly View</button>
-        <button className="tab-btn" type="button" onClick={() => onNavigateTab?.('/dashboard/month')}>Monthly Summary</button>
+        <button className="tab-btn active" type="button" onClick={() => onNavigateTab?.('/dashboard')}>{t('nav.today')}</button>
+        <button className="tab-btn" type="button" onClick={() => onNavigateTab?.('/dashboard/week')}>{t('nav.weeklyView')}</button>
+        <button className="tab-btn" type="button" onClick={() => onNavigateTab?.('/dashboard/month')}>{t('nav.monthlySummary')}</button>
       </div>
 
       {data.alerts.length > 0 && (
         <div className="dashboard-alerts">
-          <h3>Alerts Today</h3>
+          <h3>{t('dashboard.alertsToday')}</h3>
           {data.alerts.map(alert => (
             <div key={alert.id} className={`alert alert-${alert.severity}`}>
               <strong>{METRIC_LABELS[alert.metricCode] || alert.metricCode}</strong>: {alert.finalValue} {alert.unit}
@@ -244,12 +246,12 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
               </div>
               {comp && (
                 <div className="vital-comparison-rows">
-                  <TrendRow label="vs 3-day avg" current={v.finalValue} avg={comp.avg3day} />
-                  <TrendRow label="vs 7-day avg" current={v.finalValue} avg={comp.avg7day} />
+                  <TrendRow label={t('dashboard.vs3dayAvg')} current={v.finalValue} avg={comp.avg3day} />
+                  <TrendRow label={t('dashboard.vs7dayAvg')} current={v.finalValue} avg={comp.avg7day} />
                 </div>
               )}
               <div className="vital-meta">
-                {v.manualOverride === 1 && <span className="badge-override">Manual</span>}
+                {v.manualOverride === 1 && <span className="badge-override">{t('dashboard.manual')}</span>}
                 <span className={`badge-status status-${v.status}`}>{v.status}</span>
               </div>
             </div>
@@ -259,7 +261,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
 
       {data.values.length > 0 ? (
         <div className="dashboard-chart-card">
-          <h3>Tren 7 Hari Terakhir</h3>
+          <h3>{t('dashboard.trend7day')}</h3>
           <div className="dashboard-chart-grid">
             {['systolic','diastolic','spo2','heartRate','bodyWeight','bodyTemperature','sleepDuration'].map(code => {
               const v = data.values.find(x => x.metricCode === code)
@@ -286,10 +288,10 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
 
       {comparisons.length > 0 ? (
         <div className="dashboard-chart-card">
-          <h3>Trend Comparison</h3>
+          <h3>{t('dashboard.trendComparison')}</h3>
           <table className="report-table">
             <thead>
-              <tr><th>Metric</th><th>Today</th><th>3-Day Avg</th><th>7-Day Avg</th><th>Trend</th></tr>
+              <tr><th>{t('dashboard.metric')}</th><th>{t('nav.today')}</th><th>{t('dashboard.avg3day')}</th><th>{t('dashboard.avg7day')}</th><th>{t('dashboard.trend')}</th></tr>
             </thead>
             <tbody>
               {comparisons.map(c => (

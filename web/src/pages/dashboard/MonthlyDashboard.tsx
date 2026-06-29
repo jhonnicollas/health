@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatDateID } from '../../utils/dateFormat'
+import { useI18n } from '../../i18n'
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
 type DaySummary = { day: string; sessionCount: number }
@@ -31,6 +32,7 @@ const METRIC_LABELS: Record<string, string> = {
 }
 
 export function MonthlyDashboard() {
+  const { t } = useI18n()
   const [metrics, setMetrics] = useState<MetricSummary[]>([])
   const [measurementDays, setMeasurementDays] = useState(0)
   const [alertCount, setAlertCount] = useState(0)
@@ -57,28 +59,28 @@ export function MonthlyDashboard() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="clinical-empty">Loading monthly dashboard...</div>
-  if (error) return <div className="clinical-empty dashboard-error">Error: {error}</div>
-  if (metrics.length === 0) return <div className="clinical-empty">No data for the past 30 days.</div>
+  if (loading) return <div className="clinical-empty">{t('common.loading')}</div>
+  if (error) return <div className="clinical-empty dashboard-error">{t('common.errorGeneric')}</div>
+  if (metrics.length === 0) return <div className="clinical-empty">{t('dashboard.noMeasurements')}</div>
 
   return (
     <div className="monthly-dashboard">
       <div className="dashboard-tabs">
-        <button className="tab-btn" type="button">Today</button>
-        <button className="tab-btn" type="button">Weekly View</button>
-        <button className="tab-btn active" type="button">Monthly Summary</button>
+        <button className="tab-btn" type="button">{t('nav.today')}</button>
+        <button className="tab-btn" type="button">{t('nav.weeklyView')}</button>
+        <button className="tab-btn active" type="button">{t('nav.monthlySummary')}</button>
       </div>
 
       <div className="dashboard-stats">
         <div className="stat-card">
-          <span className="stat-kicker">Measurement Days</span>
+          <span className="stat-kicker">{t('dashboard.measurementDays')}</span>
           <div className="stat-value">{measurementDays}</div>
-          <div className="stat-label">days with data</div>
+          <div className="stat-label">{t('dashboard.daysWithData')}</div>
         </div>
         <div className="stat-card">
-          <span className="stat-kicker">Alert Count</span>
+          <span className="stat-kicker">{t('dashboard.alertCount')}</span>
           <div className="stat-value">{alertCount}</div>
-          <div className="stat-label">last 30 days</div>
+          <div className="stat-label">{t('dashboard.last30Days')}</div>
         </div>
         <div className="stat-card">
           <span className="stat-kicker">Latest Metrics</span>

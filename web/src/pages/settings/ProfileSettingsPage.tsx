@@ -81,6 +81,7 @@ export function ProfileSettingsPage() {
   const [birthDate, setBirthDate] = useState((profile as any)?.birthDate ?? '')
   const [heightCm, setHeightCm] = useState(profile?.heightCm?.toString() ?? '')
   const [timezone, setTimezone] = useState(profile?.timezone ?? 'Asia/Jakarta')
+  const [whatsappNumber, setWhatsappNumber] = useState((profile as any)?.whatsappNumber ?? '')
 
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
@@ -99,6 +100,7 @@ export function ProfileSettingsPage() {
       setTimezone(profile.timezone ?? 'Asia/Jakarta')
       setSex((profile as any)?.sex ?? 'male')
       setBirthDate((profile as any)?.birthDate ?? '')
+      setWhatsappNumber((profile as any)?.whatsappNumber ?? '')
     }
   }, [user, profile])
 
@@ -123,7 +125,8 @@ export function ProfileSettingsPage() {
           accessibilityMode: (profile as any)?.accessibilityMode ?? 'normal',
           sex,
           birthDate,
-          displayName
+          displayName,
+          whatsappNumber: whatsappNumber || null
         })
       })
       const body = (await response.json()) as ProfileSettingsResponse
@@ -148,7 +151,8 @@ export function ProfileSettingsPage() {
             timezone,
             sex,
             birthDate,
-            displayName
+            displayName,
+            whatsappNumber: whatsappNumber || null
           } as any
         })
       }
@@ -229,6 +233,11 @@ export function ProfileSettingsPage() {
                   <label style={{ font: 'var(--typLabelSm)', color: 'var(--colorTextSecondary)', display: 'block', marginBottom: 4 }}>Timezone</label>
                   <input className="input-field" type="text" value={timezone} onChange={(e) => setTimezone(e.target.value)} required />
                   {fieldErrors.timezone ? <span className="field-error">{fieldErrors.timezone}</span> : null}
+                </div>
+                <div>
+                  <label style={{ font: 'var(--typLabelSm)', color: 'var(--colorTextSecondary)', display: 'block', marginBottom: 4 }}>WhatsApp Number</label>
+                  <input className="input-field" inputMode="tel" type="tel" value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, '').slice(0, 15))} placeholder="6281234567890" />
+                  {fieldErrors.whatsappNumber ? <span className="field-error">{fieldErrors.whatsappNumber}</span> : null}
                 </div>
               </div>
 

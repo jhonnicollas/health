@@ -64,6 +64,7 @@ type OnboardingInput = {
   theme?: unknown
   accessibilityMode?: unknown
   aiConsent?: unknown
+  whatsappNumber?: unknown
 }
 
 type ProfileUpdateInput = {
@@ -72,6 +73,7 @@ type ProfileUpdateInput = {
   timezone?: unknown
   theme?: unknown
   accessibilityMode?: unknown
+  whatsappNumber?: unknown
 }
 
 type UiSettingsInput = {
@@ -102,6 +104,7 @@ type ProfileRow = {
   emergencyConsent: number
   aiConsent: number
   dataShareConsent: number
+  whatsappNumber: string | null
 }
 
 type MetricCatalogRow = {
@@ -302,6 +305,7 @@ function validateOnboardingInput(input: OnboardingInput) {
   const accessibilityMode =
     typeof input.accessibilityMode === 'string' ? input.accessibilityMode : 'normal'
   const aiConsent = Boolean(input.aiConsent)
+  const whatsappNumber = typeof input.whatsappNumber === 'string' ? input.whatsappNumber.replace(/\D/g, '').slice(0, 15) : null
 
   if (displayName.length < 2) {
     details.push({ field: 'displayName', message: 'Nama tampilan minimal 2 karakter.' })
@@ -371,7 +375,8 @@ function validateOnboardingInput(input: OnboardingInput) {
       timezone,
       theme,
       accessibilityMode,
-      aiConsent
+      aiConsent,
+      whatsappNumber
     }
   }
 }
@@ -387,6 +392,8 @@ function validateProfileUpdateInput(input: ProfileUpdateInput) {
   const theme = typeof input.theme === 'string' ? input.theme : undefined
   const accessibilityMode =
     typeof input.accessibilityMode === 'string' ? input.accessibilityMode : undefined
+  const hasWhatsapp = input.whatsappNumber !== undefined && input.whatsappNumber !== null
+  const whatsappNumber = hasWhatsapp ? (typeof input.whatsappNumber === 'string' ? input.whatsappNumber.replace(/\D/g, '').slice(0, 15) : undefined) : undefined
 
   if (hasDisplayName && displayName!.trim().length < 2) {
     details.push({ field: 'displayName', message: 'Nama tampilan minimal 2 karakter.' })
@@ -422,6 +429,10 @@ function validateProfileUpdateInput(input: ProfileUpdateInput) {
     details.push({ field: 'accessibilityMode', message: 'Mode aksesibilitas tidak valid.' })
   }
 
+  if (hasWhatsapp && whatsappNumber && (whatsappNumber.length < 8 || whatsappNumber.length > 15)) {
+    details.push({ field: 'whatsappNumber', message: 'Nomor WhatsApp 8-15 digit.' })
+  }
+
   if (details.length > 0) {
     return {
       ok: false as const,
@@ -436,7 +447,8 @@ function validateProfileUpdateInput(input: ProfileUpdateInput) {
       heightCm,
       timezone,
       theme,
-      accessibilityMode
+      accessibilityMode,
+      whatsappNumber
     }
   }
 }
@@ -782,7 +794,8 @@ function publicProfile(profile: ProfileRow | null) {
     theme: profile.theme,
     emergencyConsent: Boolean(profile.emergencyConsent),
     aiConsent: Boolean(profile.aiConsent),
-    dataShareConsent: Boolean(profile.dataShareConsent)
+    dataShareConsent: Boolean(profile.dataShareConsent),
+    whatsappNumber: profile.whatsappNumber ?? null
   }
 }
 
@@ -1216,7 +1229,7 @@ app.get('/api/auth/me', async (c) => {
       `SELECT
         u.id, u.email, u.displayName, u.telegramEnabled, u.browserPushEnabled,
         p.id AS profileId, p.sex, p.birthDate, p.heightCm, p.timezone,
-        p.accessibilityMode, p.theme, p.emergencyConsent, p.aiConsent, p.dataShareConsent
+        p.accessibilityMode, p.theme, p.emergencyConsent, p.aiConsent, p.dataShareConsent, p.whatsappNumber
        FROM HL_sessions s
        JOIN HL_users u ON u.id = s.userId
        LEFT JOIN HL_userProfiles p ON p.userId = u.id
@@ -1239,6 +1252,7 @@ app.get('/api/auth/me', async (c) => {
           emergencyConsent: number | null
           aiConsent: number | null
           dataShareConsent: number | null
+          whatsappNumber: string | null
         }
       >()
 
@@ -1258,7 +1272,8 @@ app.get('/api/auth/me', async (c) => {
           theme: row.theme ?? 'light',
           emergencyConsent: row.emergencyConsent ?? 0,
           aiConsent: row.aiConsent ?? 0,
-          dataShareConsent: row.dataShareConsent ?? 0
+          dataShareConsent: row.dataShareConsent ?? 0,
+          whatsappNumber: row.whatsappNumber ?? null
         }
       : null
 
@@ -1349,8 +1364,8 @@ app.post('/api/profile/onboarding', async (c) => {
     const profileId = await insertAndGetId(c.env.DB.prepare(
       `INSERT INTO HL_userProfiles
         (userId, sex, birthDate, heightCm, timezone, accessibilityMode, theme,
-         emergencyConsent, aiConsent, dataShareConsent, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+         emergencyConsent, aiConsent, dataShareConsent, whatsappNumber, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).bind(
       user.id,
       validation.data.sex,
@@ -1359,7 +1374,8 @@ app.post('/api/profile/onboarding', async (c) => {
       validation.data.timezone,
       validation.data.accessibilityMode,
       validation.data.theme,
-      validation.data.aiConsent ? 1 : 0
+      validation.data.aiConsent ? 1 : 0,
+      validation.data.whatsappNumber || null
     ))
 
     await c.env.DB.batch([
@@ -1443,7 +1459,7 @@ app.get('/api/profile', async (c) => {
   try {
     const profile = await c.env.DB.prepare(
       `SELECT id, userId, sex, birthDate, heightCm, timezone, accessibilityMode, theme,
-        emergencyConsent, aiConsent, dataShareConsent
+        emergencyConsent, aiConsent, dataShareConsent, whatsappNumber
        FROM HL_userProfiles
        WHERE userId = ?
        LIMIT 1`
@@ -1516,7 +1532,7 @@ app.put('/api/profile', async (c) => {
   try {
     const existingProfile = await c.env.DB.prepare(
       `SELECT id, userId, sex, birthDate, heightCm, timezone, accessibilityMode, theme,
-        emergencyConsent, aiConsent, dataShareConsent
+        emergencyConsent, aiConsent, dataShareConsent, whatsappNumber
        FROM HL_userProfiles
        WHERE userId = ?
        LIMIT 1`
@@ -1535,17 +1551,19 @@ app.put('/api/profile', async (c) => {
     const nextAccessibilityMode =
       validation.data.accessibilityMode ?? existingProfile.accessibilityMode
     const nextDisplayName = validation.data.displayName ?? undefined
+    const nextWhatsappNumber = validation.data.whatsappNumber !== undefined ? validation.data.whatsappNumber : existingProfile.whatsappNumber
 
     const batchStmts = [
       c.env.DB.prepare(
         `UPDATE HL_userProfiles
-         SET heightCm = ?, timezone = ?, theme = ?, accessibilityMode = ?, updatedAt = CURRENT_TIMESTAMP
+         SET heightCm = ?, timezone = ?, theme = ?, accessibilityMode = ?, whatsappNumber = ?, updatedAt = CURRENT_TIMESTAMP
          WHERE userId = ?`
       ).bind(
         nextHeightCm,
         nextTimezone,
         nextTheme,
         nextAccessibilityMode,
+        nextWhatsappNumber ?? null,
         user.id
       ),
       c.env.DB.prepare(
@@ -3861,17 +3879,42 @@ app.post('/api/reminders', async (c) => {
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const body = await c.req.json() as { metricCode?: string; time?: string; scheduleTime?: string; daysOfWeek?: string; label?: string }
+    const body = await c.req.json() as { reminderType?: string; metricCode?: string; time?: string; scheduleTime?: string; timezone?: string; channel?: string; payload?: { message?: string; label?: string; daysOfWeek?: string }; enabled?: boolean }
     const scheduleTime = body.scheduleTime || body.time || ''
     if (!scheduleTime) return jsonResponse(c, failure('VALIDATION_ERROR', 'scheduleTime wajib.', 400, [], startedAt))
-    const reminderType = body.metricCode || 'general'
+    const reminderType = body.reminderType || body.metricCode || 'general'
+    if (!['morningMeasurement', 'eveningMeasurement', 'medication', 'general'].includes(reminderType)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'reminderType tidak valid.', 400, [{ field: 'reminderType', message: 'Gunakan morningMeasurement, eveningMeasurement, medication, atau general.' }], startedAt))
+    }
+    const channel = body.channel || 'telegram'
+    if (!['inApp', 'telegram', 'browser', 'email'].includes(channel)) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'channel tidak valid.', 400, [{ field: 'channel', message: 'Gunakan inApp, telegram, browser, atau email.' }], startedAt))
+    }
     const profile = await c.env.DB.prepare('SELECT timezone FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ timezone: string }>()
-    const userTimezone = profile?.timezone || 'Asia/Jakarta'
-    const remId = await insertAndGetId(c.env.DB.prepare(
-      `INSERT INTO HL_reminderSettings (userId, reminderType, scheduleTime, timezone, payloadJson, enabled, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).bind(userId, reminderType, scheduleTime, userTimezone, JSON.stringify({ label: body.label || null, daysOfWeek: body.daysOfWeek || '1,2,3,4,5,6,7' })))
-    return jsonResponse(c, success({ reminderId: remId }, 201, startedAt))
+    const userTimezone = body.timezone || profile?.timezone || 'Asia/Jakarta'
+    const payloadData = body.payload || {}
+    const payloadJson = JSON.stringify({
+      label: payloadData.label || payloadData.message || null,
+      message: payloadData.message || payloadData.label || null,
+      daysOfWeek: payloadData.daysOfWeek || '1,2,3,4,5,6,7'
+    })
+    const enabledVal = body.enabled === false ? 0 : 1
+    const insertResult = await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO HL_reminderSettings (userId, reminderType, scheduleTime, timezone, channel, payloadJson, enabled, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).bind(userId, reminderType, scheduleTime, userTimezone, channel, payloadJson, enabledVal).run()
+    const remId = Number(insertResult.meta?.last_row_id ?? 0)
+    if (remId > 0) {
+      return jsonResponse(c, success({ reminderId: remId }, 201, startedAt))
+    }
+    // INSERT OR IGNORE skipped (UNIQUE constraint) — update existing row instead
+    await c.env.DB.prepare(
+      `UPDATE HL_reminderSettings SET scheduleTime = ?, timezone = ?, channel = ?, payloadJson = ?, enabled = ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ? AND reminderType = ? AND channel = ?`
+    ).bind(scheduleTime, userTimezone, channel, payloadJson, enabledVal, userId, reminderType, channel).run()
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM HL_reminderSettings WHERE userId = ? AND reminderType = ? AND channel = ?'
+    ).bind(userId, reminderType, channel).first<{ id: number }>()
+    return jsonResponse(c, success({ reminderId: existing?.id || 0 }, 200, startedAt))
   } catch (error) {
     console.error('reminder create error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal buat reminder.', 500, [], startedAt))
@@ -3884,9 +3927,22 @@ app.get('/api/reminders', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const rows = await c.env.DB.prepare(
-      `SELECT id, reminderType as metricCode, scheduleTime as time, payloadJson, enabled FROM HL_reminderSettings WHERE userId = ? ORDER BY scheduleTime ASC`
-    ).bind(userId).all()
-    return jsonResponse(c, success({ reminders: rows.results || [] }, 200, startedAt))
+      `SELECT id, reminderType, scheduleTime, timezone, channel, payloadJson, enabled FROM HL_reminderSettings WHERE userId = ? ORDER BY scheduleTime ASC`
+    ).bind(userId).all<{ id: number; reminderType: string; scheduleTime: string; timezone: string; channel: string; payloadJson: string | null; enabled: number }>()
+    const reminders = (rows.results || []).map(r => {
+      let payload: { message?: string; label?: string; daysOfWeek?: string } = {}
+      try { payload = r.payloadJson ? JSON.parse(r.payloadJson) : {} } catch { /* ignore */ }
+      return {
+        id: r.id,
+        reminderType: r.reminderType,
+        enabled: r.enabled === 1,
+        scheduleTime: r.scheduleTime,
+        timezone: r.timezone,
+        channel: r.channel,
+        message: payload.message || payload.label || ''
+      }
+    })
+    return jsonResponse(c, success({ reminders }, 200, startedAt))
   } catch (error) {
     console.error('reminder list error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal list reminder.', 500, [], startedAt))
@@ -5046,6 +5102,25 @@ app.put('/api/admin/plans/:planCode', async (c) => {
   }
 })
 
+// ponytail: plan soft-delete (sets active=0), no hard delete to preserve FK integrity
+app.delete('/api/admin/plans/:planCode', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const user = await getAuthenticatedUser(c)
+    if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const denied = await requireAdminPermission(c, user, 'admin.billing.manage', startedAt)
+    if (denied) return denied
+    const planCode = c.req.param('planCode')
+    if (planCode === 'free') return jsonResponse(c, failure('VALIDATION_ERROR', 'Plan free tidak boleh dihapus.', 400, [], startedAt))
+    await c.env.DB.prepare('UPDATE HL_plans SET active = 0, updatedAt = CURRENT_TIMESTAMP WHERE planCode = ?').bind(planCode).run()
+    await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.plans.delete', entityType: 'HL_plans', entityId: planCode, metadataJson: { planCode, softDeleted: true } })
+    return jsonResponse(c, success({ planCode, deleted: true }, 200, startedAt))
+  } catch (error) {
+    console.error('admin plan delete error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menghapus plan.', 500, [], startedAt))
+  }
+})
+
 app.get('/api/admin/plans/:planCode/features', async (c) => {
   const startedAt = Date.now()
   try {
@@ -5877,23 +5952,100 @@ app.get('/api/notifications', async (c) => {
   }
 })
 
-app.post('/api/notifications/browser/subscribe', async (c) => {
+app.post('/api/push/subscribe', async (c) => {
   const startedAt = Date.now()
   try {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
-    const body = await c.req.json() as { endpoint?: string; keys?: { p256dh?: string; auth?: string }; userAgent?: string }
-    if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+    // Accept both { subscription: { endpoint, keys: { p256dh, auth } } } and { endpoint, keys: { p256dh, auth } }
+    const raw = await c.req.json() as { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; endpoint?: string; keys?: { p256dh?: string; auth?: string }; userAgent?: string }
+    const sub = raw.subscription || raw
+    const endpoint = sub.endpoint
+    const p256dh = sub.keys?.p256dh
+    const auth = sub.keys?.auth
+    if (!endpoint || !p256dh || !auth) {
       return jsonResponse(c, failure('VALIDATION_ERROR', 'endpoint, keys.p256dh, dan keys.auth wajib.', 400, [], startedAt))
     }
     await c.env.DB.prepare(
-      "INSERT INTO HL_pushSubscriptions (userId, endpoint, p256dh, auth, userAgent, enabled, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(endpoint) DO UPDATE SET userId = excluded.userId, p256dh = excluded.p256dh, auth = excluded.auth, userAgent = excluded.userAgent, updatedAt = CURRENT_TIMESTAMP"
-    ).bind(userId, body.endpoint, body.keys.p256dh, body.keys.auth, body.userAgent || null).run()
+      "INSERT INTO HL_pushSubscriptions (userId, endpoint, p256dh, auth, userAgent, enabled, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(endpoint) DO UPDATE SET userId = excluded.userId, p256dh = excluded.p256dh, auth = excluded.auth, userAgent = excluded.userAgent, enabled = 1, updatedAt = CURRENT_TIMESTAMP"
+    ).bind(userId, endpoint, p256dh, auth, raw.userAgent || c.req.header('User-Agent') || null).run()
     await c.env.DB.prepare('UPDATE HL_users SET browserPushEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId).run()
     return jsonResponse(c, success({ subscribed: true }, 201, startedAt))
   } catch (error) {
     console.error('push subscribe error:', error)
     return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal subscribe push.', 500, [], startedAt))
+  }
+})
+
+// Alias for backward compatibility
+app.post('/api/notifications/browser/subscribe', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const raw = await c.req.json() as { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; endpoint?: string; keys?: { p256dh?: string; auth?: string }; userAgent?: string }
+    const sub = raw.subscription || raw
+    const endpoint = sub.endpoint
+    const p256dh = sub.keys?.p256dh
+    const auth = sub.keys?.auth
+    if (!endpoint || !p256dh || !auth) {
+      return jsonResponse(c, failure('VALIDATION_ERROR', 'endpoint, keys.p256dh, dan keys.auth wajib.', 400, [], startedAt))
+    }
+    await c.env.DB.prepare(
+      "INSERT INTO HL_pushSubscriptions (userId, endpoint, p256dh, auth, userAgent, enabled, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(endpoint) DO UPDATE SET userId = excluded.userId, p256dh = excluded.p256dh, auth = excluded.auth, userAgent = excluded.userAgent, enabled = 1, updatedAt = CURRENT_TIMESTAMP"
+    ).bind(userId, endpoint, p256dh, auth, raw.userAgent || c.req.header('User-Agent') || null).run()
+    await c.env.DB.prepare('UPDATE HL_users SET browserPushEnabled = 1, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(userId).run()
+    return jsonResponse(c, success({ subscribed: true }, 201, startedAt))
+  } catch (error) {
+    console.error('push subscribe alias error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal subscribe push.', 500, [], startedAt))
+  }
+})
+
+app.delete('/api/push/unsubscribe', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const body = await c.req.json() as { endpoint?: string }
+    if (!body.endpoint) return jsonResponse(c, failure('VALIDATION_ERROR', 'endpoint wajib.', 400, [], startedAt))
+    await c.env.DB.prepare('UPDATE HL_pushSubscriptions SET enabled = 0, updatedAt = CURRENT_TIMESTAMP WHERE userId = ? AND endpoint = ?').bind(userId, body.endpoint).run()
+    return jsonResponse(c, success({ unsubscribed: true }, 200, startedAt))
+  } catch (error) {
+    console.error('push unsubscribe error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal unsubscribe push.', 500, [], startedAt))
+  }
+})
+
+app.post('/api/push/test', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const userId = await getCurrentSession(c)
+    if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+    const vapidPrivateKey = c.env.VAPID_PRIVATE_KEY
+    if (!vapidPrivateKey) return jsonResponse(c, failure('INTERNAL_ERROR', 'VAPID private key tidak dikonfigurasi.', 500, [], startedAt))
+    const body = await c.req.json().catch(() => ({})) as { title?: string; body?: string }
+    const { WebPushService } = await import('./services/web-push.js')
+    const result = await WebPushService.sendToUser(c.env.DB, userId, {
+      title: body.title || 'iSehat Test',
+      body: body.body || 'Push notification test berhasil!',
+      url: '/'
+    }, vapidPrivateKey)
+    return jsonResponse(c, success({ sent: result.sent, failed: result.failed }, 200, startedAt))
+  } catch (error) {
+    console.error('push test error:', error)
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal kirim test push.', 500, [], startedAt))
+  }
+})
+
+app.get('/api/push/vapid-key', async (c) => {
+  const startedAt = Date.now()
+  try {
+    const vapidPublicKey = c.env.VAPID_PUBLIC_KEY
+    if (!vapidPublicKey) return jsonResponse(c, failure('INTERNAL_ERROR', 'VAPID public key tidak dikonfigurasi.', 500, [], startedAt))
+    return jsonResponse(c, success({ vapidPublicKey }, 200, startedAt))
+  } catch (error) {
+    return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt))
   }
 })
 
@@ -5903,14 +6055,20 @@ app.put('/api/reminders/:id', async (c) => {
     const userId = await getCurrentSession(c)
     if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
     const reminderId = c.req.param('id')
-    const body = await c.req.json() as { enabled?: boolean; time?: string; label?: string }
-    const existing = await c.env.DB.prepare('SELECT id FROM HL_reminderSettings WHERE id = ? AND userId = ?').bind(reminderId, userId).first()
+    const body = await c.req.json() as { enabled?: boolean; scheduleTime?: string; time?: string; label?: string; message?: string; channel?: string }
+    const existing = await c.env.DB.prepare('SELECT id, payloadJson FROM HL_reminderSettings WHERE id = ? AND userId = ?').bind(reminderId, userId).first<{ id: number; payloadJson: string | null }>()
     if (!existing) return jsonResponse(c, failure('NOT_FOUND', 'Reminder tidak ditemukan.', 404, [], startedAt))
     const updates: string[] = []
     const params: unknown[] = []
-    if (body.time) { updates.push('scheduleTime = ?'); params.push(body.time) }
+    const scheduleTime = body.scheduleTime || body.time
+    if (scheduleTime) { updates.push('scheduleTime = ?'); params.push(scheduleTime) }
     if (body.enabled !== undefined) { updates.push('enabled = ?'); params.push(body.enabled ? 1 : 0) }
-    if (body.label) { updates.push('payloadJson = ?'); params.push(JSON.stringify({ label: body.label })) }
+    if (body.channel) { updates.push('channel = ?'); params.push(body.channel) }
+    if (body.label || body.message) {
+      let existingPayload: { message?: string; label?: string; daysOfWeek?: string } = {}
+      try { existingPayload = existing.payloadJson ? JSON.parse(existing.payloadJson) : {} } catch { /* ignore */ }
+      updates.push('payloadJson = ?'); params.push(JSON.stringify({ ...existingPayload, message: body.message || body.label || existingPayload.message, label: body.label || body.message || existingPayload.label }))
+    }
     if (updates.length > 0) {
       updates.push('updatedAt = CURRENT_TIMESTAMP')
       params.push(reminderId, userId)

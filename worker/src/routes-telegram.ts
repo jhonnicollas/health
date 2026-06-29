@@ -26,10 +26,27 @@ async function getSession(c: HC): Promise<number | null> {
   return row?.userId || null
 }
 
+const TELEGRAM_REJECTION_THRESHOLD = 5
+const TELEGRAM_REJECTION_WINDOW_MINUTES = 60
+
 async function createSafetyEvent(db: D1Database, userId: number, sourceId: string, eventType: string, severity: string, title: string, message: string): Promise<void> {
   const existing = await db.prepare("SELECT id FROM HL_safetyEvents WHERE userId = ? AND eventType = ? AND sourceId = ? LIMIT 1").bind(userId, eventType, sourceId).first<any>()
   if (existing) return
   await db.prepare("INSERT INTO HL_safetyEvents (userId, sourceType, sourceId, eventType, severity, title, message, notificationStatus, createdAt) VALUES (?, 'telegram', ?, ?, ?, ?, ?, 'queued', CURRENT_TIMESTAMP)").bind(userId, sourceId, eventType, severity, title, message).run()
+}
+
+async function checkRejectionSpike(db: D1Database, chatId: string): Promise<void> {
+  const cutoff = new Date(Date.now() - TELEGRAM_REJECTION_WINDOW_MINUTES * 60000).toISOString()
+  const count = await db.prepare(
+    "SELECT COUNT(*) as cnt FROM HL_telegramCallbackEvents WHERE telegramChatId = ? AND status = 'rejected' AND createdAt > ?"
+  ).bind(chatId, cutoff).first<any>()
+  if (!count || count.cnt < TELEGRAM_REJECTION_THRESHOLD) return
+
+  const link = await db.prepare("SELECT userId FROM HL_telegramLinks WHERE telegramChatId = ? AND verified = 1 LIMIT 1").bind(chatId).first<any>()
+  const userId = link?.userId; if (!userId) return
+  await createSafetyEvent(db, userId, chatId, 'telegram.rejectionSpike', 'warning',
+    'Telegram Rejection Spike',
+    `Chat ${chatId} — ${count.cnt}+ rejected callbacks within ${TELEGRAM_REJECTION_WINDOW_MINUTES} minutes.`)
 }
 
 const REMINDER_BUTTONS = [[
@@ -72,6 +89,8 @@ export function mountTelegramRoutes(app: any) {
         if (validation.code === 'TELEGRAM_CHAT_NOT_LINKED' || validation.code === 'INVALID_CALLBACK_DATA') {
           await AuditService.write(c.env.DB, { userId: null, action: 'telegram.webhook.rejected', entityType: 'HL_telegramCallbackEvents', entityId: validation.callbackQueryId || 'unknown', metadataJson: { reason: validation.reason, code: validation.code } })
         }
+        const rejectedChatId = cq?.message?.chat?.id != null ? String(cq.message.chat.id) : null
+        if (rejectedChatId) { await checkRejectionSpike(c.env.DB, rejectedChatId) }
         return jr(c, fail('TELEGRAM_WEBHOOK_FORBIDDEN', validation.reason, 403, [], s), 403)
       }
 

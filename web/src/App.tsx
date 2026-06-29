@@ -27,6 +27,8 @@ import './i18n/locales/admin'
 import './i18n/locales/settings'
 import './i18n/locales/kb'
 import './i18n/locales/nav'
+import './i18n/locales/reports'
+import './i18n/locales/reports'
 import { TodayDashboard } from './pages/dashboard/TodayDashboard'
 import { WeeklyDashboard } from './pages/dashboard/WeeklyDashboard'
 import { MonthlyDashboard } from './pages/dashboard/MonthlyDashboard'
@@ -398,7 +400,6 @@ function AppRoutes() {
           </nav>
         </div>
         <div className="sidebar-footer">
-          <LanguageSwitcher compact={sidebarCollapsed} />
           <button onClick={() => { try { localStorage.removeItem('hl-welcome-seen') } catch { /* ignore */ } setShowWizard(true) }} type="button" title={t('nav.appTour')}><Icon name="tour" />{!sidebarCollapsed && <span>{t('nav.appTour')}</span>}</button>
           <button onClick={() => navigate('/kb')} type="button"><Icon name="help" />{!sidebarCollapsed && <span>{t('nav.helpCenter')}</span>}</button>
           <button onClick={handleLogout} type="button"><Icon name="logout" />{!sidebarCollapsed && <span>{t('nav.logout')}</span>}</button>
@@ -438,6 +439,7 @@ function AppRoutes() {
           </div>
           <div className="topbar-actions">
             <div className="topbar-clock"><span className="clock-date">{clock.dateStr}</span><span className="clock-time">{clock.timeStr}</span></div>
+            <LanguageSwitcher compact />
             <div className="topbar-theme-switch">
               {['light', 'warm', 'dark'].map(thm => (
                 <button key={thm} className={profile?.theme === thm ? 'active' : ''} onClick={() => { document.documentElement.dataset.theme = thm; fetch('/api/profile', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: thm, timezone: profile?.timezone ?? 'Asia/Jakarta', heightCm: profile?.heightCm ?? 170, accessibilityMode: profile?.accessibilityMode ?? 'normal' }) }).then(r => { if (r.ok) void refresh() }).catch(() => {}) }} type="button" aria-label={`${thm} mode`}><Icon name={thm === 'light' ? 'light_mode' : thm === 'warm' ? 'wb_sunny' : 'dark_mode'} /></button>

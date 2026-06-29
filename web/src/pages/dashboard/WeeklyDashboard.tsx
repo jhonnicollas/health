@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { TrendBadge, type TrendDirection } from '../../components/dashboard/TrendBadge'
 import { formatDateID } from '../../utils/dateFormat'
+import { useI18n } from '../../i18n'
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
 type DailyPoint = { day: string; metricCode: string; avgValue: number }
@@ -34,6 +35,7 @@ const METRIC_LABELS: Record<string, string> = {
 }
 
 export function WeeklyDashboard() {
+  const { t } = useI18n()
   const [metrics, setMetrics] = useState<MetricSummary[]>([])
   const [daily, setDaily] = useState<DailyPoint[]>([])
   const [summary, setSummary] = useState<Omit<WeeklyPayload, 'metrics' | 'daily'> | null>(null)
@@ -62,9 +64,9 @@ export function WeeklyDashboard() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="clinical-empty">Loading weekly dashboard...</div>
-  if (error) return <div className="clinical-empty dashboard-error">Error: {error}</div>
-  if (metrics.length === 0) return <div className="clinical-empty">No data for the past 7 days.</div>
+  if (loading) return <div className="clinical-empty">{t('common.loading')}</div>
+  if (error) return <div className="clinical-empty dashboard-error">{t('common.errorGeneric')}</div>
+  if (metrics.length === 0) return <div className="clinical-empty">{t('dashboard.noMeasurements')}</div>
 
   const grouped = new Map<string, DailyPoint[]>()
   for (const p of daily) {
@@ -97,9 +99,9 @@ export function WeeklyDashboard() {
           <div className="stat-label">{summary?.worstDay?.sessionCount ?? 0} sessions</div>
         </div>
         <div className="stat-card">
-          <span className="stat-kicker">Adherence</span>
+          <span className="stat-kicker">{t('dashboard.adherence')}</span>
           <div className="stat-value">{summary?.adherence ?? '-'}{summary?.adherence !== null && summary?.adherence !== undefined ? '%' : ''}</div>
-          <div className="stat-label">{summary?.alertCount ?? 0} alerts</div>
+          <div className="stat-label">{summary?.alertCount ?? 0} {t('dashboard.alertsToday').toLowerCase()}</div>
         </div>
       </div>
 

@@ -1,0 +1,28 @@
+import { registerTranslations } from '../index'
+
+registerTranslations('medications', {
+  eyebrow: { 'id-ID': 'Tracker', 'en-US': 'Tracker' },
+  title: { 'id-ID': 'Jadwal Obat Hari Ini', 'en-US': "Today's Medication Schedule" },
+  subtitle: { 'id-ID': 'Catat status obat tanpa saran dosis atau perubahan terapi.', 'en-US': 'Log medication status without dosage advice or therapy changes.' },
+  meds: { 'id-ID': 'obat', 'en-US': 'meds' },
+  addMedication: { 'id-ID': 'Tambah Obat', 'en-US': 'Add Medication' },
+  addMedicationDesc: { 'id-ID': 'Nama, teks dosis, dan jadwal muncul di checklist harian.', 'en-US': 'Name, dosage text, and schedule appear in the daily checklist.' },
+  nameLabel: { 'id-ID': 'Nama obat', 'en-US': 'Medication name' },
+  dosage: { 'id-ID': 'Dosis', 'en-US': 'Dosage' },
+  schedule: { 'id-ID': 'Jadwal', 'en-US': 'Schedule' },
+  schedulePlaceholder: { 'id-ID': 'Pagi setelah makan', 'en-US': 'Morning after meal' },
+  saving: { 'id-ID': 'Menyimpan...', 'en-US': 'Saving...' },
+  checklist: { 'id-ID': 'Checklist Hari Ini', 'en-US': "Today's Checklist" },
+  noMeds: { 'id-ID': 'Belum ada obat tercatat.', 'en-US': 'No medications recorded yet.' },
+  statusCompleted: { 'id-ID': 'Selesai', 'en-US': 'Completed' },
+  statusSkipped: { 'id-ID': 'Dilewati', 'en-US': 'Skipped' },
+  statusPending: { 'id-ID': 'Tertunda', 'en-US': 'Pending' },
+  take: { 'id-ID': 'Minum', 'en-US': 'Take' },
+  skip: { 'id-ID': 'Lewati', 'en-US': 'Skip' },
+  remove: { 'id-ID': 'Hapus', 'en-US': 'Remove' },
+  loadFailed: { 'id-ID': 'Gagal memuat obat.', 'en-US': 'Failed to load medications.' },
+  loadLogsFailed: { 'id-ID': 'Gagal memuat log obat.', 'en-US': 'Failed to load medication logs.' },
+  addFailed: { 'id-ID': 'Gagal menambah obat.', 'en-US': 'Failed to add medication.' },
+  logFailed: { 'id-ID': 'Gagal mencatat status obat.', 'en-US': 'Failed to log medication status.' },
+  connError: { 'id-ID': 'Tidak bisa terhubung ke server.', 'en-US': 'Could not connect to server.' },
+})
