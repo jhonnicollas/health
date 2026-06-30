@@ -109,3 +109,15 @@ Format:
   (8) LOW: /api/ai/clinical/message missing CLINICAL_COPILOT_ENABLED gate — added.
   (9) LOW: Migration 005 header/metadata said 004 — fixed to 005.
 - Status: DONE
+
+---
+
+## S6A Security: Leaked Credentials — 2026-06-30
+
+- Task: Remove plaintext Cloudflare credentials from TASK_PLAN_SPRINT6_AI.md
+- Worker: docs
+- Files changed: docs_sprint6/TASK_PLAN_SPRINT6_AI.md (removed lines 37-38)
+- Tests: N/A (doc fix)
+- Validation: git grep confirms zero remaining matches for cfut_ / 79dea
+- Notes: CRITICAL — Cloudflare Account ID + API Token were hardcoded in TASK_PLAN line 37-38. Per AGENTS §2: secrets must only live in Cloudflare Secrets/Env. Removed and squashed history so no commit contains the secret.
+- Status: DONE
