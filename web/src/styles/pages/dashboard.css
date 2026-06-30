@@ -1,0 +1,405 @@
+
+/* Add subtle padding to all settings panels and forms */
+.settings-card,
+.settings-form {
+  padding: 24px;
+}
+
+/* Settings panel pages need padding */
+.settings-panel > * + * {
+  margin-top: 0;
+}
+
+/* Profile delete - ensure form is full width */
+.danger-zone {
+  padding: 24px;
+}
+
+.action-panel,
+.result-card {
+  padding: 24px;
+}
+
+/* Mobile add fab visible when not on AI page */
+.app-page:not(:has(.ai-assistant-panel)) .mobile-add-fab {
+  display: inline-flex;
+}
+
+.app-page:not(:has(.ai-assistant-panel)) .ai-fab {
+  display: none;
+}
+
+/* Force a better contrast for autofilled input */
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 30px color-mix(in srgb, var(--colorPrimary) 8%, var(--colorSurface)) inset !important;
+  -webkit-text-fill-color: var(--colorTextPrimary) !important;
+}
+
+/* Print: hide sidebar/topbar/footer in print */
+@media print {
+  .app-sidebar,
+  .app-topbar,
+  .mobile-topbar,
+  .app-bottom-nav,
+  .ai-fab,
+  .mobile-add-fab,
+  .stitch-form-footer { display: none !important; }
+  .app-content-area { padding: 0 !important; }
+  .stitch-device-cards { grid-template-columns: 1fr !important; }
+}
+
+/* ===== Dashboard 7-day chart ===== */
+.dashboard-chart-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid var(--colorBorderSoft);
+  border-radius: var(--radiusXl);
+  background: var(--colorSurfaceElevated);
+  box-shadow: var(--shadowCard);
+}
+.dashboard-chart-card h3 {
+  margin: 0;
+  font: var(--typHeadlineMd);
+  color: var(--colorTextPrimary);
+}
+.dashboard-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 16px;
+  align-items: end;
+  min-height: 200px;
+}
+.dashboard-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dashboard-chart-bar-wrap {
+  width: 100%;
+  height: 160px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--colorSurface);
+  border-radius: 8px;
+  padding: 4px;
+}
+.dashboard-chart-bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.4s ease;
+}
+.dashboard-chart-label {
+  font: var(--typLabelSm);
+  color: var(--colorTextSecondary);
+  text-align: center;
+  line-height: 1.2;
+}
+.dashboard-chart-value {
+  font: var(--typLabelMd);
+  color: var(--colorTextPrimary);
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .dashboard-chart-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .dashboard-chart-bar-wrap {
+    height: 100px;
+  }
+}
+
+/* ===== Page heading with help icon ===== */
+.page-heading-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-heading-help {
+  width: 22px;
+  height: 22px;
+}
+.page-heading-help .material-symbols-outlined {
+  font-size: 14px;
+}
+
+/* ===== Metric code badge with medical term icon ===== */
+.metric-code-badge-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--colorSurface);
+  border: 1px solid var(--colorBorder);
+  border-radius: var(--radiusSm);
+  font: var(--typLabelSm);
+  font-weight: 600;
+  color: var(--colorText);
+}
+.medical-term {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+.medical-term-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+  border: none;
+  color: var(--colorTextSecondary);
+  transition: color 0.15s;
+  vertical-align: middle;
+}
+.medical-term-info:hover {
+  color: var(--colorPrimary);
+}
+.medical-term-info .material-symbols-outlined {
+  font-size: 14px;
+  line-height: 1;
+}
+.metric-code-badge-cell .medical-term {
+  margin-left: 0;
+}
+.metric-code-badge-cell .medical-term-info {
+  padding: 0;
+  vertical-align: middle;
+}
+.metric-code-badge-cell .medical-term-info .material-symbols-outlined {
+  font-size: 13px;
+}
+
+.medical-term-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: var(--colorSurface);
+  border: 1px solid var(--colorBorder);
+  border-radius: var(--radiusSm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  font: var(--typLabelSm);
+  color: var(--colorTextSecondary);
+  white-space: normal;
+  max-width: min(280px, calc(100vw - 24px));
+  line-height: 1.4;
+  pointer-events: auto;
+  font-size: 12px;
+}
+
+/* ===== Medical Term Popup — Full overlay modal ===== */
+.mtp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: mtp-fade-in 0.15s ease-out;
+}
+@keyframes mtp-fade-in { from { opacity: 0 } to { opacity: 1 } }
+
+.mtp-panel {
+  background: var(--colorSurface);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+  width: min(600px, 100%);
+  max-height: min(85vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: mtp-slide-up 0.2s ease-out;
+}
+@keyframes mtp-slide-up { from { transform: translateY(24px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+
+.mtp-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 2px solid var(--colorBorder);
+  background: linear-gradient(135deg, var(--colorSurfaceContainerLow) 0%, var(--colorSurfaceContainer) 100%);
+  flex-shrink: 0;
+}
+.mtp-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mtp-title h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--colorTextPrimary);
+}
+.mtp-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--colorSurfaceContainerHigh);
+  color: var(--colorTextSecondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.mtp-close:hover { background: var(--colorSurfaceContainerHighest); }
+.mtp-close .material-symbols-outlined { font-size: 20px; }
+
+.mtp-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.mtp-fulldef {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--colorTextSecondary);
+  margin: 0 0 16px;
+}
+
+.mtp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.mtp-card {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--colorSurfaceContainerLow);
+  border: 1px solid var(--colorBorder);
+}
+.mtp-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mtp-card-icon .material-symbols-outlined { font-size: 20px; }
+.mtp-card-range .mtp-card-icon { background: color-mix(in srgb, var(--colorPrimary) 12%, transparent); color: var(--colorPrimary); }
+.mtp-card-device .mtp-card-icon { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
+.mtp-card-body { display: flex; flex-direction: column; min-width: 0; }
+.mtp-card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--colorTextMuted); letter-spacing: 0.5px; }
+.mtp-card-value { font-size: 14px; font-weight: 800; color: var(--colorTextPrimary); margin-top: 2px; }
+.mtp-card-sub { font-size: 11px; color: var(--colorTextMuted); margin-top: 2px; font-style: italic; line-height: 1.3; }
+
+.mtp-block {
+  margin-bottom: 14px;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.mtp-block h3 {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mtp-block h3 .material-symbols-outlined { font-size: 18px; }
+.mtp-block p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--colorTextSecondary); }
+
+.mtp-block-risk {
+  background: color-mix(in srgb, #ef4444 6%, transparent);
+  border: 1px solid color-mix(in srgb, #ef4444 20%, transparent);
+}
+.mtp-block-risk h3 { color: #dc2626; }
+
+.mtp-block-doctor {
+  background: color-mix(in srgb, #f59e0b 6%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 20%, transparent);
+}
+.mtp-block-doctor h3 { color: #d97706; }
+
+.mtp-block-tip {
+  background: color-mix(in srgb, #10b981 6%, transparent);
+  border: 1px solid color-mix(in srgb, #10b981 20%, transparent);
+}
+.mtp-block-tip h3 { color: #059669; }
+
+.mtp-source {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: var(--colorSurfaceContainerLow);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--colorTextMuted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mtp-source .material-symbols-outlined { font-size: 14px; color: var(--colorPrimary); }
+.mtp-source a { color: var(--colorPrimary); text-decoration: underline; font-weight: 600; }
+.mtp-unavailable { color: var(--colorTextMuted); font-style: italic; text-align: center; padding: 40px 0; }
+
+/* Mobile: full-screen bottom sheet */
+@media (max-width: 640px) {
+  .mtp-overlay { align-items: flex-end; padding: 0; }
+  .mtp-panel {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 24px 24px 0 0;
+  }
+  .mtp-grid { grid-template-columns: 1fr; }
+  .mtp-body { padding: 16px; }
+}
+
+/* ===== Page heading actions (right side buttons) ===== */
+.page-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.page-heading-actions .btn-primary {
+  white-space: nowrap;
+}
+
+/* ===== AI summary blocks ===== */
+.ai-summary {
+  padding: 20px 24px;
+  border: 1px solid color-mix(in srgb, var(--colorPrimary) 24%, var(--colorBorder));
+  border-radius: var(--radiusXl);
+  background: color-mix(in srgb, var(--colorPrimary) 6%, var(--colorSurfaceElevated));
+  box-shadow: var(--shadowCard);
+}
+.ai-summary h3 {
+  margin: 0 0 8px;
+  font: var(--typHeadlineMd);
+  color: var(--colorTextPrimary);
+}
+.ai-summary p {
+  margin: 0;
+  font: var(--typBodyMd);
+  color: var(--colorTextSecondary);
+  line-height: 1.6;
+}
+.ai-summary-error {
+  border-color: var(--colorStatusCritical);
+  background: color-mix(in srgb, var(--colorStatusCritical) 6%, var(--colorSurfaceElevated));
+}
+.ai-summary-error p { color: var(--colorStatusCritical); }
+
+

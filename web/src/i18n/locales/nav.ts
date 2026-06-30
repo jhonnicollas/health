@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('nav', {
   // Nav groups

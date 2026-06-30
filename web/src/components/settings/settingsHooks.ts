@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 export type ConfigRow = {
   configKey: string

@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('dashboard', {
   eyebrow: { 'id-ID': 'Sprint 5A', 'en-US': 'Sprint 5A' },

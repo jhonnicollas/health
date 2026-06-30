@@ -1,20 +1,15 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-
-export const SUPPORTED_LOCALES = ['id-ID', 'en-US'] as const
-export type SupportedLocale = typeof SUPPORTED_LOCALES[number]
-export const DEFAULT_LOCALE: SupportedLocale = 'id-ID'
-export const FALLBACK_LOCALE: SupportedLocale = 'en-US'
+import { useState, useCallback, useEffect } from 'react'
+import {
+  SUPPORTED_LOCALES,
+  type SupportedLocale,
+  DEFAULT_LOCALE,
+  FALLBACK_LOCALE,
+  translations,
+} from './registry'
+import { I18nContext } from './context'
+import './loadLocales'
 
 const LOCALE_STORAGE_KEY = 'hl_locale'
-
-// Translation maps: namespace → key → locale → string
-type TranslationMap = Record<string, Record<string, Record<SupportedLocale, string>>>
-
-const translations: TranslationMap = {}
-
-export function registerTranslations(namespace: string, data: Record<string, Record<SupportedLocale, string>>) {
-  translations[namespace] = data
-}
 
 function detectLocale(): SupportedLocale {
   try {
@@ -24,25 +19,6 @@ function detectLocale(): SupportedLocale {
   const browser = navigator.language
   if (browser?.startsWith('en')) return 'en-US'
   return DEFAULT_LOCALE
-}
-
-type I18nContextType = {
-  locale: SupportedLocale
-  setLocale: (locale: SupportedLocale) => void
-  t: (key: string, fallback?: string) => string
-}
-
-const I18nContext = createContext<I18nContextType>({
-  locale: DEFAULT_LOCALE,
-  setLocale: () => {},
-  t: (key) => key,
-})
-
-export function useI18n() { return useContext(I18nContext) }
-
-export function useTranslation() {
-  const { t } = useI18n()
-  return { t }
 }
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
@@ -86,3 +62,4 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     </I18nContext.Provider>
   )
 }
+

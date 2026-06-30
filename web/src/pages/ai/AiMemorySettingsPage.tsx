@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, no-empty */
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 import { translateErrorCode } from '../../api/translateError'
 
 export function AiMemorySettingsPage() {

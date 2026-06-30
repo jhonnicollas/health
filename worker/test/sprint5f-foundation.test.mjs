@@ -76,10 +76,10 @@ test('ConfigService update for non-secret stores real value', async () => {
       })
     })
   }
-  const updated = await ConfigService.update(db, {}, 'appName', { configValue: 'HL Health Companion' })
-  assert.equal(updated.configValue, 'HL Health Companion')
+  const updated = await ConfigService.update(db, {}, 'appName', { configValue: 'iSehat' })
+  assert.equal(updated.configValue, 'iSehat')
   const updateArgs = captured.find((c) => c.sql.includes('UPDATE HL_systemConfigs'))?.args
-  assert.equal(updateArgs[0], 'HL Health Companion')
+  assert.equal(updateArgs[0], 'iSehat')
 })
 
 test('AuditService redacts sensitive keys in metadata', async () => {

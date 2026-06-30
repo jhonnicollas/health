@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
 import { EmailOtpVerificationStep } from '../../components/auth/EmailOtpVerificationStep'
 import { LanguageSwitcher } from '../../components/i18n/LanguageSwitcher'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 type LoginState = 'idle' | 'submitting' | 'error'
 
@@ -115,7 +115,7 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
       <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 100 }}><LanguageSwitcher compact /></div>
       <section className="auth-panel" aria-labelledby="login-title">
         <div className="auth-copy">
-          <p className="eyebrow">HL Health Companion</p>
+          <p className="eyebrow">iSehat</p>
           <h1 id="login-title">{t('auth.loginTitle')}</h1>
           <p>{t('auth.loginSubtitle')}</p>
           <div className="auth-feature-grid" aria-label="Ringkasan keamanan">

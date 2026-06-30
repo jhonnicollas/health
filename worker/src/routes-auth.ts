@@ -472,9 +472,11 @@ export function mountAuthRoutes(app: any) {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       const dateStr = c.req.query('date') || new Date().toISOString().slice(0, 10)
-      const ms = await c.env.DB.prepare("SELECT v.metricCode, v.finalValue, v.status, v.severity, v.createdAt FROM HL_measurementValues v JOIN HL_measurementSessions s ON s.id = v.sessionId WHERE s.userId = ? AND date(s.measuredAt) = date(?) ORDER BY v.createdAt DESC").bind(uid, dateStr).all<any>()
+      const ms = await c.env.DB.prepare("SELECT v.metricCode, v.finalValue, v.status, v.severity, v.createdAt, v.measuredAt, v.unit FROM HL_measurementValues v JOIN HL_measurementSessions s ON s.id = v.sessionId WHERE s.userId = ? AND date(s.measuredAt) = date(?) ORDER BY v.measuredAt DESC").bind(uid, dateStr).all<any>()
+      const seen = new Set<string>()
+      const measurements = (ms.results || []).filter((r: any) => { if (seen.has(r.metricCode)) return false; seen.add(r.metricCode); return true })
       const sym = await c.env.DB.prepare("SELECT id, symptomDateTime, quickSymptomsJson, bodyArea, painScale, painSeverity, mood, isRedFlag FROM HL_symptomLogs WHERE userId = ? AND date(symptomDateTime) = date(?) ORDER BY symptomDateTime DESC").bind(uid, dateStr).all<any>()
-      return jr(c, ok({ date: dateStr, hasData: (ms.results?.length || 0) > 0 || (sym.results?.length || 0) > 0, measurements: ms.results || [], symptoms: sym.results || [] }, 200, s), 200)
+      return jr(c, ok({ date: dateStr, hasData: (measurements.length || 0) > 0 || (sym.results?.length || 0) > 0, measurements: measurements, symptoms: sym.results || [] }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal memuat hub kesehatan.', 500, [], s), 500) }
   })
 

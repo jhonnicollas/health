@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useI18n } from '../../i18n'
+import { useI18n, useMetricLabels } from '../../i18n/useI18n'
 import { translateErrorCode } from '../../api/translateError'
 
 type VitalSnapshot = {
@@ -43,6 +43,7 @@ type ChatMessage = {
 
 function AiAssistantPage() {
   const { t, locale } = useI18n()
+  const ml = useMetricLabels()
   const [question, setQuestion] = useState(t('ai.defaultQuestion'))
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -67,7 +68,7 @@ function AiAssistantPage() {
       .then(body => { if (body && body.success && body.data?.recommendations) setRecommendations(body.data.recommendations) })
       .catch(() => { setRecsError(t('ai.connError')) })
       .finally(() => setRecsLoading(false))
-  }, [])
+  }, [t])
 
   async function ask() {
     const trimmedQuestion = question.trim()
@@ -139,7 +140,7 @@ function AiAssistantPage() {
           <div className="vital-strip" aria-label="Latest vitals">
             {vitals.map((value) => (
               <span key={`${value.metricCode}-${value.finalValue}`}>
-                <span className={`badge-status badge-${value.severity}`}><span className="status-dot" />{value.metricCode}</span>: {value.finalValue} {value.unit}
+                <span className={`badge-status badge-${value.severity}`}><span className="status-dot" />{ml[value.metricCode] || value.metricCode}</span>: {value.finalValue} {value.unit}
               </span>
             ))}
           </div>

@@ -5,12 +5,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) 1rem max(1rem, env(safe-area-inset-bottom, 0px));
   background: rgba(0, 0, 0, 0.72);
 }
 
 .emergency-modal-card {
   width: min(520px, 100%);
+  max-height: calc(100svh - 2rem);
+  overflow-y: auto;
   padding: 2rem;
   border: 3px solid var(--colorStatusEmergency);
   border-radius: var(--radiusLg);
@@ -75,9 +77,9 @@
 }
 
 .emergency-modal-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
   flex-shrink: 0;
   accent-color: var(--colorStatusEmergency);
 }

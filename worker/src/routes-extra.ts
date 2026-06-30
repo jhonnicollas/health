@@ -452,135 +452,6 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     }
   })
 
-  // US-4.1.1 generate doctor-ready PDF (HTML) — saved to R2 + HL_reports
-  app.post('/api/reports/doctor-ready', async (c) => {
-    const startedAt = Date.now()
-    try {
-      const userId = await getCurrentSession(c)
-      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const rangeStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      const rangeEnd = new Date().toISOString()
-      const values = await c.env.DB.prepare(
-        'SELECT metricCode, finalValue, unit, status, severity, measuredAt FROM HL_measurementValues WHERE userId = ? AND measuredAt BETWEEN ? AND ? ORDER BY measuredAt ASC'
-      ).bind(userId, rangeStart, rangeEnd).all()
-      const profile = await c.env.DB.prepare('SELECT displayName FROM HL_users WHERE id = ?').bind(userId).first<{ displayName: string }>()
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Laporan 30 Hari</title></head><body><h1>Laporan Kesehatan 30 Hari</h1><p>Nama: ${escapeHtml(profile?.displayName || '-')}</p><p>Rentang: ${formatIdShortDateTime(rangeStart)} s/d ${formatIdShortDateTime(rangeEnd)}</p><table border="1" cellpadding="4"><tr><th>Tanggal</th><th>Metrik</th><th>Nilai</th><th>Unit</th><th>Status</th><th>Severity</th></tr>${(values.results || []).map((v: any) => `<tr><td>${formatIdShortDateTime(v.measuredAt)}</td><td>${v.metricCode}</td><td>${v.finalValue}</td><td>${v.unit}</td><td>${v.status}</td><td>${v.severity}</td></tr>`).join('')}</table><p><em>Laporan ini hanya data, bukan diagnosis. Konsultasikan dengan dokter.</em></p></body></html>`
-      const reportId = await (async () => {
-        const tempId = Date.now().toString(36)
-        const r2Key = `HL/users/${userId}/reports/${tempId}.html`
-        await c.env.LOGS.put(r2Key, html, { httpMetadata: { contentType: 'text/html; charset=utf-8' } })
-        return insertAndGetId(c.env.DB.prepare(
-          "INSERT INTO HL_reports (userId, reportType, rangeStart, rangeEnd, r2Key, status, summaryJson, createdAt, updatedAt) VALUES (?, 'doctorReady30d', ?, ?, ?, 'ready', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-        ).bind(userId, rangeStart, rangeEnd, r2Key, JSON.stringify({ count: (values.results || []).length })))
-      })()
-      await c.env.DB.prepare(
-        "INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, 'reportGenerate', 'HL_reports', ?, ?, CURRENT_TIMESTAMP)"
-      ).bind(userId, reportId, JSON.stringify({ reportType: 'doctorReady30d' })).run()
-      return jsonResponse(c, success({ reportId, status: 'ready' }, 201, startedAt), 201)
-    } catch (e) {
-      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal generate PDF.', 500, [], startedAt), 500)
-    }
-  })
-
-  // US-4.1.3 download (HTML, since Workers free tier cannot run Puppeteer)
-  app.get('/api/reports/:id/download', async (c) => {
-    const startedAt = Date.now()
-    try {
-      const userId = await getCurrentSession(c)
-      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const reportId = c.req.param('id')
-      const report = await c.env.DB.prepare('SELECT userId, r2Key FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: number; r2Key: string }>()
-      if (!report) return jsonResponse(c, failure('NOT_FOUND', 'Report tidak ditemukan.', 404, [], startedAt), 404)
-      if (report.userId !== userId) {
-        const link = await c.env.DB.prepare("SELECT id FROM HL_familyLinks WHERE ownerUserId = ? AND linkedUserId = ? AND status = 'active' AND canViewDashboard = 1").bind(report.userId, userId).first()
-        if (!link) return jsonResponse(c, failure('FORBIDDEN', 'Tidak ada akses.', 403, [], startedAt), 403)
-      }
-      const obj = await c.env.LOGS.get(report.r2Key)
-      if (!obj) return jsonResponse(c, failure('NOT_FOUND', 'File tidak ditemukan.', 404, [], startedAt), 404)
-      return new Response(obj.body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
-    } catch (e) {
-      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal download.', 500, [], startedAt), 500)
-    }
-  })
-
-  // US-4.1.4 share link
-  app.post('/api/reports/:id/share', async (c) => {
-    const startedAt = Date.now()
-    try {
-      const userId = await getCurrentSession(c)
-      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const reportId = c.req.param('id')
-      const body = await c.req.json() as { recipientLabel?: string; expiresInHours?: number }
-      const report = await c.env.DB.prepare('SELECT userId FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: number }>()
-      if (!report) return jsonResponse(c, failure('NOT_FOUND', 'Report tidak ditemukan.', 404, [], startedAt), 404)
-      if (report.userId !== userId) return jsonResponse(c, failure('FORBIDDEN', 'Tidak memiliki akses.', 403, [], startedAt), 403)
-      const shareToken = crypto.randomUUID().replace(/-/g, '')
-      const shareTokenHash = await sha256Token(shareToken)
-      const expiresInHours = Math.min(Math.max(body.expiresInHours ?? 24, 1), 168)
-      const expiresAt = new Date(Date.now() + expiresInHours * 3600 * 1000).toISOString()
-      await insertAndGetId(c.env.DB.prepare(
-        "INSERT INTO HL_reportShares (reportId, userId, shareTokenHash, recipientLabel, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
-      ).bind(reportId, userId, shareTokenHash, body.recipientLabel || null, expiresAt))
-      return jsonResponse(c, success({ shareToken, expiresAt, shareUrl: `/api/reports/share/${shareToken}` }, 201, startedAt), 201)
-    } catch (e) {
-      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal share.', 500, [], startedAt), 500)
-    }
-  })
-
-  // US-4.1.5 get report measurement data for CSV export
-  app.get('/api/reports/:id/data', async (c) => {
-    const startedAt = Date.now()
-    try {
-      const userId = await getCurrentSession(c)
-      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const reportId = c.req.param('id')
-      const report = await c.env.DB.prepare('SELECT userId, rangeStart, rangeEnd FROM HL_reports WHERE id = ?').bind(reportId).first<{ userId: number; rangeStart: string; rangeEnd: string }>()
-      if (!report) return jsonResponse(c, failure('NOT_FOUND', 'Report tidak ditemukan.', 404, [], startedAt), 404)
-      if (report.userId !== userId) {
-        const link = await c.env.DB.prepare("SELECT id FROM HL_familyLinks WHERE ownerUserId = ? AND linkedUserId = ? AND status = 'active' AND canViewDashboard = 1").bind(report.userId, userId).first()
-        if (!link) return jsonResponse(c, failure('FORBIDDEN', 'Tidak ada akses.', 403, [], startedAt), 403)
-      }
-      const values = await c.env.DB.prepare(
-        `SELECT metricCode, finalValue, unit, status, severity, measuredAt
-         FROM HL_measurementValues
-         WHERE userId = ? AND measuredAt BETWEEN ? AND ?
-         ORDER BY measuredAt DESC, metricCode ASC`
-      ).bind(report.userId, report.rangeStart, report.rangeEnd).all<{
-        metricCode: string; finalValue: number; unit: string; status: string; severity: string; measuredAt: string
-      }>()
-      const profile = await c.env.DB.prepare('SELECT displayName FROM HL_users WHERE id = ?').bind(report.userId).first<{ displayName: string }>()
-      return jsonResponse(c, success({
-        reportId,
-        patientName: profile?.displayName || '-',
-        rangeStart: report.rangeStart,
-        rangeEnd: report.rangeEnd,
-        count: (values.results || []).length,
-        values: values.results || []
-      }, 200, startedAt), 200)
-    } catch (e) {
-      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat data laporan.', 500, [], startedAt), 500)
-    }
-  })
-
-  // US-4.1.4 public share view
-  app.get('/api/reports/share/:shareToken', async (c) => {
-    const startedAt = Date.now()
-    try {
-      const token = c.req.param('shareToken')
-      const tokenHash = await sha256Token(token)
-      const share = await c.env.DB.prepare('SELECT reportId, expiresAt, revokedAt FROM HL_reportShares WHERE shareTokenHash = ?').bind(tokenHash).first<{ reportId: string; expiresAt: string; revokedAt: string | null }>()
-      if (!share) return jsonResponse(c, failure('NOT_FOUND', 'Link share tidak ditemukan.', 404, [], startedAt), 404)
-      if (share.revokedAt) return jsonResponse(c, failure('VALIDATION_ERROR', 'Link share sudah dicabut.', 400, [], startedAt), 400)
-      if (new Date(share.expiresAt) < new Date()) return jsonResponse(c, failure('VALIDATION_ERROR', 'Link share kadaluarsa.', 400, [], startedAt), 400)
-      const report = await c.env.DB.prepare('SELECT r2Key FROM HL_reports WHERE id = ?').bind(share.reportId).first<{ r2Key: string }>()
-      if (!report) return jsonResponse(c, failure('NOT_FOUND', 'Report tidak ditemukan.', 404, [], startedAt), 404)
-      const obj = await c.env.LOGS.get(report.r2Key)
-      if (!obj) return jsonResponse(c, failure('NOT_FOUND', 'File tidak ditemukan.', 404, [], startedAt), 404)
-      return new Response(obj.body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
-    } catch (e) {
-      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal.', 500, [], startedAt), 500)
-    }
-  })
 
   // US-4.2.1 start fasting
   app.post('/api/fasting/start', async (c) => {
@@ -741,41 +612,6 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
     }
   })
 
-  app.get('/api/dashboard/comparison', async (c) => {
-    const startedAt = Date.now()
-    try {
-      const userId = await getCurrentSession(c)
-      if (!userId) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt), 401)
-      const metricCode = c.req.query('metricCode') || 'systolic'
-      const asOfDate = c.req.query('asOfDate') || new Date().toISOString().slice(0, 10)
-      const todayRow = await c.env.DB.prepare(
-        'SELECT finalValue FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(measuredAt,1,10) <= ? ORDER BY measuredAt DESC LIMIT 1'
-      ).bind(userId, metricCode, asOfDate).first<{ finalValue: number }>()
-      const threeDaysAgo = new Date(new Date(asOfDate).getTime() - 3 * 86400000).toISOString().slice(0, 10)
-      const sevenDaysAgo = new Date(new Date(asOfDate).getTime() - 7 * 86400000).toISOString().slice(0, 10)
-      const avg3 = await c.env.DB.prepare(
-        'SELECT AVG(finalValue) as avgVal, COUNT(*) as cnt FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(measuredAt,1,10) >= ? AND substr(measuredAt,1,10) < ?'
-      ).bind(userId, metricCode, threeDaysAgo, asOfDate).first<{ avgVal: number; cnt: number }>()
-      const avg7 = await c.env.DB.prepare(
-        'SELECT AVG(finalValue) as avgVal, COUNT(*) as cnt FROM HL_measurementValues WHERE userId = ? AND metricCode = ? AND substr(measuredAt,1,10) >= ? AND substr(measuredAt,1,10) < ?'
-      ).bind(userId, metricCode, sevenDaysAgo, asOfDate).first<{ avgVal: number; cnt: number }>()
-      const todayValue = todayRow?.finalValue ?? null
-      const threeDayAverage = avg3?.cnt && avg3.cnt >= 3 ? Math.round((avg3.avgVal || 0) * 10) / 10 : null
-      const sevenDayAverage = avg7?.cnt && avg7.cnt >= 7 ? Math.round((avg7.avgVal || 0) * 10) / 10 : null
-      const delta3Day = todayValue !== null && threeDayAverage !== null ? Math.round((todayValue - threeDayAverage) * 10) / 10 : null
-      const delta7Day = todayValue !== null && sevenDayAverage !== null ? Math.round((todayValue - sevenDayAverage) * 10) / 10 : null
-      const status = delta3Day !== null ? (delta3Day > 0 ? 'up' : delta3Day < 0 ? 'down' : 'stable') : 'unknown'
-      return jsonResponse(c, success({
-        metricCode, todayValue, threeDayAverage, sevenDayAverage,
-        delta3Day, delta7Day, status,
-        hasEnough3DayData: threeDayAverage !== null,
-        hasEnough7DayData: sevenDayAverage !== null
-      }, 200, startedAt), 200)
-    } catch (e) {
-      console.error('dashboard comparison error:', e)
-      return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat perbandingan.', 500, [], startedAt), 500)
-    }
-  })
 
   app.get('/api/ai/recommendations', async (c) => {
     const startedAt = Date.now()
@@ -943,7 +779,7 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
         d.setDate(d.getDate() - i * 2)
         const symptomDateTime = d.toISOString().slice(0, 10) + 'T10:00:00Z'
         await c.env.DB.prepare(
-          `INSERT INTO HL_symptoms (userId, bodyArea, painScale, description, symptomDateTime, redFlagged, redFlagReason, createdAt)
+          `INSERT INTO HL_symptomLogs (userId, bodyArea, painScale, description, symptomDateTime, isRedFlag, redFlagsJson, createdAt)
            VALUES (?, ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP)`
         ).bind(userId, symptomSamples[i].bodyArea, symptomSamples[i].painScale, symptomSamples[i].description, symptomDateTime).run()
         seeded.symptoms++
@@ -957,9 +793,9 @@ export function mountExtraRoutes(app: Hono<{ Bindings: ExtraEnv }>) {
         const amount = Math.round(1500 + Math.random() * 1500)
         const target = 2500
         await c.env.DB.prepare(
-          `INSERT INTO HL_hydrationLogs (userId, amount, unit, source, loggedAt, createdAt)
-           VALUES (?, ?, 'ml', 'web', ?, CURRENT_TIMESTAMP)`
-        ).bind(userId, amount, date + 'T09:00:00Z').run()
+          `INSERT INTO HL_waterIntakeLogs (userId, amountMl, logDate, source, loggedAt, createdAt)
+           VALUES (?, ?, ?, 'web', ?, CURRENT_TIMESTAMP)`
+        ).bind(userId, amount, date, date + 'T09:00:00Z').run()
         seeded.hydration++
       }
 

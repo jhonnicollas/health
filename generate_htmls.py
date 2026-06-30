@@ -112,7 +112,7 @@ base_template = """<!DOCTYPE html>
           <span class="material-symbols-outlined text-inverse-primary text-[20px]" style="font-variation-settings:'FILL' 1">health_and_safety</span>
         </div>
         <div>
-          <h1 class="text-[17px] font-bold text-on-surface leading-tight">HealthSync Pro</h1>
+          <h1 class="text-[17px] font-bold text-on-surface leading-tight">iSehat</h1>
           <p class="text-[11px] text-on-surface-variant">Enterprise Health</p>
         </div>
       </div>
@@ -209,7 +209,7 @@ base_template = """<!DOCTYPE html>
 
 pages = {
     "admin_users_roles.html": {
-        "title": "Users & Roles - Admin - HealthSync Pro",
+        "title": "Users & Roles - Admin - iSehat",
         "page_title": "Manajemen User & Role",
         "page_subtitle": "Kelola pengguna, assign role, dan pantau status subscription",
         "nav_active": "users",
@@ -247,7 +247,7 @@ pages = {
         """
     },
     "admin_plans_subscriptions.html": {
-        "title": "Plans & Subscriptions - Admin - HealthSync Pro",
+        "title": "Plans & Subscriptions - Admin - iSehat",
         "page_title": "Plans & Subscriptions",
         "page_subtitle": "Kelola plan berlangganan, fitur, harga, dan quota",
         "nav_active": "plans",
@@ -280,7 +280,7 @@ pages = {
         """
     },
     "admin_ai_config.html": {
-        "title": "AI Configuration - Admin - HealthSync Pro",
+        "title": "AI Configuration - Admin - iSehat",
         "page_title": "Konfigurasi AI",
         "page_subtitle": "Kelola model, fallback, timeout, disclaimer, dan AI Memory.",
         "nav_active": "ai",
@@ -308,7 +308,7 @@ pages = {
         """
     },
     "admin_system_config.html": {
-        "title": "System Config - Admin - HealthSync Pro",
+        "title": "System Config - Admin - iSehat",
         "page_title": "System Configuration",
         "page_subtitle": "Konfigurasi sistem dinamis tanpa perlu deploy ulang. Semua perubahan dicatat di audit log.",
         "nav_active": "system",
@@ -337,7 +337,7 @@ pages = {
         """
     },
     "admin_audit_logs.html": {
-        "title": "Audit Logs - Admin - HealthSync Pro",
+        "title": "Audit Logs - Admin - iSehat",
         "page_title": "Audit Logs",
         "page_subtitle": "Catatan lengkap semua aksi sensitif sistem. Data ini tidak dapat diubah atau dihapus.",
         "nav_active": "audit",
@@ -368,8 +368,8 @@ pages = {
         """
     },
     "premium_upgrade.html": {
-        "title": "Upgrade ke Premium - HealthSync Pro",
-        "page_title": "Upgrade ke HealthSync Pro Premium",
+        "title": "Upgrade ke Premium - iSehat",
+        "page_title": "Upgrade ke iSehat Premium",
         "page_subtitle": "Dari pencatatan biasa menjadi pendamping kesehatan harian yang cerdas dan personal.",
         "nav_active": "none",
         "page_content": """
@@ -402,7 +402,7 @@ pages = {
         """
     },
     "education_card_modal.html": {
-        "title": "Education Cards - HealthSync Pro",
+        "title": "Education Cards - iSehat",
         "page_title": "Education Cards",
         "page_subtitle": "Preview modal untuk kartu edukasi kesehatan.",
         "nav_active": "none",

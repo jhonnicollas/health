@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from 'react'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 import { translateErrorCode } from '../../api/translateError'
 import { EducationBottomSheet } from '../../components/EducationBottomSheet'
 

@@ -1,0 +1,24 @@
+
+/* Welcome Wizard */
+.wizard-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+.wizard-panel { background: #fff; border-radius: 20px; max-width: 460px; width: 100%; padding: 32px; box-shadow: 0 24px 60px -12px rgba(0,0,0,0.3); animation: wizardSlide 0.3s cubic-bezier(0.4,0,0.2,1); }
+@keyframes wizardSlide { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.wizard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.wizard-icon { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
+.wizard-icon .material-symbols-outlined { font-size: 30px; }
+.wizard-skip { background: none; border: none; color: var(--text-secondary, #6b7280); font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 16px; border-radius: 8px; min-height: 44px; }
+.wizard-skip:hover { background: #f3f4f6; }
+.wizard-title { margin: 0 0 10px; font-size: 24px; font-weight: 900; color: var(--text-primary, #111827); }
+.wizard-desc { margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: var(--text-secondary, #6b7280); }
+.wizard-dots { display: flex; gap: 6px; margin-bottom: 24px; }
+.wizard-dot { width: 8px; height: 8px; border-radius: 50%; background: #e5e7eb; transition: all 0.2s; }
+.wizard-dot.active { width: 24px; border-radius: 4px; background: var(--primary, #111827); }
+.wizard-dot.done { background: #d1d5db; }
+.wizard-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.wizard-btn-secondary { padding: 12px 20px; border-radius: 12px; border: 1px solid var(--border, #e5e7eb); background: #fff; color: var(--text-primary, #111827); font-size: 14px; font-weight: 700; cursor: pointer; }
+.wizard-btn-secondary:hover { background: #f8fafc; }
+.wizard-btn-try { padding: 12px 20px; border-radius: 12px; border: 1px solid #0369a1; background: rgba(3,105,161,0.08); color: #0369a1; font-size: 14px; font-weight: 700; cursor: pointer; }
+.wizard-btn-try:hover { background: rgba(3,105,161,0.14); }
+.wizard-btn-primary { padding: 12px 24px; border-radius: 12px; border: none; background: var(--primary, #111827); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; margin-left: auto; }
+.wizard-btn-primary:hover { opacity: 0.92; }
+.wizard-progress { text-align: center; margin: 16px 0 0; font-size: 12px; color: var(--text-muted, #9ca3af); }

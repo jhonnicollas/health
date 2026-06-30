@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useAuth } from '../../context/auth'
 import { EmailOtpVerificationStep } from '../../components/auth/EmailOtpVerificationStep'
 import { LanguageSwitcher } from '../../components/i18n/LanguageSwitcher'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 type RegisterState = 'idle' | 'submitting' | 'success' | 'error'
 
@@ -128,7 +128,7 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
       <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 100 }}><LanguageSwitcher compact /></div>
       <section className="auth-panel" aria-labelledby="register-title">
         <div className="auth-copy">
-          <p className="eyebrow">HL Health Companion</p>
+          <p className="eyebrow">iSehat</p>
           <h1 id="register-title">Buat akun kesehatan pribadi</h1>
           <p>
             Simpan catatan pengukuran dengan akun terpisah dan lanjutkan ke profil kesehatan

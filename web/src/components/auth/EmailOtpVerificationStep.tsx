@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { OtpInput } from './OtpInput'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 type Props = {
   challengeId: number

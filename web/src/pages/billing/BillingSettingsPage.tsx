@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 type SubscriptionInfo = {
   planCode: string
@@ -79,7 +79,7 @@ export function BillingSettingsPage({ onNavigate }: { onNavigate?: (path: string
       finally { setLoading(false) }
     }
     void load()
-  }, [])
+  }, [t])
 
   async function handleCancel() {
     if (!sub || !confirm('Yakin ingin membatalkan langganan? Akses premium akan tetap aktif sampai akhir periode.')) return

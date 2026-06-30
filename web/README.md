@@ -1,4 +1,4 @@
-# HL Health Companion — Frontend
+# iSehat — Frontend
 
 React 19 + Vite 8 + TypeScript 6 SPA, deployed to Cloudflare Pages.
 

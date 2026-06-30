@@ -130,7 +130,7 @@ export function EmergencyContactsPage() {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chatId: telegramChatId.trim(), message: 'Halo dari HL Health Companion. Kontak darurat Anda sudah terdaftar.' })
+            body: JSON.stringify({ chatId: telegramChatId.trim(), message: 'Halo dari iSehat. Kontak darurat Anda sudah terdaftar.' })
           })
           setTestStatus('Telegram test terkirim ke ' + telegramChatId.trim())
         } catch {
@@ -158,7 +158,7 @@ export function EmergencyContactsPage() {
         const res = await fetch('/api/telegram/test', {
           method: 'POST', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chatId: contact.telegramChatId, message: 'Test notifikasi darurat dari HL Health Companion.' })
+          body: JSON.stringify({ chatId: contact.telegramChatId, message: 'Test notifikasi darurat dari iSehat.' })
         })
         const body = (await res.json().catch(() => null)) as { success?: boolean; error?: { message: string } } | null
         setTestStatus(body?.success ? `Test Telegram ke ${contact.contactName} berhasil.` : `Gagal: ${body?.error?.message ?? 'Tidak bisa mengirim.'}`)

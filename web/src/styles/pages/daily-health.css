@@ -1,0 +1,55 @@
+
+/* Daily Health Hub */
+.daily-hub-page .daily-hub-header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+@media (min-width: 768px) { .daily-hub-page .daily-hub-header { flex-direction: row; align-items: flex-start; justify-content: space-between; } }
+.daily-hub-page .daily-hub-header h2 { margin: 0; font-size: 1.5rem; font-weight: 900; }
+.daily-hub-page .daily-hub-header .eyebrow { margin: 0 0 4px; font-size: 12px; font-weight: 800; color: var(--text-secondary, #6b7280); text-transform: uppercase; letter-spacing: 0.16em; }
+.daily-hub-page .daily-hub-header .subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary, #6b7280); }
+.daily-hub-page .daily-hub-header input[type="date"] { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border, #e5e7eb); font-size: 13px; background: #fff; }
+.daily-hub-page .daily-status-banner { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: rgba(16,185,129,.06); border: 1px solid var(--border, #e5e7eb); border-left-width: 4px; border-radius: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.daily-hub-page .daily-status-banner .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.daily-hub-page .daily-status-banner .status-label { font-size: 13px; font-weight: 800; }
+.daily-hub-page .daily-status-banner .status-last { margin-left: auto; font-size: 12px; color: var(--text-secondary, #6b7280); }
+.daily-hub-page .daily-bento-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 1024px) { .daily-hub-page .daily-bento-grid { grid-template-columns: 1fr 1fr; } }
+.daily-hub-page .bento-card { background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 16px; padding: 18px; }
+.daily-hub-page .bento-card h3 { margin: 0 0 14px; font-size: 15px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+.daily-hub-page .bento-card .empty { margin: 0; font-size: 13px; color: var(--text-muted, #9ca3af); }
+.daily-hub-page .card-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.daily-hub-page .card-header .card-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.daily-hub-page .card-header h3 { margin: 0; }
+.daily-hub-page .card-header .subtitle { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary, #6b7280); }
+.daily-hub-page .card-header .hyd-percent { margin-left: auto; font-size: 18px; font-weight: 900; color: #0369a1; }
+.daily-hub-page .vitals-list { display: flex; flex-direction: column; gap: 10px; }
+.daily-hub-page .vital-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; }
+.daily-hub-page .vital-info { display: flex; align-items: center; gap: 10px; }
+.daily-hub-page .vital-info .material-symbols-outlined { font-size: 20px; }
+.daily-hub-page .vital-label { margin: 0; font-size: 12px; font-weight: 800; color: var(--text-secondary, #6b7280); text-transform: uppercase; }
+.daily-hub-page .vital-value { margin: 2px 0 0; font-size: 16px; font-weight: 900; }
+.daily-hub-page .vital-value span { font-size: 12px; font-weight: 500; color: var(--text-secondary, #6b7280); }
+.daily-hub-page .vas-track { display: flex; gap: 2px; height: 8px; margin-bottom: 6px; }
+.daily-hub-page .vas-segment { flex: 1; border-radius: 2px; background: var(--surface-variant, #e4e2e4); }
+.daily-hub-page .vas-segment.active { background: #f59e0b; }
+.daily-hub-page .vas-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary, #6b7280); }
+.daily-hub-page .card-actions { display: flex; gap: 8px; margin-top: 14px; }
+.daily-hub-page .card-actions a { flex: 1; text-align: center; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; }
+.daily-hub-page .btn-secondary { background: #fff; border: 1px solid var(--border, #e5e7eb); color: var(--text-primary, #111827); }
+.daily-hub-page .btn-warning { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3); color: #92400e; }
+.daily-hub-page .hyd-row { display: flex; align-items: center; gap: 16px; }
+.daily-hub-page .hyd-ring { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+.daily-hub-page .hyd-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #0369a1; }
+.daily-hub-page .hyd-ring-center .material-symbols-outlined { font-size: 18px; }
+.daily-hub-page .hyd-ring-center .ring-value { margin: 0; font-size: 16px; font-weight: 900; }
+.daily-hub-page .hyd-ring-center .ring-unit { margin: 0; font-size: 11px; }
+.daily-hub-page .hyd-info { flex: 1; }
+.daily-hub-page .hyd-total { margin: 0; font-size: 20px; font-weight: 900; }
+.daily-hub-page .hyd-total span { font-size: 13px; font-weight: 500; color: var(--text-secondary, #6b7280); }
+.daily-hub-page .hyd-remaining { margin: 2px 0 8px; font-size: 12px; color: var(--text-secondary, #6b7280); }
+.daily-hub-page .hyd-progress { height: 6px; border-radius: 999px; background: var(--surface-variant, #e4e2e4); overflow: hidden; margin-bottom: 10px; }
+.daily-hub-page .hyd-progress > div { height: 100%; background: #0369a1; border-radius: 999px; }
+.daily-hub-page .hyd-quick { display: flex; gap: 8px; }
+.daily-hub-page .hyd-quick a { flex: 1; text-align: center; padding: 10px; border-radius: 8px; border: 1px solid var(--border, #e5e7eb); font-size: 13px; font-weight: 700; color: #0369a1; text-decoration: none; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+.daily-hub-page .daily-quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 16px; }
+@media (min-width: 768px) { .daily-hub-page .daily-quick-actions { grid-template-columns: repeat(4, 1fr); } }
+.daily-hub-page .action-tile { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--border, #e5e7eb); background: #fff; font-size: 13px; font-weight: 800; color: var(--text-primary, #111827); text-decoration: none; cursor: pointer; }
+.daily-hub-page .action-tile .material-symbols-outlined { color: var(--primary, #111827); }

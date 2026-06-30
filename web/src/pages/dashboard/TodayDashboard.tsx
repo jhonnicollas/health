@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
-import { useI18n } from '../../i18n'
+import { useI18n, useMetricLabels, useSeverityLabels } from '../../i18n/useI18n'
 
 type Comparison = {
   avg3day: number | null
@@ -42,25 +42,6 @@ type DashboardData = {
   bestStreak?: number
   aiInsight?: string
 }
-
-const METRIC_LABELS: Record<string, string> = {
-  spo2: 'SpO2',
-  heartRate: 'Heart Rate',
-  systolic: 'Systolic',
-  diastolic: 'Diastolic',
-  bloodPressurePulse: 'Pulse',
-  glucoseFasting: 'Fasting Glucose',
-  glucosePostMeal: 'Post-Meal Glucose',
-  cholesterolTotal: 'Total Cholesterol',
-  uricAcid: 'Uric Acid',
-  bodyWeight: 'Body Weight',
-  bmi: 'BMI',
-  waistCircumference: 'Waist',
-  bodyTemperature: 'Body Temp',
-  sleepDuration: 'Sleep',
-  height: 'Height'
-}
-
 const METRIC_ICONS: Record<string, string> = {
   spo2: 'air',
   heartRate: 'favorite',
@@ -79,15 +60,6 @@ const METRIC_ICONS: Record<string, string> = {
   height: 'height'
 }
 
-const SEVERITY_BADGE: Record<string, { label: string, className: string }> = {
-  normal: { label: 'Normal', className: 'badge-normal' },
-  info: { label: 'Info', className: 'badge-info' },
-  warning: { label: 'Warning', className: 'badge-warning' },
-  high: { label: 'High', className: 'badge-high' },
-  critical: { label: 'Critical', className: 'badge-critical' },
-  emergency: { label: 'Emergency', className: 'badge-emergency' }
-}
-
 type ComparisonData = {
   metricCode: string
   todayValue: number | null
@@ -102,6 +74,8 @@ type ComparisonData = {
 
 export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: string) => void }) {
   const { t } = useI18n()
+  const metricLabels = useMetricLabels()
+  const severityLabels = useSeverityLabels()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -116,7 +90,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
         if (result.success) {
           setData(result.data)
         } else {
-          setError(result.error?.message || 'Failed to load dashboard')
+          setError(result.error?.message || 'Gagal memuat dashboard')
         }
       } catch {
         setError(t('dashboard.connError'))
@@ -142,7 +116,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
     }
     void loadDashboard()
     void loadComparisons()
-  }, [])
+  }, [t])
 
   if (loading) {
     return <div className="dashboard-loading clinical-empty">{t('dashboard.loadingDashboard')}</div>
@@ -218,7 +192,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
           <h3>{t('dashboard.alertsToday')}</h3>
           {data.alerts.map(alert => (
             <div key={alert.id} className={`alert alert-${alert.severity}`}>
-              <strong>{METRIC_LABELS[alert.metricCode] || alert.metricCode}</strong>: {alert.finalValue} {alert.unit}
+              <strong>{metricLabels[alert.metricCode] || alert.metricCode}</strong>: {alert.finalValue} {alert.unit}
               <p>{alert.message}</p>
             </div>
           ))}
@@ -227,7 +201,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
 
       <div className="vitals-grid">
         {data.values.map(v => {
-          const badge = SEVERITY_BADGE[v.severity] || SEVERITY_BADGE[v.status] || { label: v.status, className: 'badge-info' }
+          const badge = { label: severityLabels[v.severity] || severityLabels[v.status] || v.status, className: `badge-${v.severity || v.status || 'info'}` }
           const comp = v.comparisons
           return (
             <div key={v.id} className={`vital-card severity-${v.severity}`}>
@@ -236,7 +210,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
                   <span className="material-symbols-outlined vital-icon" aria-hidden="true">
                     {METRIC_ICONS[v.metricCode] ?? 'monitor_heart'}
                   </span>
-                  <span className="vital-label-text"><MedicalTerm term={METRIC_LABELS[v.metricCode] || v.metricCode} shortDef={MEDICAL_GLOSSARY[v.metricCode] || ''} /></span>
+                  <span className="vital-label-text"><MedicalTerm term={metricLabels[v.metricCode] || v.metricCode} shortDef={MEDICAL_GLOSSARY[v.metricCode] || ''} termCode={v.metricCode} /></span>
                 </div>
                 <span className={`vital-badge ${badge.className}`}>{badge.label}</span>
               </div>
@@ -277,7 +251,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
                   <div className="dashboard-chart-bar-wrap">
                     <div className={`dashboard-chart-bar ${sev}`} style={{ height: `${heightPct}%` }} />
                   </div>
-                  <span className="dashboard-chart-label">{METRIC_LABELS[code] || code}</span>
+                  <span className="dashboard-chart-label">{metricLabels[code] || code}</span>
                   <strong className="dashboard-chart-value">{v.finalValue} {v.unit}</strong>
                 </div>
               )
@@ -296,7 +270,7 @@ export function TodayDashboard({ onNavigateTab }: { onNavigateTab?: (path: strin
             <tbody>
               {comparisons.map(c => (
                 <tr key={c.metricCode}>
-                  <td>{METRIC_LABELS[c.metricCode] || c.metricCode}</td>
+                  <td>{metricLabels[c.metricCode] || c.metricCode}</td>
                   <td><strong>{c.todayValue}</strong></td>
                   <td>{c.hasEnough3DayData ? c.threeDayAverage : '—'}</td>
                   <td>{c.hasEnough7DayData ? c.sevenDayAverage : '—'}</td>

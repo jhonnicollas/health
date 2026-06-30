@@ -1,4 +1,4 @@
-# HL Health Companion
+# iSehat
 
 Cloudflare-first health logging PWA — record vitals via photo, extract values with AI vision, validate with rule-based severity, push to Telegram, and share dashboards with family/caregivers.
 
@@ -8,7 +8,7 @@ Cloudflare-first health logging PWA — record vitals via photo, extract values 
 |---|---|
 | Runtime | Cloudflare Workers (TypeScript) |
 | API | Hono.js |
-| Database | Cloudflare D1 (`DB` → `multi_Ai_db`, 68 HL tables after Sprint 5 migration) |
+| Database | Cloudflare D1 (`DB` → `isehat_db`, 69 HL tables Sprint 1–5 + 10 new Sprint 6 tables) |
 | Storage | Cloudflare R2 (`LOGS` → `multi-apps-ai-bucket`) |
 | AI Vision | `@cf/meta/llama-3.2-11b-vision-instruct` (configurable via `HL_systemConfigs`) |
 | AI Text | 9router OpenAI-compatible endpoint, 3-model fallback (`deepseek-v4-flash-free`, `mimo-v2.5-free`, `poolside/laguna-m.1:free`) |
@@ -46,7 +46,7 @@ hl-health-companion/
 
 ## Sprint Status
 
-All **4 Sprints** complete — 151 user stories + gap remediations + enterprise production fixes. Sprint 5 now in progress.
+All **5 implementation Sprints** complete (69 HL tables, 336/336 tests, 153-item §10 test plan 100% coverage). **Sprint 6** now ready to start — AI Clinical Copilot runtime, Emergency, WhatsApp via Baileys, Admin AI Governance.
 
 | Sprint | Scope | Status |
 |---|---|---|
@@ -54,19 +54,29 @@ All **4 Sprints** complete — 151 user stories + gap remediations + enterprise 
 | Sprint 2 | Health Intelligence: rules engine, popup, AI recommendation, comparison, weekly/monthly dashboards, reports, KB | ✅ |
 | Sprint 3 | Family & Alerts: Telegram link, emergency alerts, family/caregiver RBAC, reminders, browser push, medication | ✅ |
 | Sprint 4 | Advanced: Doctor Ready PDF, fasting timer, gamification, pattern detection, senior mode, PWA, export, privacy | ✅ |
-| Sprint 5 | Commercial Foundation, OAuth, Education, Symptom, Hydration, AI Infrastructure, Cycle Tracking, Telegram | 🚧 In Progress |
+| Sprint 5 | Commercial Foundation + OAuth + Education + Symptom + Hydration + AI Infrastructure + Cycle + Telegram | ✅ |
+| Sprint 6 | AI Clinical Copilot + Emergency + WhatsApp/Baileys + Admin AI Governance + Hardening + Closed Beta | 🚧 Ready, S6A-T-01 next |
+
+> For Sprint 6 resume state, see [`HANDOFF_SPRINT6.md`](./HANDOFF_SPRINT6.md).
+> For legacy Sprint 1–5 deploy-state, see [`archive/sprint1-5/HANDOFF.md`](./archive/sprint1-5/HANDOFF.md).
 
 ## Cloudflare Bindings
 
 ```toml
+# Worker #1 — isehat-api-worker (= worker/)
 [[d1_databases]]
 binding = "DB"
-database_name = "multi_Ai_db"
-database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"
+database_name = "isehat_db"           # D1 cross-migrated 2026-06-27 (was multi_Ai_db)
+database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
 
 [[r2_buckets]]
 binding = "LOGS"
 bucket_name = "multi-apps-ai-bucket"
+
+# Sprint 6: Worker #1 now has a Service binding to Worker #2 (isehat-ai-worker).
+[[services]]
+binding = "AI_SERVICE"
+service = "isehat-ai-worker"
 
 [[queues.producers]]
 queue = "telegram-submit-summary"
@@ -77,6 +87,15 @@ queue = "telegram-submit-summary"
 max_batch_size = 10
 max_batch_timeout = 5
 ```
+
+Additional Workers are scaffolded for Sprint 6 (skeletons on disk):
+
+| Worker | Path | Status |
+|---|---|---|
+| #1 `isehat-api-worker` | `worker/` | active (Sprint 1–5) |
+| #2 `isehat-ai-worker` | `isehat-ai-worker/` | S6A-T-01 next |
+| #3 `isehat-jobs-worker` | `isehat-jobs-worker/` | S6F (cron + retention) |
+| #4 `isehat-webhooks-worker` | `isehat-webhooks-worker/` | S6G (Xendit + Telegram + WhatsApp) |
 
 ## Development
 
@@ -97,17 +116,19 @@ Pages proxies `/api/*` to Worker via `functions/api/[[path]].ts`.
 
 ## Database
 
-68 tables with `HL_` prefix, camelCase fields. Key tables:
+79 tables with `HL_` prefix, camelCase fields. **69 tables** come from Sprint 1–5 (D1 cross-migrated 2026-06-27 from `multi_Ai_db` to `isehat_db`). **10 new tables** are Sprint 6 (`worker/migrations/003_sprint6_schema.sql`):
 
-Apply local D1 schema and seed in this order:
+Apply local D1 schema and seed in this order (database `isehat_db` — D1 cross-migrated 2026-06-27 from `multi_Ai_db`):
 
 ```bash
 cd worker
-npx wrangler d1 execute multi_Ai_db --local --file ../docs/07-schema.sql
-npx wrangler d1 execute multi_Ai_db --local --file ../docs/08-seed.sql
-npx wrangler d1 execute multi_Ai_db --local --file ../docs_sprint5/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
-npx wrangler d1 execute multi_Ai_db --local --file ../docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
-npx wrangler d1 execute multi_Ai_db --local --command "PRAGMA foreign_key_check;"
+npx wrangler d1 execute isehat_db --local --file ../docs/07-schema.sql
+npx wrangler d1 execute isehat_db --local --file ../docs/08-seed.sql
+npx wrangler d1 execute isehat_db --local --file ../docs_sprint5/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+npx wrangler d1 execute isehat_db --local --file ../docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+# Sprint 6 — optional, only if isehat-ai-worker tables desired in local D1:
+npx wrangler d1 execute isehat_db --local --file ./migrations/003_sprint6_schema.sql
+npx wrangler d1 execute isehat_db --local --command "PRAGMA foreign_key_check;"
 ```
 
 **Sprint 1–4 (38 tables):**
@@ -157,6 +178,20 @@ npx wrangler d1 execute multi_Ai_db --local --command "PRAGMA foreign_key_check;
 
 - `HL_telegramCallbackEvents` — Telegram webhook callbacks
 
+**Sprint 5X — Post-Deploy Hardening (2 tables):**
+
+- `HL_billingCheckoutSessions` — Xendit/Mock checkout session lifecycle (added 2026-06-28 via S5X-BILL-001..014)
+- `HL_emailOtpChallenges` — Email OTP challenges for register/login (added 2026-06-27 via migration `001_s5x_auth_email_otp.sql`)
+
+**Sprint 6 — AI Clinical Copilot Runtime (10 tables, optional):**
+
+- `HL_aiClinicalSessions` / `HL_modelRuns` / `HL_aiClinicalMessages` / `HL_aiClinicalIntakeAnswers` — clinical copilot chat
+- `HL_aiOutputSafetyFlags` — 13-detector safety decision log
+- `HL_promptVersions` — versioned prompt template registry
+- `HL_whatsappLinks` / `HL_whatsappMessages` — WhatsApp/Baileys link + message log
+- `HL_firstAidProtocols` — emergency first-aid reviewable protocols
+- `HL_aiKnowledgeDocuments` — knowledge source-of-truth registry
+
 ## API Routes (~155 endpoints)
 
 **Auth**: register, login, logout, me, forgot-password, forgot-password
@@ -202,15 +237,21 @@ npx wrangler d1 execute multi_Ai_db --local --command "PRAGMA foreign_key_check;
 3. **No Original Image Stored** — Only compressed (50%) + watermarked webp saved to R2.
 4. **Configurable Timeout** — AI extraction timeout read from `HL_systemConfigs`, not hardcoded.
 5. **Naming** — Tables start with `HL_` (no underscore after); fields use camelCase.
-6. **No New DB/Bucket** — Use existing `multi_Ai_db` and `multi-apps-ai-bucket`.
+6. **No New DB/Bucket** — Use existing `isehat_db` and `multi-apps-ai-bucket`.
 7. **Sensitive Data Encryption** — AES-GCM via `ENCRYPTION_KEY` secret for Telegram chat IDs, emergency contacts, medication notes.
 
 ### Sprint 5 Rules
 
 8. **Safety Events** — Sprint 5 non-metric safety events use `HL_safetyEvents`, not `HL_alerts`.
-9. **AI Clinical Copilot Deferred** — Sprint 5C builds infrastructure only; the AI Clinical Copilot feature ships in Sprint 6.
+9. **AI Clinical Copilot Deferred (now shipping)** — Sprint 6A wiring resumes here. 13-detector Safety Runtime v2 per `docs_sprint6/AI_SAFETY_RUNTIME_SPEC.md`.
 10. **Audit Logs Required** — All admin mutations must write to `HL_auditLogs`.
 11. **No Plaintext Secrets** — No secrets in D1, API responses, logs, or frontend bundle. Secrets live in Cloudflare Secrets/Env only.
+
+### Sprint 6 Hard Boundaries (added 2026-06-30)
+
+12. **AI must not prescribe or diagnose.** Sprint 6 forbids `forbiddenActions` × 9 entries; medical safety = 13-detector server-side ABES.
+13. **Sprint 5C context data = sprint6 basis** — `HL_vectorDocuments` / `HL_aiContextQueries` maps cleanly into new Sprint 6 tables. No destructive migration.
+14. **WhatsApp via Baileys VPS** — out-of-Cloudflare process; only `isehat-webhooks-worker` accepts WA webhooks (signed via `WA_GATEWAY_SECRET`).
 
 ## Account
 
@@ -219,4 +260,10 @@ npx wrangler d1 execute multi_Ai_db --local --command "PRAGMA foreign_key_check;
 
 ## Multi-Agent Protocol
 
-See `AGENTS.md` for task ordering, handoff, logging, and validation rules.
+See `AGENTS.md` (root) for cross-sprint task ordering, handoff, logging, and validation rules. **Sprint 6-specific** rules are in [`docs_sprint6/AGENTS_SPRINT6.md`](./docs_sprint6/AGENTS_SPRINT6.md).
+
+Resume pointers:
+
+- **Sprint 6 active:** [`HANDOFF_SPRINT6.md`](./HANDOFF_SPRINT6.md) + [`WORK_LOG_SPRINT6.md`](./WORK_LOG_SPRINT6.md)
+- **Sprint 1–5 legacy:** [`archive/sprint1-5/HANDOFF.md`](./archive/sprint1-5/HANDOFF.md) + [`archive/sprint1-5/WORK_LOG.md`](./archive/sprint1-5/WORK_LOG.md)
+- **Sprint 1–4 legacy:** [`archive/sprint1-4/AGENTS_Sprint1-4.md`](./archive/sprint1-4/AGENTS_Sprint1-4.md) (rulebook superseded by `/AGENTS.md`)

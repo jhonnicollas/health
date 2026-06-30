@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('auth', {
   loginTitle: { 'id-ID': 'Masuk ke catatan kesehatan', 'en-US': 'Sign in to your health log' },

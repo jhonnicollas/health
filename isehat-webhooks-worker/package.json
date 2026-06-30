@@ -1,0 +1,23 @@
+{
+  "name": "@hl/isehat-webhooks-worker",
+  "version": "1.0.0",
+  "description": "Sprint 6 Worker #4 — external webhook gateway (Baileys WhatsApp / Telegram / Xendit), signature validation, idempotent forwarding",
+  "main": "dist/index.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "keywords": ["sprint6", "webhooks", "baileys", "idempotency"],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "hono": "^4.12.26"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260620.1",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.103.0"
+  }
+}

@@ -292,36 +292,20 @@ function InfoChip({ info }: { info: typeof METRIC_EDU[string] }) {
       <button
         ref={btnRef}
         type="button"
-        className="info-chip-btn"
+        className="stitch-prep-btn"
         onClick={(e) => { e.preventDefault(); setShow(!show) }}
         aria-label="Lihat penjelasan"
       >
         <span className="material-symbols-outlined">help</span>
       </button>
       {show ? (
-        <div ref={popupRef} className="info-chip-popup">
-          <div className="info-chip-content">
-            <div className="metric-info-row">
-              <span className="metric-info-label">Tujuan:</span>
-              <span>{info.whyMeasure}</span>
-            </div>
-            <div className="metric-info-row">
-              <span className="metric-info-label">Arti angka:</span>
-              <span>{info.whatItMeans}</span>
-            </div>
-            <div className="metric-info-row">
-              <span className="metric-info-label">Mencegah:</span>
-              <span>{info.prevents}</span>
-            </div>
-            <div className="metric-info-row">
-              <span className="metric-info-label">Tindakan dini:</span>
-              <span>{info.earlyAction}</span>
-            </div>
-            <div className="metric-info-row metric-info-range">
-              <span className="material-symbols-outlined">straighten</span>
-              <span>{info.unitRange}</span>
-            </div>
-          </div>
+        <div ref={popupRef} className="stitch-prep-popup">
+          <span className="stitch-prep-popup-title">{info.title}</span>
+          <div className="metric-info-row"><span className="metric-info-label">Tujuan:</span> <span>{info.whyMeasure}</span></div>
+          <div className="metric-info-row"><span className="metric-info-label">Arti angka:</span> <span>{info.whatItMeans}</span></div>
+          <div className="metric-info-row"><span className="metric-info-label">Mencegah:</span> <span>{info.prevents}</span></div>
+          <div className="metric-info-row"><span className="metric-info-label">Tindakan dini:</span> <span>{info.earlyAction}</span></div>
+          <div className="metric-info-row metric-info-range"><span className="material-symbols-outlined">straighten</span> <span>{info.unitRange}</span></div>
         </div>
       ) : null}
     </span>
@@ -424,11 +408,12 @@ function suggestionFor(metricCode: string, valueText: string) {
     heartRate: [
       { min: 60, max: 100, level: 'normal', text: 'Normal saat istirahat.' },
       { min: 50, max: 59.9, level: 'warning', text: 'Agak rendah. Ulangi saat duduk tenang.' },
+      { min: 0, max: 49.9, level: 'critical', text: 'Bradikardia. Segera konsultasi dokter.' },
       { min: 100.1, max: 250, level: 'warning', text: 'Cepat. Istirahat 5 menit lalu ukur ulang.' }
     ],
     bloodPressurePulse: [
       { min: 60, max: 100, level: 'normal', text: 'Pulse normal.' },
-      { min: 20, max: 59.9, level: 'warning', text: 'Pulse rendah. Ulangi saat tenang.' },
+      { min: 0, max: 59.9, level: 'warning', text: 'Pulse rendah. Ulangi saat tenang.' },
       { min: 100.1, max: 250, level: 'warning', text: 'Pulse cepat. Istirahat dan cek ulang.' }
     ],
     systolic: [
@@ -446,6 +431,37 @@ function suggestionFor(metricCode: string, valueText: string) {
       { min: 35, max: 37.4, level: 'normal', text: 'Suhu normal.' },
       { min: 37.5, max: 38.9, level: 'warning', text: 'Demam. Cukup cairan dan pantau ulang.' },
       { min: 39, max: 45, level: 'critical', text: 'Demam tinggi. Pantau ketat; cari bantuan bila ada gejala berat.' }
+    ],
+    bodyWeight: [
+      { min: 0, max: 500, level: 'warning', text: 'Berat badan terverifikasi saat submit.' }
+    ],
+    sleepDuration: [
+      { min: 7, max: 9, level: 'normal', text: 'Durasi tidur ideal untuk dewasa.' },
+      { min: 6, max: 6.9, level: 'warning', text: 'Kurang tidur. Targetkan 7-9 jam.' },
+      { min: 0, max: 5.9, level: 'critical', text: 'Sangat kurang tidur. Konsultasi jika terus berlanjut.' },
+      { min: 9.1, max: 24, level: 'warning', text: 'Tidur berlebih. Bisa tanda kurang aktivitas atau masalah kesehatan.' }
+    ],
+    waistCircumference: [
+      { min: 0, max: 200, level: 'warning', text: 'Nilai akan divalidasi dengan rule medis saat submit.' }
+    ],
+    glucoseFasting: [
+      { min: 70, max: 99, level: 'normal', text: 'Gula darah puasa normal.' },
+      { min: 100, max: 125, level: 'warning', text: 'Prediabetes. Konsultasi dengan dokter.' },
+      { min: 126, max: 500, level: 'critical', text: 'Diabetes. Segera konsultasi dengan dokter.' }
+    ],
+    glucosePostMeal: [
+      { min: 0, max: 139, level: 'normal', text: 'Gula darah post-meal normal.' },
+      { min: 140, max: 199, level: 'warning', text: 'Prediabetes. Pantau asupan gula.' },
+      { min: 200, max: 500, level: 'critical', text: 'Tinggi. Konsultasi dengan dokter.' }
+    ],
+    cholesterolTotal: [
+      { min: 0, max: 199, level: 'normal', text: 'Kolesterol total normal.' },
+      { min: 200, max: 239, level: 'warning', text: 'Batas tinggi. Perbaiki pola makan.' },
+      { min: 240, max: 500, level: 'critical', text: 'Tinggi. Konsultasi dengan dokter.' }
+    ],
+    uricAcid: [
+      { min: 0, max: 7, level: 'normal', text: 'Asam urat dalam batas normal (pria <7.0, wanita <6.0 mg/dL).' },
+      { min: 7.1, max: 20, level: 'warning', text: 'Tinggi. Risiko gout. Kurangi jeroan dan alkohol.' }
     ]
   }
   const matched = rules[metricCode]?.find((rule) => value >= rule.min && value <= rule.max)
@@ -564,6 +580,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
   }
 
   function handleValueChange(metricCode: string, raw: string, physicalMax: number | null | undefined) {
+    if (metricCode === 'bodyWeight' || metricCode === 'bodyTemperature' || metricCode === 'waistCircumference') raw = raw.replace(',', '.')
     const maxDigits = physicalMax != null ? String(Math.ceil(physicalMax)).length + 3 : 8
     let sanitized = raw
     if (sanitized.length > maxDigits) sanitized = sanitized.slice(0, maxDigits)
@@ -784,6 +801,16 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
       {aiError ? <p className="form-message error" role="status">{aiError}</p> : null}
       {error ? <p className="form-message error" role="status">{error}</p> : null}
 
+      <div className="stitch-form-footer" style={{ paddingBottom: 8 }}>
+        <button disabled={submitting} type="submit" className="stitch-btn-submit" style={{ minWidth: 120 }}>
+          {submitting ? (
+            <><span className="spinner" /> Menyimpan...</>
+          ) : (
+            <><span className="material-symbols-outlined">check_circle</span> Simpan</>
+          )}
+        </button>
+      </div>
+
       <div className="stitch-device-cards">
         {Array.from(deviceGroups.entries()).map(([deviceCode, group]) => {
           const hasAttachment = group.selections.some(s => s.metric.requiresAttachment)
@@ -966,7 +993,7 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                           </div>
                         ) : null}
                         <div className="bp-trial-actions">
-                          {trials.length < 2 ? (
+                          {trials.length < 3 ? (
                             <button type="button" className="btn-secondary" onClick={addBpTrial}>
                               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
                               Tambah Ukur (max 3x)
@@ -1020,23 +1047,67 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
                             {sleepRec.label}: <strong>{sleepRec.minH}–{sleepRec.maxH} jam</strong>
                           </div>
                         ) : null}
-                        <div className="stitch-input-wrap">
-                          <input
-                            id={`input-${metric.metricCode}`}
-                            className={`stitch-metric-input ${entry.error ? 'has-error' : ''} ${isBmi ? 'is-calculated' : ''} ${isAuto ? 'is-autofilled' : ''}`}
-                            inputMode="decimal"
-                            min={metric.physicalMin ?? ''}
-                            max={metric.physicalMax ?? ''}
-                            step={(metric.physicalMin != null && metric.physicalMax != null) ? ((metric.physicalMax - metric.physicalMin) >= 10 ? '1' : '0.1') : 'any'}
-                            placeholder={isBmi ? 'Otomatis' : (metric.physicalMin != null && metric.physicalMax != null ? `${metric.physicalMin}–${metric.physicalMax}` : '0')}
-                            readOnly={isBmi}
-                            type="number"
-                            value={entry.final}
-                            onChange={(e) => handleValueChange(metric.metricCode, e.target.value, metric.physicalMax)}
-                            onFocus={(e) => e.target.select()}
-                            onKeyDown={(e) => { const next = group.selections[selIdx + 1]; handleInputKeyDown(e, next ? `input-${next.metric.metricCode}` : null) }}
-                          />
-                          <span className="stitch-input-unit">{metric.unit}</span>
+                        <div className={`stitch-input-wrap ${isSleep ? 'stitch-sleep-wrap' : ''}`}>
+                          {isSleep ? (
+                            <>
+                              <input
+                                id={`input-${metric.metricCode}-hours`}
+                                className={`stitch-metric-input ${entry.error ? 'has-error' : ''} ${isAuto ? 'is-autofilled' : ''}`}
+                                inputMode="decimal"
+                                min={0} max={24}
+                                step="1"
+                                placeholder="7"
+                                type="number"
+                                value={entry.final ? Math.floor(Number(entry.final) || 0) : ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value
+                                  const h = raw === '' ? 0 : Math.max(0, parseInt(raw) || 0)
+                                  const currentMins = entry.final ? Math.round((Number(entry.final) - Math.floor(Number(entry.final))) * 60) : 0
+                                  const m = Math.min(59, currentMins || 0)
+                                  handleValueChange(metric.metricCode, String(h + m / 60), metric.physicalMax)
+                                }}
+                                onFocus={(e) => e.target.select()}
+                              />
+                              <span className="stitch-input-unit">jam</span>
+                              <input
+                                id={`input-${metric.metricCode}-mins`}
+                                className={`stitch-metric-input ${entry.error ? 'has-error' : ''} ${isAuto ? 'is-autofilled' : ''}`}
+                                inputMode="numeric"
+                                min={0} max={59}
+                                step="1"
+                                placeholder="0"
+                                type="number"
+                                value={entry.final ? Math.round((Number(entry.final) - Math.floor(Number(entry.final))) * 60) : ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value
+                                  const m = raw === '' ? 0 : Math.max(0, Math.min(59, parseInt(raw) || 0))
+                                  const h = entry.final ? Math.floor(Number(entry.final)) || 0 : 0
+                                  handleValueChange(metric.metricCode, String(h + m / 60), metric.physicalMax)
+                                }}
+                                onFocus={(e) => e.target.select()}
+                              />
+                              <span className="stitch-input-unit">menit</span>
+                            </>
+                          ) : (
+                            <>
+                              <input
+                                id={`input-${metric.metricCode}`}
+                                className={`stitch-metric-input ${entry.error ? 'has-error' : ''} ${isBmi ? 'is-calculated' : ''} ${isAuto ? 'is-autofilled' : ''}`}
+                                inputMode="decimal"
+                                min={metric.physicalMin ?? ''}
+                                max={metric.physicalMax ?? ''}
+                                step={metric.metricCode === 'bodyTemperature' || metric.metricCode === 'bodyWeight' ? '0.1' : (metric.physicalMin != null && metric.physicalMax != null) ? ((metric.physicalMax - metric.physicalMin) >= 10 ? '1' : '0.1') : 'any'}
+                                placeholder={isBmi ? 'Otomatis' : (metric.physicalMin != null && metric.physicalMax != null ? `${metric.physicalMin}–${metric.physicalMax}` : '0')}
+                                readOnly={isBmi}
+                                type="number"
+                                value={entry.final}
+                                onChange={(e) => handleValueChange(metric.metricCode, e.target.value, metric.physicalMax)}
+                                onFocus={(e) => e.target.select()}
+                                onKeyDown={(e) => { const next = group.selections[selIdx + 1]; handleInputKeyDown(e, next ? `input-${next.metric.metricCode}` : null) }}
+                              />
+                              <span className="stitch-input-unit">{metric.unit}</span>
+                            </>
+                          )}
                         </div>
                         {entry.error ? <span className="stitch-field-error">{entry.error}</span> : null}
                         <SuggestionPreview metricCode={metric.metricCode} value={entry.final} />
@@ -1102,23 +1173,32 @@ export function DynamicMetricForm({ selectedMetrics, onClearSelection, onSubmit,
           <div className="interpretation-card">
             <div className="page-heading compact">
               <h3>Hasil Interpretasi Pengukuran</h3>
-              <button onClick={() => setInterpretation(null)} type="button">Tutup</button>
-            </div>
-            {interpretation.interpretations.map((interp) => (
-              <div key={interp.metricCode} className={`interpretation-item severity-${interp.severity}`}>
-                <div className="interpretation-item-header">
-                  <strong>{interp.metricName}</strong>
-                  <span className={`badge-status badge-${interp.severity}`}>
-                    <span className="status-dot" />{interp.status}
-                  </span>
-                </div>
-                <p className="interpretation-value">{interp.finalValue} {interp.unit}</p>
-                <h4>{interp.popupTitle}</h4>
-                <p>{interp.popupMessage}</p>
-                <p><strong>Saran:</strong> {interp.recommendation}</p>
-                <small className="muted">Sumber: {interp.sourceLabel}</small>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { window.print() }} type="button" className="btn-secondary" style={{ fontSize: 13 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>print</span> Cetak
+                </button>
+                <button onClick={() => setInterpretation(null)} type="button">Tutup</button>
               </div>
-            ))}
+            </div>
+            {interpretation.interpretations.map((interp) => {
+              const edu = METRIC_EDU[interp.metricCode]
+              return (
+                <div key={interp.metricCode} className={`interpretation-item severity-${interp.severity}`}>
+                  <div className="interpretation-item-header">
+                    <strong>{interp.metricName}</strong>
+                    <span className={`badge-status badge-${interp.severity}`}>
+                      <span className="status-dot" />{interp.status}
+                    </span>
+                  </div>
+                  <p className="interpretation-value">{interp.finalValue} {interp.unit}</p>
+                  {edu?.unitRange ? <p className="muted" style={{ fontSize: 13, marginTop: -8 }}><span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: 'middle' }}>straighten</span> {edu.unitRange}</p> : null}
+                  <h4>{interp.popupTitle}</h4>
+                  <p>{interp.popupMessage}</p>
+                  <p><strong>Saran:</strong> {interp.recommendation}</p>
+                  <small className="muted">Sumber: {interp.sourceLabel} — {edu?.title || interp.metricName}</small>
+                </div>
+              )
+            })}
           </div>
         </div>
       ) : null}

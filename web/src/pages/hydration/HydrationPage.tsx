@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, no-empty */
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 import { translateErrorCode } from '../../api/translateError'
 import { useToast } from '../../components/Toast'
 import { EducationBottomSheet } from '../../components/EducationBottomSheet'

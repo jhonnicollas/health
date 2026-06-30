@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { useI18n, SUPPORTED_LOCALES, type SupportedLocale } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
+import { SUPPORTED_LOCALES, type SupportedLocale } from '../../i18n/registry'
 
 const LOCALE_LABELS: Record<SupportedLocale, string> = {
   'id-ID': '🇮🇩 ID',

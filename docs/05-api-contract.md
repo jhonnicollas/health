@@ -1,4 +1,4 @@
-# API CONTRACT — HL Health Companion
+# API CONTRACT — iSehat
 
 > **Sumber: audit langsung ke `worker/src/index.ts` (122 endpoint), `routes-extra.ts` (28), `routes-admin.ts` (3), `routes-ai.ts` (10), `routes-auth.ts` (20), `routes-cycle.ts` (9), `routes-hydration.ts` (6), `routes-telegram.ts` (3). Total ~200 endpoint aktif.**
 > Dokumen lama: `archive/docs_legacy_2025_sprint1-5/05-api-contract.md`.
@@ -309,38 +309,83 @@ Semua response JSON mengikuti envelope:
 | Method | Path | Auth | Keterangan | Sumber |
 |---|---|---|---|---|
 | GET | `/api/plans` | 🔒 | list `HL_plans` (public pricing) | routes-admin.ts:56 |
-| POST | `/api/me/subscribe` | 🔒 💎 | `{ planCode, provider?, returnUrl? }` → checkout session (mock or xendit) | routes-admin.ts:71 |
+| POST | `/api/me/subscribe` | — | **DEPRECATED (410)** — replaced by `POST /api/billing/checkout` | routes-admin.ts:71 |
+| POST | `/api/billing/checkout` | 🔒 💎 | `{ planCode, provider?, returnUrl? }` → create `HL_billingCheckoutSessions` + return checkout URL | index.ts:5660 |
+| GET | `/api/billing/checkout/:checkoutId` | 🔒 | get checkout session status | index.ts:5716 |
+| GET | `/api/billing/my-subscription` | 🔒 | current user's `HL_subscriptions` + plan | index.ts:5732 |
+| GET | `/api/billing/invoices` | 🔒 | list `HL_billingCheckoutSessions` history | index.ts:5743 |
+| POST | `/api/billing/webhook/:provider` | 🤖 | Xendit / generic / mock webhook → `HL_paymentEvents` + subscription activation | index.ts:5754 |
 
-(Plan CRUD admin, subscription admin, payment webhook — ada di service `services/billing/*`; lihat implementasi lengkap di worker.)
+### 2.24 Admin — Users, Roles, Permissions
 
-### 2.24 Admin — System Config / AI Config / Feature Flags / Master Data / Education / Audit / Users
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/admin/me` | 🔒 👑 | current admin profile + permissions | index.ts:4633 |
+| GET | `/api/admin/metrics` | 🔒 👑 | system metrics | index.ts:4657 |
+| GET | `/api/admin/users` | 🔒 👑 | list users | index.ts:4684 |
+| GET | `/api/admin/users/:userId` | 🔒 👑 | user detail | index.ts:4731 |
+| PUT | `/api/admin/users/:userId/status` | 🔒 👑 | activate/deactivate user | index.ts:4772 |
+| GET | `/api/admin/roles` | 🔒 👑 | list roles | index.ts:4805 |
+| POST | `/api/admin/roles` | 🔒 👑 | create role | index.ts:4833 |
+| PUT | `/api/admin/roles/:roleCode` | 🔒 👑 | update role | index.ts:4900 |
+| DELETE | `/api/admin/roles/:roleCode` | 🔒 👑 | delete role | index.ts:4946 |
+| PUT | `/api/admin/roles/:roleCode/permissions` | 🔒 👑 | assign permissions to role | index.ts:4863 |
+| GET | `/api/admin/permissions` | 🔒 👑 | list permissions | index.ts:4929 |
+| POST | `/api/admin/users/:userId/roles` | 🔒 👑 | assign role to user | index.ts:4966 |
+| DELETE | `/api/admin/users/:userId/roles/:roleCode` | 🔒 👑 | revoke role from user | index.ts:4998 |
 
-Selengkapnya ada di modul admin lain (lihat `routes-admin.ts` + services). Ringkasan permission:
+### 2.25 Admin — Plans, Subscriptions, Billing
 
-```text
-admin.config.read              → GET HL_systemConfigs (non-secret only, masked)
-admin.config.update            → PUT HL_systemConfigs (validasi storageMode)
-admin.aiConfig.update          → PUT aiTextEndpoint, aiTextModels, aiTextDefaultModel, aiVisionTimeoutMs, clinicalCopilotEnabled
-admin.aiMemory.read            → GET /api/ai/memory/status (all users)
-admin.aiMemory.manage          → POST /api/ai/memory/rebuild (all users)
-admin.aiClinicalCopilot.manage → GET/PUT readiness
-admin.billing.read             → GET HL_subscriptions, HL_paymentEvents
-admin.billing.manage           → POST manual subscription, cancel, refund
-admin.metricCatalog.manage     → CRUD HL_metricCatalog
-admin.metricRules.manage       → CRUD HL_metricRules (rule priority, severity)
-admin.education.manage         → CRUD HL_educationCards
-admin.kb.manage                → CRUD HL_knowledgeArticles
-admin.featureFlags.manage      → CRUD HL_featureFlags
-admin.audit.read               → GET HL_auditLogs (filtered)
-admin.security.read            → GET HL_safetyEvents
-admin.sensitiveHealth.read     → GET HL_symptomLogs/HL_cycleLogs (audit-wajib)
-admin.roles.read               → GET HL_roles, HL_permissions, HL_userRoles
-admin.roles.manage             → POST/PUT/DELETE role assignments
-admin.users.read               → GET HL_users list + summary
-admin.users.update             → PUT HL_users (active, displayName)
-admin.support.limitedView      → GET HL_users tanpa PII/sensitive
-admin.support.impersonateLimited → audited impersonation
-```
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/admin/plans` | 🔒 👑 | list plans | index.ts:5038 |
+| POST | `/api/admin/plans` | 🔒 👑 | create plan | index.ts:5061 |
+| PUT | `/api/admin/plans/:planCode` | 🔒 👑 | update plan | index.ts:5085 |
+| DELETE | `/api/admin/plans/:planCode` | 🔒 👑 | delete plan | index.ts:5106 |
+| GET | `/api/admin/plans/:planCode/features` | 🔒 👑 | list plan features | index.ts:5124 |
+| PUT | `/api/admin/plans/:planCode/features` | 🔒 👑 | update plan features | index.ts:5143 |
+| GET | `/api/admin/subscriptions` | 🔒 👑 | list subscriptions | index.ts:5169 |
+| POST | `/api/admin/users/:userId/subscriptions` | 🔒 👑 | manual create subscription | index.ts:5189 |
+| PUT | `/api/admin/subscriptions/:subscriptionId` | 🔒 👑 | update/cancel subscription | index.ts:5210 |
+
+### 2.26 Admin — Config, AI Config, Feature Flags
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/admin/configs` | 🔒 👑 `admin.config.read` | list `HL_systemConfigs` + `HL_configMetadata` | index.ts:5265 |
+| POST | `/api/admin/configs` | 🔒 👑 `admin.config.update` | create config | index.ts:5317 |
+| PUT | `/api/admin/configs/:configKey` | 🔒 👑 `admin.config.update` | update config | index.ts:5280 |
+| DELETE | `/api/admin/configs/:configKey` | 🔒 👑 `admin.config.update` | delete config | index.ts:5359 |
+| GET | `/api/admin/ai-config` | 🔒 👑 `admin.aiConfig.update` | get AI config | index.ts:5392 |
+| PUT | `/api/admin/ai-config` | 🔒 👑 `admin.aiConfig.update` | update AI config | index.ts:5409 |
+| GET | `/api/admin/feature-flags` | 🔒 👑 | list feature flags | index.ts:5430 |
+| POST | `/api/admin/feature-flags` | 🔒 👑 | create feature flag | index.ts:5451 |
+| PUT | `/api/admin/feature-flags/:flagCode` | 🔒 👑 | update feature flag | index.ts:5485 |
+| DELETE | `/api/admin/feature-flags/:flagCode` | 🔒 👑 | delete feature flag | index.ts:5527 |
+| GET | `/api/me/entitlements` | 🔒 | current user's entitlements | index.ts:5230 |
+| POST | `/api/internal/usage/consume` | 🔒 👑 / internal | consume usage quota (internal) | index.ts:5249 |
+
+### 2.27 Admin — Master Data, Education, KB, Audit
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET/POST/PUT/DELETE | `/api/admin/metric-catalog*` | 🔒 👑 | CRUD `HL_metricCatalog` | (di worker/src/index.ts) |
+| GET/POST/PUT/DELETE | `/api/admin/metric-rules*` | 🔒 👑 | CRUD `HL_metricRules` | (di worker/src/index.ts) |
+| GET/POST/PUT/DELETE | `/api/admin/education-cards*` | 🔒 👑 | CRUD `HL_educationCards` | (di worker/src/index.ts) |
+| GET/POST/PUT/DELETE | `/api/admin/kb*` | 🔒 👑 | CRUD `HL_knowledgeArticles` | (di worker/src/index.ts) |
+| GET | `/api/admin/audit-logs` | 🔒 👑 `admin.audit.read` | filtered audit logs | (di worker/src/index.ts) |
+| GET | `/api/admin/safety-events` | 🔒 👑 `admin.security.read` | `HL_safetyEvents` summary | (di worker/src/index.ts) |
+| GET | `/api/admin/sensitive-access/symptoms` | 🔒 👑 `admin.sensitiveHealth.read` | audited symptom access | (di worker/src/index.ts) |
+| GET | `/api/admin/sensitive-access/cycles` | 🔒 👑 `admin.sensitiveHealth.read` | audited cycle access | (di worker/src/index.ts) |
+
+### 2.28 Telegram (General)
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/telegram/status` | 🔒 | linked Telegram status | index.ts:3553 |
+| POST | `/api/telegram/connect` | 🔒 | link/init Telegram verification | index.ts:3568 |
+| POST | `/api/telegram/test` | 🔒 | send test message | index.ts:3587 |
+| POST | `/api/telegram/webhook` | 🤖 | general Telegram update webhook | index.ts:6262 |
 
 ---
 
@@ -572,3 +617,211 @@ Lihat juga:
 - Design System: `docs/06-design-system.md`
 - Architecture: `docs/04-ARCHITECTURE.md`
 - PRD Sprint 1–5: `docs/01-PRD_SPRINT1-5.md`
+
+---
+
+## A. Complete Endpoint Index (Source-of-Truth Audit)
+
+> Generated directly from `worker/src/index.ts` and `worker/src/routes-*.ts`. Total 199 route registrations. Use this as the authoritative checklist.
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| get | `/` | 🌍 |  |
+| post | `/api/account/delete` | 🔒 |  |
+| get | `/api/admin/ai-clinical-copilot/readiness` | 🔒 👑 |  |
+| get | `/api/admin/ai-config` | 🔒 👑 |  |
+| put | `/api/admin/ai-config` | 🔒 👑 |  |
+| get | `/api/admin/audit-logs` | 🔒 👑 |  |
+| get | `/api/admin/configs` | 🔒 👑 |  |
+| post | `/api/admin/configs` | 🔒 👑 |  |
+| delete | `/api/admin/configs/:configKey` | 🔒 👑 |  |
+| put | `/api/admin/configs/:configKey` | 🔒 👑 |  |
+| get | `/api/admin/dashboard/summary` | 🔒 👑 |  |
+| get | `/api/admin/education/cards` | 🔒 👑 |  |
+| put | `/api/admin/education/cards/:topicType/:topicCode` | 🔒 👑 |  |
+| get | `/api/admin/feature-flags` | 🔒 👑 |  |
+| put | `/api/admin/feature-flags/:flagCode` | 🔒 👑 |  |
+| get | `/api/admin/knowledge-articles` | 🔒 👑 |  |
+| put | `/api/admin/knowledge-articles/:slug` | 🔒 👑 |  |
+| get | `/api/admin/me` | 🔒 👑 |  |
+| get | `/api/admin/metric-catalog` | 🔒 👑 |  |
+| put | `/api/admin/metric-catalog/:metricCode` | 🔒 👑 |  |
+| get | `/api/admin/metric-rules` | 🔒 👑 |  |
+| put | `/api/admin/metric-rules/:ruleCode` | 🔒 👑 |  |
+| get | `/api/admin/metrics` | 🔒 👑 |  |
+| get | `/api/admin/permissions` | 🔒 👑 |  |
+| get | `/api/admin/plans` | 🔒 👑 |  |
+| post | `/api/admin/plans` | 🔒 👑 |  |
+| delete | `/api/admin/plans/:planCode` | 🔒 👑 |  |
+| put | `/api/admin/plans/:planCode` | 🔒 👑 |  |
+| get | `/api/admin/plans/:planCode/features` | 🔒 👑 |  |
+| put | `/api/admin/plans/:planCode/features` | 🔒 👑 |  |
+| get | `/api/admin/roles` | 🔒 👑 |  |
+| post | `/api/admin/roles` | 🔒 👑 |  |
+| delete | `/api/admin/roles/:roleCode` | 🔒 👑 |  |
+| put | `/api/admin/roles/:roleCode` | 🔒 👑 |  |
+| put | `/api/admin/roles/:roleCode/permissions` | 🔒 👑 |  |
+| get | `/api/admin/safety-events` | 🔒 👑 |  |
+| get | `/api/admin/subscriptions` | 🔒 👑 |  |
+| put | `/api/admin/subscriptions/:subscriptionId` | 🔒 👑 |  |
+| get | `/api/admin/users` | 🔒 👑 |  |
+| get | `/api/admin/users/:userId` | 🔒 👑 |  |
+| post | `/api/admin/users/:userId/ai-memory/rebuild` | 🔒 👑 |  |
+| get | `/api/admin/users/:userId/ai-memory/status` | 🔒 👑 |  |
+| post | `/api/admin/users/:userId/roles` | 🔒 👑 |  |
+| delete | `/api/admin/users/:userId/roles/:roleCode` | 🔒 👑 |  |
+| put | `/api/admin/users/:userId/status` | 🔒 👑 |  |
+| post | `/api/admin/users/:userId/subscriptions` | 🔒 👑 |  |
+| post | `/api/ai/assistant` | 🔒 | 💎 |
+| get | `/api/ai/context-package` | 🔒 |  |
+| post | `/api/ai/context/query` | 🔒 |  |
+| post | `/api/ai/disclaimer/enforce` | 🔒 |  |
+| delete | `/api/ai/memory` | 🔒 |  |
+| post | `/api/ai/memory/rebuild` | 🔒 |  |
+| get | `/api/ai/memory/status` | 🔒 |  |
+| post | `/api/ai/recommendation` | 🔒 |  |
+| get | `/api/ai/recommendations` | 🔒 |  |
+| post | `/api/ai/report-analysis` | 🔒 |  |
+| get | `/api/alerts` | 🔒 |  |
+| post | `/api/alerts/:id/acknowledge` | 🔒 |  |
+| post | `/api/auth/change-password` | — |  |
+| post | `/api/auth/forgot-password` | — |  |
+| get | `/api/auth/google` | — |  |
+| get | `/api/auth/google/accounts` | — |  |
+| get | `/api/auth/google/callback` | — |  |
+| delete | `/api/auth/google/link` | — |  |
+| post | `/api/auth/google/link` | — |  |
+| post | `/api/auth/login` | — |  |
+| post | `/api/auth/login/start` | — |  |
+| post | `/api/auth/login/verify` | — |  |
+| post | `/api/auth/logout` | 🔒 |  |
+| get | `/api/auth/me` | 🔒 |  |
+| post | `/api/auth/otp/resend` | — |  |
+| post | `/api/auth/register` | — |  |
+| post | `/api/auth/register/start` | — |  |
+| post | `/api/auth/register/verify` | — |  |
+| get | `/api/badges` | 🔒 |  |
+| post | `/api/billing/checkout` | 🔒 | 💎 |
+| get | `/api/billing/checkout/:checkoutId` | 🔒 |  |
+| get | `/api/billing/invoices` | 🔒 |  |
+| get | `/api/billing/my-subscription` | 🔒 |  |
+| post | `/api/billing/webhook/:provider` | 🤖/⏰ |  |
+| get | `/api/caregiver/monitor/:userId` | 🔒 |  |
+| get | `/api/cycle/access` | 🔒 |  |
+| get | `/api/cycle/calendar` | 🔒 |  |
+| post | `/api/cycle/guardrails/acknowledge` | 🔒 |  |
+| get | `/api/cycle/logs` | 🔒 |  |
+| post | `/api/cycle/logs` | 🔒 |  |
+| get | `/api/cycle/settings` | 🔒 |  |
+| put | `/api/cycle/settings` | 🔒 |  |
+| get | `/api/dashboard/comparison` | 🔒 |  |
+| get | `/api/dashboard/daily-health` | 🔒 |  |
+| get | `/api/dashboard/monthly` | 🔒 |  |
+| get | `/api/dashboard/today` | 🔒 |  |
+| get | `/api/dashboard/weekly` | 🔒 |  |
+| post | `/api/dev/seed-test-data` | 🔒 |  |
+| get | `/api/dev/test-email-outbox/latest` | — |  |
+| get | `/api/education/cards` | 🔒 |  |
+| post | `/api/education/cards/:topicType/:topicCode/acknowledge` | 🔒 |  |
+| get | `/api/emergency/contacts` | 🔒 |  |
+| post | `/api/emergency/contacts` | 🔒 |  |
+| delete | `/api/emergency/contacts/:id` | 🔒 |  |
+| patch | `/api/emergency/contacts/:id/consent` | 🔒 |  |
+| post | `/api/emergency/contacts/notify` | 🔒 |  |
+| get | `/api/export/csv` | 🔒 |  |
+| get | `/api/family-links/:familyLinkId/permissions/cycle` | 🔒 |  |
+| put | `/api/family-links/:familyLinkId/permissions/sensitive-health` | 🔒 |  |
+| delete | `/api/family/:id` | 🔒 |  |
+| post | `/api/family/accept` | 🔒 |  |
+| get | `/api/family/access-check` | 🔒 |  |
+| get | `/api/family/caregiver/dashboard` | 🔒 |  |
+| get | `/api/family/dashboard` | 🔒 |  |
+| post | `/api/family/invite` | 🔒 |  |
+| get | `/api/family/links` | 🔒 |  |
+| put | `/api/family/members/:id/permissions` | 🔒 |  |
+| get | `/api/fasting/current` | 🔒 |  |
+| post | `/api/fasting/start` | 🔒 |  |
+| post | `/api/fasting/stop` | 🔒 |  |
+| get | `/api/history/timeline` | 🔒 |  |
+| get | `/api/hydration/history` | 🔒 |  |
+| post | `/api/hydration/logs` | 🔒 |  |
+| delete | `/api/hydration/logs/:logId` | 🔒 |  |
+| get | `/api/hydration/settings` | 🔒 |  |
+| put | `/api/hydration/settings` | 🔒 |  |
+| get | `/api/hydration/today` | 🔒 |  |
+| post | `/api/internal/cron/hydration-reminders` | 🤖/⏰ |  |
+| post | `/api/internal/cron/reminders` | 🤖/⏰ |  |
+| post | `/api/internal/usage/consume` | 🤖/⏰ |  |
+| get | `/api/kb` | 🔒 |  |
+| get | `/api/kb/:slug` | 🔒 |  |
+| get | `/api/me/entitlements` | 🔒 |  |
+| get | `/api/me/preferences` | 🔒 |  |
+| put | `/api/me/preferences` | 🔒 |  |
+| post | `/api/me/subscribe` | 🔒 |  |
+| delete | `/api/measurements/:id` | 🔒 |  |
+| get | `/api/measurements/attachments/:id` | 🔒 |  |
+| post | `/api/measurements/attachments/upload` | 🔒 |  |
+| get | `/api/measurements/drafts` | 🔒 |  |
+| post | `/api/measurements/extract` | 🔒 |  |
+| post | `/api/measurements/extract/limit-check` | 🔒 |  |
+| get | `/api/measurements/history` | 🔒 |  |
+| get | `/api/measurements/last` | 🔒 |  |
+| post | `/api/measurements/last/save` | 🔒 |  |
+| post | `/api/measurements/submit` | 🔒 |  |
+| post | `/api/measurements/sync` | 🔒 |  |
+| get | `/api/measurements/today` | 🔒 |  |
+| post | `/api/measurements/validate` | 🔒 |  |
+| get | `/api/medication-logs` | 🔒 |  |
+| post | `/api/medication-logs` | 🔒 |  |
+| get | `/api/medications` | 🔒 |  |
+| post | `/api/medications` | 🔒 |  |
+| delete | `/api/medications/:id` | 🔒 |  |
+| put | `/api/medications/:id` | 🔒 |  |
+| post | `/api/medications/:id/log` | 🔒 |  |
+| get | `/api/medications/adherence` | 🔒 |  |
+| get | `/api/medications/logs` | 🔒 |  |
+| get | `/api/metrics/catalog` | 🔒 |  |
+| get | `/api/notifications` | 🔒 |  |
+| post | `/api/notifications/browser/subscribe` | 🔒 |  |
+| get | `/api/patterns` | 🔒 |  |
+| post | `/api/patterns/generate` | 🔒 |  |
+| post | `/api/patterns/generate/medication` | 🔒 |  |
+| post | `/api/patterns/generate/sleep-bp` | 🔒 |  |
+| post | `/api/patterns/generate/weight-bp` | 🔒 |  |
+| get | `/api/plans` | 🔒 |  |
+| post | `/api/privacy/deleteAccount` | 🔒 |  |
+| get | `/api/profile` | 🔒 |  |
+| put | `/api/profile` | 🔒 |  |
+| post | `/api/profile/onboarding` | 🔒 |  |
+| post | `/api/push/subscribe` | 🔒 |  |
+| post | `/api/push/test` | 🔒 |  |
+| delete | `/api/push/unsubscribe` | 🔒 |  |
+| get | `/api/push/vapid-key` | 🔒 |  |
+| get | `/api/reminders` | 🔒 |  |
+| post | `/api/reminders` | 🔒 |  |
+| delete | `/api/reminders/:id` | 🔒 |  |
+| put | `/api/reminders/:id` | 🔒 |  |
+| get | `/api/reports/:id/data` | 🔒 |  |
+| get | `/api/reports/:id/download` | 🔒 |  |
+| post | `/api/reports/:id/share` | 🔒 |  |
+| get | `/api/reports/daily` | 🔒 |  |
+| post | `/api/reports/doctor-ready` | 🔒 | 💎 |
+| get | `/api/reports/monthly` | 🔒 |  |
+| get | `/api/reports/share/:shareToken` | 🌍 |  |
+| get | `/api/reports/weekly` | 🔒 |  |
+| put | `/api/settings/consent` | 🔒 |  |
+| put | `/api/settings/ui` | 🔒 |  |
+| get | `/api/streaks` | 🔒 |  |
+| get | `/api/symptoms` | 🔒 |  |
+| post | `/api/symptoms` | 🔒 |  |
+| get | `/api/symptoms/:symptomLogId` | 🔒 |  |
+| get | `/api/symptoms/history` | 🔒 |  |
+| post | `/api/symptoms/prompt-dismissals` | 🔒 |  |
+| post | `/api/telegram/connect` | 🔒 |  |
+| put | `/api/telegram/settings` | 🔒 |  |
+| get | `/api/telegram/status` | 🔒 |  |
+| post | `/api/telegram/test` | 🔒 |  |
+| post | `/api/telegram/verify` | 🔒 |  |
+| post | `/api/telegram/water-webhook` | 🤖/⏰ |  |
+| post | `/api/telegram/webhook` | 🤖/⏰ |  |
+| post | `/api/webhook/telegram/water` | 🤖/⏰ |  |

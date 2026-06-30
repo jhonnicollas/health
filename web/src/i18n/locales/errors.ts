@@ -1,4 +1,4 @@
-import { registerTranslations, type SupportedLocale } from '../index'
+import { registerTranslations, type SupportedLocale } from '../registry'
 
 export const ERROR_MESSAGES: Record<string, Record<SupportedLocale, string>> = {
   UNAUTHORIZED: { 'id-ID': 'Sesi tidak valid.', 'en-US': 'Invalid session.' },

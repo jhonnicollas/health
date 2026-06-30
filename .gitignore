@@ -11,6 +11,8 @@ archive/
 brain/
 node_modules/
 dist/
+stress/
+site/
 
 *.log
 .dev.vars

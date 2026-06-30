@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('settings', {
   profileTitle: { 'id-ID': 'User Profile', 'en-US': 'User Profile' },

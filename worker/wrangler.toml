@@ -1,4 +1,4 @@
-name = "hl-health-companion-api"
+name = "isehat-api"
 main = "src/index.ts"
 compatibility_date = "2026-06-20"
 workers_dev = true
@@ -50,3 +50,8 @@ VAPID_PUBLIC_KEY = "BJazmolj-Nf6eACLfCesD92Uobws77I6X0ADanxIEpc-BBcRATkbBBJwZWxj
 VAPID_SUBJECT = "mailto:admin@isehat.biz.id"
 # VAPID_PRIVATE_KEY must be set via: wrangler secret put VAPID_PRIVATE_KEY
 
+# Sprint 6: AI Clinical Copilot runtime. Worker #1 proxies /api/ai/clinical/*
+# to isehat-ai-worker via Cloudflare Service Binding (S6A-T-02).
+[[services]]
+binding = "AI_SERVICE"
+service = "isehat-ai-worker"

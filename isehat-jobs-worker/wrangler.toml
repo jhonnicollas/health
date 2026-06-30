@@ -1,0 +1,69 @@
+name = "isehat-jobs-worker"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+workers_dev = true
+
+# Worker #3 — Sprint 6F onwards.
+# Source of truth: docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md §6.5 (shared bindings) + §6.3 (delivered in S6F).
+
+[[d1_databases]]
+binding = "DB"
+database_name = "isehat_db"
+database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
+
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "multi-apps-ai-bucket"
+
+# Queue consumers — isehat-jobs-worker is the consumer side for outbound /
+# retention / eval jobs. Producers are Worker #1 (and Worker #2 for AI memory jobs).
+# PRD §6.5: telegram-submit-summary (existing from Sprint 5), ai-memory-jobs (new),
+# whatsapp-outbound (S6G), eval-jobs (S6H).
+[[queues.consumers]]
+queue = "telegram-submit-summary"
+max_batch_size = 10
+max_batch_timeout = 5
+
+[[queues.consumers]]
+queue = "ai-memory-jobs"
+max_batch_size = 5
+max_batch_timeout = 10
+
+[[queues.consumers]]
+queue = "whatsapp-outbound"
+max_batch_size = 10
+max_batch_timeout = 5
+
+[[queues.consumers]]
+queue = "eval-jobs"
+max_batch_size = 5
+max_batch_timeout = 30
+
+# Cron triggers — 6 retention jobs per PRD §15.4.
+# Schedule format: minute hour day-of-month month day-of-week (UTC).
+#   02:00 daily  — expire AI clinical sessions > 365 days
+#   02:30 daily  — nullify contentEncrypted > 90 days
+#   03:00 daily  — hard-delete AI clinical messages > 180 days
+#   04:00 weekly — archive model runs > 365 days (+ delete from D1)
+#   04:30 weekly — delete Vectorize vectors for users inactive > 365 days
+#   05:00 1st    — archive safety flags > 730 days (+ delete from D1)
+[triggers]
+crons = [
+  "0 2 * * *",
+  "30 2 * * *",
+  "0 3 * * *",
+  "0 4 * * 0",
+  "30 4 * * 0",
+  "0 5 1 * *"
+]
+
+[vars]
+# CRON_SECRET used by Worker #4 GET /api/whatsapp/health probe and by any
+# external admin manual-trigger endpoint. Set via Cloudflare Secrets.
+# Retained vars mirror HL_systemConfigs keys (D1 is source of truth).
+RETENTION_SESSIONS_HOURS = "8760"   # 365d
+RETENTION_MESSAGES_HOURS = "4320"   # 180d
+RETENTION_ENCRYPTED_HOURS = "2160"  # 90d
+RETENTION_MODEL_RUNS_HOURS = "8760"
+RETENTION_INACTIVE_USERS_HOURS = "8760"
+RETENTION_SAFETY_FLAGS_HOURS = "17520" # 730d

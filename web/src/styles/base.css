@@ -1,0 +1,118 @@
+.auth-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: var(--marginMobile);
+  background: var(--colorBackground);
+}
+
+.app-page {
+  min-height: 100svh;
+  display: flex;
+  background: var(--colorBackground);
+}
+
+.app-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: var(--sidebarWidth);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--colorBorderSoft);
+  background: var(--colorSurface);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.sidebar-brand {
+  padding: 24px;
+  border-bottom: 1px solid var(--colorBorderSoft);
+}
+
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sidebar-brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 0.5rem;
+  background: var(--colorPrimaryContainer);
+  color: var(--colorPrimaryText);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.sidebar-brand-icon .material-symbols-outlined {
+  font-size: 24px;
+}
+
+.mobile-brand-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.mobile-brand-icon .material-symbols-outlined {
+  font-size: 21px;
+}
+
+.sidebar-brand h1 {
+  font: var(--typHeadlineMd);
+  font-weight: 700;
+  color: var(--colorPrimaryStrong);
+  line-height: 1.2;
+}
+
+.sidebar-brand p {
+  font: var(--typLabelSm);
+  color: var(--colorTextMuted);
+}
+
+.emergency-support-btn {
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 8px 16px;
+  color: var(--colorPrimaryText);
+  background: var(--colorStatusCritical);
+  font: var(--typLabelMd);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--shadowSoft);
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.emergency-support-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.emergency-support-btn:hover {
+  background: var(--colorErrorContainer);
+  color: var(--colorOnErrorContainer);
+}
+
+.sidebar-nav-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+}
+

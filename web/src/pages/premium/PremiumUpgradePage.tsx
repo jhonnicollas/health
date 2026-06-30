@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useEntitlements } from '../../hooks/useEntitlements'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 import { translateErrorCode } from '../../api/translateError'
 
 type PlanInfo = {
@@ -71,7 +71,7 @@ export function PremiumUpgradePage({ onNavigate }: { onNavigate?: (path: string)
       }
     }
     void load()
-  }, [])
+  }, [t])
 
   const currentPlanCode = entitlements?.planCode || 'free'
 

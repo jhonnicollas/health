@@ -1,0 +1,838 @@
+
+/* ============================================================
+   EP-P2.x - STITCH-STYLE MEASUREMENT PAGE
+   ============================================================ */
+
+.stitch-measurement-form {
+  max-width: none;
+  width: 100%;
+  padding: 8px 0;
+}
+
+/* Age Banner */
+.user-info-banner {
+  background: linear-gradient(135deg, var(--colorPrimarySurface) 0%, color-mix(in srgb, var(--colorPrimary) 5%, transparent) 100%);
+  border-left: 4px solid var(--colorPrimary);
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadowSm);
+}
+
+.user-info-banner .material-symbols-outlined {
+  color: var(--colorPrimary);
+  font-size: 24px;
+}
+
+.user-info-banner strong {
+  color: var(--colorTextPrimary);
+  font-weight: 600;
+}
+
+.user-info-banner-inline {
+  margin: 0 0 0 12px;
+  padding: 8px 12px;
+  border-left-width: 3px;
+  border-radius: 10px;
+  gap: 8px;
+  white-space: nowrap;
+  font: var(--typBodySm);
+  max-width: min(420px, 100%);
+}
+
+.user-info-banner-inline .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* Device Cards Container */
+.stitch-device-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+/* Individual Device Card */
+.stitch-device-card {
+  background: var(--colorSurfaceContainerLowest);
+  border: 1px solid var(--colorOutlineVariant);
+  border-radius: 20px;
+  box-shadow: var(--shadowLg);
+  position: relative;
+}
+
+.stitch-device-card:hover {
+  border-color: color-mix(in srgb, var(--colorPrimary) 30%, var(--colorOutlineVariant));
+}
+
+/* Card Header */
+.stitch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 2px solid var(--colorBorder);
+  background: linear-gradient(to right, var(--colorSurface) 0%, var(--colorSurfaceContainerLow) 100%);
+  border-left: 4px solid var(--colorPrimary);
+}
+
+.stitch-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stitch-device-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.stitch-device-card:hover .stitch-device-icon {
+  transform: scale(1.05);
+}
+
+.stitch-device-icon .material-symbols-outlined {
+  font-size: 26px;
+}
+
+.stitch-device-title {
+  font: var(--typHeadlineMd);
+  font-weight: 600;
+  color: var(--colorTextPrimary);
+  margin: 0;
+}
+
+.stitch-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font: var(--typLabelSm);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.stitch-ai-badge-success {
+  background: color-mix(in srgb, var(--colorSuccess) 20%, transparent);
+  color: var(--colorSuccess);
+  border: 1px solid color-mix(in srgb, var(--colorSuccess) 40%, var(--colorBorder));
+}
+
+.stitch-ai-badge-error {
+  background: color-mix(in srgb, var(--colorDanger) 20%, transparent);
+  color: var(--colorDanger);
+  border: 1px solid color-mix(in srgb, var(--colorDanger) 40%, var(--colorBorder));
+}
+
+.stitch-ai-badge-warning {
+  background: color-mix(in srgb, var(--colorWarning) 20%, transparent);
+  color: var(--colorWarning);
+  border: 1px solid color-mix(in srgb, var(--colorWarning) 40%, var(--colorBorder));
+}
+
+.stitch-ai-badge-loading {
+  background: color-mix(in srgb, var(--colorPrimary) 15%, transparent);
+  color: var(--colorPrimary);
+  border: 1px solid color-mix(in srgb, var(--colorPrimary) 40%, var(--colorBorder));
+}
+
+/* Card Body - 2 Column Layout */
+.stitch-card-body {
+  display: flex;
+  padding: 24px;
+  gap: 24px;
+}
+
+.stitch-image-side {
+  flex: 0 0 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stitch-capture-area {
+  position: relative;
+  aspect-ratio: 16/9;
+  border: 2px dashed var(--colorOutlineVariant);
+  border-radius: 16px;
+  background: var(--colorSurfaceContainerHigh);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+}
+
+.stitch-capture-area:hover {
+  border-color: var(--colorPrimary);
+  background: var(--colorPrimarySurface);
+}
+
+.stitch-capture-area input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.stitch-capture-area .material-symbols-outlined {
+  font-size: 48px;
+  color: var(--colorTextMuted);
+  margin-bottom: 8px;
+}
+
+.stitch-capture-area:hover .material-symbols-outlined {
+  color: var(--colorPrimary);
+}
+
+.stitch-capture-label {
+  font: var(--typLabelMd);
+  font-weight: 600;
+  color: var(--colorTextPrimary);
+}
+
+.stitch-capture-hint {
+  font: var(--typBodySm);
+  color: var(--colorTextMuted);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.stitch-preview {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid var(--colorBorder);
+}
+
+.stitch-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stitch-retake-btn {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  border-radius: 24px;
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: var(--typLabelMd);
+  font-weight: 600;
+  border: 1px solid var(--colorBorder);
+  transition: all 0.2s ease;
+}
+
+.stitch-retake-btn:hover {
+  background: white;
+  transform: translateX(-50%) scale(1.05);
+}
+
+.stitch-retake-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.stitch-retake-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.stitch-ai-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--colorSurface);
+  border-radius: 12px;
+  border: 1px solid var(--colorBorder);
+}
+
+.stitch-ai-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--colorBorder);
+  border-radius: 2px;
+  overflow: hidden;
+  animation: aiLoading 1.5s ease-in-out infinite;
+}
+
+@keyframes aiLoading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Measurement Prep Tips Button */
+.stitch-prep-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid #f39c12;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #f39c12;
+  transition: background 0.15s, color 0.15s;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.stitch-prep-btn:hover {
+  background: #f39c12;
+  color: #fff;
+}
+.stitch-prep-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+.stitch-prep-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  margin-top: 6px;
+  padding: 16px 18px;
+  background: var(--colorSurface);
+  border: 1.5px solid #f39c12;
+  border-radius: var(--radiusMd);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  font: var(--typBodyMd);
+  color: var(--colorText);
+  white-space: normal;
+  max-width: min(400px, calc(100vw - 32px));
+  width: max-content;
+  line-height: 1.6;
+  pointer-events: auto;
+}
+.stitch-prep-popup ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+}
+.stitch-prep-popup li {
+  margin-bottom: 8px;
+}
+.stitch-prep-popup-title {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 6px;
+  color: #f39c12;
+  font-size: 1.1em;
+}
+
+.stitch-ai-progress span {
+  font: var(--typBodySm);
+  color: var(--colorTextMuted);
+  font-weight: 500;
+}
+
+.stitch-input-side {
+  flex: 0 0 60%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stitch-metric-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stitch-metric-label {
+  font: var(--typLabelMd);
+  font-weight: 600;
+  color: var(--colorTextSecondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stitch-confidence {
+  font: var(--typLabelSm);
+  color: var(--colorPrimary);
+  font-weight: 700;
+  background: var(--colorPrimarySurface);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.stitch-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.stitch-metric-input {
+  flex: 1;
+  font: var(--typHeadlineLg);
+  font-weight: 700;
+  color: var(--colorPrimary);
+  padding: 20px 24px;
+  border: 2px solid var(--colorOutlineVariant);
+  border-radius: 16px;
+  border-bottom-width: 4px;
+  background: var(--colorSurface);
+  transition: all 0.2s ease;
+  text-align: center;
+  -moz-appearance: textfield;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stitch-metric-input::placeholder {
+  color: var(--colorTextMuted);
+  opacity: 0.5;
+}
+
+.stitch-metric-input:focus {
+  outline: none;
+  border-color: var(--colorPrimary);
+  border-bottom-width: 4px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--colorPrimary) 20%, transparent);
+}
+
+.stitch-metric-input.is-calculated {
+  color: var(--colorTertiary);
+  font-style: italic;
+  cursor: not-allowed;
+  background: var(--colorSurfaceContainerLow);
+}
+
+.stitch-metric-input.has-error {
+  border-color: var(--colorDanger);
+  border-bottom-width: 4px;
+  background: color-mix(in srgb, var(--colorDanger) 10%, transparent);
+}
+
+.stitch-metric-input::-webkit-inner-spin-button,
+.stitch-metric-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stitch-input-unit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 12px;
+  background: var(--colorSurfaceContainerLow);
+  border: 2px solid var(--colorOutlineVariant);
+  border-left: none;
+  border-radius: 0 16px 16px 0;
+  font: var(--typLabelMd);
+  font-weight: 600;
+  color: var(--colorTextSecondary);
+  user-select: none;
+}
+
+.stitch-field-error {
+  font: var(--typBodySm);
+  color: var(--colorDanger);
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.stitch-ai-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  font: var(--typBodyMd);
+  margin-top: 16px;
+}
+
+.stitch-ai-message-success {
+  background: color-mix(in srgb, var(--colorSuccess) 15%, transparent);
+  color: var(--colorSuccess);
+  border: 1px solid color-mix(in srgb, var(--colorSuccess) 30%, var(--colorBorder));
+}
+
+.stitch-ai-message-error {
+  background: color-mix(in srgb, var(--colorDanger) 15%, transparent);
+  color: var(--colorDanger);
+  border: 1px solid color-mix(in srgb, var(--colorDanger) 30%, var(--colorBorder));
+}
+
+.stitch-ai-message-warning {
+  background: color-mix(in srgb, var(--colorWarning) 15%, transparent);
+  color: var(--colorWarning);
+  border: 1px solid color-mix(in srgb, var(--colorWarning) 30%, var(--colorBorder));
+}
+
+/* Footer Actions */
+.stitch-form-footer {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 24px;
+  background: var(--colorSurfaceContainerLowest);
+  border-radius: 16px;
+  border: 1px solid var(--colorBorder);
+  box-shadow: var(--shadowSm);
+}
+
+.stitch-btn-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border: 2px solid var(--colorOutlineVariant);
+  border-radius: 12px;
+  background: var(--colorSurface);
+  color: var(--colorTextSecondary);
+  font: var(--typLabelMd);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stitch-btn-clear:hover:not(:disabled) {
+  border-color: var(--colorDanger);
+  color: var(--colorDanger);
+  background: color-mix(in srgb, var(--colorDanger) 5%, transparent);
+}
+
+.stitch-btn-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stitch-btn-submit {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 18px 32px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--colorPrimary) 0%, color-mix(in srgb, var(--colorPrimary) 80%, transparent) 100%);
+  color: var(--colorPrimaryText);
+  font: var(--typHeadlineMd);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--colorPrimary) 30%, transparent);
+  transition: all 0.2s ease;
+  min-height: 60px;
+}
+
+.stitch-btn-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--colorPrimary) 40%, transparent);
+}
+
+.stitch-btn-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .stitch-measurement-form {
+    padding: 16px 12px;
+  }
+
+  .user-info-banner {
+    padding: 12px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .user-info-banner-inline {
+    margin: 8px 0 0 0;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .stitch-card-body {
+    flex-direction: column;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .stitch-input-wrap {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stitch-input-unit {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .stitch-form-footer {
+    flex-direction: column;
+  }
+
+  .stitch-btn-clear {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stitch-btn-submit {
+    width: 100%;
+    padding: 20px 24px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1023px) {
+  .stitch-card-body {
+    gap: 16px;
+  }
+
+  .stitch-form-footer {
+    flex-direction: row-reverse;
+  }
+}
+
+/* Blood Pressure side-by-side layout */
+.stitch-bp-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.stitch-bp-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.stitch-bp-divider {
+  font-size: 2.5rem;
+  font-weight: 300;
+  color: var(--colorTextMuted);
+  padding-bottom: 12px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .stitch-bp-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .stitch-bp-divider {
+    display: none;
+  }
+}
+
+/* Ensure all panel pages have proper spacing */
+.today-dashboard,
+.weekly-dashboard,
+.monthly-dashboard {
+  gap: 24px;
+}
+
+.today-dashboard .dashboard-bento {
+  gap: 24px;
+}
+
+/* Ensure report table has proper cell padding */
+.report-table td,
+.report-table th {
+  padding: 12px 20px !important;
+}
+
+/* History panel proper spacing */
+.history-panel .page-heading {
+  margin-bottom: 8px;
+}
+
+/* Fix sidebar collapse width consistency */
+.app-page.sidebar-collapsed .sidebar-brand {
+  padding: 16px 12px;
+}
+
+.app-page.sidebar-collapsed .sidebar-brand-row {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+.app-page.sidebar-collapsed .sidebar-collapse-btn {
+  margin: 0 auto;
+}
+
+/* Topbar user dropdown - ensure it opens on click */
+.topbar-user-wrap {
+  position: relative;
+}
+
+/* Add click-outside-to-close behavior handled via JS in App.tsx */
+
+/* ===== EP-P6.3: UI Overhaul - Device Selection Polish ===== */
+.device-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.device-selector-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 2px solid var(--colorBorder);
+  border-radius: 14px;
+  background: var(--colorSurface);
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  min-height: 80px;
+  transition: all 0.2s ease;
+}
+
+.device-selector-card:hover {
+  border-color: var(--colorPrimary);
+  background: var(--colorSurfaceHover);
+}
+
+.device-selector-card.selected {
+  border-color: var(--colorPrimary);
+  background: var(--colorPrimarySurface);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--colorPrimary) 15%, transparent);
+}
+
+.device-selector-card.recorded-today {
+  border-color: var(--colorSuccess, #2e7d32);
+  background: color-mix(in srgb, #2e7d32 8%, var(--colorSurface));
+}
+
+.device-selector-card.recorded-today.selected {
+  background: color-mix(in srgb, #2e7d32 12%, var(--colorPrimarySurface));
+}
+
+.device-selector-card.late-warning {
+  border-color: #6d4c41;
+  background: color-mix(in srgb, #6d4c41 8%, var(--colorSurface));
+}
+
+.device-selector-card .device-icon {
+  font-size: 30px;
+  color: var(--colorTextSecondary);
+  flex-shrink: 0;
+}
+
+.device-selector-card.selected .device-icon {
+  color: var(--colorPrimary);
+}
+
+.device-selector-card.recorded-today .device-icon {
+  color: var(--colorSuccess, #2e7d32);
+}
+
+.device-selector-card.late-warning .device-icon {
+  color: #6d4c41;
+}
+
+.device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.device-info strong {
+  font: var(--typBodyMd);
+  font-weight: 600;
+  color: var(--colorTextPrimary);
+}
+
+.device-status-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--typBodySm);
+  color: var(--colorSuccess, #2e7d32);
+  font-weight: 600;
+}
+
+.device-status-late {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--typBodySm);
+  color: #6d4c41;
+  font-weight: 600;
+}
+
+.device-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 22px;
+  color: var(--colorPrimary);
+}
+
+.device-selector-card.recorded-today .device-check {
+  color: var(--colorSuccess, #2e7d32);
+}
+
+.sinocare-mode-selector {
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: var(--colorSurfaceHover);
+  border-radius: 14px;
+  border: 1px solid var(--colorBorder);
+}
+
+.sinocare-mode-selector p {
+  margin: 0 0 12px;
+}
+
+.sinocare-mode-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sinocare-mode-btn {
+  padding: 12px 20px;
+  border: 2px solid var(--colorBorder);
+  border-radius: 10px;
+  background: var(--colorSurface);
+  cursor: pointer;
+  font: var(--typBodyMd);
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.sinocare-mode-btn:hover {
+  border-color: var(--colorPrimary);
+  background: var(--colorSurfaceHover);
+}
+
+.sinocare-mode-btn.selected {
+  border-color: var(--colorPrimary);
+  background: var(--colorPrimarySurface);
+  color: var(--colorPrimary);
+  font-weight: 600;
+}

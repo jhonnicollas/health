@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('billing', {
   upgradeTitle: { 'id-ID': 'Upgrade Plan Anda', 'en-US': 'Upgrade Your Plan' },

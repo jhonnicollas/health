@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useToast } from '../../components/Toast'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 type FaqItem = { q: string; a: string }
 type FaqCategory = { id: string; label: string; icon: string; items: FaqItem[] }
@@ -13,7 +13,7 @@ const FAQ_CATEGORIES: FaqCategory[] = [
     icon: 'manage_accounts',
     items: [
       {
-        q: 'Bagaimana cara mendaftar akun HealthSync?',
+        q: 'Bagaimana cara mendaftar akun iSehat?',
         a: 'Buka halaman utama lalu pilih "Daftar". Masukkan nama lengkap, email aktif, dan kata sandi yang kuat (minimal 8 karakter). Setelah menekan tombol Daftar, kami mengirim tautan verifikasi ke email Anda. Klik tautan tersebut untuk mengaktifkan akun, lalu lengkapi data onboarding (tinggi badan, zona waktu, mode aksesibilitas). Jika email verifikasi tidak masuk, periksa folder spam atau gunakan fitur "Kirim ulang tautan" di halaman login.',
       },
       {

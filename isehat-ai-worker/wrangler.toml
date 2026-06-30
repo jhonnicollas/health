@@ -1,0 +1,84 @@
+name = "isehat-ai-worker"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+workers_dev = true
+
+# Source of truth: docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md §6.5 Shared Platform Bindings
+
+[[d1_databases]]
+binding = "DB"
+database_name = "isehat_db"
+database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
+
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "multi-apps-ai-bucket"
+
+# Vectorize Free Tier — 1 index, 768-dim bge-base-en-v1.5 (PRD §8.9, §S3 6C §2)
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "hl-health-memory"
+
+# AI Search — open beta, free within platform limits (PRD §8.10)
+# BLOCKED until AI Search instance is provisioned in Cloudflare dashboard.
+# Set instance_id after creating the index; deploy will fail with [TBD].
+[ai_search]
+binding = "AI_SEARCH"
+instance_id = "[TBD — provision AI Search in Cloudflare dashboard]"
+
+# KV cache — prompt / routing / config / education / search / disclaimer (PRD §8.11)
+# BLOCKED until KV namespace is created. Run: wrangler kv:namespace create AI_KV
+# Then replace the id below; deploy will fail with [TBD].
+[[kv_namespaces]]
+binding = "AI_KV"
+id = "[TBD — run: wrangler kv:namespace create AI_KV]"
+
+# Durable Objects — 5 classes per PRD §8.12
+# Bindings declared but classes not yet implemented; added via S6E / S6G as those phases land.
+[[durable_objects.bindings]]
+name = "AI_CHAT_SESSION_DO"
+class_name = "AiChatSessionDO"
+
+[[durable_objects.bindings]]
+name = "WHATSAPP_SESSION_DO"
+class_name = "WhatsAppSessionDO"
+
+[[durable_objects.bindings]]
+name = "USER_AI_LOCK_DO"
+class_name = "UserAiLockDO"
+
+[[durable_objects.bindings]]
+name = "MODEL_STREAMING_DO"
+class_name = "ModelStreamingDO"
+
+[[durable_objects.bindings]]
+name = "JOB_PROGRESS_DO"
+class_name = "JobProgressDO"
+
+# Durable object migrations — placeholders; replace when adding real DO scripts.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AiChatSessionDO","WhatsAppSessionDO","UserAiLockDO","ModelStreamingDO","JobProgressDO"]
+
+# Workers AI binding (used by EmbeddingService bge-base-en-v1.5 in S6C-T-03).
+[ai]
+binding = "AI"
+
+# Cloudflare AI Gateway URL is constructed at runtime from CLOUDFLARE_ACCOUNT_ID +
+# CLOUDFLARE_API_TOKEN env (NOT a binding per PRD §8.14). 9ROUTER_API_KEY is BYOK
+# referenced by AI Gateway provider config, never present in this Worker.
+# Set via: wrangler secret put CLOUDFLARE_API_TOKEN
+# Set via: wrangler secret put 9ROUTER_API_KEY (only if aiGateway.directFallback.enabled)
+
+# Sprint 6 runtime defaults (mirrors §13.3 system configs; the source of truth is D1:
+# HL_systemConfigs, not Worker [vars]. Vars here are Worker-only fallbacks.)
+[vars]
+AI_GATEWAY_ENABLED = "true"
+AI_GATEWAY_PRIMARY_PROVIDER = "9router"
+VECTORIZE_MAX_VECTORS_PER_USER = "500"
+VECTORIZE_ALERT_THRESHOLD_PERCENT = "80"
+CLINICAL_COPILOT_ENABLED = "false"
+CLINICAL_COPILOT_MAX_TURNS = "20"
+WHATSAPP_MAX_REPLY_CHARS = "400"
+MEDICAL_SAFETY_RUNTIME_ENABLED = "true"
+MEDICAL_SAFETY_RUNTIME_STRICT_MODE = "true"

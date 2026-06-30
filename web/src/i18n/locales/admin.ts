@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('admin', {
   adminTitle: { 'id-ID': 'Admin Panel', 'en-US': 'Admin Panel' },

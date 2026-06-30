@@ -1,5 +1,5 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState, useCallback, createContext, useContext } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import { useState, useCallback, createContext, useContext } from 'react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
 type ToastItem = { id: number; message: string; type: ToastType }
@@ -28,8 +28,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastBubble({ item, onClose }: { item: ToastItem; onClose: () => void }) {
-  const [visible, setVisible] = useState(false)
-  useEffect(() => { setVisible(true) }, [])
+  const [visible] = useState(true)
 
   const icons: Record<ToastType, string> = { success: 'check_circle', error: 'error', info: 'info', warning: 'warning' }
   const colors: Record<ToastType, string> = {

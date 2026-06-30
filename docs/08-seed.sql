@@ -1,4 +1,4 @@
--- HL Health Companion seed data for Cloudflare D1 / SQLite
+-- iSehat seed data for Cloudflare D1 / SQLite
 -- Target existing database: multi_Ai_db
 -- This file is idempotent and safe to run repeatedly.
 -- Naming rules:

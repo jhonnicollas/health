@@ -1,6 +1,6 @@
 {
-  "name": "HL Health Companion",
-  "short_name": "HL Health",
+  "name": "iSehat",
+  "short_name": "iSehat",
   "description": "Pencatatan kesehatan pribadi dengan aman.",
   "start_url": "/",
   "display": "standalone",

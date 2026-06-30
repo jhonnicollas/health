@@ -1,4 +1,4 @@
-# DESIGN SYSTEM — HL Health Companion (HealthSync Pro)
+# DESIGN SYSTEM — iSehat
 
 > **Sumber: audit langsung ke `web/src/index.css` (CSS variables & themes), `web/src/App.css` (6544 LOC utility classes), `web/src/App.tsx` (NAV structure), `web/src/components/*` (22 components), `web/src/pages/*` (47 pages), `web/src/i18n/locales/*` (24 locale files), `web/src/styles/{senior-mode,high-contrast}.css`.**
 > Dokumen lama: `archive/docs_legacy_2025_sprint1-5/06-design-system.md`.
@@ -8,7 +8,7 @@
 ## 1. Identitas Produk
 
 ```text
-Product name   : HealthSync Pro (tampilan FE) — sistem: HL Health Companion
+Product name   : iSehat
 Type           : Health logging PWA (React 19 + Vite + TypeScript)
 Style          : Material-inspired, accessible, mobile-first
 Icon set       : Material Symbols Outlined (variable font, FILL 0/1)
@@ -245,7 +245,7 @@ graph TB
 #### 5.1.1 Sidebar (`aside.app-sidebar`)
 
 - Fixed width 280px, collapsible (`sidebar-collapsed` class + `localStorage.hl-sidebar-collapsed`).
-- Brand block: `local_hospital` icon + "HealthSync Pro" wordmark + collapse chevron + emergency support quick button.
+- Brand block: `local_hospital` icon + "iSehat" wordmark + collapse chevron + emergency support quick button.
 - Search box (`topbar-search-wrap` di desktop, di sidebar juga).
 - Nav groups (`nav-group`): expandable sections.
 - Footer: Welcome Tour, Help Center, Logout.
@@ -588,7 +588,7 @@ Dipakai di:
 ## 16. Aset Visual
 
 - **Brand icon**: `local_hospital` (Material Symbols, FILL=1).
-- **Logo type**: "HealthSync Pro" (`<h1>` Inter 700).
+- **Logo type**: "iSehat" (`<h1>` Inter 700).
 - **Hero image** (di `site/`): `/public/images/blog/*`.
 - **Mockup HTML referensi**: `web/frontend_stitch/*.html` (legacy, tidak di-bundle).
 - **Mockup Sprint 5**: `docs_sprint5/Frontend/*.html` (admin, premium, education, audit).

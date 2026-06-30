@@ -4,6 +4,15 @@ import { AiMemoryService } from './services/ai-memory.js'
 import { AuditService } from './services/audit.js'
 import { RbacService } from './services/rbac.js'
 import { EntitlementService } from './services/entitlements.js'
+import {
+  insertAndGetId,
+  getRecentValues,
+  filterUnsafeContent,
+  extractPatternScore,
+  callConfiguredTextAi
+} from './utils/index-helpers.js'
+import { parseLocale } from './i18n/locale.js'
+import { getAiDisclaimer } from './i18n/disclaimer-templates.js'
 
 interface LocalEnv { DB: D1Database; AI_MEMORY_QUEUE?: Queue; VECTORIZE_INDEX?: any }
 type HC = Context<{ Bindings: LocalEnv }>
@@ -138,5 +147,260 @@ export function mountAiRoutes(app: any) {
         forbiddenActions: ['final_diagnosis','emergency_decision','prescription','medication_dosage_instruction','replace_doctor_claim','cross_user_retrieval']
       }, 200, s), 200)
     } catch (e) { return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
+  })
+
+  app.post('/api/ai/recommendation', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const userId = await getSession(c)
+      if (!userId) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+      const body = await c.req.json() as { sessionId?: string }
+      const sessionId = body?.sessionId
+
+      const todayValues = sessionId
+        ? await c.env.DB.prepare(
+            'SELECT metricCode, finalValue, unit, status, severity FROM HL_measurementValues WHERE sessionId = ?'
+          ).bind(sessionId).all<{ metricCode: string; finalValue: number; unit: string; status: string; severity: string }>()
+        : { results: [] as any[] }
+
+      const last3Days = await getRecentValues(c as any, userId, 3)
+      const last7Days = await getRecentValues(c as any, userId, 7)
+
+      const summary = {
+        today: (todayValues.results || []).map(v => `${v.metricCode}=${v.finalValue}${v.unit} (${v.status})`),
+        last3DaysCount: last3Days.length,
+        last7DaysCount: last7Days.length
+      }
+
+      const prompt = `Anda analis kesehatan senior. Analisis data berikut dan beri interpretasi SPESIFIK:
+
+Data: ${JSON.stringify(summary)}
+
+WAJIB:
+- Beri skor kesehatan (1-10) berdasarkan data
+- Sebut kondisi jika indikasi jelas (misal: hipertensi, underweight, dll)
+- Rekomendasi konkret berdasarkan data aktual
+- Jangan bermain aman, langsung pada data
+- MAKSIMAL 3 kalimat dalam Bahasa Indonesia`
+
+      let recommendationText = 'Rekomendasi tidak tersedia saat ini. Jaga pola makan seimbang, istirahat cukup, dan hidrasi yang baik.'
+      let safetyStatus: 'safe' | 'filtered' | 'fallback' = 'fallback'
+      let modelName = 'deterministic-fallback'
+
+      const aiResult = await callConfiguredTextAi(c as any, [
+        {
+          role: 'system',
+          content: 'Anda analis kesehatan senior. Bersikap spesifik dan berani berdasarkan data. Beri skor dan interpretasi langsung dalam Bahasa Indonesia.'
+        },
+        { role: 'user', content: prompt }
+      ], 300)
+      if (aiResult) {
+        const filtered = filterUnsafeContent(aiResult.text)
+        recommendationText = filtered.filtered
+        safetyStatus = filtered.safe ? 'safe' : 'filtered'
+        modelName = aiResult.model
+      }
+
+      const recId = await insertAndGetId(c.env.DB.prepare(
+        `INSERT INTO HL_aiRecommendations
+         (userId, sessionId, summaryText, todayJson, threeDayJson, sevenDayJson, ruleStatusJson, modelName, durationMs, safetyStatus, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+      ).bind(
+        userId,
+        sessionId || null,
+        recommendationText,
+        JSON.stringify(summary.today),
+        JSON.stringify(last3Days),
+        JSON.stringify(last7Days),
+        JSON.stringify((todayValues.results || []).map(v => ({ metric: v.metricCode, status: v.status, severity: v.severity }))),
+        modelName,
+        Date.now() - s,
+        safetyStatus
+      ))
+
+      const has3Day = last3Days.length >= 3
+      const has7Day = last7Days.length >= 7
+      const dataMessages: string[] = []
+      if (!has3Day) dataMessages.push('Belum cukup data 3 hari untuk perbandingan.')
+      if (!has7Day) dataMessages.push('Belum cukup data 7 hari untuk perbandingan.')
+
+      return jr(c, ok({
+        recommendationId: recId,
+        recommendation: recommendationText,
+        safetyStatus,
+        has3DayComparison: has3Day,
+        has7DayComparison: has7Day,
+        dataMessages,
+        summary
+      }, 200, s), 200)
+    } catch (error) {
+      console.error('AI recommendation endpoint error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Rekomendasi AI gagal.', 500, [], s), 500)
+    }
+  })
+
+  app.post('/api/ai/assistant', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const userId = await getSession(c)
+      if (!userId) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const body = await c.req.json().catch(() => ({})) as { question?: string; clinicalCopilotMode?: boolean }
+      if (body.clinicalCopilotMode) return jr(c, { body: { success: false, error: { code: 'AI_CLINICAL_COPILOT_DEFERRED', message: 'AI Clinical Copilot runtime is deferred to Sprint 6.', details: [{ scopeStatus: 'deferred_to_sprint6' }] }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status: 403 } as any, 403)
+      const ent = await EntitlementService.requireEntitlement(c.env.DB, userId, 'feature.aiAssistant.use')
+      if (!ent.allowed) return jr(c, fail('ENTITLEMENT_REQUIRED', 'Fitur AI memerlukan paket Premium.', 403, [{ featureCode: ent.featureCode, planCode: ent.planCode }], s), 403)
+      const question = (body.question || '').trim()
+      if (!question) return jr(c, fail('VALIDATION_ERROR', 'question wajib.', 400, [], s), 400)
+
+      const profile = await c.env.DB.prepare(
+        `SELECT u.displayName, p.heightCm, p.sex, p.birthDate
+         FROM HL_users u
+         LEFT JOIN HL_userProfiles p ON p.userId = u.id
+         WHERE u.id = ?`
+      ).bind(userId).first<{ displayName: string; heightCm: number | null; sex: string | null; birthDate: string | null }>()
+
+      const latestValues = await c.env.DB.prepare(
+        `SELECT metricCode, finalValue, unit, status, severity, measuredAt
+         FROM HL_measurementValues
+         WHERE userId = ?
+         ORDER BY measuredAt DESC
+         LIMIT 8`
+      ).bind(userId).all<{
+        metricCode: string
+        finalValue: number
+        unit: string
+        status: string
+        severity: string
+        measuredAt: string
+      }>()
+
+      const vitals = (latestValues.results || []).map((value) => ({
+        metricCode: value.metricCode,
+        finalValue: value.finalValue,
+        unit: value.unit,
+        status: value.status,
+        severity: value.severity,
+        measuredAt: value.measuredAt
+      }))
+
+      const contextSummary = vitals.length > 0
+        ? vitals
+            .map((value) => `${value.metricCode}: ${value.finalValue} ${value.unit} (${value.status}, ${value.severity})`)
+            .join('; ')
+        : 'Belum ada data vital terbaru.'
+
+      let reply = [
+        `Pertanyaan Anda: ${question}.`,
+        `Konteks pengukuran saat ini: ${contextSummary}`,
+        'Saran umum: pilih makanan rendah garam, cukup minum air, istirahat cukup, dan tetap konsultasikan keputusan medis ke dokter.'
+      ].join(' ')
+      let model = 'deterministic-fallback'
+      let usedFallback = true
+
+      const aiResult = await callConfiguredTextAi(c as any, [
+        {
+          role: 'system',
+          content:
+            'Anda adalah seorang Dokter Senior dan Spesialis Medis untuk aplikasi iSehat. Anda memiliki akses ke seluruh data historis dan metrik kesehatan pengguna. Lakukan analisa mendalam terhadap kondisi pasien berdasarkan data yang diberikan. Berikan "Clinical Confidence Score" (1-100) terhadap analisa Anda. Berikan rekomendasi medis, peringatan, dan insight layaknya dokter spesialis. WAJIB akhiri respons Anda dengan teks berikut tanpa diubah: \n"[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."'
+        },
+        {
+          role: 'user',
+          content: `Profil: ${JSON.stringify(profile || {})}\nVitals terbaru: ${JSON.stringify(vitals)}\nPertanyaan: ${question}`
+        }
+      ], 220)
+      if (aiResult) {
+        const filtered = filterUnsafeContent(aiResult.text)
+        let assistantReply = filtered.filtered
+        assistantReply = AiMemoryService.enforceDisclaimer(assistantReply, aiResult.model)
+        const patternScore = extractPatternScore(assistantReply)
+        reply = assistantReply
+        model = aiResult.model
+        usedFallback = false
+        const context = await AiMemoryService.buildContextPackage(c.env.DB, userId)
+        const { score: dataSufficiencyScore, scoreReason } = AiMemoryService.calculateDataSufficiency(context)
+        const contextTrace = vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, sourceType: 'measurement', source: 'HL_measurementValues' }))
+
+        return jr(c, ok({
+          reply,
+          patternScore,
+          disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)),
+          model,
+          usedFallback,
+          vitals,
+          profile: profile || null,
+          dataSufficiencyScore,
+          scoreReason,
+          contextTrace,
+          usedVectorContext: false
+        }, 200, s), 200)
+      }
+
+      return jr(c, ok({
+        reply,
+        patternScore: 0,
+        disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)),
+        model,
+        usedFallback,
+        vitals,
+        profile: profile || null,
+        dataSufficiencyScore: 0,
+        scoreReason: 'Data kurang untuk analisis',
+        contextTrace: vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, sourceType: 'measurement', source: 'HL_measurementValues' })),
+        usedVectorContext: false
+      }, 200, s), 200)
+    } catch (error) {
+      console.error('ai assistant endpoint error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Asisten AI gagal merespons.', 500, [], s), 500)
+    }
+  })
+
+  app.post('/api/ai/report-analysis', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const userId = await getSession(c)
+      if (!userId) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const body = await c.req.json() as { reportType?: string; context?: string; clinicalCopilotMode?: boolean }
+      if (body.clinicalCopilotMode) return jr(c, { body: { success: false, error: { code: 'AI_CLINICAL_COPILOT_DEFERRED', message: 'AI Clinical Copilot runtime is deferred to Sprint 6.', details: [{ scopeStatus: 'deferred_to_sprint6' }] }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status: 403 } as any, 403)
+      const reportType = body?.reportType
+      if (reportType !== 'daily' && reportType !== 'weekly' && reportType !== 'monthly') {
+        return jr(c, fail('VALIDATION_ERROR', 'reportType harus daily/weekly/monthly.', 400, [], s), 400)
+      }
+      const context = (body?.context || '').slice(0, 2000)
+
+      const prompt = `Anda adalah seorang Dokter Senior dan Spesialis Medis untuk aplikasi iSehat. Anda memiliki akses ke seluruh data historis dan metrik kesehatan pengguna.
+1. Lakukan ANALISA MENDALAM dan AGRESIF terhadap kondisi pasien berdasarkan data laporan berikut.
+2. Berikan "Clinical Confidence Score" (1-100) terhadap analisa Anda beserta justifikasi singkat.
+3. Berikan rekomendasi medis, peringatan, dan insight layaknya dokter spesialis yang sedang mendiagnosis pasien.
+
+Data laporan ${reportType}:
+${context}
+
+WAJIB sertakan teks ini tepat di akhir respons Anda TANPA DIUBAH sedikit pun:
+"[NamaModelAI] is AI and can make mistakes. Segala keputusan, tindakan medis, dan akibat yang timbul dari informasi ini adalah tanggung jawab Anda sepenuhnya, bukan tanggung jawab pemilik aplikasi maupun aplikasi ini."`
+
+      const messages = [
+        { role: 'system', content: 'Anda adalah Dokter Senior dan Spesialis Medis. Analisa pasien secara mendalam, berikan Clinical Confidence Score, dan akhiri dengan disclaimer tanggung jawab medis.' },
+        { role: 'user', content: prompt }
+      ] as any
+
+      const aiResult = await callConfiguredTextAi(c as any, messages, 400)
+      if (aiResult) {
+        let analysis = aiResult.text
+        analysis = AiMemoryService.enforceDisclaimer(analysis, aiResult.model)
+        const patternScore = extractPatternScore(analysis)
+        return jr(c, ok({ analysis, patternScore, model: aiResult.model, disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)), usedFallback: false }, 200, s), 200)
+      }
+      return jr(c, ok({
+        analysis: 'AI tidak tersedia saat ini. Silakan konsultasi dengan dokter untuk interpretasi data Anda.',
+        patternScore: 0,
+        model: 'fallback',
+        disclaimer: getAiDisclaimer(parseLocale(c.req.raw.headers)),
+        usedFallback: true
+      }, 200, s), 200)
+    } catch (error) {
+      console.error('report analysis error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal menganalisa data.', 500, [], s), 500)
+    }
   })
 }

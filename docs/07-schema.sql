@@ -1,4 +1,4 @@
--- HL Health Companion — Unified D1 Schema (Sprint 1–5 + S5X hardening)
+-- iSehat — Unified D1 Schema (Sprint 1–5 + S5X hardening)
 -- Target: Cloudflare D1 / SQLite
 -- R2 bucket: multi-apps-ai-bucket (binding LOGS)
 -- Queue: telegram-submit-summary (binding TELEGRAM_QUEUE)
@@ -1196,6 +1196,9 @@ CREATE INDEX IF NOT EXISTS idxHLPlanFeaturesFeature ON HL_planFeatures(featureCo
 CREATE INDEX IF NOT EXISTS idxHLSubscriptionsUserStatus ON HL_subscriptions(userId, status, currentPeriodEnd);
 CREATE INDEX IF NOT EXISTS idxHLSubscriptionsProvider ON HL_subscriptions(provider, providerSubscriptionId);
 CREATE INDEX IF NOT EXISTS idxHLPaymentEventsProvider ON HL_paymentEvents(provider, providerEventId);
+CREATE INDEX IF NOT EXISTS idxHLBillingCheckoutSessionsUser ON HL_billingCheckoutSessions(userId, createdAt);
+CREATE INDEX IF NOT EXISTS idxHLBillingCheckoutSessionsMerchantRef ON HL_billingCheckoutSessions(merchantRef);
+CREATE INDEX IF NOT EXISTS idxHLBillingCheckoutSessionsProviderCheckout ON HL_billingCheckoutSessions(provider, providerCheckoutId);
 CREATE INDEX IF NOT EXISTS idxHLUsageCountersUserFeature ON HL_usageCounters(userId, featureCode, usageWindow);
 CREATE INDEX IF NOT EXISTS idxHLFeatureFlagsEnabled ON HL_featureFlags(flagCode, enabled);
 CREATE INDEX IF NOT EXISTS idxHLConfigMetadataCategory ON HL_configMetadata(category, isSecret, active);

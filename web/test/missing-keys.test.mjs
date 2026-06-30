@@ -13,12 +13,20 @@ const LOCALES_DIR = join(__dirname, '..', 'src', 'i18n', 'locales')
 
 function extractRegisterCalls(content) {
   const calls = []
-  // Match registerTranslations('namespace', { ... }) — extract the object body
-  const regex = /registerTranslations\(\s*['"`]([^'"`]+)['"`]\s*,\s*\{([\s\S]*?)\}\s*\)/g
+  // Match registerTranslations('namespace', { ... }) or registerTranslations('namespace', VARIABLE)
+  const regex = /registerTranslations\(\s*['"`]([^'"`]+)['"`]\s*,\s*(?:\{([\s\S]*?)\}\s*\)|([A-Za-z_$][A-Za-z0-9_$]*)\s*\))/g
   let match
   while ((match = regex.exec(content)) !== null) {
     const namespace = match[1]
-    const body = match[2]
+    let body = match[2]
+    if (!body && match[3]) {
+      // Resolve variable reference: const NAME = { ... }
+      const varRegex = new RegExp(`(?:export\\s+)?const\\s+${match[3]}\\s*:\\s*[^=]+\\s*=\\s*\\{([\\s\\S]*?)\\}\\s*;?`, 'g')
+      const varMatch = varRegex.exec(content)
+      if (!varMatch) continue
+      body = varMatch[1]
+    }
+    if (!body) continue
     // Extract keys: keyName: { 'id-ID': '...', 'en-US': '...' }
     const keyRegex = /([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*\{\s*['"]id-ID['"]\s*:\s*['"`]([^'"`]*)['"`]\s*,\s*['"]en-US['"]\s*:\s*['"`]([^'"`]*)['"`]\s*\}/g
     let keyMatch

@@ -105,6 +105,13 @@
   font-weight: 700;
 }
 
+.popup-confirm-checkbox input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
+  accent-color: var(--colorPrimary);
+}
+
 .popup-actions {
   display: flex;
   flex-wrap: wrap;

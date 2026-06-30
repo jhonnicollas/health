@@ -1,5 +1,5 @@
 #!/bin/bash
-# E2E UAT Script for HL Health Companion Production
+# E2E UAT Script for iSehat Production
 # Usage: API=https://hl-health-companion.indiehomesungairaya.workers.dev ./e2e-uat.sh
 
 set -uo pipefail

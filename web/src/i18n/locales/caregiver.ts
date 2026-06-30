@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('caregiver', {
   eyebrow: { 'id-ID': 'Caregiver', 'en-US': 'Caregiver' },

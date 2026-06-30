@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, no-empty */
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useI18n, useMetricLabels, useSeverityLabels } from '../../i18n/useI18n'
 import { EducationBottomSheet } from '../../components/EducationBottomSheet'
 
 function ProgressRing({ percent, size = 96, stroke = 8 }: { percent: number; size?: number; stroke?: number }) {
@@ -32,6 +32,8 @@ function todayStr() { return new Date().toISOString().slice(0, 10) }
 export function DailyHealthHubPage() {
   const { user } = useAuth()
   const { t } = useI18n()
+  const ml = useMetricLabels()
+  const sl = useSeverityLabels()
   const [date, setDate] = useState(todayStr())
   const [data, setData] = useState<any>(null)
   const [hydration, setHydration] = useState<any>(null)
@@ -116,11 +118,11 @@ export function DailyHealthHubPage() {
                       <div className="vital-info">
                         <span className="material-symbols-outlined" style={{ color: m.color }}>{m.icon}</span>
                         <div>
-                          <p className="vital-label">{m.labelKey ? t(m.labelKey) : m.metricCode}</p>
+                          <p className="vital-label">{m.labelKey ? t(m.labelKey) : (ml[m.metricCode] || m.metricCode)}</p>
                           <p className="vital-value">{m.finalValue} <span>{m.unit}</span></p>
                         </div>
                       </div>
-                      <span className="pill" style={{ background: `${m.color}15`, color: m.color, borderColor: `${m.color}40` }}>{m.status || 'Normal'}</span>
+                      <span className="pill" style={{ background: `${m.color}15`, color: m.color, borderColor: `${m.color}40` }}>{sl[m.severity] || m.status || 'Normal'}</span>
                     </div>
                   ))}
                 </div>

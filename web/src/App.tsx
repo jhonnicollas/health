@@ -13,7 +13,8 @@ import { UpgradePrompt } from './components/UpgradePrompt'
 import { WelcomeWizard } from './components/WelcomeWizard'
 import { ToastProvider } from './components/Toast'
 import { LanguageSwitcher } from './components/i18n/LanguageSwitcher'
-import { I18nProvider, useI18n } from './i18n'
+import { I18nProvider } from './i18n'
+import { useI18n, useMetricLabels } from './i18n/useI18n'
 import './i18n/locales/common'
 import './i18n/locales/errors'
 import './i18n/locales/auth'
@@ -67,7 +68,22 @@ import { BillingSuccessPage } from './pages/billing/BillingSuccessPage'
 import { BillingCancelPage } from './pages/billing/BillingCancelPage'
 import { MockCheckoutPage } from './pages/billing/MockCheckoutPage'
 import { BillingSettingsPage } from './pages/billing/BillingSettingsPage'
-import './App.css'
+import './styles/base.css'
+import './styles/layout.css'
+import './styles/components.css'
+import './styles/pages/device-selector.css'
+import './styles/pages/measurement.css'
+import './styles/pages/ai.css'
+import './styles/pages/dashboard.css'
+import './styles/pages/admin.css'
+import './styles/pages/hydration.css'
+import './styles/pages/daily-health.css'
+import './styles/pages/telegram.css'
+import './styles/pages/symptom.css'
+import './styles/pages/cycle.css'
+import './styles/pages/welcome.css'
+import './styles/utilities.css'
+import './styles/theme.css'
 import { useEntitlements } from './hooks/useEntitlements'
 import { formatDateTimeShort } from './utils/dateFormat'
 
@@ -230,7 +246,8 @@ function AppRoutes() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<NavLink[]>([])
-  const [notifData, setNotifData] = useState<any[]>([])
+  type Notif = { id: string; acknowledged?: boolean; severity: string; metricCode: string; message: string; createdAt: string }
+  const [notifData, setNotifData] = useState<Notif[]>([])
   const notifCount = notifData.filter(a => !a.acknowledged).length
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
   const notifRef = useRef<HTMLDivElement | null>(null)
@@ -238,6 +255,7 @@ function AppRoutes() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['nav.dashboard', 'nav.reports', 'nav.healthTracking']))
   const [showWizard, setShowWizard] = useState(() => { try { return localStorage.getItem('hl-welcome-seen') !== 'true' } catch { return false } })
   const { t } = useI18n()
+  const ml = useMetricLabels()
 
   function toggleSidebar() {
     setSidebarCollapsed((prev) => {
@@ -343,7 +361,7 @@ function AppRoutes() {
         <div className="sidebar-brand">
           <div className="sidebar-brand-row">
             <span className="sidebar-brand-icon"><Icon name="local_hospital" className="fill" /></span>
-            {!sidebarCollapsed && <div><h1>HealthSync Pro</h1></div>}
+            {!sidebarCollapsed && <div><h1>iSehat</h1></div>}
           </div>
           <button className="sidebar-collapse-btn" onClick={toggleSidebar} type="button" aria-label={sidebarCollapsed ? t('nav.expand') : t('nav.collapse')}>
             <Icon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} />
@@ -412,7 +430,7 @@ function AppRoutes() {
         <div className="mobile-topbar">
           <div className="mobile-topbar-brand">
             <span className="sidebar-brand-icon mobile-brand-icon"><Icon name="health_and_safety" className="fill" /></span>
-            <h1>HealthSync Pro</h1>
+            <h1>iSehat</h1>
           </div>
           <div className="mobile-topbar-actions">
             <button type="button" aria-label="Notifications" onClick={() => setNotifOpen(o => !o)}><Icon name="notifications" /></button>
@@ -451,8 +469,8 @@ function AppRoutes() {
               ))}
             </div>
             <div className="topbar-notif-wrap" ref={notifRef}>
-              <button className="topbar-icon-btn has-alert" onClick={() => { setNotifOpen(o => !o); if (!notifOpen) void (async () => { try { const r = await fetch('/api/alerts?limit=5', { credentials: 'include' }); const j = await r.json(); if (j.success) setNotifData(j.data?.alerts || []); } catch { /* ignore */ } })() }} type="button"><Icon name="notifications" />{notifCount > 0 && <span className="notif-badge">{notifCount}</span>}</button>
-              {notifOpen && <div className="notif-dropdown"><div className="notif-header">{t('nav.notifLatest')}</div>{notifData.length === 0 ? <div className="notif-empty">{t('nav.notifEmpty')}</div> : <div className="notif-list">{notifData.map((a) => { const dt = formatDateTimeShort(a.createdAt); return <div key={a.id} className={`notif-item severity-${a.severity}`}><span className="material-symbols-outlined notif-icon">{a.severity === 'critical' ? 'error' : 'warning'}</span><div><strong>{a.metricCode}</strong><p>{a.message}</p><small>{dt.date} {dt.time}</small></div></div> })}</div>}</div>}
+              <button className="topbar-icon-btn has-alert" onClick={() => { setNotifOpen(o => !o); if (!notifOpen) void (async () => { try { const r = await fetch('/api/alerts?limit=5', { credentials: 'include' }); const j = await r.json(); if (j.success) setNotifData((j.data?.alerts || []) as Notif[]); } catch { /* ignore */ } })() }} type="button"><Icon name="notifications" />{notifCount > 0 && <span className="notif-badge">{notifCount}</span>}</button>
+              {notifOpen && <div className="notif-dropdown"><div className="notif-header">{t('nav.notifLatest')}</div>{notifData.length === 0 ? <div className="notif-empty">{t('nav.notifEmpty')}</div> : <div className="notif-list">{notifData.map((a) => { const dt = formatDateTimeShort(a.createdAt); return <div key={a.id} className={`notif-item severity-${a.severity}`}><span className="material-symbols-outlined notif-icon">{a.severity === 'critical' ? 'error' : 'warning'}</span><div><strong>{ml[a.metricCode] || a.metricCode}</strong><p>{a.message}</p><small>{dt.date} {dt.time}</small></div></div> })}</div>}</div>}
             </div>
             <div className="topbar-user-wrap" ref={userMenuRef}>
               <button className="topbar-user" onClick={() => setUserMenuOpen(o => !o)} type="button" aria-label={`User menu for ${user.displayName}`}>

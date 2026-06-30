@@ -1,0 +1,220 @@
+
+/* Cycle Page */
+.cycle-page .cycle-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (min-width: 640px) { .cycle-page .cycle-header { flex-direction: row; align-items: flex-start; justify-content: space-between; } }
+.cycle-page .cycle-header h2 { margin: 0; font-size: 1.5rem; font-weight: 900; }
+.cycle-page .cycle-header .eyebrow { margin: 0 0 4px; font-size: 12px; font-weight: 800; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.16em; }
+.cycle-page .cycle-header .subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary, #6b7280); }
+.cycle-page .private-pill { background: #ede9fe; color: #7c3aed; border-color: #c4b5fd; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
+.cycle-page .private-pill .material-symbols-outlined { font-size: 14px; }
+
+.cycle-page .cycle-pause-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  margin-bottom: 16px;
+}
+.cycle-page .cycle-pause-banner p { margin: 0; font-size: 13px; }
+
+.cycle-page .cycle-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 1024px) { .cycle-page .cycle-grid { grid-template-columns: 1fr 340px; align-items: start; } }
+
+.cycle-page .cycle-calendar-card {
+  background: #fff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.cycle-page .cycle-calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+.cycle-page .cycle-calendar-toolbar button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary, #6b7280);
+}
+.cycle-page .cycle-calendar-toolbar button:hover { background: #f3f4f6; }
+.cycle-page .cycle-calendar-title { text-align: center; }
+.cycle-page .cycle-calendar-title .month-name { margin: 0; font-weight: 900; font-size: 16px; }
+.cycle-page .cycle-calendar-title .cycle-status { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary, #6b7280); }
+
+.cycle-page .cycle-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: #f8fafc;
+  padding: 8px 0;
+}
+.cycle-page .cycle-weekdays div { font-size: 12px; font-weight: 800; color: var(--text-secondary, #6b7280); }
+
+.cycle-page .cycle-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 8px;
+}
+.cycle-page .cycle-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: #f8fafc;
+  cursor: pointer;
+  padding: 4px;
+  min-height: 58px;
+}
+.cycle-page .cycle-day.empty { background: transparent; cursor: default; }
+.cycle-page .cycle-day .day-number { font-size: 13px; font-weight: 600; color: var(--text-primary, #111827); }
+.cycle-page .cycle-day .day-dot { width: 6px; height: 6px; border-radius: 50%; margin: 3px 0; }
+.cycle-page .cycle-day .day-label { font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.cycle-page .cycle-day.period { background: #fee2e2; }
+.cycle-page .cycle-day.period .day-number { color: #dc2626; font-weight: 900; }
+.cycle-page .cycle-day.period .day-label { color: #dc2626; }
+.cycle-page .cycle-day.fertile { background: #ffedd5; }
+.cycle-page .cycle-day.fertile .day-number { color: #c2410c; font-weight: 900; }
+.cycle-page .cycle-day.fertile .day-label { color: #c2410c; }
+.cycle-page .cycle-day.ovulation { background: #fce7f3; }
+.cycle-page .cycle-day.ovulation .day-number { color: #be185d; font-weight: 900; }
+.cycle-page .cycle-day.ovulation .day-label { color: #be185d; }
+.cycle-page .cycle-day.today { border: 2px solid #7c3aed; }
+.cycle-page .cycle-day.selected { box-shadow: 0 0 0 2px #a78bfa; }
+
+.cycle-page .cycle-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+.cycle-page .cycle-legend span { display: flex; align-items: center; gap: 5px; }
+.cycle-page .cycle-legend .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+.cycle-page .cycle-side-panel { display: flex; flex-direction: column; gap: 16px; }
+.cycle-page .cycle-status-card {
+  background: #ede9fe;
+  border: 1px solid #c4b5fd;
+  border-radius: 14px;
+  padding: 18px;
+}
+.cycle-page .cycle-status-card .status-label { margin: 0; font-size: 13px; font-weight: 800; text-transform: uppercase; color: #7c3aed; }
+.cycle-page .cycle-status-card .status-title { margin: 6px 0 0; font-size: 18px; font-weight: 900; color: #7c3aed; }
+.cycle-page .cycle-status-card .status-note { margin: 6px 0 0; font-size: 13px; color: var(--text-secondary, #6b7280); }
+.cycle-page .cycle-status-card .guardrail-btn {
+  margin-top: 12px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: 1px solid #fbbf24;
+  background: #fef3c7;
+  color: #78350f;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.cycle-page .cycle-log-card {
+  background: #fff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 18px;
+}
+.cycle-page .cycle-log-card h3 { margin: 0 0 12px; font-size: 16px; font-weight: 900; }
+.cycle-page .cycle-log-card .selected-date { margin: 0 0 12px; font-weight: 700; color: #7c3aed; }
+.cycle-page .cycle-log-card label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 12px; color: var(--text-secondary, #4b5563); }
+.cycle-page .cycle-log-card select,
+.cycle-page .cycle-log-card textarea {
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  font-size: 14px;
+  font-family: inherit;
+}
+.cycle-page .cycle-log-card textarea { resize: vertical; }
+.cycle-page .cycle-log-card .mood-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.cycle-page .cycle-log-card .mood-chips .chip {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: #f3f4f6;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.cycle-page .cycle-log-card .mood-chips .chip:hover { background: #e5e7eb; }
+.cycle-page .cycle-log-card .save-log-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: var(--primary, #004bca);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.cycle-page .cycle-log-card .hint { color: var(--text-muted, #9ca3af); font-size: 13px; margin: 0; }
+
+.cycle-page .cycle-guardrail-card {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  padding: 18px;
+}
+.cycle-page .cycle-guardrail-card .guardrail-title { margin: 0 0 6px; font-weight: 900; color: #dc2626; }
+.cycle-page .cycle-guardrail-card p { margin: 0 0 12px; font-size: 13px; color: #7f1d1d; }
+.cycle-page .cycle-guardrail-card .settings-link {
+  background: none;
+  border: none;
+  color: #7c3aed;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.cycle-page .cycle-settings label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.cycle-page .cycle-settings input[type="number"],
+.cycle-page .cycle-settings input[type="date"] {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+.cycle-page .cycle-settings .checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cycle-page .cycle-settings .checkbox-row input { width: auto; }
+
+.cycle-page .guardrail-modal h3 { color: #dc2626; margin: 0 0 12px; }
+.cycle-page .guardrail-modal p { line-height: 1.6; }

@@ -1,4 +1,4 @@
-# ARCHITECTURE — HL Health Companion
+# ARCHITECTURE — iSehat
 
 > **Dokumen ini dibuat berdasarkan audit langsung terhadap source code di repo (worker/, web/, docs/03.SQL_SCHEMA_*, docs_sprint5/04.SQL_SEED_*, worker/migrations/*).**
 > Status: **Sprint 1–5 selesai, Sprint 5F (foundation hardening) & S5X (auth/billing/i18n) delivered, Sprint 6 AI Clinical Copilot di-defer.**
@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-HL Health Companion adalah aplikasi kesehatan digital yang berjalan 100% di stack Cloudflare. Pengguna dapat:
+iSehat adalah aplikasi kesehatan digital yang berjalan 100% di stack Cloudflare. Pengguna dapat:
 
 1. Login (email/password lokal, OTP email, OAuth Google) lalu menyelesaikan onboarding profile.
 2. Mengukur tanda vital (tekanan darah, glukosa, kolesterol, asam urat, SpO2, berat, dll) lewat foto, upload, atau input manual.
@@ -625,13 +625,10 @@ Sprint 5C **TIDAK** membangun AI Clinical Copilot runtime. Flag `clinicalCopilot
 3. npm test
 4. wrangler d1 execute isehat_db --remote --file=../docs/07-schema.sql
 5. wrangler d1 execute isehat_db --remote --file=../docs/08-seed.sql
-6. wrangler d1 execute isehat_db --remote --file=../docs/03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
-7. wrangler d1 execute isehat_db --remote --file=../docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
-8. wrangler d1 execute isehat_db --remote --file=./migrations/001_s5x_auth_email_otp.sql
-9. wrangler d1 execute isehat_db --remote --file=./migrations/002_s5x_whatsapp_profile.sql
-10. wrangler d1 execute isehat_db --remote --command="PRAGMA foreign_key_check;"
-11. wrangler deploy
-12. cd ../web && npm run build && wrangler pages deploy dist
+6. wrangler d1 execute isehat_db --remote --file=../docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+7. wrangler d1 execute isehat_db --remote --command="PRAGMA foreign_key_check;"
+8. wrangler deploy
+9. cd ../web && npm run build && wrangler pages deploy dist
 ```
 
 Deployed URLs:

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { formatDateTimeShort } from '../../utils/dateFormat'
+import { useMetricLabels } from '../../i18n/useI18n'
 
 type AlertItem = {
   id: number
@@ -37,6 +38,7 @@ type ApiResp<T> = {
 type AlertTab = 'alerts' | 'telegram'
 
 export function AlertsPage() {
+  const ml = useMetricLabels()
   const [alerts, setAlerts] = useState<AlertItem[]>([])
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [activeTab, setActiveTab] = useState<AlertTab>('alerts')
@@ -107,11 +109,11 @@ export function AlertsPage() {
     <section className="settings-panel alerts-center" aria-labelledby="alerts-title">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Notifications</p>
-          <h2 id="alerts-title">Inbox &amp; Alerts Center</h2>
-          <p>Rule-based alerts and notification delivery logs in one control center.</p>
+          <p className="eyebrow">Notifikasi</p>
+          <h2 id="alerts-title">Kotak Masuk & Pusat Peringatan</h2>
+          <p>Peringatan berbasis rule dan log pengiriman notifikasi dalam satu pusat kendali.</p>
         </div>
-        <span className="status-chip">{alerts.length} alerts</span>
+        <span className="status-chip">{alerts.length} peringatan</span>
       </div>
 
       <div className="alerts-tabs" role="tablist" aria-label="Alerts / Telegram">
@@ -123,7 +125,7 @@ export function AlertsPage() {
           onClick={() => setActiveTab('alerts')}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 6 }}>notifications_active</span>
-          Emergency Alerts
+          Peringatan Darurat
         </button>
         <button
           type="button"
@@ -133,7 +135,7 @@ export function AlertsPage() {
           onClick={() => setActiveTab('telegram')}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: 'middle', marginRight: 6 }}>send</span>
-          Telegram Log
+          Log Telegram
         </button>
       </div>
 
@@ -141,7 +143,7 @@ export function AlertsPage() {
 
       {activeTab === 'alerts' ? (
         <div className="settings-card">
-          <h3>Rule Alerts</h3>
+          <h3>Peringatan Rule</h3>
           {alertsLoading ? <p className="muted">Memuat alert...</p> : null}
           {!alertsLoading && alerts.length === 0 ? <p>Tidak ada alert untuk filter ini.</p> : null}
           {alerts.length > 0 ? (
@@ -151,15 +153,15 @@ export function AlertsPage() {
                 return (
                   <li key={alert.id} className={`alert-item severity-${alert.severity}`}>
                     <div>
-                      <strong>{alert.metricCode}</strong>: {alert.message}
+                      <strong>{ml[alert.metricCode] || alert.metricCode}</strong>: {alert.message}
                       <div className="muted">
-                        Value {alert.finalValue} {alert.unit} · {dt.date} {dt.time}
+                        Nilai {alert.finalValue} {alert.unit} · {dt.date} {dt.time}
                       </div>
                     </div>
                     {alert.acknowledged === true || alert.acknowledged === 1 ? (
-                      <span className="badge-status badge-normal"><span className="status-dot" />Acknowledged</span>
+                      <span className="badge-status badge-normal"><span className="status-dot" />Diketahui</span>
                     ) : (
-                      <button onClick={() => void acknowledge(alert.id)} type="button">Acknowledge</button>
+                      <button onClick={() => void acknowledge(alert.id)} type="button">Terima</button>
                     )}
                   </li>
                 )
@@ -169,7 +171,7 @@ export function AlertsPage() {
         </div>
       ) : (
         <div className="settings-card">
-          <h3>Telegram Delivery Timeline</h3>
+          <h3>Linimasa Pengiriman Telegram</h3>
           {telegramLoading ? <p className="muted">Memuat log Telegram...</p> : null}
           {!telegramLoading && notifications.length === 0 ? <p>Tidak ada log notifikasi Telegram.</p> : null}
           {notifications.length > 0 ? (

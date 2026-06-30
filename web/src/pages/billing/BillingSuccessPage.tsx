@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 export function BillingSuccessPage({ onNavigate }: { onNavigate?: (path: string) => void }) {
   const { user } = useAuth()

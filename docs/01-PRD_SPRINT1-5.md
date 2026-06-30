@@ -1,4 +1,4 @@
-# PRODUCT REQUIREMENTS DOCUMENT — HL Health Companion
+# PRODUCT REQUIREMENTS DOCUMENT — iSehat
 ## Sprint 1–5 Full Scope (Foundation + 5A + 5B + 5C + 5D + 5E + 5F/X)
 
 > **Sumber: audit langsung ke source code (`worker/src/*`, `web/src/*`, `docs/07-schema.sql`, `docs/03.SQL_SCHEMA_SPRINT5_FINAL_…`, `docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_…`).**
@@ -9,7 +9,7 @@
 
 ## 1. Product Vision & Mission
 
-**Nama produk:** HL Health Companion (UI brand: HealthSync Pro)
+**Nama produk:** iSehat
 
 **Vision:**
 Membantu pengguna — terutama orang dewasa di Indonesia dan keluarganya — mencatat, memahami, dan mengelola tanda-tanda vital kesehatan harian secara aman, dengan bantuan AI vision, aturan medis deterministik, dan dukungan caregiver/keluarga.

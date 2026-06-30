@@ -1,8 +1,8 @@
 {
-  "name": "hl-health-companion",
+  "name": "isehat",
   "private": true,
   "version": "1.0.0",
-  "description": "HL Health Companion - PWA & Hono Worker",
+  "description": "iSehat - PWA & Hono Worker",
   "workspaces": [
     "web",
     "worker"

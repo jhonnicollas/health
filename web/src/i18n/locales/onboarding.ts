@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('onboarding', {
   eyebrow: { 'id-ID': 'Profil kesehatan', 'en-US': 'Health profile' },

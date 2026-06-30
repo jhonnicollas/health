@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatDateID } from '../../utils/dateFormat'
-import { useI18n } from '../../i18n'
+import { useI18n, useMetricLabels } from '../../i18n/useI18n'
 
 type MetricSummary = { metricCode: string; avgValue: number; minValue: number; maxValue: number; cnt: number }
 type DaySummary = { day: string; sessionCount: number }
@@ -13,26 +13,9 @@ type MonthlyPayload = {
   latest: LatestMetric[]
 }
 
-const METRIC_LABELS: Record<string, string> = {
-  spo2: 'SpO2',
-  heartRate: 'Heart Rate',
-  systolic: 'Systolic',
-  diastolic: 'Diastolic',
-  bloodPressurePulse: 'Pulse',
-  glucoseFasting: 'Fasting Glucose',
-  glucosePostMeal: 'Post-Meal Glucose',
-  cholesterolTotal: 'Total Cholesterol',
-  uricAcid: 'Uric Acid',
-  bodyWeight: 'Body Weight',
-  bmi: 'BMI',
-  waistCircumference: 'Waist',
-  bodyTemperature: 'Body Temp',
-  sleepDuration: 'Sleep',
-  height: 'Height'
-}
-
 export function MonthlyDashboard() {
   const { t } = useI18n()
+  const METRIC_LABELS = useMetricLabels()
   const [metrics, setMetrics] = useState<MetricSummary[]>([])
   const [measurementDays, setMeasurementDays] = useState(0)
   const [alertCount, setAlertCount] = useState(0)
@@ -52,7 +35,7 @@ export function MonthlyDashboard() {
           setDaily(d.data.daily)
           setLatest(d.data.latest)
         } else {
-          setError(d.error?.message ?? 'Failed to load monthly dashboard.')
+          setError(d.error?.message ?? 'Gagal memuat dashboard bulanan.')
         }
       })
       .catch(e => setError(String(e)))
@@ -83,9 +66,9 @@ export function MonthlyDashboard() {
           <div className="stat-label">{t('dashboard.last30Days')}</div>
         </div>
         <div className="stat-card">
-          <span className="stat-kicker">Latest Metrics</span>
+          <span className="stat-kicker">Metrik Terbaru</span>
           <div className="stat-value">{latest.length}</div>
-          <div className="stat-label">recent entries</div>
+          <div className="stat-label">entri terbaru</div>
         </div>
       </div>
 
@@ -112,7 +95,7 @@ export function MonthlyDashboard() {
               </div>
               <div className="vital-reading-row">
                 <span className="vital-reading">{m.avgValue?.toFixed(1)}</span>
-                <span className="vital-unit">avg</span>
+                <span className="vital-unit">rata-rata</span>
               </div>
               <div className="vital-comparison-rows">
                 <div className="vital-comparison-row">
@@ -120,11 +103,11 @@ export function MonthlyDashboard() {
                   <span>{m.minValue}</span>
                 </div>
                 <div className="vital-comparison-row">
-                  <span>Max</span>
+                  <span>Maks</span>
                   <span>{m.maxValue}</span>
                 </div>
                 <div className="vital-comparison-row">
-                  <span>Readings</span>
+                  <span>Pembacaan</span>
                   <span>{m.cnt}</span>
                 </div>
               </div>

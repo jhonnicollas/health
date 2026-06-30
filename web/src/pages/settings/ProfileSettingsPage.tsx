@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { FormEvent } from 'react'
-import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useAuth, type Profile } from '../../context/auth'
+import { useI18n } from '../../i18n/useI18n'
+
+type ProfileFull = NonNullable<Profile> & { [key: string]: unknown }
 
 type ProfileSettingsResponse = {
   success: boolean
@@ -76,12 +78,13 @@ export function ProfileSettingsPage() {
   const { profile, refresh, user, requiresOnboarding, setAuthenticated } = useAuth()
   const { t } = useI18n()
 
+  const pf = (profile ?? {}) as ProfileFull
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
-  const [sex, setSex] = useState((profile as any)?.sex ?? 'male')
-  const [birthDate, setBirthDate] = useState((profile as any)?.birthDate ?? '')
+  const [sex, setSex] = useState(pf.sex ?? 'male')
+  const [birthDate, setBirthDate] = useState(pf.birthDate ?? '')
   const [heightCm, setHeightCm] = useState(profile?.heightCm?.toString() ?? '')
   const [timezone, setTimezone] = useState(profile?.timezone ?? 'Asia/Jakarta')
-  const [whatsappNumber, setWhatsappNumber] = useState((profile as any)?.whatsappNumber ?? '')
+  const [whatsappNumber, setWhatsappNumber] = useState(pf.whatsappNumber ?? '')
 
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
@@ -93,16 +96,7 @@ export function ProfileSettingsPage() {
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState('')
 
-  useEffect(() => {
-    if (user) setDisplayName(user.displayName ?? '')
-    if (profile) {
-      setHeightCm(profile.heightCm?.toString() ?? '')
-      setTimezone(profile.timezone ?? 'Asia/Jakarta')
-      setSex((profile as any)?.sex ?? 'male')
-      setBirthDate((profile as any)?.birthDate ?? '')
-      setWhatsappNumber((profile as any)?.whatsappNumber ?? '')
-    }
-  }, [user, profile])
+  const formKey = useMemo(() => `${user?.displayName ?? ''}-${pf.sex ?? ''}-${pf.birthDate ?? ''}-${profile?.heightCm ?? ''}-${profile?.timezone ?? ''}-${pf.whatsappNumber ?? ''}`, [user, profile])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -121,8 +115,8 @@ export function ProfileSettingsPage() {
         body: JSON.stringify({
           heightCm: Number(heightCm),
           timezone,
-          theme: (profile as any)?.theme ?? 'light',
-          accessibilityMode: (profile as any)?.accessibilityMode ?? 'normal',
+          theme: pf.theme ?? 'light',
+          accessibilityMode: pf.accessibilityMode ?? 'normal',
           sex,
           birthDate,
           displayName,
@@ -153,7 +147,7 @@ export function ProfileSettingsPage() {
             birthDate,
             displayName,
             whatsappNumber: whatsappNumber || null
-          } as any
+          } as ProfileFull
         })
       }
       void refresh()
@@ -205,7 +199,7 @@ export function ProfileSettingsPage() {
             </h3>
             <p style={{ font: 'var(--typBodySm)', color: 'var(--colorTextSecondary)', marginBottom: 20 }}>Update your name, demographics, and clinical identifiers.</p>
 
-            <form onSubmit={handleSubmit}>
+            <form key={formKey} onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
                 <div>
                   <label style={{ font: 'var(--typLabelSm)', color: 'var(--colorTextSecondary)', display: 'block', marginBottom: 4 }}>Display Name</label>

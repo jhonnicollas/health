@@ -15,21 +15,21 @@ export type WatermarkedImage = {
   height: number
 }
 
-const FALLBACK_APP_NAME = 'HL Health Companion'
+const FALLBACK_APP_NAME = 'iSehat'
 
 const METRIC_LABELS: Record<string, string> = {
-  spo2: 'SpO2',
-  heartRate: 'Heart Rate',
+  spo2: 'SpO₂',
+  heartRate: 'Denyut Jantung',
   systolic: 'Sistolik',
   diastolic: 'Diastolik',
-  bloodPressurePulse: 'Nadi',
+  bloodPressurePulse: 'Pulse Tensimeter',
   glucoseFasting: 'Gula Darah Puasa',
   glucosePostMeal: 'Gula Darah 2 Jam PP',
   cholesterolTotal: 'Kolesterol Total',
   uricAcid: 'Asam Urat',
   bodyWeight: 'Berat Badan',
   bmi: 'BMI',
-  waistCircumference: 'Lingkar Pinggang',
+  waistCircumference: 'Lingkar Perut',
   bodyTemperature: 'Suhu Tubuh',
   sleepDuration: 'Durasi Tidur',
   height: 'Tinggi Badan'

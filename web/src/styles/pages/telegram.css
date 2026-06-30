@@ -1,0 +1,38 @@
+
+/* Telegram Page */
+.telegram-page .telegram-header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+@media (min-width: 768px) { .telegram-page .telegram-header { flex-direction: row; align-items: flex-start; justify-content: space-between; } }
+.telegram-page .telegram-header h2 { margin: 0; font-size: 1.5rem; font-weight: 900; }
+.telegram-page .telegram-header .eyebrow { margin: 0 0 4px; font-size: 12px; font-weight: 800; color: var(--text-secondary, #6b7280); text-transform: uppercase; letter-spacing: 0.16em; }
+.telegram-page .telegram-header .subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary, #6b7280); }
+.telegram-page .pill { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border, #e5e7eb); font-size: 12px; font-weight: 700; }
+.telegram-page .pill.success { background: rgba(16,185,129,.1); color: #047857; border-color: rgba(16,185,129,.3); }
+.telegram-page .pill.muted { background: #f3f4f6; color: var(--text-secondary, #6b7280); }
+.telegram-page .telegram-connect-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 768px) { .telegram-page .telegram-connect-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .telegram-page .telegram-connect-grid { grid-template-columns: repeat(3, 1fr); } }
+.telegram-page .tg-card { background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 16px; padding: 18px; }
+.telegram-page .tg-card h3 { margin: 0 0 10px; font-size: 15px; font-weight: 900; }
+.telegram-page .tg-card p { margin: 0 0 10px; font-size: 13px; color: var(--text-secondary, #6b7280); }
+.telegram-page .tg-card .tg-hint { font-size: 12px; color: var(--text-muted, #9ca3af); font-style: italic; }
+.telegram-page .tg-primary { width: 100%; padding: 12px; border-radius: 12px; border: none; background: var(--primary, #111827); color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; }
+.telegram-page .tg-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.telegram-page .tg-code { display: inline-block; padding: 10px 16px; border-radius: 10px; background: #f3f4f6; font-size: 18px; font-weight: 900; letter-spacing: 0.08em; }
+.telegram-page .tg-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.telegram-page .tg-field span { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary, #6b7280); }
+.telegram-page .tg-field input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border, #e5e7eb); font-size: 13px; }
+.telegram-page .telegram-linked { margin-bottom: 16px; }
+.telegram-page .telegram-demo-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 768px) { .telegram-page .telegram-demo-grid { grid-template-columns: minmax(280px, .9fr) 1fr; } }
+.telegram-page .tg-message { background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 20px; padding: 18px; }
+.telegram-page .tg-msg-title { margin: 0 0 6px; font-size: 14px; font-weight: 800; }
+.telegram-page .tg-msg-body { margin: 0 0 14px; font-size: 13px; color: var(--text-secondary, #6b7280); }
+.telegram-page .tg-msg-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.telegram-page .tg-action { padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 800; border: 1px solid var(--border, #e5e7eb); cursor: default; }
+.telegram-page .tg-action.primary { background: #0369a1; color: #fff; border-color: #0369a1; }
+.telegram-page .tg-action.secondary { background: #fff; color: var(--text-primary, #111827); }
+.telegram-page .tg-security-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 768px) { .telegram-page .tg-security-grid { grid-template-columns: repeat(2, 1fr); } }
+.telegram-page .tg-security-item { background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 14px; }
+.telegram-page .tg-s-title { margin: 0 0 4px; font-size: 13px; font-weight: 900; }
+.telegram-page .tg-s-body { margin: 0; font-size: 12px; color: var(--text-secondary, #6b7280); }

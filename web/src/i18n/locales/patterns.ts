@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('patterns', {
   eyebrow: { 'id-ID': 'Wawasan', 'en-US': 'Insights' },

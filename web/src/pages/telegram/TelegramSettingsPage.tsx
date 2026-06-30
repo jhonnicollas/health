@@ -1,4 +1,4 @@
-/* eslint-disable no-empty */
+ 
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/auth'
 

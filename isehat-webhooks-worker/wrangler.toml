@@ -1,0 +1,38 @@
+name = "isehat-webhooks-worker"
+main = "src/index.ts"
+compatibility_date = "2026-06-20"
+workers_dev = true
+
+# Worker #4 — Sprint 6G onwards.
+# Source of truth: docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md §6.2 Worker #4 scope +
+# docs_sprint6/WHATSAPP_BAILEYS_ARCHITECTURE.md §5.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "isehat_db"
+database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
+
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "multi-apps-ai-bucket"
+
+# Service Bindings OUT — Worker #4 forwards webhooks to internal workers.
+# Names match PRD §6.4 Service Binding Matrix.
+[[services]]
+binding = "API_SERVICE"
+service = "isehat-api-worker"
+
+[[services]]
+binding = "AI_SERVICE"
+service = "isehat-ai-worker"
+
+[[services]]
+binding = "JOBS_SERVICE"
+service = "isehat-jobs-worker"
+
+# CRON_SECRET used by VPS Baileys gateway health probe POST every 5 min.
+# Set via: wrangler secret put CRON_SECRET
+# Set via: wrangler secret put WA_GATEWAY_SECRET  (Baileys VPS shared with this Worker)
+# Set via: wrangler secret put XENDIT_WEBHOOK_SECRET (Xendit signed webhook verify)
+# Set via: wrangler secret put TELEGRAM_BOT_TOKEN  (Telegram update webhook)
+# (Variables commented — the Workers runtime does not allow secrets in [vars] for safety.)

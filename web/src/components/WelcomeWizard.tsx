@@ -1,6 +1,6 @@
-/* eslint-disable react-hooks/set-state-in-effect */
+ 
 import { useState } from 'react'
-import { useI18n } from '../i18n'
+import { useI18n } from '../i18n/useI18n'
 
 const STEPS = [
   { icon: 'dashboard', color: '#10b981' },

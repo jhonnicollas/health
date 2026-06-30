@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useToast } from '../../components/Toast'
 import { useAuth } from '../../context/auth'
-import { useI18n } from '../../i18n'
+import { useI18n } from '../../i18n/useI18n'
 
 type ManualStep = { text: string }
 type ManualSection = {

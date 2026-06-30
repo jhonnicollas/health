@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('kb', {
   // Knowledge base
@@ -46,7 +46,7 @@ registerTranslations('kb', {
   // Manual
   manualEyebrow: { 'id-ID': 'Panduan', 'en-US': 'Guide' },
   manualTitle: { 'id-ID': 'Manual Pengguna', 'en-US': 'User Manual' },
-  manualSubtitle: { 'id-ID': 'Panduan lengkap untuk setiap fitur HealthSync — ikuti langkah demi langkah untuk memaksimalkan manfaat aplikasi.', 'en-US': 'Complete guide for every HealthSync feature — follow step by step to maximize the app.' },
+  manualSubtitle: { 'id-ID': 'Panduan lengkap untuk setiap fitur iSehat — ikuti langkah demi langkah untuk memaksimalkan manfaat aplikasi.', 'en-US': 'Complete guide for every iSehat feature — follow step by step to maximize the app.' },
   manualSections: { 'id-ID': 'bagian', 'en-US': 'sections' },
   tableOfContents: { 'id-ID': 'Daftar Isi', 'en-US': 'Table of Contents' },
   manualIntro: { 'id-ID': 'Panduan ini menjelaskan setiap fitur secara bertahap. Pilih topik di daftar isi untuk melompat ke bagian terkait.', 'en-US': 'This guide explains each feature step by step. Select a topic in the table of contents to jump to the relevant section.' },

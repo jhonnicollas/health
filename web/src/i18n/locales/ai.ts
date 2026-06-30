@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('ai', {
   assistantTitle: { 'id-ID': 'Safe Health Chat', 'en-US': 'Safe Health Chat' },

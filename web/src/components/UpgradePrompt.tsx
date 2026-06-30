@@ -1,4 +1,4 @@
-import { useI18n } from '../i18n'
+import { useI18n } from '../i18n/useI18n'
 
 export function UpgradePrompt({ feature, onNavigate }: { feature: string; onNavigate: (path: string) => void }) {
   const { t } = useI18n()

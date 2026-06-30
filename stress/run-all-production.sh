@@ -5,7 +5,7 @@ OUTDIR="stress-results-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUTDIR"
 
 echo "=========================================="
-echo " HL Health Companion — Production Stress Test"
+echo " iSehat — Production Stress Test"
 echo " Target: $BASE_URL"
 echo " Output: $OUTDIR"
 echo " Started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
