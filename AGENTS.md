@@ -1,6 +1,6 @@
 # AGENTS.md — Sprint 5 Compact AI-Agent Rules
 
-Product: HL Health Companion  
+Product: iSehat  
 Scope: Sprint 5 Foundation + 5A + 5B + 5C + 5D + 5E  
 Mode: compact, resume-safe, vibe-coding safe  
 Status: use this file as the runtime rulebook for coding agents.
@@ -275,13 +275,13 @@ If old pre-Sprint-5 logs exist, archive them outside the active context. Do not 
 First run prompt:
 
 ```text
-Implement HL Health Companion Sprint 5. Read AGENTS.md, HANDOFF.md, latest WORK_LOG.md, and only the current task section from docs_sprint5/08.TASK_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL.md. Start with the task shown in HANDOFF.md only. Complete exactly one task cycle at a time. Follow TDD, run validation, update WORK_LOG.md and HANDOFF.md, then continue to the next READY task/phase automatically until Sprint 5 Cross-Phase Release Gate is DONE or a real BLOCKED condition occurs.
+Implement iSehat Sprint 5. Read AGENTS.md, HANDOFF.md, latest WORK_LOG.md, and only the current task section from docs_sprint5/08.TASK_PLAN_SPRINT5_FULL_READY_REVISED_AI_SPRINT6_MOCKUP_PONYTAIL.md. Start with the task shown in HANDOFF.md only. Complete exactly one task cycle at a time. Follow TDD, run validation, update WORK_LOG.md and HANDOFF.md, then continue to the next READY task/phase automatically until Sprint 5 Cross-Phase Release Gate is DONE or a real BLOCKED condition occurs.
 ```
 
 Resume prompt:
 
 ```text
-Continue HL Health Companion Sprint 5 from HANDOFF.md. Identify the current/next task, read only relevant final docs, complete one task cycle, run validation, update WORK_LOG.md and HANDOFF.md, then continue sequentially to the next READY task/phase automatically until Sprint 5 Cross-Phase Release Gate is DONE or a real BLOCKED condition occurs.
+Continue iSehat Sprint 5 from HANDOFF.md. Identify the current/next task, read only relevant final docs, complete one task cycle, run validation, update WORK_LOG.md and HANDOFF.md, then continue sequentially to the next READY task/phase automatically until Sprint 5 Cross-Phase Release Gate is DONE or a real BLOCKED condition occurs.
 ```
 
 Failure prompt:
@@ -289,3 +289,380 @@ Failure prompt:
 ```text
 Audit the current failed task only. Read HANDOFF.md, latest WORK_LOG.md, the current task section, related API/SQL sections, and test output. Fix the smallest cause, rerun validation, update logs, then continue sequentially if the task becomes DONE. Stop only if the task remains BLOCKED with exact evidence.
 ```
+
+---
+
+## 12. Ponytail — Lazy Senior Dev (Instruction-Only Fallback)
+
+### iSehat ↔ Ponytail precedence (read this first)
+
+Ponytail governs the *shape* (deletion over addition, fewest files,
+shortest working diff). iSehat governs the *substance* (source-of-truth
+order in §1, hard-boundary rules in §2, TDD in §6, done/blocked in §8).
+When in doubt: hard-boundary rule wins, then source-of-truth, then the
+Ponytail ladder. Ponytail *never* overrides medical-safety, secret-handling,
+Cloudflare-D1 invariants, or backward-compatibility with Sprint 1–4.
+
+### Persistence
+
+ACTIVE EVERY RESPONSE. No drift back to over-building. Still active if
+unsure. Off only: explicit "stop ponytail" / "normal mode".
+
+### Mode
+
+Default: `full`. Override with: `lite | full | ultra`.
+
+### OpenCode plugin wins (when both loaded)
+
+If `skills/ponytail/SKILL.md` is also loaded by your host adapter
+(e.g. the OpenCode plugin via `./.opencode/plugins/ponytail.mjs`),
+treat THAT file as canonical. This §12 is the **fallback only** for
+agents that read project-root `AGENTS.md` and cannot load the plugin
+(Codebuff / Freebuff / Claude Code / Codex extension in VS Code).
+
+### Source
+
+`https://github.com/DietrichGebert/ponytail` (MIT).
+
+### The ladder
+
+Stop at the first rung that holds:
+
+```text
+1. Does this need to exist at all?         YAGNI, skip it.
+2. Already in this codebase?               reuse it. Grep first.
+3. Stdlib does it?                         use stdlib.
+4. Native platform feature covers it?      use native. <input type="date">, CSS over JS, DB constraint over app code.
+5. Already-installed dependency solves it? use it. Don't add a new one for what a few lines can do.
+6. Can it be one line?                     one line.
+7. Only then:                              the minimum code that works.
+```
+
+The ladder runs *after* you understand the problem, not instead of it.
+Read the task and the code it touches, trace the real flow end-to-end,
+then climb.
+
+### Bug fix = root cause, not symptom
+
+A report names a symptom. Grep every caller of the function you will
+touch. Fix once in the shared function — one guard there is a smaller
+diff than one per caller, and patching only the ticket-named path leaves
+sibling callers still broken.
+
+### Rules
+
+```text
+- No unrequested abstractions (no interface with one implementation, no factory for one product, no config for a constant).
+- No new dependency if avoidable. No boilerplate nobody asked for.
+- Deletion over addition. Boring over clever. Fewest files possible.
+- Shortest working diff wins — but only once you understand the problem.
+- Question complex requests: "Do you actually need X, or does Y cover it?".
+- Mark deliberate simplifications with a `ponytail:` comment; if there's a known ceiling (global lock, O(n²) scan, naive heuristic), the comment names the ceiling AND the upgrade path.
+```
+
+### When NOT to be lazy
+
+```text
+- Trust-boundary input validation.
+- Error handling that prevents data loss.
+- Security, accessibility, anything explicitly requested.
+- Understanding the problem: read fully, trace the real flow, THEN be lazy.
+- One runnable check behind non-trivial logic (assert-based demo() or one test file). YAGNI applies to tests too; trivial one-liners need no test.
+```
+
+---
+
+## 13. Git Versioning Best Practices
+
+### 13.1 Branch per phase
+
+```text
+- One phase = one branch: sprint6/S6A, sprint6/S6B, ..., sprint6/S6I.
+- Never commit phase implementation directly to main. Phase branches only.
+- Tag the merge commit of each phase as sprint6-<phase>-DONE.
+```
+
+### 13.2 Worktree per scope (only when needed)
+
+```text
+- Default: work in main worktree on the phase branch.
+- If scope conflict (e.g., Lane A Sprint 6 + Lane B Sprint 5 fixes touch main),
+  use git worktree add ../wt-<branch> -b <branch> main for isolation.
+- Worktrees share .git/ but isolate working tree + index + staged changes.
+```
+
+### 13.3 Commit per task
+
+```text
+- One task ID = one commit. No batching.
+- Conventional Commits scope: [sprint6/<phase>] <task code>: <imperative title>
+  or [fix/...] <scope>: <title> for Lane B.
+- Commit message body MUST cite the PRD section or spec doc being implemented.
+```
+
+### 13.4 Push per phase gate (not per task)
+
+```text
+- Local commits accumulate per task. No push per task.
+- Push only at the phase gate, AFTER:
+  1. Full cycle test green (worker tsc + npm test, web tsc + eslint + build).
+  2. D1 migration applied + PRAGMA foreign_key_check clean.
+  3. Audit bundle complete (code-reviewer + security-audit + compliance-audit + coverage + perf).
+  4. HANDOFF update + WORK_LOG entry per task complete.
+- Then: git push -u origin sprint6/<phase>.
+- NEVER git push origin main --force.
+- NEVER git push --force-with-lease to main (use merge, not rebase, on shared branches).
+```
+
+### 13.5 Forbidden destructive operations (without explicit user approval)
+
+```text
+- git reset --hard once pushed.
+- git push --force to main.
+- git clean -fd while uncommitted work exists.
+- git branch -D on a branch with unpushed commits.
+- git push origin main directly (main only accepts merges from approved branches).
+- git fetch origin && git rebase on pushed branches (use merge instead).
+```
+
+---
+
+## 14. Multi-Agent Parallelism Best Practices
+
+### 14.1 When CAN a sprint be split across agents
+
+```text
+YES, only if all three:
+1. File-disjoint: no shared source file between agents.
+2. Dependency-disjoint: no inter-task import / function call between agents.
+3. Quota-disjoint: no shared D1 write target race condition.
+```
+
+### 14.2 Per-agent rules
+
+```text
+- 1 agent = 1 sub-branch: agent-<id>/<lane> from main.
+- 1 agent = 1 specific task ID from TASK_PLAN (never invent task IDs).
+- 1 agent = 1 allowed file path list (touch only allowed paths; integrator rejects out-of-scope).
+- 1 agent outputs 1 commit per task with scope: [agent-<id>] <task code>: <title>.
+- 1 agent NEVER invents: permission codes, table columns, config keys, endpoint paths.
+- 1 agent's commit message MUST cite PRD section or TASK_PLAN task ID.
+```
+
+### 14.3 Integrator (Buffy) role
+
+```text
+- Spawn each agent with disjoint scope verification.
+- After ALL agents DONE: merge sub-branches into phase branch.
+- Run full cycle test on merged result.
+- Resolve conflicts (favor canonical PRD-aligned version).
+- Update HANDOFF + WORK_LOG + commit meta.
+- Spawn audit bundle per §15.
+```
+
+### 14.4 Conflict resolution
+
+```text
+- Same file edited by 2 agents: integrator picks version (default = later agent if PRD-aligned,
+  else integrator rewrites to PRD canonical).
+- Same task ID claimed by 2 agents: first to commit wins; second agent BLOCKED.
+- Non-canonical column invented by agent: rolled back post-review.
+- Out-of-scope file touched by agent: integrator reverts that part of commit, keep in-scope.
+```
+
+### 14.5 Failure mode triages
+
+| Mode | Detection | Response |
+|---|---|---|
+| Same file, different changes | git merge conflict | Integrator runs git diff + cherry-picks |
+| Same permission code, different meaning | post-merge audit | Reverted to PRD canonical |
+| Agent declared DONE without validation | WORK_LOG entry check | Rollback to last verified commit |
+| Agent invents task ID | TASK_PLAN grep | Reject commit, redirect to next valid task |
+| Sprint 6 Impact = BLOCKING from Lane B | cross-lane check | Hold merge; escalate to owner |
+
+---
+
+## 15. Audit & Review Best Practices
+
+### 15.1 Per-task audit (mandatory for non-trivial changes)
+
+```text
+- After every non-trivial diff, spawn code-reviewer-minimax-m3.
+- Verify: anti-pattern, dead code, naming, type safety, duplication, error handling.
+- Output: per-line feedback, severity tiers.
+- ~1 min per task. Worth it.
+```
+
+### 15.2 Per-phase audit bundle (after Phase Gate passes implementation)
+
+Spawn 5 audits in parallel after phase implementation complete:
+
+| # | Audit | Checks |
+|---|---|---|
+| 1 | code-reviewer-minimax-m3 | semantic + quality + duplication + dead code |
+| 2 | security-audit | secrets, OWASP top 10, IDOR, RBAC race, escalation paths, input validation |
+| 3 | compliance-audit (medical) | §12.1 secret scan, §12.2 sensitive data access, §12.4 medical safety (no diagnosis, disclaimer always, guardrail blocking not toast-only) |
+| 4 | test-coverage-audit | 95-item (Sprint 5) / 65-detector (Sprint 6) matrix mapping; gaps identified |
+| 5 | perf-audit | N+1 detection, query plan analysis, p95 latency, memory profile |
+
+After all 5 complete: integrator merges findings, addresses P0 immediately, schedules P1/P2.
+
+### 15.3 Cross-phase audit (only at S6I Hardening release gate)
+
+```text
+- Full audit pass across all 9 phases (S6A → S6I).
+- Includes: §18 Cross-Phase Release Gate steps + 1000-case eval dataset + 7-day closed beta.
+- Mandatory before setting clinicalCopilot.enabled = true for premium users.
+```
+
+### 15.4 Audit vs self-declare
+
+```text
+- NEVER allow agent to self-declare DONE without per-task audit feedback.
+- NEVER allow agent to skip per-phase audit bundle before push.
+- NEVER allow phase push without all 5 audits returning clean (or P1/P2 triaged).
+- Audit result MUST be appended to WORK_LOG before phase push.
+```
+
+### 15.5 Audit agent provisioning status
+
+Only `code-reviewer-minimax-m3` is provisioned as an actual agent today. Others are spec-only and require a registered skill OR custom agent definition before they can be spawned.
+
+| # | Audit | Status | Where it lives now |
+|---|---|---|---|
+| 1 | code-reviewer-minimax-m3 | PROVISIONED | built-in `code-reviewer-minimax-m3` tool |
+| 2 | security-audit | SPEC-ONLY | needs `skills/security-audit/SKILL.md` or custom agent |
+| 3 | compliance-audit (medical) | SPEC-ONLY | needs `skills/medical-compliance-audit/SKILL.md` |
+| 4 | test-coverage-audit | SPEC-ONLY | needs `skills/test-coverage-audit/SKILL.md` |
+| 5 | perf-audit | SPEC-ONLY | needs `skills/perf-audit/SKILL.md` |
+
+Until #2–#5 are provisioned, the per-phase audit bundle (§15.2) is a single-agent pass with `code-reviewer-minimax-m3` — acceptable as fallback but not equivalent to full multi-audit coverage. Provisioning backlog tracked in `docs_sprint6/AGENTS_SPRINT6.md` §19 reference.
+
+### 15.6 Rollback playbook when audit returns CRITICAL
+
+```text
+Step 1. STOP current task. Do NOT continue any further work.
+Step 2. Audit finding MUST be in WORK_LOG with: severity, file path, line, what, why,
+        and which PRD or spec doc is being violated.
+Step 3. For each CRITICAL finding, choose ONE path:
+  Path A (revert):    git revert <SHA> --no-commit (preferred for regressions; never on main).
+  Path B (fix-inline): follow-up commit; if different task → open new TASK_ID with
+                       Sprint-Impact = NONE; resolve before phase gate.
+  Path C (escalate):  cross-team impact, security boundary, OR PRD hard-boundary violation
+                       (see §2) → escalate to owner. NEVER auto-resolve.
+
+Step 4. Re-run audit bundle on the chosen resolution path.
+Step 5. Only proceed to next phase push after all CRITICAL findings have a documented
+       resolution path that re-passes the audit.
+
+NEVER silence an audit finding by marking WAS_WONT_FIX without explicit owner sign-off.
+Audit findings are evidence; deleting evidence without resolution = bug-mask.
+```
+
+---
+
+## 16. Anti-Patterns (CRITICAL — applies every task)
+
+### 16.1 Anti-Hallucination (NEVER invent)
+
+```text
+NEVER invent:
+- table names (verify via PRAGMA table_info or schema SQL)
+- column names (verify via schema SQL, not PRD narrative)
+- endpoint paths (verify via API contract §)
+- permission codes (verify via seed SQL feature codes)
+- feature codes (verify via seed SQL)
+- config keys (verify via systemConfigs seed)
+- answerType values (verify via CLINICAL_RESPONSE_SCHEMA §8.1, only 11 allowed)
+- SafetyDecision values (verify via AI_SAFETY_RUNTIME_SPEC, only 6 allowed)
+- detector codes (verify via AI_SAFETY_RUNTIME_SPEC §10.1, only 13 detectors)
+- Cloudflare binding name (verify via wrangler.toml of target worker)
+- npm package name (verify via package.json of target workspace)
+
+If unsure:
+1. STOP.
+2. Open the relevant Sprint doc (PRD, schema, API contract, spec).
+3. Use code_searcher or file_picker to grep candidate names.
+4. If still not in docs: BLOCKED with exact evidence.
+
+If conflict:
+1. Follow Source of Truth Order (§1 of root AGENTS, §1 of AGENTS_Sprint6).
+2. If still conflict: mark BLOCKED, do NOT guess.
+```
+
+### 16.2 Anti-Empty-Method (no fake-pass code)
+
+```text
+FORBIDDEN patterns (any of these = invalid DONE claim):
+- Method containing only "// TODO" or "// implement later" comment.
+- Method containing only `return null;` or `return undefined;` to satisfy import.
+- Method throwing "NotImplementedError" while marked DONE.
+- Test marked pass without any assertion (e.g., `it('passes', () => {})`).
+- Test using only `expect(true).toBe(true)` or `expect(1).toBe(1)`.
+- Test mocking dependency so heavily it does not test real behavior.
+- Test asserting mock was called (not actual outcome).
+- Coverage number high (e.g. 95%) but no real assertion in critical paths.
+- Implementing a "happy path only" branch without negative test.
+
+REQUIRED for every method declared DONE:
+1. Real implementation body (logic, not stub).
+2. At least one test that runs and asserts behavior.
+3. At least one negative test (wrong input fails, unauthorized rejected, etc.).
+4. Edge case test if method has boundary conditions.
+
+Reviewer MUST verify assertion shape on every test added.
+Coverage without real assertions = lying; integrator MUST reject.
+```
+
+### 16.3 Anti-Rush (no fast-pass through tasks)
+
+```text
+FORBIDDEN shortcuts:
+- Batching multiple TASK_IDs into one implementation slice.
+- Skipping validation (tsc / npm test / eslint / vite build).
+- Marking DONE without validation evidence in WORK_LOG.
+- Skipping audit bundle before push (see §15).
+- Inventing validation command that is not actually executed.
+- Running tests against previous green baseline without re-running after change.
+- Declaring BLOCKED as DONE to clear backlog faster.
+
+REQUIRED discipline:
+- One task cycle = 1 implementation slice + 1 test + 1 WORK_LOG entry + 1 HANDOFF update.
+- Quality over speed (medical app — every bug = potential patient safety incident).
+- If running out of time → mark BLOCKED + write safe next action. NEVER forced DONE.
+- Validation FOR every change — no exceptions, even for "trivial" CSS or doc fixes.
+- WHEN in doubt → timeline-based (PRD section §XX.YY) verification, NOT guess.
+```
+
+### 16.4 Anti-Over-Building (Ponytail-aware, see §12)
+
+```text
+- Deletion > addition. Boring > clever. Fewest files.
+- BUT never at the cost of:
+  - Trust-boundary input validation
+  - Error handling that prevents data loss
+  - Security, accessibility, anything explicitly requested
+  - Medical safety guardrails
+  - Audit logging
+- Ponytail ladder runs AFTER understanding the problem end-to-end, NOT instead of.
+- A correct minimal implementation beats a clever over-engineered one.
+```
+
+### 16.5 Self-Check Before Marking DONE
+
+For every implementation slice, agent MUST self-check against this list before writing DONE in WORK_LOG:
+
+```text
+[ ] Did I cite PRD section / schema SQL / spec doc in commit message?
+[ ] Did I write at least 1 positive test + 1 negative test?
+[ ] Did I run npm test (worker) or vitest (web)?
+[ ] Did I run tsc + eslint + build?
+[ ] Did I NOT invent any table/column/permission/feature code?
+[ ] Did I NOT leave any stub / TODO / empty method?
+[ ] Did I NOT skip audit (per §15)?
+[ ] Did I append WORK_LOG entry with evidence (commands run + result)?
+[ ] Did I update HANDOFF to next task ID?
+[ ] Did I respect Sprint 1–5 backward compat (no breaking change)?
+```
+
+If any checkbox unchecked: NOT DONE. Continue the task until all pass.
