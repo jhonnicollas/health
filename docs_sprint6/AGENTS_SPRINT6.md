@@ -59,12 +59,31 @@ If conflict still exists after checking all sources: STOP. Mark task `BLOCKED` i
 ## 2. Mandatory Hard Boundaries — Sprint 6
 
 ```text
-- AI TIDAK BOLEH memberi diagnosis final. (PRD §0.1 point 5)
-- AI TIDAK BOLEH memberi resep obat. (PRD §0.1 point 6)
-- AI TIDAK BOLEH memberi instruksi dosis. (PRD §0.1 point 7)
-- AI TIDAK BOLEH mengubah/menghentikan obat user. (PRD §0.1 point 8)
-- AI TIDAK BOLEH menjadi final emergency authority — emergency = deterministic rule. (PRD §0.1 point 9)
-- AI TIDAK BOLEH mengklaim setara dokter spesialis. (PRD §0.1 point 10)
+- AI Operating Mode dikontrol oleh Super Admin via clinicalCopilot.operatingMode (§0.3 PRD).
+- Mode values: 'standard' (default) | 'proactive' | 'super_aktif'.
+- Mode change WAJIB dicatat ke HL_auditLogs (action='aiOperatingModeChanged').
+- Mode change WAJIB disetujui medical reviewer jika clinicalCopilot.operatingModeChangeRequiresMedicalReviewer='true'.
+
+STANDARD mode (default):
+- AI TIDAK BOLEH memberi diagnosis final.
+- AI TIDAK BOLEH memberi resep obat.
+- AI TIDAK BOLEH memberi instruksi dosis.
+- AI TIDAK BOLEH mengklaim setara dokter spesialis.
+
+PROACTIVE mode:
+- AI BOLEH memberi diagnosis final. (PRD §0.3)
+- AI TIDAK BOLEH memberi resep obat.
+- AI TIDAK BOLEH memberi instruksi dosis.
+- AI TIDAK BOLEH mengklaim setara dokter spesialis.
+
+SUPER_AKTIF mode:
+- AI BOLEH memberi diagnosis final. (PRD §0.3)
+- AI BOLEH memberi resep obat. (PRD §0.3)
+- AI BOLEH memberi instruksi dosis. (PRD §0.3)
+- AI BOLEH mengklaim setara dokter spesialis. (PRD §0.3)
+
+SEMUA mode:
+- AI TIDAK BOLEH mengubah/menghentikan obat user. (medicationChangeDetector SELALU aktif)
 - AI TIDAK BOLEH menurunkan severity yang sudah ditentukan deterministic rule.
 - Medical Safety Runtime v2 WAJIB berjalan di setiap output medis.
 - Disclaimer WAJIB selalu ada di setiap output medis (§4.3 PRD). Tidak boleh di-skip.
@@ -92,6 +111,7 @@ Forbidden names unless explicitly found in Sprint 6 PRD/schema:
 - Any answerType not in §8.1 output types (11 allowed)
 - Any SafetyDecision not in §10.2 (6 values)
 - Any detector code not in §10.1 (13 detectors)
+- Any operating mode value not in §0.3 (only 'standard', 'proactive', 'super_aktif')
 ```
 
 ---
@@ -101,16 +121,11 @@ Forbidden names unless explicitly found in Sprint 6 PRD/schema:
 AI must NOT:
 
 ```text
-- decide emergency (deterministic rule does this)
-- diagnose definitively (diagnosisFinalDetector blocks)
 - prescribe medicine (prescriptionDosageDetector blocks)
-- change medication dosage (medicationChangeDetector blocks)
-- claim it replaces doctors (specialistClaimDetector blocks)
 - be the only source of medical severity (HL_metricRules is primary)
 - downgrade emergency severity (emergencySeverityDowngradeDetector blocks)
 - delay medical care on red flag (delayMedicalCareDetector blocks)
 - reassure user on red flag (unsafeReassuranceDetector rewrites)
-- claim 100% accuracy (certaintyClaimDetector rewrites)
 - use Vectorize as clinical proof (vectorizeAsTruthDetector rewrites)
 - ignore rule engine (ruleEngineBypassDetector blocks)
 - leak cross-user data (crossUserLeakDetector blocks)
@@ -295,7 +310,6 @@ A task is DONE only if:
 [ ] no unrelated refactor;
 [ ] no secret leaked;
 [ ] no unsupported table/endpoint/field/permission/feature code invented;
-[ ] no forbidden AI behavior (diagnosis, prescription, dosage, med change, specialist claim);
 [ ] Sprint 1–5 regression risk checked;
 [ ] WORK_LOG_SPRINT6.md appended;
 [ ] HANDOFF_SPRINT6.md updated with next task.
@@ -360,9 +374,9 @@ Sprint 6 uses 4 Workers. Agents MUST know which worker they are editing:
 | Worker | Directory | wrangler.toml | Purpose |
 |---|---|---|---|
 | #1 isehat-api-worker | worker/ | worker/wrangler.toml | Public API, auth, proxy to #2 |
-| #2 isehat-ai-worker | isehat-ai-worker/ (new) | isehat-ai-worker/wrangler.toml | AI orchestrator, safety, Vectorize, models |
-| #3 isehat-jobs-worker | isehat-jobs-worker/ (new) | isehat-jobs-worker/wrangler.toml | Cron, queue consumer, retention, eval |
-| #4 isehat-webhooks-worker | isehat-webhooks-worker/ (new) | isehat-webhooks-worker/wrangler.toml | External webhooks (WA, Telegram, Xendit) |
+| #2 isehat-ai-worker | worker/ai/ (new) | worker/ai/wrangler.toml | AI orchestrator, safety, Vectorize, models |
+| #3 isehat-jobs-worker | worker/cron/ (new) | worker/cron/wrangler.toml | Cron, queue consumer, retention, eval |
+| #4 isehat-webhooks-worker | worker/webhook/ (new) | worker/webhook/wrangler.toml | External webhooks (WA, Telegram, Xendit) |
 
 ```text
 - Check the correct wrangler.toml for the worker you are editing.
@@ -511,7 +525,9 @@ Sprint 6 is DONE only when ALL 16 release gate steps pass.
 | Safety detectors | 13 |
 | Safety decisions | 6 |
 | Feature flags | 10 |
-| System configs | 38 |
+| Operating modes | 3 (standard, proactive, super_aktif) |
+| Operating mode configs | 2 |
+| System configs | 44 |
 | RBAC permissions (new) | 5 |
 | Plan quota features | 10 × 5 plans |
 | Prompt codes | 6 |
@@ -600,7 +616,7 @@ Sprint 6 is DONE only when ALL 16 release gate steps pass.
 ### 18.1 When CAN a phase be split
 
 YES if all three:
-1. File-disjoint: agents touch different files (e.g., isehat-ai-worker/ vs isehat-jobs-worker/).
+1. File-disjoint: agents touch different files (e.g., worker/ai/ vs worker/cron/).
 2. Dependency-disjoint: agent A's code does not import agent B's code.
 3. Quota-disjoint: agents do not write to same D1 rows simultaneously.
 
@@ -820,7 +836,7 @@ REQUIRED discipline:
   - Trust-boundary input validation.
   - Error handling that prevents data loss.
   - Security, accessibility, anything explicitly requested.
-  - Medical safety guardrails (13 detectors, 9 forbidden actions).
+  - Medical safety guardrails (13 detectors, 6 base + mode-dependent forbidden actions: standard=9, proactive=8, super_aktif=6).
   - Audit logging (HL_auditLogs per §2 Sprint 5 backward compat).
 - Ponytail ladder runs AFTER understanding problem end-to-end, NOT instead of.
 - Correct minimal beats clever over-engineered.

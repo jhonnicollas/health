@@ -68,16 +68,7 @@ plaintext Google/OAuth/Telegram/AI/Billing/Internal secrets
 ---
 
 ## 3. Medical and Privacy Safety
-
-AI must not:
-
-```text
-- decide emergency;
-- diagnose definitively;
-- prescribe medicine;
-- change medication dosage;
-- claim it replaces doctors;
-- be the only source of medical severity/guardrail.
+source of medical severity/guardrail.
 ```
 
 Required deterministic rules:
@@ -501,7 +492,7 @@ Spawn 5 audits in parallel after phase implementation complete:
 |---|---|---|
 | 1 | code-reviewer-minimax-m3 | semantic + quality + duplication + dead code |
 | 2 | security-audit | secrets, OWASP top 10, IDOR, RBAC race, escalation paths, input validation |
-| 3 | compliance-audit (medical) | §12.1 secret scan, §12.2 sensitive data access, §12.4 medical safety (no diagnosis, disclaimer always, guardrail blocking not toast-only) |
+| 3 | compliance-audit (medical) | §12.1 secret scan, §12.2 sensitive data access, §12.4 medical safety|
 | 4 | test-coverage-audit | 95-item (Sprint 5) / 65-detector (Sprint 6) matrix mapping; gaps identified |
 | 5 | perf-audit | N+1 detection, query plan analysis, p95 latency, memory profile |
 

@@ -80,6 +80,19 @@ enum SafetyDecision {
 
 # 3. 13 Detectors — Complete Specification
 
+Detectors 1–9 and 12 are **mode-invariant** (always active, same decision regardless of operating mode). Detectors 10, 11, 13 are **mode-dependent** — their decision changes based on `clinicalCopilot.operatingMode` (PRD §0.3).
+
+### Mode-Dependent Decision Matrix
+
+| Detector | `standard` | `proactive` | `super_aktif` |
+|---|---|---|---|
+| diagnosisFinalDetector | rewrite_safe | allow | allow |
+| prescriptionDosageDetector | rewrite_safe | rewrite_safe | allow |
+| specialistClaimDetector | rewrite_safe | rewrite_safe | allow |
+| medicationChangeDetector | block_and_fallback | block_and_fallback | block_and_fallback |
+
+All other detectors (1–9) always have the same decision regardless of mode.
+
 ## 3.1 missingDisclaimerDetector
 
 | Field | Value |
@@ -375,24 +388,26 @@ Log to HL_safetyEvents + HL_aiOutputSafetyFlags.
 | Field | Value |
 |---|---|
 | Detector Code | `diagnosisFinalDetector` |
-| Severity on violation | high |
-| Decision | `rewrite_safe` |
+| Severity on violation | LOW (standard mode) / N/A (proactive, super_aktif — allowed) |
+| Decision | mode-dependent: standard=rewrite_safe, proactive=allow, super_aktif=allow |
 | Runs on | Every AI output |
 
 ### Detection Logic
 
 ```text
-INPUT: aiOutput (string)
+INPUT: aiOutput (string), operatingMode ('standard' | 'proactive' | 'super_aktif')
 
-Scan for final diagnosis patterns:
-- "diagnosis Anda adalah" / "your diagnosis is"
-- "Anda menderita" / "you have" (as definitive statement)
-- "ini mengonfirmasi" / "this confirms"
-- "diagnosis:" / "diagnosis:"
-- "berdasarkan hasil, Anda memiliki" / "based on results, you have"
-- "Anda terkena" / "you are suffering from" (definitive)
+1. If operatingMode IN ('proactive', 'super_aktif') → SKIP (diagnosis final allowed per §0.3)
+2. If operatingMode = 'standard':
+   Scan for final diagnosis patterns:
+   - "diagnosis Anda adalah" / "your diagnosis is"
+   - "Anda menderita" / "you have" (as definitive statement)
+   - "ini mengonfirmasi" / "this confirms"
+   - "diagnosis:" / "diagnosis:"
+   - "berdasarkan hasil, Anda memiliki" / "based on results, you have"
+   - "Anda terkena" / "you are suffering from" (definitive)
 
-If found → VIOLATION (AI gave final diagnosis, which is forbidden per §0.1 point 5)
+   If found → VIOLATION (AI gave final diagnosis, forbidden in standard mode)
 ```
 
 ### Rewrite Action
@@ -408,25 +423,27 @@ final. Konsultasikan dengan dokter untuk diagnosis yang pasti."
 | Field | Value |
 |---|---|
 | Detector Code | `prescriptionDosageDetector` |
-| Severity on violation | high |
-| Decision | `rewrite_safe` |
+| Severity on violation | high (standard, proactive) / N/A (super_aktif — allowed) |
+| Decision | mode-dependent: standard=rewrite_safe, proactive=rewrite_safe, super_aktif=allow |
 | Runs on | Every AI output |
 
 ### Detection Logic
 
 ```text
-INPUT: aiOutput (string)
+INPUT: aiOutput (string), operatingMode ('standard' | 'proactive' | 'super_aktif')
 
-Scan for prescription/dosage patterns:
-- "minum X mg" / "take X mg"
-- "saya merekomendasikan obat" / "I recommend medication"
-- "Anda harus minum" / "you should take"
-- "dosis yang tepat adalah" / "the dosage is"
-- "mulai dengan X mg" / "start with X mg"
-- Drug name + dosage combination (e.g., "amoxicillin 500mg")
-- "resep untuk Anda" / "prescription for you"
+1. If operatingMode = 'super_aktif' → SKIP (prescription/dosage allowed per §0.3)
+2. If operatingMode IN ('standard', 'proactive'):
+   Scan for prescription/dosage patterns:
+   - "minum X mg" / "take X mg"
+   - "saya merekomendasikan obat" / "I recommend medication"
+   - "Anda harus minum" / "you should take"
+   - "dosis yang tepat adalah" / "the dosage is"
+   - "mulai dengan X mg" / "start with X mg"
+   - Drug name + dosage combination (e.g., "amoxicillin 500mg")
+   - "resep untuk Anda" / "prescription for you"
 
-If found → VIOLATION (AI gave prescription/dosage, forbidden per §0.1 points 6,7)
+   If found → VIOLATION (AI gave prescription/dosage, forbidden in standard/proactive per §0.3)
 ```
 
 ### Rewrite Action
@@ -476,23 +493,25 @@ Jangan mengubah obat tanpa konsultasi dokter. Perubahan obat dapat berbahaya."
 | Field | Value |
 |---|---|
 | Detector Code | `specialistClaimDetector` |
-| Severity on violation | medium |
-| Decision | `rewrite_safe` |
+| Severity on violation | medium (standard, proactive) / N/A (super_aktif — allowed) |
+| Decision | mode-dependent: standard=rewrite_safe, proactive=rewrite_safe, super_aktif=allow |
 | Runs on | Every AI output |
 
 ### Detection Logic
 
 ```text
-INPUT: aiOutput (string)
+INPUT: aiOutput (string), operatingMode ('standard' | 'proactive' | 'super_aktif')
 
-Scan for specialist equivalence claims:
-- "saya setara dengan dokter spesialis" / "I'm equal to a specialist"
-- "analisis saya sama dengan dokter" / "my analysis matches a doctor's"
-- "saya punya akurasi dokter" / "I have doctor-level accuracy"
-- "saya sekompeten spesialis" / "I'm as capable as a specialist"
-- "percaya saja, saya setara MD" / "trust me, I'm equivalent to MD"
+1. If operatingMode = 'super_aktif' → SKIP (specialist claim allowed per §0.3)
+2. If operatingMode IN ('standard', 'proactive'):
+   Scan for specialist equivalence claims:
+   - "saya setara dengan dokter spesialis" / "I'm equal to a specialist"
+   - "analisis saya sama dengan dokter" / "my analysis matches a doctor's"
+   - "saya punya akurasi dokter" / "I have doctor-level accuracy"
+   - "saya sekompeten spesialis" / "I'm as capable as a specialist"
+   - "percaya saja, saya setara MD" / "trust me, I'm equivalent to MD"
 
-If found → VIOLATION (AI claimed specialist equivalence, forbidden per §0.1 point 9)
+   If found → VIOLATION (AI claimed specialist equivalence, forbidden in standard/proactive per §0.3)
 ```
 
 ### Rewrite Action
@@ -622,11 +641,14 @@ Clinical Orchestrator Flow:
 ```text
 medicalSafetyRuntime.enabled    = true   (system config)
 medicalSafetyRuntime.strictMode = true   (system config)
+clinicalCopilot.operatingMode   = 'standard' (system config, super admin only)
 
 If strictMode = true:
   - All 13 detectors active
-  - No bypass allowed
+  - Mode-invariant detectors (1-9, 12): no bypass
+  - Mode-dependent detectors (10, 11, 13): decision based on operatingMode
   - Critical violations always block
+  - mode-dependent: operatingMode determines allow/rewrite_safe per §0.3
 
 If strictMode = false (NOT recommended for production):
   - Critical detectors still active

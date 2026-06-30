@@ -93,9 +93,9 @@ Additional Workers are scaffolded for Sprint 6 (skeletons on disk):
 | Worker | Path | Status |
 |---|---|---|
 | #1 `isehat-api-worker` | `worker/` | active (Sprint 1–5) |
-| #2 `isehat-ai-worker` | `isehat-ai-worker/` | S6A-T-01 next |
-| #3 `isehat-jobs-worker` | `isehat-jobs-worker/` | S6F (cron + retention) |
-| #4 `isehat-webhooks-worker` | `isehat-webhooks-worker/` | S6G (Xendit + Telegram + WhatsApp) |
+| #2 `isehat-ai-worker` | `worker/ai/` | S6A-T-01 next |
+| #3 `isehat-jobs-worker` | `worker/cron/` | S6F (cron + retention) |
+| #4 `isehat-webhooks-worker` | `worker/webhook/` | S6G (Xendit + Telegram + WhatsApp) |
 
 ## Development
 

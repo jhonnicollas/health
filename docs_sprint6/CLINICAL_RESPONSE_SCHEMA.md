@@ -41,6 +41,7 @@ Every AI Clinical Copilot API response follows the standard envelope used across
     ],
     "safetyDecision": "allow_with_disclaimer",
     "safetyFlags": [],
+    "operatingMode": "standard",
     "modelName": "deepseek-v4-flash-free",
     "modelProvider": "9router",
     "usedFallback": false,
@@ -97,17 +98,20 @@ Every AI Clinical Copilot API response follows the standard envelope used across
 | `medication_questions_for_doctor` | Pertanyaan untuk dokter/apoteker | allow | Medication safety query |
 | `blocked_unsafe_request` | Permintaan diblokir oleh Safety Runtime | block_and_fallback | Forbidden output detected |
 
-## 2.1 Forbidden answerTypes (NEVER returned)
+## 2.1 Mode-Dependent answerTypes (allowed in proactive / super_aktif mode)
 
 ```text
-diagnosis_final          — AI tidak boleh memberi diagnosis final
-prescription_guidance    — AI tidak boleh memberi resep
-dosage_instruction       — AI tidak boleh memberi instruksi dosis
-medication_change        — AI tidak boleh mengubah/menghentikan obat
-specialist_claim         — AI tidak boleh klaim setara spesialis
+diagnosis_final          — AI boleh memberi diagnosis final (proactive, super_aktif)
+prescription_guidance    — AI boleh memberi resep (super_aktif only)
+dosage_instruction       — AI boleh memberi instruksi dosis (super_aktif only)
+specialist_claim         — AI boleh klaim setara spesialis (super_aktif only)
 ```
 
-If the LLM generates any of these, the Safety Runtime rewrites the output and changes `answerType` to the appropriate safe alternative or `blocked_unsafe_request`.
+In `standard` mode, if the LLM generates any of these, the Safety Runtime rewrites the output and changes `answerType` to the appropriate safe alternative or `blocked_unsafe_request`.
+
+In `proactive` mode: `diagnosis_final` is allowed. Others still rewritten/blocked.
+
+In `super_aktif` mode: all 5 above are allowed. `medication_change` remains forbidden.
 
 ---
 
@@ -452,7 +456,7 @@ VALUES
 |---|---|
 | contentPreview | Safe truncated reply text (max 500 chars, no sensitive data) |
 | contentEncrypted | Full reply text encrypted (AES-256 via CryptoService) |
-| answerType | From response schema |
+| answerType | From response schema (mode-dependent: standard never returns diagnosis_final/prescription_guidance/dosage_instruction/specialist_claim) |
 | safetyLevel | From safetyDecision (mapped: allow→safe, block_and_fallback→blocked; others match directly) |
 | safetyFlagsJson | JSON array of triggered detector codes |
 | contextTraceJson | JSON array of context trace items |
@@ -466,10 +470,36 @@ INSERT INTO HL_modelRuns
   (userId, requestId, sessionId, channel, taskCode, providerCode, modelCode,
    promptVersion, usedVectorContext, usedAiSearch,
    inputTokenCount, outputTokenCount, latencyMs,
-   status, fallbackUsed, safetyDecision, safetyFlagsJson, createdAt)
+   status, fallbackUsed, safetyDecision, safetyFlagsJson, operatingMode, createdAt)
 VALUES
   (?, ?, ?, 'web', 'clinical_copilot', '9router', 'deepseek-v4-flash-free',
    'v1.0.0', 1, 0,
    450, 320, 1850,
-   'success', 0, 'allow_with_disclaimer', '[]', datetime('now'));
+   'success', 0, 'allow_with_disclaimer', '[]', 'standard', datetime('now'));
+```
+
+## 8.3 Operating Mode in Model Runs
+
+Every model run records the `clinicalCopilot.operatingMode` at the time of the call. This is stored in the dedicated `operatingMode` column on `HL_modelRuns` AND mirrored in `safetyFlagsJson` for audit convenience:
+
+```json
+{"operatingMode": "standard"}
+```
+
+This allows auditing which mode was active when a particular AI output was generated.
+
+## 8.4 Mode-Specific Disclaimer
+
+In `super_aktif` mode, an additional disclaimer is appended after the standard disclaimer:
+
+```text
+ID: "Mode Super Aktif: AI boleh memberi resep dan dosis. Tanggung jawab 1000% di Anda."
+EN: "Super Active Mode: AI may provide prescriptions and dosages. 1000% your responsibility."
+```
+
+In `proactive` mode, additional disclaimer:
+
+```text
+ID: "Mode Proaktif: AI boleh memberi diagnosis final. Tanggung jawab 1000% di Anda."
+EN: "Proactive Mode: AI may provide final diagnosis. 1000% your responsibility."
 ```

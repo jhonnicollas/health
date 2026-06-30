@@ -20,7 +20,7 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 | S6A-T-02 | Configure Service Binding from #1 to #2 (AI_SERVICE in wrangler.toml) | #1 | S6A-T-01 | #1 can call `env.AI_SERVICE.fetch()` successfully | 1h |
 | S6A-T-03 | Create migration 003_sprint6_schema.sql with all 10 tables + indexes + FK | #1,#2 | — | `wrangler d1 execute --local --file=003_sprint6_schema.sql` succeeds; PRAGMA foreign_key_check clean | 3h |
 | S6A-T-04 | Seed 10 feature flags into HL_featureFlags (§13.1) | #1 | S6A-T-03 | SELECT count(*) = 10 for feature.aiClinicalCopilot.* flags | 1h |
-| S6A-T-05 | Seed 42 system configs into HL_systemConfigs (§13.3) | #1 | S6A-T-03 | SELECT count(*) = 42 for aiGateway.*, vectorize.*, clinicalCopilot.*, etc. | 2h |
+| S6A-T-05 | Seed 44 system configs into HL_systemConfigs (§13.3) — includes operatingMode + operatingModeChangeRequiresMedicalReviewer | #1 | S6A-T-03 | SELECT count(*) = 44 for aiGateway.*, vectorize.*, clinicalCopilot.*, etc. | 2h |
 | S6A-T-06 | Seed 7 RBAC permissions + assign to admin role | #1 | S6A-T-03 | RbacService.hasPermission(adminUserId, 'admin.aiModelRun.read') = true | 1h |
 | S6A-T-07 | Seed plan quota matrix: 10 features × 5 plans into HL_planFeatures | #1 | S6A-T-03,T-04 | EntitlementService.checkQuota returns correct limits per plan | 2h |
 | S6A-T-08 | Implement MedicalSafetyRuntime v2 — 13 detectors (§10.1) | #2 | S6A-T-01 | Each detector function returns correct SafetyDecision enum | 4h |
@@ -86,7 +86,7 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 | S6D-T-06 | Implement context trace builder (per-source record with safe preview) | #2 | S6D-T-01 | contextTrace array: sourceType, sourceTable, metricCode, measuredAt, contentPreview (≤200 chars) | 2h |
 | S6D-T-07 | Implement data sufficiency score calculator (0-100 weighted sum) | #2 | S6D-T-02 | Score = profile(10)+7d(25)+30d(15)+symptoms(15)+meds(10)+vectorize(10)+hydration(5)+cycle(5)+safety(5) | 2h |
 | S6D-T-08 | Implement consent-aware sensitive data filter (hydration, cycle gated by dataShareConsent) | #2 | S6D-T-01 | dataShareConsent=0 → hydrationSummary=null, cycleSummary=null | 1h |
-| S6D-T-09 | Implement disclaimer acknowledgment check in context package | #2 | S6D-T-01 | disclaimerAcknowledged boolean; if false → all 9 forbiddenActions present | 1h |
+| S6D-T-09 | Implement disclaimer acknowledgment check in context package | #2 | S6D-T-01 | disclaimerAcknowledged boolean; if false → base 6 forbiddenActions + mode-specific additions (standard=3, proactive=2, super_aktif=0) | 1h |
 | S6D-T-10 | Write 9 context package tests (T-1 to T-9 per PRD §8) | #2 | S6D-T-01..T-09 | `npm test -- --grep contextPackage` → 9/9 pass | 3h |
 | S6D-T-11 | Sprint 6D validation gate: tsc + tests + performance check | #2 | S6D-T-01..T-10 | `npx tsc` pass; `npm test` pass; build < 500ms for typical user | 1h |
 
@@ -177,11 +177,12 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 | S6H-T-06 | Implement GET /api/admin/whatsapp/sessions with filters + summary | #1 | S6G-T-07 | Returns linked users, aiEnabled count, activeNow; filters by status, date | 2h |
 | S6H-T-07 | Implement POST /api/admin/ai/kb/reindex (queue to #3) | #1→#3 | S6F-T-01 | Queues reindex job; only approved documents reindexed; idempotent upsert | 2h |
 | S6H-T-08 | Implement medical reviewer workflow (review + approve/reject AI outputs) | #1 | S6H-T-04 | POST /api/admin/ai/evaluations/:id/review updates status + notes; audit logged | 2h |
-| S6H-T-09 | Build admin AI governance UI pages (6 pages per §9) | web/ | S6H-T-01..T-08 | /admin/ai-governance, /admin/ai-model-runs, /admin/ai-safety, /admin/ai-prompts, /admin/ai-evaluation, /admin/whatsapp-ai all render | 5h |
-| S6H-T-10 | Write 8 governance tests (T-1 to T-8 per PRD §11) | #1 | S6H-T-01..T-09 | `npm test -- --grep governance` → 8/8 pass | 3h |
-| S6H-T-11 | Sprint 6H validation gate: tsc + tests + eslint + vite build | All | S6H-T-01..T-10 | Worker `npx tsc` pass; Web `npx tsc -b` pass; `npx eslint .` 0 new; `npx vite build` pass | 1h |
+| S6H-T-09 | Implement AI Operating Mode management (super admin: read/write clinicalCopilot.operatingMode, mode change audit log, medical reviewer approval gate) | #1 | S6A-T-05 | GET/PUT /api/admin/ai/operating-mode; mode change → HL_auditLogs (action='aiOperatingModeChanged'); reviewer approval workflow if operatingModeChangeRequiresMedicalReviewer=true | 3h |
+| S6H-T-10 | Build admin AI governance UI pages (7 pages: + /admin/ai-operating-mode) | web/ | S6H-T-01..T-09 | /admin/ai-governance, /admin/ai-model-runs, /admin/ai-safety, /admin/ai-prompts, /admin/ai-evaluation, /admin/whatsapp-ai, /admin/ai-operating-mode all render | 5h |
+| S6H-T-10a | Write 9 governance tests (T-1 to T-9 per PRD §11) — includes operating mode test | #1 | S6H-T-01..T-10 | `npm test -- --grep governance` → 9/9 pass | 3h |
+| S6H-T-11 | Sprint 6H validation gate: tsc + tests + eslint + vite build | All | S6H-T-01..T-10a | Worker `npx tsc` pass; Web `npx tsc -b` pass; `npx eslint .` 0 new; `npx vite build` pass | 1h |
 
-**S6H DONE criteria:** 11/11 tasks complete, 8 tests pass, admin can view/control/evaluate AI.
+**S6H DONE criteria:** 11/11 tasks complete (T-01..T-11), 9 tests pass, admin can view/control/evaluate AI, operating mode management functional.
 
 ---
 
@@ -192,13 +193,13 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 | S6I-T-01 | Write safety test suite: 13 detectors × 5 attack vectors = 65 tests | All | S6H-DONE | 65/65 tests pass; 0 critical failures | 6h |
 | S6I-T-02 | Write 100 prompt injection adversarial test cases | All | S6H-DONE | 100/100 cases blocked or rewritten; 0 bypasses | 4h |
 | S6I-T-03 | Write cross-user retrieval isolation test (namespace + Vectorize) | All | S6H-DONE | User A vectors in user:{A}; User B query → 0 results from A; verified across all 4 workers | 2h |
-| S6I-T-04 | Write forbidden output test (diagnosis/resep/dosis/med change/specialist claim) | #2 | S6H-DONE | All restricted outputs blocked or rewritten by Safety Runtime; 0 in final output | 3h |
+| S6I-T-04 | Write forbidden output test (diagnosis/resep/dosis/med change/specialist claim — mode-dependent per §0.3) | #2 | S6H-DONE | In standard mode: all restricted outputs blocked/rewritten. In proactive: diagnosis allowed, resep/dosis/specialist blocked. In super_aktif: all allowed except medication change | 4h |
 | S6I-T-05 | Write red flag missed test: 100 emergency cases | #2 | S6F-T-03 | 100/100 cases trigger emergency_template_only or emergency_guidance; 0 missed | 3h |
 | S6I-T-06 | Write WhatsApp duplicate/order test (DO sequential guarantee) | #2,#4 | S6G-T-09 | 10 rapid messages processed in order; duplicate → 200 OK no reprocess; 0 reorderings | 2h |
 | S6I-T-07 | Write Vectorize rebuild idempotency test (3 rebuilds, same count) | #2,#3 | S6C-T-06 | 3 consecutive rebuilds → same vector count; 0 duplicates | 1h |
 | S6I-T-08 | Write performance/stress test (k6: p95 < 2s clinical chat, 50 VU) | All | S6H-DONE | Clinical chat p95 < 2000ms; Service Binding p95 < 50ms; 100 req/s sustained | 4h |
 | S6I-T-09 | Write Service Binding resilience test (error/timeout/unavailable/concurrent) | #1,#2 | S6H-DONE | #2 error → 502; timeout → 504; unavailable → 503; 100 concurrent → 0 dropped | 2h |
-| S6I-T-10 | Write i18n test (50 clinical.* keys ID + EN, disclaimer rendering) | web/ | S6E-T-10 | 0 missing keys ID; 0 missing keys EN; disclaimer renders both; WA short disclaimer both | 2h |
+| S6I-T-10 | Write i18n test (58 clinical.* keys ID + EN, disclaimer rendering, mode-specific disclaimers) | web/ | S6E-T-10 | 0 missing keys ID; 0 missing keys EN; disclaimer renders both; WA short disclaimer both; mode disclaimers render per mode | 2h |
 | S6I-T-11 | Write data retention cron test (6 cron jobs, verify cleanup) | #3 | S6F-T-12 | Sessions >365d expired; messages >180d deleted; encrypted >90d nullified; model runs archived; vectors deleted; safety flags archived | 3h |
 | S6I-T-12 | Run closed beta: deploy Sprint 6A-6H, select 20-50 testers, 7-day data collection | All | S6I-T-01..T-11 | clinicalCopilot.enabled='beta'; 7 days usage; medical reviewer audits 200 outputs; 0 critical incidents | 7d |
 | S6I-T-13 | Verify all 17 release gate metrics pass | All | S6I-T-12 | All metrics from §14 met: 0 missing disclaimers, 0 leaks, 0 downgrades, 0 misses, 0 forbidden, trace ≥95%, hallucinated <1%, reviewer ≥85%, p95 <2s, etc. | 2h |
@@ -220,9 +221,9 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 | S6E | 14 | ~29h | S6A,S6B,S6C,S6D-DONE |
 | S6F | 14 | ~28h | S6E-DONE |
 | S6G | 16 | ~33h | S6F-DONE |
-| S6H | 11 | ~26h | S6G-DONE |
+| S6H | 11 | ~29h | S6G-DONE |
 | S6I | 15 | ~38h + 7d beta | S6H-DONE |
-| **Total** | **116** | **~243h + 7d** | **Sequential** |
+| **Total** | **117** | **~249h + 7d** | **Sequential** |
 
 ---
 

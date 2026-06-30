@@ -69,17 +69,17 @@ Pre-S6A infrastructure placed so S6A-T-01 onwards can resume from disk with no s
 | `/WORK_LOG_SPRINT6.md` | Append-only execution log |
 | `/worker/migrations/003_sprint6_schema.sql` | All 10 Sprint 6 tables from PRD §12.1–12.10 |
 | `/worker/wrangler.toml` (updated) | Adds `[[services]]` block `AI_SERVICE → isehat-ai-worker` |
-| `/isehat-ai-worker/` | Worker #2 skeleton: wrangler.toml + src/index.ts + package.json + tsconfig.json |
-| `/isehat-jobs-worker/` | Worker #3 skeleton (cron + queue consumers) |
-| `/isehat-webhooks-worker/` | Worker #4 skeleton (Service Bindings to #1/#2/#3) |
+| `/worker/ai/` | Worker #2 skeleton: wrangler.toml + src/index.ts + package.json + tsconfig.json |
+| `/worker/cron/` | Worker #3 skeleton (cron + queue consumers) |
+| `/worker/webhook/` | Worker #4 skeleton (Service Bindings to #1/#2/#3) |
 
 ## 4-Worker Topology (Per PRD §6)
 
 ```text
 #1 isehat-api-worker    (= worker/)            existing — upgrade with AI_SERVICE Service Binding for S6A-T-02
-#2 isehat-ai-worker     (= isehat-ai-worker/)  new — AI orchestrator, Safety Runtime v2, Vectorize, Models
-#3 isehat-jobs-worker   (= isehat-jobs-worker/)  new in S6F — cron, queue consumer, retention, eval
-#4 isehat-webhooks-worker (= isehat-webhooks-worker/)  new in S6G — external webhooks (WA, Telegram, Xendit)
+#2 isehat-ai-worker     (= worker/ai/)  new — AI orchestrator, Safety Runtime v2, Vectorize, Models
+#3 isehat-jobs-worker   (= worker/cron/)  new in S6F — cron, queue consumer, retention, eval
+#4 isehat-webhooks-worker (= worker/webhook/)  new in S6G — external webhooks (WA, Telegram, Xendit)
 ```
 
 Migration order: S6A-T-03 drops `003_sprint6_schema.sql` into D1 (isehat_db, id `d777e991-ddc9-4072-8522-06cb08a6538c`), 10 tables, indexes + FK, migration order §12 PRD.

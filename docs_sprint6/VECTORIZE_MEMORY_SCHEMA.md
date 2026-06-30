@@ -107,6 +107,8 @@ interface VectorMetadata {
 | `safety_event` | HL_safetyEvents | Safety event summary | aiConsent |
 | `doctor_report` | HL_doctorReports (R2 metadata) | Doctor report summary | aiConsent |
 | `ai_clinical_session` | HL_aiClinicalSessions | AI clinical session summary | aiConsent |
+
+Note: In proactive and super_aktif modes, AI clinical session summaries may include diagnosis final and prescription/dosage content. These are still indexed as summarized content only. The operating mode under which the session was run is recorded in the session row for audit.
 | `medication_adherence` | HL_medicationLogs | Medication adherence summary (7/30 day) | aiConsent |
 | `hydration_cycle` | HL_hydrationLogs / HL_cycleLogs | Hydration/cycle summary | aiConsent + dataShareConsent |
 | `whatsapp_clinical` | HL_whatsappMessages | WhatsApp clinical chat summary | aiConsent |

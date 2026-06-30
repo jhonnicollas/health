@@ -65,6 +65,7 @@ Per PRD §3, sensitive data includes:
 | Vectorize Memory | ✅ Required | ✅ For cycle/hydration | — | — | feature.aiClinicalCopilot.vectorMemory |
 | Context Package (full) | ✅ Required | ✅ For cycle/hydration/symptom detail | — | — | — |
 | Admin AI Governance | — | — | — | — | admin.* permissions |
+| AI Operating Mode Change | — | — | — | — | admin.aiConfig.update + super admin role + medical reviewer approval |
 | Medical Reviewer Queue | — | — | — | — | admin.aiEvaluation.review |
 
 Legend: ✅ Required = must be true; — = not required for this feature
@@ -361,4 +362,6 @@ No plaintext sensitive data in any log, D1 metadata, KV, or API response.
 [ ] Family/caregiver access requires explicit per-category permission
 [ ] All consent checks at Worker #1 AND Worker #2 (defense in depth)
 [ ] No plaintext sensitive data in any log
+[ ] Operating mode respect: data accessible to AI depends on mode — proactive/super_aktif may access more clinical detail for diagnosis/prescription; standard limits to non-final answers only
+[ ] Mode-specific disclaimers shown to users based on current operating mode
 ```
