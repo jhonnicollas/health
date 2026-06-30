@@ -1,3 +1,6 @@
+# ───────────────────────────────────────────────────────────────────
+# Section A: tooling caches, secrets, build outputs (Sprint 5 baseline)
+# ───────────────────────────────────────────────────────────────────
 .agents/
 .commandcode/
 .git/
@@ -18,3 +21,40 @@ site/
 .dev.vars
 .env
 .env.*
+worker/.gitignore
+
+# ───────────────────────────────────────────────────────────────────
+# Section B: Build cache + test/stress/local-validation artifacts
+# Sprint 6 add — keep agent context lean (ripgrep respects these).
+# Already-existing-rule coverage notes:
+#   dist/        — generic, catches worker/dist AND web/dist AND root /dist
+#   site/        — generic, catches site/.astro build cache transitively
+#   node_modules/ — caught at root
+# ───────────────────────────────────────────────────────────────────
+
+# TypeScript incremental build cache (regenerated on tsc).
+*.tsbuildinfo
+worker/tsconfig.tsbuildinfo
+
+# Playwright HTML report + raw test artifacts.
+playwright-report/
+web/playwright-report/
+e2e/playwright-report/
+test-results/
+web/test-results/
+e2e/test-results/
+
+# Test coverage HTML report (regenerated on `npm test -- --coverage`).
+coverage/
+worker/coverage/
+web/coverage/
+
+# Stress-test dated run outputs (each run creates a new directory).
+stress-results/
+stress/results/
+worker/scripts/e2e-uat-output*/
+
+# Local-validation scratch sessions (AI Vision manual trace, ad-hoc curl).
+*.tmp
+worker/scratch/
+web/scratch/
