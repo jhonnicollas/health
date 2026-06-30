@@ -22,17 +22,7 @@ site/
 .env
 .env.*
 
-# ───────────────────────────────────────────────────────────────────
-# Section B: Build cache + test/stress/local-validation artifacts
-# Sprint 6 add — keep agent context lean (ripgrep respects these).
-# Patterns without leading "/" match at any depth — single-line entries
-# cover worker/, web/, e2e/ sub-directories. Avoid path-prefix triplets.
-# Already-existing-rule coverage notes:
-#   dist/        — generic, catches worker/dist AND web/dist AND root /dist
-#   site/        — generic, catches site/.astro build cache transitively
-#   node_modules/ — caught at root
-#   .wrangler/   — catches worker/.wrangler transitively (no separate rule)
-# ───────────────────────────────────────────────────────────────────
+# Section B: Build/test/stress artifact patterns (no leading / = any depth; Sprint 6 add for lean agent context).
 
 # TypeScript incremental build cache (regenerated on tsc).
 *.tsbuildinfo
