@@ -1,4 +1,4 @@
-# AGENTS_SPRINT6.md — Sprint 6 Compact AI-Agent Rules
+# AGENTS.md — Sprint 6 Compact AI-Agent Rules
 
 Product: iSehat / iSehat
 Scope: Sprint 6 (S6A → S6I) — AI Clinical Copilot Runtime + Emergency Guidance + WhatsApp AI + Cloudflare AI Platform
@@ -45,7 +45,7 @@ When documents conflict, use this order (highest to lowest priority):
 10. docs_sprint6/EVAL_DATASET_SPEC_SPRINT6.md = evaluation cases, scoring, reviewer workflow.
 11. docs_sprint6/TEST_PLAN_SPRINT6_AI_SAFETY.md = test coverage per phase.
 12. docs_sprint6/USER_STORIES_SPRINT6_AI.md = user-facing acceptance criteria.
-13. AGENTS_SPRINT6.md (this file) = execution and resume rules.
+13. AGENTS.md (this file) = execution and resume rules.
 14. HANDOFF_SPRINT6.md = current resume pointer.
 15. WORK_LOG_SPRINT6.md = execution history.
 ```
@@ -453,7 +453,7 @@ Each entry (max 25 lines):
 First run prompt:
 
 ```text
-Implement iSehat Sprint 6 AI Clinical Copilot. Read AGENTS_SPRINT6.md,
+Implement iSehat Sprint 6 AI Clinical Copilot. Read AGENTS.md,
 HANDOFF_SPRINT6.md, latest 3-5 WORK_LOG_SPRINT6.md entries, and only the
 current task section from TASK_PLAN_SPRINT6_AI.md. Open the related sub-PRD
 (02-10) for the current phase. Start with the task shown in HANDOFF_SPRINT6.md
@@ -468,7 +468,7 @@ Resume prompt:
 
 ```text
 Continue iSehat Sprint 6 from HANDOFF_SPRINT6.md. Identify the current/next
-task, read only relevant Sprint 6 docs (AGENTS_SPRINT6.md, current sub-PRD,
+task, read only relevant Sprint 6 docs (AGENTS.md, current sub-PRD,
 TASK_PLAN section, relevant spec docs), complete one task cycle, run
 validation, update WORK_LOG_SPRINT6.md and HANDOFF_SPRINT6.md, then continue
 sequentially to the next READY task/phase automatically until Sprint 6 Release
@@ -636,7 +636,7 @@ Sprint 6 parallelism map (per docs_sprint6/TASK_PLAN_SPRINT6_AI.md):
   [agent-<id>] <task code>: <title>
 - 1 agent MUST cite PRD section / spec doc in commit message.
 - 1 agent DOES NOT touch:
-  - AGENTS_Sprint6.md / HANDOFF_SPRINT6.md / WORK_LOG_SPRINT6.md (integrator only)
+  - AGENTS.md / HANDOFF_SPRINT6.md / WORK_LOG_SPRINT6.md (integrator only)
   - worker/wrangler.toml bindings (architecture)
   - shared services in worker/src/services/ that other agents also touch
 ```

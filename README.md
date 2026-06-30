@@ -8,7 +8,7 @@ Cloudflare-first health logging PWA — record vitals via photo, extract values 
 |---|---|
 | Runtime | Cloudflare Workers (TypeScript) |
 | API | Hono.js |
-| Database | Cloudflare D1 (`DB` → `isehat_db`, 69 HL tables Sprint 1–5 + 10 new Sprint 6 tables) |
+| Database | Cloudflare D1 (`DB` → `isehat_db`, 79 HL tables total: 69 Sprint 1–5 + 10 Sprint 6) |
 | Storage | Cloudflare R2 (`LOGS` → `multi-apps-ai-bucket`) |
 | AI Vision | `@cf/meta/llama-3.2-11b-vision-instruct` (configurable via `HL_systemConfigs`) |
 | AI Text | 9router OpenAI-compatible endpoint, 3-model fallback (`deepseek-v4-flash-free`, `mimo-v2.5-free`, `poolside/laguna-m.1:free`) |
@@ -22,26 +22,36 @@ Cloudflare-first health logging PWA — record vitals via photo, extract values 
 
 ```
 hl-health-companion/
-├── docs/                        # PRD, architecture, api-contract, schema, tasks, test-plan
-├── docs_sprint5/                # Sprint 5 planning: PRD, schema, seed, API contract, task plan, test plans
+├── AGENTS.md                   # Sprint 6 AI-agent operating rules
+├── HANDOFF_SPRINT6.md           # Resume state
+├── WORK_LOG_SPRINT6.md          # Execution history
+├── docs/                        # Architecture, API contract, schema
+├── docs_sprint5/                # Sprint 5 planning (PRD, schema, tasks, tests)
+├── docs_sprint6/                # Sprint 6 planning + specs (21 docs)
 ├── web/                         # React SPA frontend
 │   ├── src/
-│   │   ├── pages/               # 19 page groups (auth, dashboard, measurement, reports, etc.)
+│   │   ├── pages/               # 19 page groups (auth, dashboard, measurement, etc.)
 │   │   ├── components/          # Shared React components
-│   │   ├── hooks/               # useAiExtract
-│   │   ├── utils/               # imageCompressor, watermark, dateFormat, validation, bmiCalculator
-│   │   ├── context/             # AuthContext + auth (useAuth)
+│   │   ├── hooks/               # useAiExtract etc.
+│   │   ├── utils/               # imageCompressor, watermark, dateFormat, etc.
+│   │   ├── context/             # AuthContext
 │   │   ├── styles/              # senior-mode.css, high-contrast.css
-│   │   └── App.tsx              # SPA shell (sidebar + topbar + bottom nav)
+│   │   └── App.tsx              # SPA shell
 │   ├── public/                  # manifest.json, icons, sw.js, favicon.svg
 │   └── functions/api/           # Pages Function proxy → Worker URL
-├── worker/                      # Hono.js Worker (~4900 lines)
-│   └── src/
-│       ├── index.ts             # Main routes (auth, profile, measurements, dashboard, AI, reports, etc.)
-│       └── routes-extra.ts      # Extra routes (emergency, family, medications, fasting, streaks, patterns, cron)
-├── functions/api/[[path]].ts    # Pages Function proxy (rewrites /api/* → Worker origin)
-├── package.json                 # Monorepo root (workspaces: web, worker)
-└── AGENTS.md                    # Multi-agent operating rules
+├── worker/apps/                 # Worker #1 — isehat-api-worker (Hono.js)
+│   ├── src/
+│   │   ├── index.ts             # Main routes
+│   │   ├── routes-*.ts          # Route modules
+│   │   └── services/            # Shared services
+│   ├── migrations/              # D1 SQL migrations
+│   ├── scripts/                 # Seed, split-routes, e2e
+│   └── test/                    # Test files
+├── worker/ai/                   # Worker #2 — isehat-ai-worker (AI orchestrator)
+├── worker/cron/                 # Worker #3 — isehat-jobs-worker (cron, retention)
+├── worker/webhook/              # Worker #4 — isehat-webhooks-worker (WA, Telegram, Xendit)
+├── package.json                 # Monorepo root (workspaces: web, worker/apps)
+└── functions/api/[[path]].ts    # Pages Function proxy (rewrites /api/* → Worker origin)
 ```
 
 ## Sprint Status
@@ -63,10 +73,10 @@ All **5 implementation Sprints** complete (69 HL tables, 336/336 tests, 153-item
 ## Cloudflare Bindings
 
 ```toml
-# Worker #1 — isehat-api-worker (= worker/)
+# Worker #1 — isehat-api-worker (= worker/apps/)
 [[d1_databases]]
 binding = "DB"
-database_name = "isehat_db"           # D1 cross-migrated 2026-06-27 (was multi_Ai_db)
+database_name = "isehat_db"
 database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
 
 [[r2_buckets]]
@@ -92,7 +102,7 @@ Additional Workers are scaffolded for Sprint 6 (skeletons on disk):
 
 | Worker | Path | Status |
 |---|---|---|
-| #1 `isehat-api-worker` | `worker/` | active (Sprint 1–5) |
+| #1 `isehat-api-worker` | `worker/apps/` | active (Sprint 1–5) |
 | #2 `isehat-ai-worker` | `worker/ai/` | S6A-T-01 next |
 | #3 `isehat-jobs-worker` | `worker/cron/` | S6F (cron + retention) |
 | #4 `isehat-webhooks-worker` | `worker/webhook/` | S6G (Xendit + Telegram + WhatsApp) |
@@ -249,21 +259,21 @@ npx wrangler d1 execute isehat_db --local --command "PRAGMA foreign_key_check;"
 
 ### Sprint 6 Hard Boundaries (added 2026-06-30)
 
-12. **AI must not prescribe or diagnose.** Sprint 6 forbids `forbiddenActions` × 9 entries; medical safety = 13-detector server-side ABES.
+12. **AI forbidden actions are mode-dependent.** Sprint 6 enforces 6 base + mode-specific forbidden actions (standard=9, proactive=8, super_aktif=6); medical safety = 13-detector server-side Safety Runtime.
 13. **Sprint 5C context data = sprint6 basis** — `HL_vectorDocuments` / `HL_aiContextQueries` maps cleanly into new Sprint 6 tables. No destructive migration.
 14. **WhatsApp via Baileys VPS** — out-of-Cloudflare process; only `isehat-webhooks-worker` accepts WA webhooks (signed via `WA_GATEWAY_SECRET`).
 
 ## Account
 
-- **Cloudflare Account ID**: `79dea2845a4b62ea5229c8676dea02c0`
+- **Cloudflare Account ID**: stored in `CLOUDFLARE_ACCOUNT_ID` env var
 - **Token**: Set via `CLOUDFLARE_API_TOKEN` env var
 
 ## Multi-Agent Protocol
 
-See `AGENTS.md` (root) for cross-sprint task ordering, handoff, logging, and validation rules. **Sprint 6-specific** rules are in [`docs_sprint6/AGENTS_SPRINT6.md`](./docs_sprint6/AGENTS_SPRINT6.md).
+See `AGENTS.md` (root) for Sprint 6 task ordering, handoff, logging, and validation rules.
 
 Resume pointers:
 
 - **Sprint 6 active:** [`HANDOFF_SPRINT6.md`](./HANDOFF_SPRINT6.md) + [`WORK_LOG_SPRINT6.md`](./WORK_LOG_SPRINT6.md)
 - **Sprint 1–5 legacy:** [`archive/sprint1-5/HANDOFF.md`](./archive/sprint1-5/HANDOFF.md) + [`archive/sprint1-5/WORK_LOG.md`](./archive/sprint1-5/WORK_LOG.md)
-- **Sprint 1–4 legacy:** [`archive/sprint1-4/AGENTS_Sprint1-4.md`](./archive/sprint1-4/AGENTS_Sprint1-4.md) (rulebook superseded by `/AGENTS.md`)
+- **Sprint 1–4 legacy:** [`archive/sprint1-4/AGENTS_Sprint1-4.md`](./archive/sprint1-4/AGENTS_Sprint1-4.md) (superseded by `/AGENTS.md`)
