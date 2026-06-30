@@ -1,6 +1,6 @@
 name = "isehat-ai-worker"
 main = "src/index.ts"
-compatibility_date = "2026-06-20"
+compatibility_date = "2026-06-10"
 workers_dev = true
 
 # Source of truth: docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md §6.5 Shared Platform Bindings
@@ -21,10 +21,10 @@ index_name = "hl-health-memory"
 
 # AI Search — open beta, free within platform limits (PRD §8.10)
 # BLOCKED until AI Search instance is provisioned in Cloudflare dashboard.
-# Set instance_id after creating the index; deploy will fail with [TBD].
-[ai_search]
-binding = "AI_SEARCH"
-instance_id = "[TBD — provision AI Search in Cloudflare dashboard]"
+# Set instance_id after creating the index; uncomment and deploy.
+# [[ai_search]]
+# binding = "AI_SEARCH"
+# instance_id = "<ai-search-instance-id>"
 
 # KV cache — prompt / routing / config / education / search / disclaimer (PRD §8.11)
 # BLOCKED until KV namespace is created. Run: wrangler kv:namespace create AI_KV

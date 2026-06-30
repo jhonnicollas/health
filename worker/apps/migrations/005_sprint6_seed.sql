@@ -1,4 +1,4 @@
--- Migration 004 — Sprint 6 — Seed data for AI Clinical Copilot
+-- Migration 005 — Sprint 6 — Seed data for AI Clinical Copilot
 -- Source of truth: docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md §13 + §7 + §12
 -- Idempotent: uses INSERT OR IGNORE everywhere.
 -- Apply after: 003_sprint6_schema.sql
@@ -10,6 +10,8 @@ PRAGMA foreign_keys = ON;
 -- ---------------------------------------------------------
 INSERT OR IGNORE INTO HL_roles (roleCode, roleName, description, systemRole, active)
 VALUES
+  ('user', 'User', 'Default registered user', 1, 1),
+  ('support', 'Support', 'Customer support with limited access', 1, 1),
   ('admin', 'Admin', 'General administrator', 1, 1),
   ('superAdmin', 'Super Admin', 'Full system administrator', 1, 1),
   ('billingAdmin', 'Billing Admin', 'Billing and subscription administrator', 1, 1),
@@ -136,7 +138,10 @@ VALUES
   ('whatsappAi.healthCheckIntervalSeconds', '300', 'number', 'WhatsApp gateway health check interval'),
   -- Medical Safety Runtime
   ('medicalSafetyRuntime.enabled', 'true', 'boolean', 'Enable Medical Safety Runtime v2'),
-  ('medicalSafetyRuntime.strictMode', 'true', 'boolean', 'Strict mode: critical detectors always block');
+  ('medicalSafetyRuntime.strictMode', 'true', 'boolean', 'Strict mode: critical detectors always block'),
+  -- Operating Mode Governance
+  ('clinicalCopilot.operatingMode', 'standard', 'string', 'AI Clinical Copilot operating mode: standard | proactive | super_aktif'),
+  ('clinicalCopilot.operatingModeChangeRequiresMedicalReviewer', 'true', 'boolean', 'Require medical reviewer approval to change operating mode');
 
 -- ---------------------------------------------------------
 -- 4. Plan Quota Matrix (S6A-T-07)
@@ -396,11 +401,11 @@ VALUES
 -- Migration metadata
 -- ---------------------------------------------------------
 INSERT OR IGNORE INTO HL_schemaMigrations (migrationName, appliedAt)
-  VALUES ('004_sprint6_seed', datetime('now'));
+  VALUES ('005_sprint6_seed', datetime('now'));
 
 -- Post-seed validation:
 -- SELECT COUNT(*) FROM HL_featureFlags WHERE flagCode LIKE 'feature.aiClinicalCopilot.%';  -- expected 10
--- SELECT COUNT(*) FROM HL_systemConfigs WHERE configKey LIKE 'aiGateway.%' OR configKey LIKE 'vectorize.%' OR configKey LIKE 'clinicalCopilot.%' OR configKey LIKE 'whatsappAi.%' OR configKey LIKE 'medicalSafetyRuntime.%' OR configKey LIKE 'workersAi.%' OR configKey LIKE 'aiSearch.%' OR configKey LIKE 'kv.%' OR configKey LIKE 'firstAid.%';  -- expected 38
+-- SELECT COUNT(*) FROM HL_systemConfigs WHERE configKey LIKE 'aiGateway.%' OR configKey LIKE 'vectorize.%' OR configKey LIKE 'clinicalCopilot.%' OR configKey LIKE 'whatsappAi.%' OR configKey LIKE 'medicalSafetyRuntime.%' OR configKey LIKE 'workersAi.%' OR configKey LIKE 'aiSearch.%' OR configKey LIKE 'kv.%' OR configKey LIKE 'firstAid.%';  -- expected 44
 -- SELECT COUNT(*) FROM HL_permissions WHERE permissionCode LIKE 'admin.ai%';  -- expected 7
 -- SELECT COUNT(*) FROM HL_planFeatures WHERE featureCode LIKE 'feature.aiClinicalCopilot.%';  -- expected 50
 -- SELECT COUNT(*) FROM HL_promptVersions WHERE status='active';  -- expected 6

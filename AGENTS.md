@@ -312,7 +312,8 @@ A task is DONE only if:
 [ ] no unsupported table/endpoint/field/permission/feature code invented;
 [ ] Sprint 1–5 regression risk checked;
 [ ] WORK_LOG_SPRINT6.md appended;
-[ ] HANDOFF_SPRINT6.md updated with next task.
+[ ] HANDOFF_SPRINT6.md updated with next task;
+[ ] Task-plan documentation updated: mark task DONE in docs_sprint6/TASK_PLAN_SPRINT6_AI.md and update phase PRD status/status banner when completing the last task of a phase.
 ```
 
 Mark BLOCKED when:

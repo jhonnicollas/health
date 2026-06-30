@@ -130,3 +130,82 @@ test('usageWindowKey supports day/month/quarter/year/lifetime', () => {
   assert.equal(usageWindowKey('lifetime', now), 'lifetime')
   assert.equal(usageResetAt('quarter', now), '2026-07-01T00:00:00.000Z')
 })
+
+test('EntitlementService returns correct aiClinicalCopilot quotas per seeded plan', async () => {
+  const db = new EntitlementDbMock()
+  // Seed all 5 Sprint 6 plans
+  db.plans = [
+    { planCode: 'free', planName: 'Free', billingInterval: 'free', active: 1 },
+    { planCode: 'premiumMonthly', planName: 'Premium Monthly', billingInterval: 'monthly', active: 1 },
+    { planCode: 'premiumQuarterly', planName: 'Premium Quarterly', billingInterval: 'quarterly', active: 1 },
+    { planCode: 'premiumYearly', planName: 'Premium Yearly', billingInterval: 'yearly', active: 1 },
+    { planCode: 'familyPremium', planName: 'Family Premium', billingInterval: 'yearly', active: 1 }
+  ]
+  // Seed the full 10-feature × 5-plan matrix from 005_sprint6_seed.sql
+  db.planFeatures = [
+    { planCode: 'free', featureCode: 'feature.aiClinicalCopilot.use', enabled: 1, quotaLimit: 5, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumMonthly', featureCode: 'feature.aiClinicalCopilot.use', enabled: 1, quotaLimit: 200, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumQuarterly', featureCode: 'feature.aiClinicalCopilot.use', enabled: 1, quotaLimit: 200, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumYearly', featureCode: 'feature.aiClinicalCopilot.use', enabled: 1, quotaLimit: 200, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'familyPremium', featureCode: 'feature.aiClinicalCopilot.use', enabled: 1, quotaLimit: 300, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'free', featureCode: 'feature.aiClinicalCopilot.whatsapp', enabled: 0, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumMonthly', featureCode: 'feature.aiClinicalCopilot.whatsapp', enabled: 1, quotaLimit: 100, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumQuarterly', featureCode: 'feature.aiClinicalCopilot.whatsapp', enabled: 1, quotaLimit: 100, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumYearly', featureCode: 'feature.aiClinicalCopilot.whatsapp', enabled: 1, quotaLimit: 100, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'familyPremium', featureCode: 'feature.aiClinicalCopilot.whatsapp', enabled: 1, quotaLimit: 150, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'free', featureCode: 'feature.aiClinicalCopilot.vectorMemory', enabled: 0, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumMonthly', featureCode: 'feature.aiClinicalCopilot.vectorMemory', enabled: 1, quotaLimit: 500, quotaWindow: 'lifetime', metadataJson: null },
+    { planCode: 'premiumQuarterly', featureCode: 'feature.aiClinicalCopilot.vectorMemory', enabled: 1, quotaLimit: 500, quotaWindow: 'lifetime', metadataJson: null },
+    { planCode: 'premiumYearly', featureCode: 'feature.aiClinicalCopilot.vectorMemory', enabled: 1, quotaLimit: 500, quotaWindow: 'lifetime', metadataJson: null },
+    { planCode: 'familyPremium', featureCode: 'feature.aiClinicalCopilot.vectorMemory', enabled: 1, quotaLimit: 500, quotaWindow: 'lifetime', metadataJson: null },
+    { planCode: 'free', featureCode: 'feature.aiClinicalCopilot.firstAid', enabled: 1, quotaLimit: 3, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumMonthly', featureCode: 'feature.aiClinicalCopilot.firstAid', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumQuarterly', featureCode: 'feature.aiClinicalCopilot.firstAid', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumYearly', featureCode: 'feature.aiClinicalCopilot.firstAid', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'familyPremium', featureCode: 'feature.aiClinicalCopilot.firstAid', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'free', featureCode: 'feature.aiClinicalCopilot.emergencyGuidance', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumMonthly', featureCode: 'feature.aiClinicalCopilot.emergencyGuidance', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumQuarterly', featureCode: 'feature.aiClinicalCopilot.emergencyGuidance', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumYearly', featureCode: 'feature.aiClinicalCopilot.emergencyGuidance', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'familyPremium', featureCode: 'feature.aiClinicalCopilot.emergencyGuidance', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'free', featureCode: 'feature.aiClinicalCopilot.doctorHandoff', enabled: 0, quotaLimit: null, quotaWindow: null, metadataJson: null },
+    { planCode: 'premiumMonthly', featureCode: 'feature.aiClinicalCopilot.doctorHandoff', enabled: 1, quotaLimit: 10, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumQuarterly', featureCode: 'feature.aiClinicalCopilot.doctorHandoff', enabled: 1, quotaLimit: 10, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'premiumYearly', featureCode: 'feature.aiClinicalCopilot.doctorHandoff', enabled: 1, quotaLimit: 10, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'familyPremium', featureCode: 'feature.aiClinicalCopilot.doctorHandoff', enabled: 1, quotaLimit: 20, quotaWindow: 'month', metadataJson: null },
+    { planCode: 'familyPremium', featureCode: 'feature.aiClinicalCopilot.caregiverSummary', enabled: 1, quotaLimit: null, quotaWindow: null, metadataJson: null }
+  ]
+  db.subscriptions = [
+    { userId: 101, planCode: 'free', status: 'active', currentPeriodEnd: null },
+    { userId: 102, planCode: 'premiumMonthly', status: 'active', currentPeriodEnd: null },
+    { userId: 103, planCode: 'familyPremium', status: 'active', currentPeriodEnd: null }
+  ]
+
+  const freeQuota = await QuotaService.requireQuota(db, 101, 'feature.aiClinicalCopilot.use')
+  assert.equal(freeQuota.planCode, 'free')
+  assert.equal(freeQuota.quotaLimit, 5)
+  assert.equal(freeQuota.remaining, 5)
+
+  const premiumQuota = await QuotaService.requireQuota(db, 102, 'feature.aiClinicalCopilot.use')
+  assert.equal(premiumQuota.planCode, 'premiumMonthly')
+  assert.equal(premiumQuota.quotaLimit, 200)
+  assert.equal(premiumQuota.remaining, 200)
+
+  const familyQuota = await QuotaService.requireQuota(db, 103, 'feature.aiClinicalCopilot.use')
+  assert.equal(familyQuota.planCode, 'familyPremium')
+  assert.equal(familyQuota.quotaLimit, 300)
+  assert.equal(familyQuota.remaining, 300)
+
+  const disabled = await EntitlementService.requireEntitlement(db, 101, 'feature.aiClinicalCopilot.whatsapp')
+  assert.equal(disabled.allowed, false)
+  assert.equal(disabled.reason, 'FEATURE_DISABLED')
+
+  const unlimited = await QuotaService.requireQuota(db, 101, 'feature.aiClinicalCopilot.emergencyGuidance')
+  assert.equal(unlimited.allowed, true)
+  assert.equal(unlimited.quotaLimit, null)
+  assert.equal(unlimited.remaining, null)
+
+  const lifetime = await QuotaService.requireQuota(db, 102, 'feature.aiClinicalCopilot.vectorMemory')
+  assert.equal(lifetime.quotaLimit, 500)
+  assert.equal(lifetime.quotaWindow, 'lifetime')
+})

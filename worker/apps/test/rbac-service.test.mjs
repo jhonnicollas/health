@@ -103,3 +103,25 @@ test('RbacService grants seeded superAdmin permissions through rolePermissions o
   assert.equal(await RbacService.hasPermission(db, 5, 'admin.config.read'), true)
   assert.equal(await RbacService.hasPermission(db, 5, 'admin.config.update'), false)
 })
+
+test('RbacService admin role has Sprint 6 AI permissions seeded', async () => {
+  const db = new RbacDbMock()
+  // Seed Sprint 6 AI permissions into the mock db as the migration does
+  const sprint6Permissions = [
+    'admin.aiModelRun.read',
+    'admin.aiSafety.read',
+    'admin.aiEvaluation.read',
+    'admin.aiEvaluation.review',
+    'admin.aiConfig.read',
+    'admin.aiConfig.update',
+    'admin.whatsapp.read'
+  ]
+  for (const permissionCode of sprint6Permissions) {
+    db.permissions.push({ permissionCode, category: 'admin', active: 1 })
+    db.rolePermissions.push({ roleCode: 'admin', permissionCode })
+  }
+
+  assert.equal(await RbacService.hasPermission(db, 2, 'admin.aiModelRun.read'), true)
+  assert.equal(await RbacService.hasPermission(db, 2, 'admin.aiSafety.read'), true)
+  assert.equal(await RbacService.hasPermission(db, 2, 'admin.aiEvaluation.review'), true)
+})

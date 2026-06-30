@@ -14,7 +14,7 @@ import {
 import { parseLocale } from './i18n/locale.js'
 import { getAiDisclaimer } from './i18n/disclaimer-templates.js'
 
-interface LocalEnv { DB: D1Database; AI_MEMORY_QUEUE?: Queue; VECTORIZE_INDEX?: any }
+interface LocalEnv { DB: D1Database; AI_MEMORY_QUEUE?: Queue; VECTORIZE_INDEX?: any; AI_SERVICE?: Fetcher }
 type HC = Context<{ Bindings: LocalEnv }>
 function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body.body ?? body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now()) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
@@ -36,6 +36,26 @@ const VALID_PURPOSES = ['contextReadiness','assistantContext','reportContext','s
 const VALID_SOURCE_TYPES = ['measurement','symptom','safetyEvent','hydration','cycle','medication','fasting','pattern','report','education']
 
 export function mountAiRoutes(app: any) {
+  // Service Binding health probe — S6A-T-02
+  app.get('/api/ai/probe', async (c: HC) => {
+    const s = Date.now()
+    try {
+      if (!c.env.AI_SERVICE) {
+        return jr(c, fail('INTERNAL_ERROR', 'AI_SERVICE binding not configured.', 503, [], s), 503)
+      }
+      const res = await c.env.AI_SERVICE.fetch(new Request('https://ai-service.internal/health', { method: 'GET' }))
+      if (!res.ok) {
+        return jr(c, fail('AI_SERVICE_UNAVAILABLE', `AI worker returned HTTP ${res.status}.`, 502, [], s), 502)
+      }
+      const payload = await res.json() as any
+      const status = payload?.data?.status || payload?.status || 'unknown'
+      return c.json({ ok: status === 'ok', aiWorker: { status, worker: payload?.data?.worker || payload?.worker }, meta: { checkedAt: new Date().toISOString() } }, 200)
+    } catch (e) {
+      console.error('AI service probe failed:', e)
+      return jr(c, fail('AI_SERVICE_ERROR', 'Failed to reach AI worker via Service Binding.', 502, [], s), 502)
+    }
+  })
+
   app.post('/api/ai/context/query', async (c: HC) => {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)

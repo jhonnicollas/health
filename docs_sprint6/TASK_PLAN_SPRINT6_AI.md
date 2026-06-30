@@ -16,20 +16,20 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 
 | Task ID | Task | Worker | Depends On | Validation | Est |
 |---|---|---|---|---|---|
-| S6A-T-01 | Create isehat-ai-worker skeleton (wrangler.toml, src/index.ts, Hono app, health route) | #2 | — | `wrangler dev` starts; GET /health returns 200 | 2h |
-| S6A-T-02 | Configure Service Binding from #1 to #2 (AI_SERVICE in wrangler.toml) | #1 | S6A-T-01 | #1 can call `env.AI_SERVICE.fetch()` successfully | 1h |
-| S6A-T-03 | Create migration 003_sprint6_schema.sql with all 10 tables + indexes + FK | #1,#2 | — | `wrangler d1 execute --local --file=003_sprint6_schema.sql` succeeds; PRAGMA foreign_key_check clean | 3h |
-| S6A-T-04 | Seed 10 feature flags into HL_featureFlags (§13.1) | #1 | S6A-T-03 | SELECT count(*) = 10 for feature.aiClinicalCopilot.* flags | 1h |
-| S6A-T-05 | Seed 44 system configs into HL_systemConfigs (§13.3) — includes operatingMode + operatingModeChangeRequiresMedicalReviewer | #1 | S6A-T-03 | SELECT count(*) = 44 for aiGateway.*, vectorize.*, clinicalCopilot.*, etc. | 2h |
-| S6A-T-06 | Seed 7 RBAC permissions + assign to admin role | #1 | S6A-T-03 | RbacService.hasPermission(adminUserId, 'admin.aiModelRun.read') = true | 1h |
-| S6A-T-07 | Seed plan quota matrix: 10 features × 5 plans into HL_planFeatures | #1 | S6A-T-03,T-04 | EntitlementService.checkQuota returns correct limits per plan | 2h |
-| S6A-T-08 | Implement MedicalSafetyRuntime v2 — 13 detectors (§10.1) | #2 | S6A-T-01 | Each detector function returns correct SafetyDecision enum | 4h |
-| S6A-T-09 | Implement SafetyDecision enum + blocked response template | #2 | S6A-T-08 | Blocked template renders §10.3 text correctly | 1h |
-| S6A-T-10 | Write 13 safety guard unit tests (1 per detector) | #2 | S6A-T-08,T-09 | `npm test -- --grep safety` → 13/13 pass | 3h |
-| S6A-T-11 | Seed 6 default prompt versions in HL_promptVersions | #2 | S6A-T-03 | 6 prompt codes with status='active'; contentHash non-null | 2h |
-| S6A-T-12 | Sprint 6A validation gate: tsc + tests + PRAGMA check | All | S6A-T-01..T-11 | `npx tsc -p tsconfig.json` pass; `npm test` pass; PRAGMA foreign_key_check clean | 1h |
+| S6A-T-01 | [x] Create isehat-ai-worker skeleton (wrangler.toml, src/index.ts, Hono app, health route) | #2 | — | `wrangler dev` starts; GET /health returns 200 | 2h |
+| S6A-T-02 | [x] Configure Service Binding from #1 to #2 (AI_SERVICE in wrangler.toml) | #1 | S6A-T-01 | #1 can call `env.AI_SERVICE.fetch()` successfully | 1h |
+| S6A-T-03 | [x] Create migration 003_sprint6_schema.sql with all 10 tables + indexes + FK | #1,#2 | — | `wrangler d1 execute --local --file=003_sprint6_schema.sql` succeeds; PRAGMA foreign_key_check clean | 3h |
+| S6A-T-04 | [x] Seed 10 feature flags into HL_featureFlags (§13.1) | #1 | S6A-T-03 | SELECT count(*) = 10 for feature.aiClinicalCopilot.* flags | 1h |
+| S6A-T-05 | [x] Seed 44 system configs into HL_systemConfigs (§13.3) — includes operatingMode + operatingModeChangeRequiresMedicalReviewer | #1 | S6A-T-03 | SELECT count(*) = 44 for aiGateway.*, vectorize.*, clinicalCopilot.*, etc. | 2h |
+| S6A-T-06 | [x] Seed 7 RBAC permissions + assign to admin role | #1 | S6A-T-03 | RbacService.hasPermission(adminUserId, 'admin.aiModelRun.read') = true | 1h |
+| S6A-T-07 | [x] Seed plan quota matrix: 10 features × 5 plans into HL_planFeatures | #1 | S6A-T-03,T-04 | EntitlementService.checkQuota returns correct limits per plan | 2h |
+| S6A-T-08 | [x] Implement MedicalSafetyRuntime v2 — 13 detectors (§10.1) | #2 | S6A-T-01 | Each detector function returns correct SafetyDecision enum | 4h |
+| S6A-T-09 | [x] Implement SafetyDecision enum + blocked response template | #2 | S6A-T-08 | Blocked template renders §10.3 text correctly | 1h |
+| S6A-T-10 | [x] Write 13 safety guard unit tests (1 per detector) | #2 | S6A-T-08,T-09 | `npm test -- --grep safety` → 13/13 pass | 3h |
+| S6A-T-11 | [x] Seed 6 default prompt versions in HL_promptVersions | #2 | S6A-T-03 | 6 prompt codes with status='active'; contentHash non-null | 2h |
+| S6A-T-12 | [x] Sprint 6A validation gate: tsc + tests + PRAGMA check | All | S6A-T-01..T-11 | `npx tsc -p tsconfig.json` pass; `npm test` pass; PRAGMA foreign_key_check clean | 1h |
 
-**S6A DONE criteria:** 12/12 tasks complete, 13 safety tests pass, Service Binding functional, all schema/configs/flags seeded.
+**S6A DONE criteria:** ✅ 12/12 tasks complete, 13 safety tests pass, Service Binding functional, all schema/configs/flags seeded.
 
 ---
 

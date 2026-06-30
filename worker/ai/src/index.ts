@@ -13,29 +13,7 @@
 // to mark which routes MUST be wired up before the release gate.
 
 import { Hono } from "hono";
-
-type Bindings = {
-  DB: D1Database;
-  LOGS: R2Bucket;
-  VECTORIZE_INDEX: VectorizeIndex;
-  AI_SEARCH: AiSearch;
-  AI_KV: KVNamespace;
-  AI_CHAT_SESSION_DO: DurableObjectNamespace;
-  WHATSAPP_SESSION_DO: DurableObjectNamespace;
-  USER_AI_LOCK_DO: DurableObjectNamespace;
-  MODEL_STREAMING_DO: DurableObjectNamespace;
-  JOB_PROGRESS_DO: DurableObjectNamespace;
-  AI: Ai;
-  CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_API_TOKEN?: string;
-  CLOUDFLARE_GATEWAY_ID?: string;
-  AI_GATEWAY_ENABLED?: string;
-  VECTORIZE_MAX_VECTORS_PER_USER?: string;
-  VECTORIZE_ALERT_THRESHOLD_PERCENT?: string;
-  CLINICAL_COPILOT_ENABLED?: string;
-  MEDICAL_SAFETY_RUNTIME_ENABLED?: string;
-  MEDICAL_SAFETY_RUNTIME_STRICT_MODE?: string;
-};
+import type { Bindings } from "./types.js";
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -46,8 +24,6 @@ app.get("/health", (c) =>
     data: {
       worker: "isehat-ai-worker",
       status: "ok",
-      clinicalCopilotEnabled: c.env.CLINICAL_COPILOT_ENABLED === "true",
-      safetyRuntimeEnabled: c.env.MEDICAL_SAFETY_RUNTIME_ENABLED === "true",
     },
     meta: { checkedAt: new Date().toISOString() },
   })
@@ -82,6 +58,9 @@ app.post("/api/ai/clinical/session/start", (c) => {
 app.post("/api/ai/clinical/message", (c) => {
   const auth = requireAuth(c);
   if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  if (c.env.CLINICAL_COPILOT_ENABLED !== "true") {
+    return c.json({ success: false, error: { code: "CLINICAL_COPILOT_DEFERRED" } }, 503);
+  }
   return c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6E-T-04" } }, 501);
 });
 
@@ -132,5 +111,34 @@ app.post("/api/ai/context/query", (c) =>
 app.get("/api/ai/context-package", (c) =>
   c.json({ success: false, error: { code: "NOT_IMPLEMENTED" } }, 501)
 );
+
+// Durable Object stubs — required by wrangler.toml bindings.
+// Real implementations land in S6E (AiChatSessionDO), S6G (WhatsAppSessionDO),
+// S6B/S6E (UserAiLockDO, ModelStreamingDO), and S6F/S6H (JobProgressDO).
+export class AiChatSessionDO implements DurableObject {
+  fetch(_request: Request): Response | Promise<Response> {
+    return new Response("AiChatSessionDO stub", { status: 501 });
+  }
+}
+export class WhatsAppSessionDO implements DurableObject {
+  fetch(_request: Request): Response | Promise<Response> {
+    return new Response("WhatsAppSessionDO stub", { status: 501 });
+  }
+}
+export class UserAiLockDO implements DurableObject {
+  fetch(_request: Request): Response | Promise<Response> {
+    return new Response("UserAiLockDO stub", { status: 501 });
+  }
+}
+export class ModelStreamingDO implements DurableObject {
+  fetch(_request: Request): Response | Promise<Response> {
+    return new Response("ModelStreamingDO stub", { status: 501 });
+  }
+}
+export class JobProgressDO implements DurableObject {
+  fetch(_request: Request): Response | Promise<Response> {
+    return new Response("JobProgressDO stub", { status: 501 });
+  }
+}
 
 export default app;

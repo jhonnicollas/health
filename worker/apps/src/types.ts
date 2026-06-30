@@ -13,6 +13,7 @@ export interface Env {
   TELEGRAM_QUEUE?: Queue
   AI_MEMORY_QUEUE?: Queue
   VECTORIZE_INDEX?: any
+  AI_SERVICE?: Fetcher
   GOOGLE_CLIENT_ID?: string
   GOOGLE_CLIENT_SECRET?: string
   RESEND_API_KEY?: string

@@ -4,24 +4,32 @@
 
 ```text
 Sprint: Sprint 6 (S6A → S6I) — AI Clinical Copilot Runtime + Emergency + WhatsApp AI + Cloudflare AI Platform
-Status: NOT STARTED — Phase S6A Foundation + Safety Contract
-Current Task: S6A-T-01 (isehat-ai-worker skeleton → source code flesh-out)
-Done in Pre-S6A Setup:
-  ✓ worker/wrangler.toml [[services]] AI_SERVICE → isehat-ai-worker (S6A-T-02 pre-wired)
-  ✓ worker/migrations/003_sprint6_schema.sql (10 tables, FK-safe, HL_schemaMigrations row exists in docs/07-schema.sql line 20)
-  ✓ isehat-ai-worker / isehat-jobs-worker / isehat-webhooks-worker skeletons on disk
-  ✓ HANDOFF_SPRINT6.md / WORK_LOG_SPRINT6.md on disk
-  ✓ Forbidden-actions §9.3 = 9 entries (was 7); embedding model unified to bge-base-en-v1.5 768-dim
-Sources of canonical names verified:
-  ✓ Queue names: telegram-submit-summary, ai-memory-jobs, whatsapp-outbound, eval-jobs (PRD §S4 6F + §S5 6G + existing S5)
-  ✓ R2 bucket: multi-apps-ai-bucket (PRD §6.5 binding LOGS)
-  ✓ AI bindings are separated: env.AI (Workers AI native, in isehat-ai-worker only) vs env.AI_SERVICE (services RPC, in worker/ only)
-Next Task: S6A-T-01 (isehat-ai-worker source code: orchestrator, Safety Runtime v2, prompt loader, model router)
-Workers Active: 4 skeletons on disk (only Worker #1 has real code today)
-Tests: n/a (pre-implementation)
-tsc: n/a
+Phase: S6A (Foundation + Safety Contract)
+Status: DONE (post-audit fix pass — 9 bugs found and fixed)
+Current Task: S6A-T-12 (S6A validation gate) — COMPLETE with audit corrections
+Next Task: S6B-T-01 (Cloudflare AI Platform — AI Gateway + model router)
+Workers Active: #1 isehat-api-worker + #2 isehat-ai-worker
+Tests: worker/ai 20/20 PASS; worker/apps 338/338 PASS
+D1: PRAGMA foreign_key_check clean (0 rows)
+tsc: worker/ai PASS; worker/apps PASS
 eslint: n/a
 ```
+
+## S6A Post-Phase Audit — 2026-06-30
+
+9 bugs found and fixed:
+
+| # | Severity | Bug | Fix | File |
+|---|---|---|---|---|
+| 1 | **CRITICAL** | `sensitiveDataLeakDetector` only checked `dataShareConsent`, not `aiConsent` | Split into AI_CONSENT_ONLY + DUAL_CONSENT pattern groups | `detectors.ts` |
+| 2 | **HIGH** | `safetyRuntime.ts` Phase 2 rewrite loop didn't chain — each detector got original `aiOutput` | Pass `{...input, aiOutput: output}` to each detector | `safetyRuntime.ts` |
+| 3 | **HIGH** | Missing `operatingMode` column in `HL_aiClinicalSessions` (PRD §12.1) | Added column with CHECK constraint | `003_sprint6_schema.sql` |
+| 4 | **HIGH** | Missing `operatingMode` column in `HL_modelRuns` (PRD §12.2) | Added column with CHECK constraint | `003_sprint6_schema.sql` |
+| 5 | **HIGH** | `HL_TABLES` in `constants.ts` missing 10 Sprint 6 tables | Added all 10 new tables | `constants.ts` |
+| 6 | **MEDIUM** | `HL_modelRuns.status` CHECK included `'pending'` not in PRD §12.2 | Removed `'pending'` | `003_sprint6_schema.sql` |
+| 7 | **MEDIUM** | `runSafetyRuntime` never produced `NEEDS_HUMAN_REVIEW` (PRD §10.2) | Added pathway: high/critical rewrite severity → `NEEDS_HUMAN_REVIEW` | `safetyRuntime.ts` |
+| 8 | **LOW** | `/api/ai/clinical/message` missing `CLINICAL_COPILOT_ENABLED` gate | Added check consistent with `/session/start` | `worker/ai/src/index.ts` |
+| 9 | **LOW** | Migration 005 header/metadata ref said "004" | Fixed to "005" | `005_sprint6_seed.sql` |
 
 ## Audit Summary — 2026-06-30 Pre-S6A Start
 
