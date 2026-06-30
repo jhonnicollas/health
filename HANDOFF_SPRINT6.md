@@ -39,7 +39,7 @@ eslint: n/a
 
 ## Source-of-Truth Order for Sprint 6
 
-Per AGENTS_SPRINT6.md §1, when docs conflict:
+Per AGENTS.md §1, when docs conflict:
 
 ```text
 1. docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md        (master PRD — product, safety, schema, feature flags, plan quota, API endpoints)
@@ -54,7 +54,7 @@ Per AGENTS_SPRINT6.md §1, when docs conflict:
 10. docs_sprint6/EVAL_DATASET_SPEC_SPRINT6.md           (1000 eval cases, scoring)
 11. docs_sprint6/TEST_PLAN_SPRINT6_AI_SAFETY.md         (test coverage per phase)
 12. docs_sprint6/USER_STORIES_SPRINT6_AI.md             (user-facing acceptance criteria)
-13. AGENTS_SPRINT6.md (this file's rulebook)
+13. AGENTS6.md (this file's rulebook)
 14. HANDOFF_SPRINT6.md (this file — current resume pointer)
 15. WORK_LOG_SPRINT6.md (execution history)
 ```
@@ -76,7 +76,7 @@ Pre-S6A infrastructure placed so S6A-T-01 onwards can resume from disk with no s
 ## 4-Worker Topology (Per PRD §6)
 
 ```text
-#1 isehat-api-worker    (= worker/)            existing — upgrade with AI_SERVICE Service Binding for S6A-T-02
+#1 isehat-api-worker    (= worker/apps)            existing — upgrade with AI_SERVICE Service Binding for S6A-T-02
 #2 isehat-ai-worker     (= worker/ai/)  new — AI orchestrator, Safety Runtime v2, Vectorize, Models
 #3 isehat-jobs-worker   (= worker/cron/)  new in S6F — cron, queue consumer, retention, eval
 #4 isehat-webhooks-worker (= worker/webhook/)  new in S6G — external webhooks (WA, Telegram, Xendit)
