@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('hydration', {
   eyebrow: { 'id-ID': 'Sprint 5B', 'en-US': 'Sprint 5B' },
@@ -65,7 +65,14 @@ registerTranslations('hydration', {
   average: { 'id-ID': 'Rata-rata', 'en-US': 'Average' },
   logList: { 'id-ID': 'Daftar Log', 'en-US': 'Log List' },
   noMatchingLogs: { 'id-ID': 'Tidak ada log yang cocok dengan filter.', 'en-US': 'No logs match the filter.' },
+  noLogsDetail: { 'id-ID': 'Tidak ada log yang cocok dengan filter. Coba ubah rentang tanggal atau filter lainnya.', 'en-US': 'No logs match the filter. Try changing the date range or other filters.' },
   notes: { 'id-ID': 'Catatan', 'en-US': 'Notes' },
+  resetFilter: { 'id-ID': 'Reset Filter', 'en-US': 'Reset Filter' },
+  retry: { 'id-ID': 'Retry', 'en-US': 'Retry' },
+  deleteLog: { 'id-ID': 'Hapus log', 'en-US': 'Delete log' },
+  loginRequiredTitle: { 'id-ID': 'Silakan login', 'en-US': 'Please login' },
+  loginRequiredDesc: { 'id-ID': 'Anda perlu masuk untuk melihat riwayat hidrasi.', 'en-US': 'You need to log in to view hydration history.' },
+  noLogs: { 'id-ID': 'Tidak ada log', 'en-US': 'No logs' },
   // Settings page
   settingsTitle: { 'id-ID': '⚙️ Pengaturan Hidrasi', 'en-US': '⚙️ Hydration Settings' },
   pregnant: { 'id-ID': 'Hamil', 'en-US': 'Pregnant' },

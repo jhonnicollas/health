@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { DynamicMetricForm } from '../../components/measurement/DynamicMetricForm'
 import type { DynamicMetricSelection } from '../../components/measurement/DynamicMetricForm'
 import { useAuth } from '../../context/auth'
+import { useI18n } from '../../i18n/useI18n'
 
 type Metric = {
   metricCode: string
@@ -69,6 +70,7 @@ async function fetchTodaySessions(): Promise<TodaySession[]> {
 
 export function SelectMetricPage() {
   const { profile } = useAuth()
+  const { t } = useI18n()
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDeviceCodes, setSelectedDeviceCodes] = useState<string[]>([])
   const [sinocareModes, setSinocareModes] = useState<Set<string>>(new Set())
@@ -92,12 +94,12 @@ export function SelectMetricPage() {
         const body = (await response.json()) as CatalogResponse
         if (cancelled) return
         if (!response.ok || !body.success || !body.data) {
-          setMessage(body.error?.message ?? 'Failed to load catalog.')
+          setMessage(body.error?.message ?? t('measurement.catalogFailed'))
           return
         }
         setDevices(body.data.devices)
       } catch {
-        if (!cancelled) setMessage('Failed to load measurement catalog.')
+        if (!cancelled) setMessage(t('measurement.catalogLoadFailed'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -105,7 +107,7 @@ export function SelectMetricPage() {
     void loadCatalog()
     void fetchTodaySessions().then(setTodaySessions)
     return () => { cancelled = true }
-  }, [])
+  }, [t])
 
   const selectedMetrics = useMemo<DynamicMetricSelection[]>(() => {
     const result: DynamicMetricSelection[] = []
@@ -174,13 +176,13 @@ export function SelectMetricPage() {
     <section className="measurement-panel" aria-labelledby="device-select-title">
       <div className="measurement-step-header">
         <span className="step-number">1</span>
-        <h2 id="device-select-title">Pilih Alat Pengukuran</h2>
+        <h2 id="device-select-title">{t('measurement.selectDeviceTitle')}</h2>
       </div>
       <p className="muted" style={{ marginTop: -8, marginBottom: 8 }}>
-        Pilih satu atau lebih alat yang ingin Anda gunakan hari ini. Alat yang sudah pernah digunakan hari ini akan ditandai.
+        {t('measurement.selectDeviceDesc')}
       </p>
 
-      {loading ? <p className="loading-text">Memuat katalog alat...</p> : null}
+      {loading ? <p className="loading-text">{t('measurement.loadingCatalog')}</p> : null}
       {message ? <p className="form-message error" role="status">{message}</p> : null}
 
       {!loading && !message ? (
@@ -208,12 +210,12 @@ export function SelectMetricPage() {
                   {isRecordedToday ? (
                     <small className="device-status-today">
                       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
-                      Sudah diukur hari ini
+                      {t('measurement.recordedToday')}
                     </small>
                   ) : isLateWarning ? (
                     <small className="device-status-late">
                       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>schedule</span>
-                      Belum diukur (sudah lewat jam 12)
+                      {t('measurement.notRecordedLate')}
                     </small>
                   ) : null}
                 </div>
@@ -228,7 +230,7 @@ export function SelectMetricPage() {
 
       {sinocareDevice ? (
         <div className="sinocare-mode-selector">
-          <p><strong>{sinocareDevice.deviceName}</strong> &mdash; Pilih jenis tes:</p>
+          <p><strong>{sinocareDevice.deviceName}</strong> &mdash; {t('measurement.selectTestType')}</p>
           <div className="sinocare-mode-buttons">
             {sinocareDevice.metrics.map((metric) => (
               <button
@@ -248,11 +250,15 @@ export function SelectMetricPage() {
         <>
           <div className="measurement-step-header">
             <span className="step-number">2</span>
-            <h2>Catat Hasil Pengukuran</h2>
+            <h2>{t('measurement.recordTitle')}</h2>
+            <a href="/reports/daily" className="btn-secondary" style={{ marginLeft: 8, padding: '8px 12px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', background: 'var(--colorSurface)', cursor: 'pointer', fontSize: 13, textDecoration: 'none', color: 'inherit', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>today</span>
+              {t('reports.dayResults')}
+            </a>
             {ageInfo ? (
               <div className="user-info-banner user-info-banner-inline">
                 <span className="material-symbols-outlined">cake</span>
-                <span>Anda berusia <strong>{ageInfo.years} Tahun {ageInfo.months} Bulan {ageInfo.days} Hari</strong></span>
+                <span>{t('measurement.ageInfo')} <strong>{ageInfo.years} {t('measurement.ageYears')} {ageInfo.months} {t('measurement.ageMonths')} {ageInfo.days} {t('measurement.ageDays')}</strong></span>
               </div>
             ) : null}
             <button
@@ -262,7 +268,7 @@ export function SelectMetricPage() {
               style={{ marginLeft: 'auto', padding: '8px 16px', border: '1px solid var(--colorBorder)', borderRadius: 'var(--radiusMd)', background: 'var(--colorSurface)', cursor: 'pointer', fontSize: 14 }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: 'middle' }}>close</span>
-              Hapus Pilihan
+              {t('measurement.clearSelection')}
             </button>
           </div>
 

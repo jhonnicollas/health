@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('reports', {
   eyebrow: { 'id-ID': 'Laporan', 'en-US': 'Reports' },
@@ -35,4 +35,16 @@ registerTranslations('reports', {
   errorFailed: { 'id-ID': 'Gagal membuat laporan.', 'en-US': 'Failed to generate report.' },
   errorOpen: { 'id-ID': 'Gagal membuka laporan.', 'en-US': 'Failed to open report.' },
   errorShare: { 'id-ID': 'Gagal membuat link berbagi.', 'en-US': 'Failed to create share link.' },
+  aiFailed: { 'id-ID': 'AI tidak merespon.', 'en-US': 'AI did not respond.' },
+  aiConnError: { 'id-ID': 'Gagal terhubung ke AI.', 'en-US': 'Failed to connect to AI.' },
+  metricLabel: { 'id-ID': 'Metrik', 'en-US': 'Metric' },
+  avgShort: { 'id-ID': 'Rata-rata', 'en-US': 'Avg' },
+  minShort: { 'id-ID': 'Min', 'en-US': 'Min' },
+  maxShort: { 'id-ID': 'Maks', 'en-US': 'Max' },
+  cntShort: { 'id-ID': 'Jml', 'en-US': 'Cnt' },
+  dayLabel: { 'id-ID': 'Hari', 'en-US': 'Day' },
+  dateLabel: { 'id-ID': 'Tanggal', 'en-US': 'Date' },
+  todayLabel: { 'id-ID': 'Hari ini', 'en-US': 'Today' },
+  noDailyDetail: { 'id-ID': 'Tidak ada data harian detail untuk metrik ini.', 'en-US': 'No daily detail data for this metric.' },
+  dayResults: { 'id-ID': 'Hasil Pengukuran Hari Ini', 'en-US': "Today's Measurement Results" },
 })

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatDateTimeShort } from '../../utils/dateFormat'
 import { MedicalTerm, MEDICAL_GLOSSARY } from '../../components/MedicalTerm'
+import { useI18n, useMetricLabels, useMetricGlossary } from '../../i18n/useI18n'
 import { AttachmentViewer } from '../../components/AttachmentViewer'
 import type { HistoryAttachment } from '../../components/AttachmentViewer'
 import { UnitInfoModal } from '../../components/UnitInfoModal'
@@ -25,6 +26,9 @@ type HistorySession = {
 }
 
 function HistoryPage() {
+  const { t } = useI18n()
+  const ml = useMetricLabels()
+  const mg = useMetricGlossary()
   const [sessions, setSessions] = useState<HistorySession[]>([])
   const [selectedAttachment, setSelectedAttachment] = useState<HistoryAttachment | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -34,15 +38,15 @@ function HistoryPage() {
   const [deleteMsg, setDeleteMsg] = useState<string | null>(null)
 
   async function handleDelete(sessionId: number) {
-    if (!confirm('Hapus sesi pengukuran ini? Tindakan tidak bisa dibatalkan.')) return
+    if (!confirm(t('measurement.deleteConfirm'))) return
     setDeleting(sessionId); setDeleteMsg(null)
     try {
       const res = await fetch(`/api/measurements/${sessionId}`, { method: 'DELETE', credentials: 'include' })
       const body = (await res.json()) as { success: boolean; error?: { message: string } }
-      if (!body.success) { setDeleteMsg(body.error?.message || 'Gagal menghapus.'); return }
+      if (!body.success) { setDeleteMsg(body.error?.message || t('measurement.deleteFailed')); return }
       setSessions(prev => prev.filter(s => s.id !== sessionId))
-      setDeleteMsg('Pengukuran dihapus.')
-    } catch { setDeleteMsg('Could not connect.') }
+      setDeleteMsg(t('measurement.deleted'))
+    } catch { setDeleteMsg(t('measurement.connError')) }
     finally { setDeleting(null) }
   }
 
@@ -56,38 +60,38 @@ function HistoryPage() {
           error?: { message: string }
         }
         if (!body.success) {
-          setError(body.error?.message ?? 'Failed to load history.')
+          setError(body.error?.message ?? t('measurement.loadFailed'))
           return
         }
         setSessions(body.data?.sessions ?? [])
       } catch {
-        setError('Could not connect to server.')
+        setError(t('measurement.connError'))
       } finally {
         setLoading(false)
       }
     }
     void load()
-  }, [])
+  }, [t])
 
   return (
     <section className="settings-panel history-panel" aria-labelledby="history-title">
       <div className="page-heading">
         <div>
           <h2 id="history-title" className="page-heading-with-help">
-            Riwayat Pengukuran
+            {t('measurement.historyTitle')}
             <button
               type="button"
               className="medical-term-info page-heading-help"
               onClick={() => setShowUnitInfo(true)}
-              aria-label="Lihat satuan yang digunakan"
-              title="Lihat satuan"
+              aria-label={t('measurement.viewUnits')}
+              title={t('measurement.viewUnitsShort')}
             >
               <span className="material-symbols-outlined">help</span>
             </button>
           </h2>
-          <p>Log lengkap semua sesi pengukuran (tekanan darah, SpO₂, gula darah, suhu, berat badan) dengan status dan rekomendasi. Klik bukti foto untuk melihat detail.</p>
+          <p>{t('measurement.historySubtitle')}</p>
         </div>
-        <span className="status-chip">{sessions.length} sesi</span>
+        <span className="status-chip">{sessions.length} {t('measurement.sessions')}</span>
       </div>
 
       {sessions.length > 0 && (() => {
@@ -98,40 +102,40 @@ function HistoryPage() {
         return (
           <div className="history-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 16 }}>
             <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#6b7280' }}>Total Sesi</p>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#6b7280' }}>{t('measurement.totalSessions')}</p>
               <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900 }}>{sessions.length}</p>
             </div>
             <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#6b7280' }}>Metrik Diukur</p>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#6b7280' }}>{t('measurement.metricsMeasured')}</p>
               <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900 }}>{metrics.size}</p>
             </div>
             <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#fef3f2', border: '1px solid #fecaca' }}>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#dc2626' }}>Hasil Abnormal</p>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#dc2626' }}>{t('measurement.abnormalResults')}</p>
               <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 900, color: '#dc2626' }}>{abnormal.length}</p>
             </div>
             <div className="soft-card" style={{ padding: 16, borderRadius: 12, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#16a34a' }}>Pengukuran Terakhir</p>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#16a34a' }}>{t('measurement.latestMeasurement')}</p>
               <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 800 }}>{formatDateTimeShort(latest.measuredAt).date}</p>
             </div>
           </div>
         )
       })()}
 
-      {loading ? <p>Memuat riwayat...</p> : null}
+      {loading ? <p>{t('measurement.loadingHistory')}</p> : null}
       {error ? <p className="form-message error" role="status">{error}</p> : null}
-      {deleteMsg ? <p className={`form-message ${deleteMsg.includes('dihapus') ? 'success' : 'error'}`} role="status">{deleteMsg}</p> : null}
-      {!loading && sessions.length === 0 ? <p>No measurement history yet.</p> : null}
+      {deleteMsg ? <p className={`form-message ${deleteMsg.includes(t('measurement.deleted').slice(0,5)) ? 'success' : 'error'}`} role="status">{deleteMsg}</p> : null}
+      {!loading && sessions.length === 0 ? <p>{t('measurement.noHistory')}</p> : null}
 
       {sessions.length > 0 ? (
         <table className="report-table">
           <thead>
             <tr>
-              <th>Date &amp; Time</th>
-              <th>Metric</th>
-              <th>Result Value</th>
-              <th>Status</th>
-              <th>Rekomendasi</th>
-              <th>Evidence</th>
+              <th>{t('measurement.colDateTime')}</th>
+              <th>{t('measurement.colMetric')}</th>
+              <th>{t('measurement.colResult')}</th>
+              <th>{t('measurement.colStatus')}</th>
+              <th>{t('measurement.colRecommendation')}</th>
+              <th>{t('measurement.colEvidence')}</th>
               <th></th>
             </tr>
           </thead>
@@ -152,8 +156,7 @@ function HistoryPage() {
                     ) : null}
                     <td>
                       <span className="metric-code-badge-cell">
-                        <span>{value.metricCode}</span>
-                        <MedicalTerm term="" shortDef={MEDICAL_GLOSSARY[value.metricCode] || ''} />
+                        <MedicalTerm term={ml[value.metricCode] || value.metricCode} shortDef={mg[value.metricCode] || MEDICAL_GLOSSARY[value.metricCode] || ''} termCode={value.metricCode} />
                       </span>
                     </td>
                     <td>
@@ -166,20 +169,20 @@ function HistoryPage() {
                     </td>
                     <td>
                       <span className="muted" style={{ fontSize: '0.85em' }}>
-                        {value.severity === 'normal' ? 'Lanjutkan pola hidup sehat.' : `Lihat saran: ${value.status}`}
+                        {value.severity === 'normal' ? t('measurement.recNormal') : `${t('measurement.recAbnormal')}: ${value.status}`}
                       </span>
                     </td>
                     <td>
                       {attachment ? (
                         <button className="evidence-btn" onClick={() => setSelectedAttachment(attachment)} type="button">
-                          <span className="material-symbols-outlined">photo_camera</span> View
+                          <span className="material-symbols-outlined">photo_camera</span> {t('measurement.view')}
                         </button>
                       ) : (
                         <span className="muted" style={{ fontSize: '0.85em' }}>—</span>
                       )}
                     </td>
                     <td>
-                      <button className="evidence-btn" disabled={deleting === session.id} onClick={() => void handleDelete(session.id)} style={{ color: 'var(--colorStatusCritical, #dc2626)' }} type="button" title="Hapus sesi">
+                      <button className="evidence-btn" disabled={deleting === session.id} onClick={() => void handleDelete(session.id)} style={{ color: 'var(--colorStatusCritical, #dc2626)' }} type="button" title={t('measurement.deleteSession')}>
                         <span className="material-symbols-outlined">delete</span>
                       </button>
                     </td>

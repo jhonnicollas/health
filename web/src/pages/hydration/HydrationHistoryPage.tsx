@@ -1,13 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/auth'
+import { useI18n } from '../../i18n/useI18n'
 
-const SOURCES = [
-  { value: '', label: 'Semua Sumber' },
-  { value: 'web', label: 'Web' },
-  { value: 'telegram', label: 'Telegram' },
-  { value: 'manual', label: 'Manual' },
-]
+const SOURCE_VALUES = ['', 'web', 'telegram', 'manual']
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
 function thirtyDaysAgo() {
@@ -35,6 +31,7 @@ function SkeletonRow() {
 
 export function HydrationHistoryPage() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,11 +51,11 @@ export function HydrationHistoryPage() {
       if (minAmount) params.set('minAmount', minAmount)
       if (maxAmount) params.set('maxAmount', maxAmount)
       const r = await fetch(`/api/hydration/history?${params.toString()}`, { credentials: 'include' })
-      if (!r.ok) { setError('Gagal memuat riwayat.'); return }
+      if (!r.ok) { setError(t('hydration.loadFailed')); return }
       const j = await r.json()
       if (j.success) setLogs(j.data?.logs || [])
-      else setError('Gagal memuat riwayat.')
-    } catch { setError('Tidak bisa terhubung ke server.') } finally { setLoading(false) }
+      else setError(t('hydration.loadFailed'))
+    } catch { setError(t('hydration.connError')) } finally { setLoading(false) }
   }
 
   useEffect(() => { void load() }, [user, from, to, source, minAmount, maxAmount])
@@ -66,10 +63,10 @@ export function HydrationHistoryPage() {
   async function handleDelete(logId: number) {
     try {
       const r = await fetch(`/api/hydration/logs/${logId}`, { method: 'DELETE', credentials: 'include' })
-      if (!r.ok) { setError('Gagal menghapus log.'); return }
+      if (!r.ok) { setError(t('hydration.deleteFailed')); return }
       const j = await r.json()
       if (j.success) { setDeleteId(null); void load() }
-    } catch { setError('Tidak bisa terhubung ke server.') }
+    } catch { setError(t('hydration.connError')) }
   }
 
   const stats = useMemo(() => {
@@ -82,8 +79,8 @@ export function HydrationHistoryPage() {
     <section className="settings-panel">
       <div className="empty-state">
         <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--colorTextMuted)' }}>login</span>
-        <h3>Silakan login</h3>
-        <p>Anda perlu masuk untuk melihat riwayat hidrasi.</p>
+        <h3>{t('hydration.pleaseLogin')}</h3>
+        <p>{t('hydration.loginRequiredDesc')}</p>
       </div>
     </section>
   )
@@ -95,12 +92,12 @@ export function HydrationHistoryPage() {
           <div className="hydration-title">
             <div className="hydration-icon"><span className="material-symbols-outlined fill-icon">history</span></div>
             <div>
-              <p className="eyebrow">Sprint 5B</p>
-              <h2>Riwayat Asupan Air</h2>
-              <p className="subtitle">Filter berdasarkan tanggal, sumber, dan jumlah.</p>
+              <p className="eyebrow">{t('hydration.historyEyebrow')}</p>
+              <h2>{t('hydration.historyTitle')}</h2>
+              <p className="subtitle">{t('hydration.historySubtitle')}</p>
             </div>
           </div>
-          <a href="/hydration" className="btn-secondary" style={{ fontSize: 13, padding: '6px 14px' }}>← Kembali</a>
+          <a href="/hydration" className="btn-secondary" style={{ fontSize: 13, padding: '6px 14px' }}>{t('hydration.back')}</a>
         </div>
       </div>
 
@@ -108,56 +105,56 @@ export function HydrationHistoryPage() {
         <div className="form-message error" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="material-symbols-outlined">error</span>
           {error}
-          <button className="btn-secondary" style={{ marginLeft: 'auto', fontSize: 12 }} onClick={() => void load()}>Retry</button>
+          <button className="btn-secondary" style={{ marginLeft: 'auto', fontSize: 12 }} onClick={() => void load()}>{t('hydration.retry')}</button>
         </div>
       )}
 
       <div className="hydration-filters">
         <label className="filter-field">
-          <span>Dari</span>
+          <span>{t('hydration.fromLabel')}</span>
           <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
         </label>
         <label className="filter-field">
-          <span>Sampai</span>
+          <span>{t('hydration.toLabel')}</span>
           <input type="date" value={to} onChange={e => setTo(e.target.value)} />
         </label>
         <label className="filter-field">
-          <span>Sumber</span>
+          <span>{t('hydration.sourceLabel')}</span>
           <select value={source} onChange={e => setSource(e.target.value)}>
-            {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {SOURCE_VALUES.map(v => <option key={v} value={v}>{v === '' ? t('hydration.allSources') : v === 'web' ? t('hydration.webSource') : v === 'telegram' ? t('hydration.telegramSource') : t('hydration.manualSource')}</option>)}
           </select>
         </label>
         <label className="filter-field">
-          <span>Min (ml)</span>
+          <span>{t('hydration.minAmount')}</span>
           <input type="number" inputMode="numeric" min={0} value={minAmount} onChange={e => setMinAmount(e.target.value)} placeholder="0" />
         </label>
         <label className="filter-field">
-          <span>Max (ml)</span>
+          <span>{t('hydration.maxAmount')}</span>
           <input type="number" inputMode="numeric" min={0} value={maxAmount} onChange={e => setMaxAmount(e.target.value)} placeholder="5000" />
         </label>
       </div>
 
       <div className="hydration-stats" style={{ marginTop: 16 }}>
         <div className="soft-card">
-          <p className="stat-label">Total Log</p>
+          <p className="stat-label">{t('hydration.totalLogs')}</p>
           <p className="stat-value">{loading ? <span className="skeleton" style={{ width: 40, height: 20, display: 'inline-block' }} /> : stats.count}</p>
         </div>
         <div className="soft-card">
-          <p className="stat-label">Total Volume</p>
+          <p className="stat-label">{t('hydration.totalVolume')}</p>
           <p className="stat-value consumed">{loading ? <span className="skeleton" style={{ width: 60, height: 20, display: 'inline-block' }} /> : `${stats.totalMl.toLocaleString('id-ID')}ml`}</p>
         </div>
         <div className="soft-card">
-          <p className="stat-label">Rata-rata</p>
+          <p className="stat-label">{t('hydration.average')}</p>
           <p className="stat-value">{loading ? <span className="skeleton" style={{ width: 50, height: 20, display: 'inline-block' }} /> : `${stats.avg.toLocaleString('id-ID')}ml`}</p>
         </div>
       </div>
 
       {loading ? (
         <div className="hydration-history" style={{ marginTop: 24 }}>
-          <h3>Daftar Log</h3>
+          <h3>{t('hydration.logList')}</h3>
           <div className="hydration-table-wrap">
             <table className="hydration-table">
-              <thead><tr><th>Tanggal</th><th>Waktu</th><th>Jumlah</th><th>Sumber</th><th>Catatan</th><th /></tr></thead>
+              <thead><tr><th>{t('hydration.date')}</th><th>{t('hydration.time')}</th><th>{t('hydration.amount')}</th><th>{t('hydration.source')}</th><th>{t('hydration.notes')}</th><th /></tr></thead>
               <tbody>
                 {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} />)}
               </tbody>
@@ -167,18 +164,18 @@ export function HydrationHistoryPage() {
       ) : logs.length === 0 ? (
         <div className="empty-state" style={{ marginTop: 32 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 48, color: 'var(--colorTextMuted)' }}>water_drop</span>
-          <h3>Tidak ada log</h3>
-          <p>Tidak ada log yang cocok dengan filter. Coba ubah rentang tanggal atau filter lainnya.</p>
+          <h3>{t('hydration.noLogs')}</h3>
+          <p>{t('hydration.noLogsDetail')}</p>
           <button className="btn-secondary" onClick={() => { setFrom(thirtyDaysAgo()); setTo(todayStr()); setSource(''); setMinAmount(''); setMaxAmount('') }} style={{ marginTop: 12 }}>
-            Reset Filter
+            {t('hydration.resetFilter')}
           </button>
         </div>
       ) : (
         <div className="hydration-history" style={{ marginTop: 24 }}>
-          <h3>Daftar Log</h3>
+          <h3>{t('hydration.logList')}</h3>
           <div className="hydration-table-wrap">
             <table className="hydration-table">
-              <thead><tr><th>Tanggal</th><th>Waktu</th><th>Jumlah</th><th>Sumber</th><th>Catatan</th><th /></tr></thead>
+              <thead><tr><th>{t('hydration.date')}</th><th>{t('hydration.time')}</th><th>{t('hydration.amount')}</th><th>{t('hydration.source')}</th><th>{t('hydration.notes')}</th><th /></tr></thead>
               <tbody>
                 {logs.map((l: any) => (
                   <tr key={l.id}>
@@ -190,11 +187,11 @@ export function HydrationHistoryPage() {
                     <td className="actions">
                       {deleteId === l.id ? (
                         <>
-                          <button className="delete-confirm" onClick={() => handleDelete(l.id)}>Hapus</button>
-                          <button className="delete-cancel" onClick={() => setDeleteId(null)}>Batal</button>
+                          <button className="delete-confirm" onClick={() => handleDelete(l.id)}>{t('hydration.delete')}</button>
+                          <button className="delete-cancel" onClick={() => setDeleteId(null)}>{t('hydration.cancel')}</button>
                         </>
                       ) : (
-                        <button className="delete-btn" onClick={() => setDeleteId(l.id)} title="Hapus log"><span className="material-symbols-outlined">close</span></button>
+                        <button className="delete-btn" onClick={() => setDeleteId(l.id)} title={t('hydration.deleteLog')}><span className="material-symbols-outlined">close</span></button>
                       )}
                     </td>
                   </tr>

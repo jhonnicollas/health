@@ -1,4 +1,4 @@
-import { registerTranslations } from '../index'
+import { registerTranslations } from '../registry'
 
 registerTranslations('measurement', {
   // HistoryPage
@@ -44,4 +44,5 @@ registerTranslations('measurement', {
   ageMonths: { 'id-ID': 'Bulan', 'en-US': 'Months' },
   ageDays: { 'id-ID': 'Hari', 'en-US': 'Days' },
   clearSelection: { 'id-ID': 'Hapus Pilihan', 'en-US': 'Clear Selection' },
+  todayResults: { 'id-ID': 'Hasil Pengukuran Hari Ini', 'en-US': "Today's Measurements" },
 })
