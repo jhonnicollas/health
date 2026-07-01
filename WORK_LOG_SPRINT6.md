@@ -483,3 +483,20 @@ Format:
 - Validation: tsc clean all 4 workers; npm test green across apps/ai/cron
 - Notes: T-10 UI deferred. OM downgrade skips reviewer, upgrade requires. Prompt activate: deprecate previous + KV invalidation. Eval scoring placeholder.
 - Status: DONE
+
+## S6A-T-13 — 2026-07-02 06:00 UTC (Sprint 6 E2E audit + fixes)
+
+- Task: Add Playwright E2E specs for Sprint 6 path: frontend -> backend -> api-worker -> ai-worker -> webhooks-worker/WhatsApp per docs_sprint6/E2E_PLAYWRIGHT_SCENARIOS_SPRINT1_6.md §Sprint 6. Fix 3 hardcoded path/D1 bugs in test files. Apply security patterns (AGENTS.md §0/§2).
+- Worker: web (E2E) + worker/apps (proxy stubs ref) + worker/webhook (signature/dedup).
+- Files changed (11 files, 662 insertions, 16 deletions):
+  - NEW web/e2e/smoke/sprint6-{ai-clinical,whatsapp-linking,webhook,cross-worker}.spec.ts (28 tests)
+  - MOD web/e2e/support/auth.ts (path + D1 name + clinicalConsent TestUserRole + regenerated tokenHash)
+  - MOD worker/apps/test/{sprint5f-foundation,sprint5-security-privacy}.test.mjs (path fix + glob extended)
+  - MOD web/e2e/run-smoke.sh (added 4 sprint6 entries to SPECS)
+  - MOD web/.gitignore (removed blanket e2e/ parent-ignore, added targeted runtime-artifact patterns)
+  - MOD .gitignore (added *.pem *.key *.crt *.p12 *.pfx cryptographic-key patterns)
+  - MOD web/package.json (added @playwright/test devDependency)
+- Tests: 28 Sprint 6 tests discoverable via `npx playwright test --list`; web tsc -b EXIT=0; code-reviewer-minimax-m3 x3 passes (0 CRITICAL/MAJOR after fixes).
+- Validation: tsc PASS, Playwright discoverability PASS, all 4 specs compile, runtime execution requires wrangler dev (AI_SERVICE binding required for full 200 paths; default mode = 401/403/503 gate validation).
+- Notes: Sprint 6 E2E validates the proxy gates (auth, entitlement, quota, consent, rate-limit) without needing a real ai-worker. Spec hooks allow prod-mode end-to-end LLM assertions via PLAYWRIGHT_BASE_URL=https://app.isehat.biz.id. SECURITY: credentials shared in chat during this session are NOT echoed in any staged file (env-only with skip-on-missing per AGENTS.md §0) and were placed in conversation log only — recommend immediate rotation at provider dashboards if any of the chat-shared credentials are reused.
+- Status: DONE (commit 01c8a1f pushed to origin sprint6/S6A).
