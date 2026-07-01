@@ -37,7 +37,7 @@ app.get("/health", (c) => {
     data: {
       worker: "isehat-jobs-worker",
       status: "ok",
-      cronsConfigured: 6,
+      cronsConfigured: 7,
       queueConsumers: 4,
     },
     meta: { checkedAt: new Date().toISOString() },
@@ -90,6 +90,9 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (contr
       break;
     case "30 4 * * 0":
       ctx.waitUntil(deleteInactiveVectors(env));
+      break;
+    case "45 4 * * *":
+      ctx.waitUntil(cleanupUnlinkedWhatsApp(env));
       break;
     case "0 5 1 * *":
       ctx.waitUntil(archiveSafetyFlags(env));
@@ -217,6 +220,27 @@ export async function archiveSafetyFlags(env: Bindings): Promise<number> {
   }
 }
 
+// GC: daily cleanup of unlinked WhatsApp messages older than 30 days
+// PRD S6F retention: processedStatus='ignored_unlinked' AND createdAt < 30 days
+// Uses idx_whatsappMessages_ignoredUnlinked partial index from migration 007
+export async function cleanupUnlinkedWhatsApp(env: Bindings): Promise<number> {
+  try {
+    const result = await env.DB.prepare(
+      `DELETE FROM HL_whatsappMessages
+       WHERE processedStatus = 'ignored_unlinked'
+         AND createdAt < datetime('now', '-30 day')`
+    ).run();
+    const meta = result.meta as Record<string, unknown> | undefined;
+    const count = Number(meta?.changes ?? 0);
+    await writeAuditLog(env.DB, 'dataRetentionCleanup', 'cleanupUnlinkedWhatsApp', count, { retentionDays: 30 });
+    return count;
+  } catch (error) {
+    console.error('cleanupUnlinkedWhatsApp failed:', error);
+    await writeAuditLog(env.DB, 'dataRetentionCleanup', 'cleanupUnlinkedWhatsApp', 0, { error: String(error) });
+    return 0;
+  }
+}
+
 // S6F-T-12: mark vectors deleted for inactive users; optionally enqueue cleanup to Worker #2
 export async function deleteInactiveVectors(env: Bindings): Promise<number> {
   const hours = getRetentionHours(env.RETENTION_INACTIVE_USERS_HOURS, 8760);
@@ -274,20 +298,20 @@ export const queue: ExportedHandlerQueueHandler<Bindings> = async (batch, env, _
     const type = typeof body.type === 'string' ? body.type : '';
 
     try {
-      switch (true) {
-        case type === 'doctorHandoff':
-          await handleDoctorHandoffQueue(env, body);
-          break;
-        case type === 'rebuild':
-        case type === 'delete':
-          // Memory jobs are processed by Worker #2; Worker #3 only logs receipt.
-          console.log(`queue: ai-memory-jobs ${type} received, no-op in Worker #3`);
-          break;
-        case type === 'whatsapp-outbound' || (batch as any).queue === 'whatsapp-outbound':
-          await handleWhatsappOutboundQueue(env, body);
-          break;
-        default:
-          console.log(`queue: unhandled type ${type}`);
+      if (type === 'doctorHandoff') {
+        await handleDoctorHandoffQueue(env, body);
+      } else if (type === 'rebuild') {
+        await handleMemoryRebuildQueue(env, body);
+      } else if (type === 'delete') {
+        await handleMemoryDeleteQueue(env, body);
+      } else if (type === 'whatsapp-outbound' || (batch as any).queue === 'whatsapp-outbound') {
+        await handleWhatsappOutboundQueue(env, body);
+      } else if (type === 'evalRun') {
+        await handleEvalRunQueue(env, body);
+      } else if (type === 'kbReindex') {
+        console.log(`queue: eval-jobs kbReindex received, requestedBy=${body.requestedBy || 'unknown'}`);
+      } else {
+        console.log(`queue: unhandled type ${type}`);
       }
     } catch (error) {
       console.error(`queue handler error for type ${type}:`, error);
@@ -365,5 +389,173 @@ async function handleWhatsappOutboundQueue(env: Bindings, body: Record<string, u
     } catch (error) {
       console.error('handleWhatsappOutboundQueue: Baileys gateway post failed:', error);
     }
+  }
+}
+
+// ai-memory-jobs: forward rebuild to Worker #2 via Service Binding
+async function handleMemoryRebuildQueue(env: Bindings, body: Record<string, unknown>): Promise<void> {
+  const userId = Number(body.userId);
+  if (!Number.isFinite(userId) || userId <= 0) {
+    console.error('handleMemoryRebuildQueue: invalid userId');
+    return;
+  }
+  await writeAuditLog(env.DB, 'memoryRebuildRequested', 'HL_vectorDocuments', 0, { userId });
+  if (env.AI_SERVICE) {
+    try {
+      await env.AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/memory/rebuild', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-UserId': String(userId) },
+        body: JSON.stringify({}),
+      }));
+    } catch (error) {
+      console.error(`handleMemoryRebuildQueue: forward to AI_SERVICE failed for user ${userId}:`, error);
+    }
+  }
+}
+
+// ai-memory-jobs: forward delete to Worker #2 via Service Binding
+async function handleMemoryDeleteQueue(env: Bindings, body: Record<string, unknown>): Promise<void> {
+  const userId = Number(body.userId);
+  if (!Number.isFinite(userId) || userId <= 0) {
+    console.error('handleMemoryDeleteQueue: invalid userId');
+    return;
+  }
+  await writeAuditLog(env.DB, 'memoryDeleteRequested', 'HL_vectorDocuments', 0, { userId });
+  if (env.AI_SERVICE) {
+    try {
+      await env.AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/memory/delete-inactive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      }));
+    } catch (error) {
+      console.error(`handleMemoryDeleteQueue: forward to AI_SERVICE failed for user ${userId}:`, error);
+    }
+  }
+}
+
+// eval-jobs: process evaluation dataset cases against the clinical orchestrator
+async function handleEvalRunQueue(env: Bindings, body: Record<string, unknown>): Promise<void> {
+  const datasetVersion = typeof body.datasetVersion === 'string' ? body.datasetVersion : 'v1.0.0';
+  await writeAuditLog(env.DB, 'evalRunStarted', 'HL_aiKnowledgeDocuments', 0, { datasetVersion });
+  try {
+    const datasetObj = await env.LOGS.get('eval/sprint6/dataset.json');
+    if (!datasetObj) {
+      console.error('handleEvalRunQueue: dataset not found in R2');
+      await writeAuditLog(env.DB, 'evalRunFailed', 'HL_aiKnowledgeDocuments', 0, { datasetVersion, reason: 'dataset_not_found' });
+      return;
+    }
+    const datasetText = await datasetObj.text();
+    const dataset = JSON.parse(datasetText);
+    const cases = dataset.cases || [];
+    if (!Array.isArray(cases) || cases.length === 0) {
+      console.error('handleEvalRunQueue: invalid dataset format — empty or missing cases');
+      return;
+    }
+
+    let passed = 0;
+    let failed = 0;
+    const results: Array<{ caseId: string; passed: boolean; error?: string }> = [];
+
+    for (const caseItem of cases) {
+      const caseId = caseItem.caseId || 'unknown';
+      try {
+        let outputText = '';
+        let answerType = '';
+        let hasDisclaimer = false;
+        let hasRedFlag = false;
+
+        // Call clinical orchestrator via AI_SERVICE if available
+        if (env.AI_SERVICE && caseItem.input?.message) {
+          try {
+            const res = await env.AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/clinical/message', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Internal-UserId': '1' },
+              body: JSON.stringify({
+                sessionId: 1,
+                message: caseItem.input.message,
+                locale: caseItem.locale || 'id',
+              }),
+            }));
+            const payload = await res.json().catch(() => ({})) as Record<string, unknown>;
+            const data = payload?.data as Record<string, unknown> | undefined;
+            outputText = String(data?.reply || payload?.reply || '');
+            answerType = String(data?.answerType || '');
+            hasDisclaimer = /ai dapat melakukan kesalahan|ai can make mistakes/i.test(outputText);
+            hasRedFlag = String(data?.redFlagStatus || '') === 'emergency';
+          } catch {
+            outputText = '';
+          }
+        }
+
+        // Check expected output
+        const expected = caseItem.expectedOutput || {};
+        let casePassed = true;
+        const errors: string[] = [];
+
+        if (expected.shouldContain && Array.isArray(expected.shouldContain)) {
+          for (const phrase of expected.shouldContain) {
+            if (!outputText.toLowerCase().includes(phrase.toLowerCase())) {
+              casePassed = false;
+              errors.push(`missing: ${phrase}`);
+            }
+          }
+        }
+        if (expected.shouldNotContain && Array.isArray(expected.shouldNotContain)) {
+          for (const phrase of expected.shouldNotContain) {
+            if (outputText.toLowerCase().includes(phrase.toLowerCase())) {
+              casePassed = false;
+              errors.push(`found_forbidden: ${phrase}`);
+            }
+          }
+        }
+        if (expected.disclaimerExpected && !hasDisclaimer) {
+          casePassed = false;
+          errors.push('missing_disclaimer');
+        }
+        if (expected.redFlagExpected !== undefined && expected.redFlagExpected !== hasRedFlag) {
+          casePassed = false;
+          errors.push(`redFlag_mismatch: expected=${expected.redFlagExpected} actual=${hasRedFlag}`);
+        }
+        if (expected.answerTypeExpected && Array.isArray(expected.answerTypeExpected)) {
+          if (!expected.answerTypeExpected.includes(answerType)) {
+            casePassed = false;
+            errors.push(`answerType_mismatch: expected one of ${expected.answerTypeExpected.join(',')} got ${answerType}`);
+          }
+        }
+
+        if (casePassed) passed++;
+        else failed++;
+
+        results.push({ caseId, passed: casePassed, error: errors.length > 0 ? errors.join('; ') : undefined });
+
+        // Store case result
+        await env.DB.prepare(
+          `INSERT OR REPLACE INTO HL_aiKnowledgeDocuments
+            (sourceType, sourceId, title, locale, contentVersion, reviewerStatus, indexedAt, createdAt, updatedAt)
+           VALUES ('eval_case', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        ).bind(
+          caseId,
+          `Eval ${casePassed ? 'PASS' : 'FAIL'}: ${caseItem.category || 'unknown'} (${answerType})`,
+          caseItem.locale || 'id',
+          datasetVersion,
+          casePassed ? 'approved' : 'draft'
+        ).run();
+      } catch (error) {
+        failed++;
+        results.push({ caseId, passed: false, error: String(error) });
+      }
+    }
+
+    await writeAuditLog(env.DB, 'evalRunCompleted', 'HL_aiKnowledgeDocuments', passed, {
+      datasetVersion,
+      totalCases: cases.length,
+      passed,
+      failed,
+      passRate: cases.length > 0 ? Math.round((passed / cases.length) * 100) : 0,
+    });
+  } catch (error) {
+    console.error('handleEvalRunQueue: failed:', error);
+    await writeAuditLog(env.DB, 'evalRunFailed', 'HL_aiKnowledgeDocuments', 0, { datasetVersion, error: String(error) });
   }
 }

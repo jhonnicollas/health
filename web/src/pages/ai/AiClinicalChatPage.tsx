@@ -93,6 +93,8 @@ export function AiClinicalChatPage() {
   }, [messages])
 
   useEffect(() => {
+    // Deliberate one-time session initialization on mount; locale/t are stable.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStarting(true)
     setError(null)
     fetch('/api/ai/clinical/session/start', {

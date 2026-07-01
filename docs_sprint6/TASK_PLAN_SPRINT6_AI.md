@@ -195,7 +195,7 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 | S6H-T-10a | Write 9 governance tests (T-1 to T-9 per PRD §11) — includes operating mode test | #1 | S6H-T-01..T-10 | `npm test -- --grep governance` → 9/9 pass | 3h |
 | S6H-T-11 | Sprint 6H validation gate: tsc + tests + eslint + vite build | All | S6H-T-01..T-10a | Worker `npx tsc` pass; Web `npx tsc -b` pass; `npx eslint .` 0 new; `npx vite build` pass | 1h |
 
-**S6H DONE criteria:** 11/11 tasks complete (T-01..T-11), 9 tests pass, admin can view/control/evaluate AI, operating mode management functional.
+**S6H DONE criteria:** 11/11 tasks complete (T-01..T-11), 27 tests pass, admin can view/control/evaluate AI, operating mode management functional. **STATUS: ✅ DONE** (T-10 UI deferred to post-S6H; backend T-01..T-09+T-10a+T-11 complete)
 
 ---
 

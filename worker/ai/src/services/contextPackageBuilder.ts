@@ -11,7 +11,7 @@
 
 import type { Bindings } from '../types.js';
 import type { OperatingMode } from '../safety/safetyDecision.js';
-import { getOperatingMode } from './config.js';
+import { getOperatingMode, getConfigNumber } from './config.js';
 import { VectorizeService } from './vectorizeService.js';
 
 // ─── Types ───
@@ -234,6 +234,11 @@ export async function buildContextPackage(
   // Build forbidden actions
   const forbiddenActions = buildForbiddenActions(operatingMode, disclaimerAcknowledged);
 
+  // Apply maxContextItems limit (PRD §13.3: clinicalCopilot.maxContextItems)
+  const maxItems = await getConfigNumber(env, 'clinicalCopilot.maxContextItems', 50);
+  const trimmedTrace = contextTrace.slice(0, maxItems);
+  const trimmedVecMem = vectorMemory.slice(0, Math.min(maxItems, 20));
+
   const partialReason = timedOut ? 'partial:timeout' : undefined;
 
   return {
@@ -247,14 +252,14 @@ export async function buildContextPackage(
     medicationSummary: medications,
     hydrationSummary: hydration,
     cycleSummary: cycle,
-    vectorMemory,
+    vectorMemory: trimmedVecMem,
     knowledgeBase,
     dataSufficiencyScore: score,
     scoreReason: partialReason ? `${partialReason} ${scoreReason}` : scoreReason,
     redFlagPrecheck,
     forbiddenActions,
     modeSpecificForbiddenActions: MODE_SPECIFIC_FORBIDDEN,
-    contextTrace,
+    contextTrace: trimmedTrace,
     operatingMode,
   };
 }

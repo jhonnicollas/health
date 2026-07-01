@@ -49,14 +49,35 @@ function normalizeWhatsappNumber(raw: string): string {
   return stripped.startsWith("+") ? stripped : `+${stripped.replace(/^\+/, "")}`;
 }
 
+// PRD §7.1: HL_whatsappMessages.messageType CHECK allows text/image/document/audio/command.
+// 'video' is intentionally folded into 'document' to satisfy the CHECK constraint
+// (no separate video tracking in PRD §12.8) and prevent INSERT failures on outbound.
 function detectMessageType(body: Record<string, unknown>): string {
-  if (typeof body.messageType === "string") return body.messageType;
+  if (typeof body.messageType === "string") {
+    return body.messageType === "video" ? "document" : body.messageType;
+  }
   const msg = (body.message as Record<string, unknown>) ?? {};
-  if (msg.imageMessage || body.mediaMimeType?.toString().startsWith("image/")) return "image";
-  if (msg.audioMessage || body.mediaMimeType?.toString().startsWith("audio/")) return "audio";
-  if (msg.videoMessage || body.mediaMimeType?.toString().startsWith("video/")) return "video";
-  if (msg.documentMessage || body.mediaMimeType?.toString().startsWith("application/")) return "document";
+  const mime = body.mediaMimeType?.toString() ?? "";
+  if (msg.imageMessage || mime.startsWith("image/")) return "image";
+  if (msg.audioMessage || mime.startsWith("audio/")) return "audio";
+  if (msg.videoMessage || mime.startsWith("video/")) return "document";
+  if (msg.documentMessage || mime.startsWith("application/")) return "document";
   return "text";
+}
+
+// PRD §7.1: Mime allowlist (image/jpeg, image/png, application/pdf) + 10 MB / 13.3 MB base64 size cap.
+const ALLOWED_MEDIA_MIMES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/jpg",
+  "application/pdf",
+]);
+const MAX_MEDIA_BYTES = 10 * 1024 * 1024; // 10 MB
+// base64 is ~4/3 larger than raw bytes; reject base64 strings > 13.4 MB to stay under 10 MB decoded.
+const MAX_MEDIA_BASE64_CHARS = Math.ceil((MAX_MEDIA_BYTES / 3) * 4) + 64;
+
+function isAllowedMediaMime(mime: string): boolean {
+  return ALLOWED_MEDIA_MIMES.has(mime.toLowerCase());
 }
 
 function extractTextContent(body: Record<string, unknown>): string | undefined {
@@ -184,19 +205,36 @@ app.post("/api/whatsapp/webhook", async (c) => {
   const locale: "id" | "en" = body.locale === "en" ? "en" : "id";
 
   if (!link || link.verified !== 1 || link.aiEnabled !== 1) {
-    await c.env.DB.prepare(
-      `INSERT INTO HL_whatsappMessages
-        (userId, whatsappLinkId, providerMessageId, direction, messageType, contentPreview, processedStatus, createdAt)
-       VALUES (NULL, NULL, ?, 'inbound', ?, ?, 'ignored_unlinked', CURRENT_TIMESTAMP)`
-    ).bind(inbound.providerMessageId, inbound.messageType, inbound.textContent?.slice(0, 200) ?? null).run();
+    try {
+      await c.env.DB.prepare(
+        `INSERT INTO HL_whatsappMessages
+          (userId, whatsappLinkId, providerMessageId, direction, messageType, contentPreview, processedStatus, createdAt)
+         VALUES (NULL, NULL, ?, 'inbound', ?, ?, 'ignored_unlinked', CURRENT_TIMESTAMP)`
+      ).bind(inbound.providerMessageId, inbound.messageType, inbound.textContent?.slice(0, 200) ?? null).run();
+    } catch (err) {
+      // Race: UNIQUE(providerMessageId) from migration 007. Surface as duplicate so VPS Baileys stops retrying.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/UNIQUE constraint failed/i.test(msg) || /providerMessageId/i.test(msg)) {
+        return c.json({ success: true, duplicate: true, unlinked: true }, 200);
+      }
+      throw err;
+    }
     return c.json({ success: true, unlinked: true, reply: linkingInstruction(locale) }, 200);
   }
 
-  await c.env.DB.prepare(
-    `INSERT INTO HL_whatsappMessages
-      (userId, whatsappLinkId, providerMessageId, direction, messageType, contentPreview, processedStatus, createdAt)
-     VALUES (?, ?, ?, 'inbound', ?, ?, 'processing', CURRENT_TIMESTAMP)`
-  ).bind(link.userId, link.id, inbound.providerMessageId, inbound.messageType, inbound.textContent?.slice(0, 200) ?? null).run();
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO HL_whatsappMessages
+        (userId, whatsappLinkId, providerMessageId, direction, messageType, contentPreview, processedStatus, createdAt)
+       VALUES (?, ?, ?, 'inbound', ?, ?, 'processing', CURRENT_TIMESTAMP)`
+    ).bind(link.userId, link.id, inbound.providerMessageId, inbound.messageType, inbound.textContent?.slice(0, 200) ?? null).run();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/UNIQUE constraint failed/i.test(msg) || /providerMessageId/i.test(msg)) {
+      return c.json({ success: true, duplicate: true }, 200);
+    }
+    throw err;
+  }
 
   if (!c.env.AI_SERVICE) {
     return c.json({ success: false, error: { code: "AI_SERVICE_UNAVAILABLE" } }, 503);
@@ -223,7 +261,7 @@ app.post("/api/whatsapp/webhook", async (c) => {
   }
 });
 
-// 11.3 WhatsApp media ingest — S6G-T-13
+// 11.3 WhatsApp media ingest — S6G-T-13 (PRD §7.1: 10MB cap + MIME allowlist)
 app.post("/api/whatsapp/media/ingest", async (c) => {
   if (!validateGatewaySecret(c, c.env)) {
     return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
@@ -245,6 +283,22 @@ app.post("/api/whatsapp/media/ingest", async (c) => {
     return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "providerMessageId, whatsappNumber and mediaBufferBase64 are required" } }, 400);
   }
 
+  // PRD §7.1 — MIME allowlist: image/jpeg, image/png, application/pdf.
+  if (!isAllowedMediaMime(mediaMimeType)) {
+    return c.json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: `mediaMimeType not allowed. Allowed: ${Array.from(ALLOWED_MEDIA_MIMES).join(", ")}` },
+    }, 400);
+  }
+
+  // PRD §7.1 — File size < 10MB. base64-encoded length is the cheapest pre-decode guard.
+  if (mediaBufferBase64.length > MAX_MEDIA_BASE64_CHARS) {
+    return c.json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: `mediaBufferBase64 length exceeds ${MAX_MEDIA_BASE64_CHARS} chars (≈10 MB decoded)` },
+    }, 400);
+  }
+
   const whatsappNumber = normalizeWhatsappNumber(rawNumber);
   const numberHash = await sha256Token(whatsappNumber);
   const link = await c.env.DB.prepare(
@@ -258,6 +312,12 @@ app.post("/api/whatsapp/media/ingest", async (c) => {
   const binary = atob(mediaBufferBase64);
   const buffer = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) buffer[i] = binary.charCodeAt(i);
+
+  // Belt-and-suspenders: actual decoded-bytes check (catch malformed base64 that
+  // declared its length but actually encodes less — still bounded).
+  if (buffer.byteLength > MAX_MEDIA_BYTES) {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Decoded media exceeds 10 MB limit" } }, 400);
+  }
 
   if (c.env.LOGS) {
     try {

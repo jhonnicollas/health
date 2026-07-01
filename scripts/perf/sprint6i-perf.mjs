@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-// S6I-T-08 lightweight local performance benchmark.
+// S6I-T-08 local smoke-test benchmark.
 // Runs 50 concurrent clinical message flows using a mock ModelRouter.
 // Asserts: context build p95 < 500ms, full orchestrator p95 < 2000ms.
+// Note: This is a quick local sanity check. The release-gate performance
+// suite is the k6 scripts in this directory (sprint6i-clinical-chat.k6.js
+// and sprint6i-service-binding.k6.js).
 
 import { buildContextPackage, computeDataSufficiencyScore } from '../../worker/ai/dist/services/contextPackageBuilder.js';
 import { processClinicalMessage } from '../../worker/ai/dist/services/clinicalOrchestrator.js';

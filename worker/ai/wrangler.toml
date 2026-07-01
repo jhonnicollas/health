@@ -36,7 +36,6 @@ id = "59ba33a4d92a4e0c852c9df6c63b11e9"
 queue = "ai-memory-jobs"
 binding = "AI_MEMORY_QUEUE"
 
-# Queue producer — WhatsApp outbound replies enqueued for Worker #3
 [[queues.producers]]
 queue = "whatsapp-outbound"
 binding = "WHATSAPP_OUTBOUND_QUEUE"
@@ -85,7 +84,7 @@ AI_GATEWAY_ENABLED = "true"
 AI_GATEWAY_PRIMARY_PROVIDER = "9router"
 VECTORIZE_MAX_VECTORS_PER_USER = "500"
 VECTORIZE_ALERT_THRESHOLD_PERCENT = "80"
-CLINICAL_COPILOT_ENABLED = "false"
+CLINICAL_COPILOT_ENABLED = "true"
 CLINICAL_COPILOT_MAX_TURNS = "20"
 WHATSAPP_MAX_REPLY_CHARS = "400"
 MEDICAL_SAFETY_RUNTIME_ENABLED = "true"

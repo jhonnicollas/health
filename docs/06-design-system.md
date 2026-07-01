@@ -1,6 +1,6 @@
 # DESIGN SYSTEM — iSehat
 
-> **Sumber: audit langsung ke `web/src/index.css` (CSS variables & themes), `web/src/App.css` (6544 LOC utility classes), `web/src/App.tsx` (NAV structure), `web/src/components/*` (22 components), `web/src/pages/*` (47 pages), `web/src/i18n/locales/*` (24 locale files), `web/src/styles/{senior-mode,high-contrast}.css`.**
+> **Sumber: audit langsung ke `web/src/index.css` (CSS variables & themes), `web/src/App.css` (6544 LOC utility classes), `web/src/App.tsx` (NAV structure), `web/src/components/*` (22 components), `web/src/pages/*` (47 pages), `web/src/i18n/locales/*` (25+ locale files), `web/src/styles/{senior-mode,high-contrast}.css`. Sprint 6 additions: AI Clinical Copilot chat, Emergency Guidance, First Aid, WhatsApp, Admin AI Governance pages.**
 > Dokumen lama: `archive/docs_legacy_2025_sprint1-5/06-design-system.md`.
 
 ---
@@ -292,7 +292,7 @@ Setiap page (Today/Weekly/Monthly Dashboard, HydrationPage, dll.) memakai contai
 
 ---
 
-## 6. Navigation Map (47 routes)
+## 6. Navigation Map (47+ routes)
 
 ```text
 NAV_GROUPS (10 groups)
@@ -323,9 +323,11 @@ NAV_GROUPS (10 groups)
 │   ├── /medications              MedicationsPage
 │   ├── /patterns                 PatternsPage
 │   └── /reminders                RemindersPage
-├── AI & Insights
+├── AI & Insights (Sprint 6 expanded)
 │   ├── /ai-assistant             AiAssistantPage (feature.aiAssistant.use)
-│   └── /ai-memory                AiMemorySettingsPage (paid: feature.vectorMemory.use)
+│   ├── /ai-clinical              AiClinicalChatPage (S6E — feature.aiClinicalCopilot.use)
+│   ├── /ai-memory                AiMemorySettingsPage (paid: feature.vectorMemory.use)
+│   └── /ai-first-aid             AiFirstAidPage (S6F — feature.aiClinicalCopilot.firstAid)
 ├── Family & Safety
 │   ├── /family                   FamilyPage (paid: feature.familyDashboard.use)
 │   ├── /emergency                EmergencyContactsPage
@@ -340,14 +342,21 @@ NAV_GROUPS (10 groups)
 │   ├── /settings/app             AppSettingsPage
 │   ├── /settings/billing         BillingSettingsPage
 │   ├── /settings/delete          ProfileDeletePage (hidden, privacy)
+│   ├── /whatsapp                 WhatsAppSettingsPage (S6G — feature.aiClinicalCopilot.whatsapp)
 │   ├── /telegram                 TelegramSettingsPage (paid)
 │   └── /premium/upgrade          PremiumUpgradePage (no-block path)
 ├── Billing
 │   ├── /billing/success          BillingSuccessPage
 │   ├── /billing/cancel           BillingCancelPage
 │   └── /billing/mock-checkout    MockCheckoutPage
-├── Admin
-│   └── /admin                    AdminPage (adminOnly)
+├── Admin (Sprint 6 expanded)
+│   ├── /admin                    AdminPage (adminOnly)
+│   ├── /admin/ai-model-runs      AiModelRunsPage (S6H — admin.aiModelRun.read)
+│   ├── /admin/ai-safety          AiSafetyFlagsPage (S6H — admin.aiSafety.read)
+│   ├── /admin/ai-prompts         AiPromptVersionsPage (S6H — admin.aiConfig.read)
+│   ├── /admin/ai-evaluation      AiEvaluationPage (S6H — admin.aiEvaluation.read)
+│   ├── /admin/whatsapp-sessions  AiWhatsappSessionsPage (S6H — admin.whatsapp.read)
+│   └── /admin/ai-operating-mode  AiOperatingModePage (S6H — admin.aiConfig.update)
 └── Auth (no nav)
     ├── /login                    LoginPage
     ├── /register                 RegisterPage
@@ -415,7 +424,7 @@ PRO badge (`<span class="nav-badge pro-badge">PRO</span>`) muncul di nav item de
 
 ---
 
-## 8. i18n (24 locale files)
+## 8. i18n (25+ locale files)
 
 Lokasi: `web/src/i18n/locales/*.ts` (TS modules export `id` & `en` translation maps).
 
@@ -426,8 +435,10 @@ doctor.ts           emergency.ts       errors.ts          family.ts
 fasting.ts          hydration.ts       kb.ts              medications.ts
 nav.ts              onboarding.ts      patterns.ts        reminders.ts
 reports.ts          settings.ts        symptom.ts         measurement.ts
-ai.ts
+ai.ts               clinical.ts        whatsapp.ts        governance.ts
 ```
+
+Sprint 6 additions: `clinical.ts` (AI Clinical Copilot chat, emergency, first-aid), `whatsapp.ts` (link/verify/unlink), `governance.ts` (model runs, safety flags, prompts, eval, operating mode). ~50 new keys per locale.
 
 API: `I18nProvider` + `useI18n()` (dari `web/src/i18n/index.tsx`) — expose `{ t, locale, setLocale }`. Locale default `id`, fallback `en`.
 
@@ -529,6 +540,59 @@ Empty state
   > "Belum ada data" + CTA pertama
 ```
 
+### 12.4 AI Clinical Chat page (Sprint 6 — S6E)
+
+```text
+.ai-clinical-chat
+  > .chat-header              (session title + operating-mode badge + close button)
+  > .chat-messages
+    > .message.user           (right-aligned, --colorPrimaryContainer bg)
+    > .message.assistant      (left-aligned, --colorSurfaceElevated bg)
+      > .answer-type-badge    (safe_summary | possible_explanations | emergency_guidance | ...)
+      > .message-content      (formatted text)
+      > .context-trace-drawer (expandable: shows data sources + scores)
+      > .safety-disclaimer    (mandatory footer, --colorStatusWarning text)
+  > .chat-input
+    > textarea (max 5000 chars)
+    > .data-sufficiency-score (circular gauge, 0-100)
+    > .red-flag-banner       (if redFlagStatus=emergency → red bg, auto-escalate)
+  > .operating-mode-indicator  (pill: standard/proactive/super_aktif)
+```
+
+### 12.5 Emergency Guidance Card (Sprint 6 — S6F)
+
+```text
+.emergency-guidance-card        (--colorStatusEmergency bg, NO auto-dismiss)
+  > .emergency-header           (⚠️ icon + "PERINGATAN DARURAT" text)
+  > .emergency-actions          (Call 119/112 button + Contact faskes + Contact caregiver)
+  > .emergency-template         (deterministic text from renderEmergencyTemplate)
+  > .disclaimer                  (mandatory, always visible)
+```
+
+### 12.6 First Aid Protocol Card (Sprint 6 — S6F)
+
+```text
+.first-aid-protocol-card
+  > .red-flags-banner           (top, --colorStatusCritical, list of red flags)
+  > .do-steps                   (green bg, --colorStatusNormal)
+  > .dont-steps                 (red bg, --colorStatusCritical)
+  > .seek-help-now              (orange bg, --colorStatusHigh)
+  > .reviewer-status-footer     (reviewerStatus=approved + contentVersion)
+  > .disclaimer                  (mandatory)
+```
+
+### 12.7 AI Governance Admin pages (Sprint 6 — S6H)
+
+```text
+.admin-ai-page
+  > .governance-tabs            (Model Runs | Safety Flags | Prompts | Evaluations | Settings)
+  > .model-runs-dashboard       (summary cards: successRate, avgLatency, topTasks, topModels)
+  > .safety-flags-chart         (grouped by flagCode, severity, actionTaken)
+  > .prompt-version-list        (draft/active/deprecated, activate action)
+  > .evaluation-queue           (run/review/pass/fail/needs_investigation)
+  > .operating-mode-panel       (current mode + change form + reviewer approval gate)
+```
+
 ---
 
 ## 13. Status / Severity Patterns
@@ -540,6 +604,21 @@ severity=warning   → chip kuning (--colorStatusWarning)
 severity=high      → chip oranye (--colorStatusHigh)
 severity=critical  → chip merah (--colorStatusCritical)
 severity=emergency → chip merah gelap + EmergencyModal (--colorStatusEmergency)
+```
+
+Sprint 6 additions:
+
+```text
+safetyDecision=allow                → pill hijau (no rewrite)
+safetyDecision=allow_with_disclaimer → pill biru (disclaimer inserted)
+safetyDecision=rewrite_safe         → pill kuning (content rewritten)
+safetyDecision=block_and_fallback   → pill merah (blocked, safe template)
+safetyDecision=emergency_template_only → pill merah gelap (no LLM, deterministic)
+safetyDecision=needs_human_review   → pill oranye (flagged for reviewer)
+
+operatingMode=standard    → pill biru (default)
+operatingMode=proactive   → pill kuning (diagnosis allowed)
+operatingMode=super_aktif → pill merah (prescription/dosage allowed)
 ```
 
 Dipakai di:
@@ -633,6 +712,9 @@ Tidak ada CSS-in-JS, tidak ada Tailwind, tidak ada preprocessor (Sass/Less). Kon
 
 Lihat juga:
 - Schema: `docs/07-schema.sql`
+- Sprint 6 Schema: `worker/migrations/003_sprint6_schema.sql`
 - API Contract: `docs/05-api-contract.md`
 - Architecture: `docs/04-ARCHITECTURE.md`
-- PRD Sprint 1–5: `docs/01-PRD_SPRINT1-5.md`
+- PRD Sprint 6: `docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md`
+- AI Safety Runtime: `docs_sprint6/AI_SAFETY_RUNTIME_SPEC.md`
+- Clinical Response Schema: `docs_sprint6/CLINICAL_RESPONSE_SCHEMA.md`

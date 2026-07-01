@@ -35,7 +35,13 @@ import {
   encryptContent,
   renderEmergencyTemplate,
   logEmergencyEvent,
+  generateFollowUpQuestions,
+  getOperatingMode,
+  getConfigBoolean,
 } from "./services/index.js";
+import { runSafetyRuntime } from "./safety/safetyRuntime.js";
+import { SafetyDecision } from "./safety/safetyDecision.js";
+import type { DetectorInput } from "./safety/detectors.js";
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -227,10 +233,56 @@ app.post("/api/ai/clinical/sessions/:id/close", async (c) => {
   }
 });
 
-app.post("/api/ai/clinical/follow-up", (c) => {
+// S6E-T-09/S6H follow-up: Generate follow-up questions
+app.post("/api/ai/clinical/follow-up", async (c) => {
   const auth = requireAuth(c);
   if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
-  return c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6E-??" } }, 501);
+  const userId = auth.userId;
+
+  try {
+    const body = await c.req.json() as { sessionId?: number; message?: string; locale?: string };
+    if (!body.sessionId || !body.message) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "sessionId and message are required" } }, 400);
+    }
+
+    const session = await c.env.DB.prepare(
+      "SELECT id, status FROM HL_aiClinicalSessions WHERE id = ? AND userId = ?"
+    ).bind(body.sessionId, userId).first<{ id: number; status: string }>();
+
+    if (!session) {
+      return c.json({ success: false, error: { code: "NOT_FOUND", message: "Session not found" } }, 404);
+    }
+    if (session.status !== "active") {
+      return c.json({ success: false, error: { code: "SESSION_CLOSED", message: "Session is not active" } }, 400);
+    }
+
+    const locale = (body.locale === "en" ? "en" : "id") as "id" | "en";
+    const contextPackage = await buildContextPackage(c.env, userId, {
+      queryText: body.message,
+      disclaimerAcknowledged: false,
+      timeoutMs: 3000,
+    });
+
+    const questions = generateFollowUpQuestions(contextPackage, 'symptom_interview');
+    const disclaimer = locale === 'en'
+      ? 'AI CAN MAKE MISTAKES.\nDO NOT RELY ON AI 100%.\nDO NOT TRUST AI 100%.\nALL DECISIONS YOU MAKE BASED ON THIS AI OUTPUT ARE 1000% YOUR OWN RESPONSIBILITY.'
+      : 'AI DAPAT MELAKUKAN KESALAHAN.\nTIDAK BOLEH MENGANDALKAN AI 100%.\nTIDAK BOLEH PERCAYA AI 100%.\nSEGALA KEPUTUSAN ANDA DARI HASIL AI INI, ADALAH 1000% TANGGUNG JAWAB ANDA.';
+
+    return c.json({
+      success: true,
+      data: {
+        questions,
+        dataSufficiencyScore: contextPackage.dataSufficiencyScore,
+        dataSufficiencyLabel: getSufficiencyLabel(contextPackage.dataSufficiencyScore),
+        disclaimer,
+        contextTrace: contextPackage.contextTrace,
+        redFlagStatus: contextPackage.redFlagPrecheck.severity,
+      },
+    });
+  } catch (error) {
+    console.error("clinical/follow-up error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to generate follow-up" } }, 500);
+  }
 });
 
 // S6F-T-06/T-07: First Aid Protocol Engine
@@ -448,13 +500,108 @@ app.post("/api/ai/clinical/doctor-handoff", async (c) => {
   }
 });
 
-app.post("/api/ai/clinical/emergency-guidance", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6F-T-03" } }, 501)
-);
+// S6F-T-03/T-04: Deterministic Emergency Guidance
+app.post("/api/ai/clinical/emergency-guidance", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
 
-app.post("/api/ai/clinical/safety-check", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Internal-only; land in S6H" } }, 501)
-);
+  try {
+    const body = await c.req.json() as { sessionId?: number; locale?: string };
+    const locale = (body.locale === "en" ? "en" : "id") as "id" | "en";
+    const operatingMode = await getOperatingMode(c.env);
+    const contextPackage = await buildContextPackage(c.env, userId, {
+      queryText: 'emergency guidance',
+      disclaimerAcknowledged: false,
+      timeoutMs: 3000,
+    });
+
+    const emergencyBody = renderEmergencyTemplate(locale);
+    const disclaimerBase = locale === 'en'
+      ? 'AI CAN MAKE MISTAKES.\nDO NOT RELY ON AI 100%.\nDO NOT TRUST AI 100%.\nALL DECISIONS YOU MAKE BASED ON THIS AI OUTPUT ARE 1000% YOUR OWN RESPONSIBILITY.'
+      : 'AI DAPAT MELAKUKAN KESALAHAN.\nTIDAK BOLEH MENGANDALKAN AI 100%.\nTIDAK BOLEH PERCAYA AI 100%.\nSEGALA KEPUTUSAN ANDA DARI HASIL AI INI, ADALAH 1000% TANGGUNG JAWAB ANDA.';
+
+    const modeAddition = locale === 'en'
+      ? (operatingMode === 'proactive' ? '\n\nProactive Mode: AI may give a final diagnosis, but CANNOT prescribe medication or dosage.' : operatingMode === 'super_aktif' ? '\n\nSuper Active Mode: AI may prescribe medication and dosage. Still consult with a doctor.' : '')
+      : (operatingMode === 'proactive' ? '\n\nMode Proaktif: AI boleh memberi diagnosis final, tetapi TIDAK boleh memberi resep atau dosis.' : operatingMode === 'super_aktif' ? '\n\nMode Super Aktif: AI boleh memberi resep dan dosis. Tetap konsultasikan dengan dokter.' : '');
+
+    const disclaimer = disclaimerBase + modeAddition;
+    const fullReply = `${emergencyBody}\n\n${disclaimer}`;
+
+    if (body.sessionId) {
+      await logEmergencyEvent(c.env, userId, body.sessionId, undefined);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        answerType: 'emergency_guidance',
+        reply: fullReply,
+        disclaimer,
+        contextTrace: contextPackage.contextTrace,
+        redFlagStatus: contextPackage.redFlagPrecheck.severity,
+        dataSufficiencyScore: contextPackage.dataSufficiencyScore,
+        dataSufficiencyLabel: getSufficiencyLabel(contextPackage.dataSufficiencyScore),
+        safetyDecision: 'emergency_template_only',
+      },
+    });
+  } catch (error) {
+    console.error("clinical/emergency-guidance error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to get emergency guidance" } }, 500);
+  }
+});
+
+// S6H: Safety Check — run Safety Runtime on provided text (internal/admin)
+app.post("/api/ai/clinical/safety-check", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    const body = await c.req.json() as {
+      text?: string;
+      locale?: string;
+      operatingMode?: string;
+      redFlagPresent?: boolean;
+    };
+
+    if (!body.text) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "text is required" } }, 400);
+    }
+
+    const locale = (body.locale === "en" ? "en" : "id") as "id" | "en";
+    const mode = (body.operatingMode === 'proactive' || body.operatingMode === 'super_aktif') ? body.operatingMode : 'standard';
+    const safetyEnabled = await getConfigBoolean(c.env, 'medicalSafetyRuntime.enabled', true);
+
+    if (!safetyEnabled) {
+      return c.json({
+        success: true,
+        data: { decision: 'allow', output: body.text, flags: [] },
+      });
+    }
+
+    const safetyInput: DetectorInput = {
+      aiOutput: body.text,
+      locale,
+      redFlagPresent: body.redFlagPresent ?? false,
+      operatingMode: mode as 'standard' | 'proactive' | 'super_aktif',
+    };
+
+    const safetyResult = runSafetyRuntime(safetyInput);
+
+    return c.json({
+      success: true,
+      data: {
+        decision: safetyResult.finalDecision,
+        output: safetyResult.output,
+        flags: safetyResult.flags,
+      },
+    });
+  } catch (error) {
+    console.error("clinical/safety-check error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to run safety check" } }, 500);
+  }
+});
 
 // 11.2 AI Memory routes — S6C implementation.
 // PRD S6C §5: VectorizeService query/insert/delete/deleteAll/getStatus
@@ -682,28 +829,164 @@ app.post("/api/ai/clinical/whatsapp/event", async (c) => {
   }
 });
 
-// Durable Object stubs — required by wrangler.toml bindings.
-// Real implementations land in S6E (AiChatSessionDO), S6G (WhatsAppSessionDO),
-// S6B/S6E (UserAiLockDO, ModelStreamingDO), and S6F/S6H (JobProgressDO).
+// Durable Object implementations — PRD §8.12 FR-12
+// AiChatSessionDO, UserAiLockDO, ModelStreamingDO, JobProgressDO
+// WhatsAppSessionDO is imported from ./whatsappSessionDo.js
+
 export class AiChatSessionDO implements DurableObject {
-  fetch(_request: Request): Response | Promise<Response> {
-    return new Response("AiChatSessionDO stub", { status: 501 });
+  private state: DurableObjectState;
+  private storage: DurableObjectStorage;
+
+  constructor(state: DurableObjectState, env: Bindings) {
+    this.state = state;
+    this.storage = state.storage;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = String(body.action || '');
+
+    if (action === 'append') {
+      const messages = body.messages as Array<Record<string, unknown>> | undefined;
+      if (messages) {
+        const existing = (await this.storage.get<Array<Record<string, unknown>>>('messages')) || [];
+        existing.push(...messages);
+        await this.storage.put('messages', existing);
+        // Reset idle alarm — 30 min after last activity
+        await this.state.storage.setAlarm(Date.now() + 30 * 60 * 1000);
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (action === 'flush') {
+      const messages = (await this.storage.get<Array<Record<string, unknown>>>('messages')) || [];
+      await this.storage.delete('messages');
+      await this.state.storage.setAlarm(Date.now() + 30 * 60 * 1000);
+      return new Response(JSON.stringify({ success: true, count: messages.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Read stored messages
+    const stored = (await this.storage.get<Array<Record<string, unknown>>>('messages')) || [];
+    return new Response(JSON.stringify({ success: true, count: stored.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  async alarm(): Promise<void> {
+    // Persist pending messages to D1 and clear buffer
+    // (D1 persist happens in ClinicalOrchestrator after each message)
+    await this.storage.delete('messages');
   }
 }
 export { WhatsAppSessionDO };
+
 export class UserAiLockDO implements DurableObject {
-  fetch(_request: Request): Response | Promise<Response> {
-    return new Response("UserAiLockDO stub", { status: 501 });
+  private state: DurableObjectState;
+  private storage: DurableObjectStorage;
+
+  constructor(state: DurableObjectState, env: Bindings) {
+    this.state = state;
+    this.storage = state.storage;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = String(body.action || '');
+
+    if (action === 'acquire') {
+      const locked = await this.storage.get<boolean>('locked');
+      if (locked) {
+        return new Response(JSON.stringify({ success: false, reason: 'ALREADY_LOCKED' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+      }
+      await this.storage.put('locked', true);
+      await this.storage.put('lockedAt', Date.now());
+      // Auto-release alarm after 5 min
+      await this.state.storage.setAlarm(Date.now() + 5 * 60 * 1000);
+      return new Response(JSON.stringify({ success: true, action: 'acquired' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (action === 'release') {
+      await this.storage.delete('locked');
+      await this.storage.delete('lockedAt');
+      return new Response(JSON.stringify({ success: true, action: 'released' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const locked = await this.storage.get<boolean>('locked');
+    return new Response(JSON.stringify({ success: true, locked: !!locked }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  async alarm(): Promise<void> {
+    // Auto-release lock on alarm (safety release for abandoned locks)
+    await this.storage.delete('locked');
+    await this.storage.delete('lockedAt');
   }
 }
+
 export class ModelStreamingDO implements DurableObject {
-  fetch(_request: Request): Response | Promise<Response> {
-    return new Response("ModelStreamingDO stub", { status: 501 });
+  private state: DurableObjectState;
+  private storage: DurableObjectStorage;
+
+  constructor(state: DurableObjectState, env: Bindings) {
+    this.state = state;
+    this.storage = state.storage;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = String(body.action || '');
+
+    if (action === 'append') {
+      const chunk = String(body.chunk || '');
+      const existing = (await this.storage.get<string>('buffer')) || '';
+      await this.storage.put('buffer', existing + chunk);
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (action === 'flush') {
+      const buffer = (await this.storage.get<string>('buffer')) || '';
+      await this.storage.delete('buffer');
+      return new Response(JSON.stringify({ success: true, text: buffer }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const buffer = (await this.storage.get<string>('buffer')) || '';
+    return new Response(JSON.stringify({ success: true, length: buffer.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  async alarm(): Promise<void> {
+    await this.storage.delete('buffer');
   }
 }
+
 export class JobProgressDO implements DurableObject {
-  fetch(_request: Request): Response | Promise<Response> {
-    return new Response("JobProgressDO stub", { status: 501 });
+  private state: DurableObjectState;
+  private storage: DurableObjectStorage;
+
+  constructor(state: DurableObjectState, env: Bindings) {
+    this.state = state;
+    this.storage = state.storage;
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const action = String(body.action || '');
+
+    if (action === 'progress') {
+      const processed = Number(body.processed ?? 0);
+      const total = Number(body.total ?? 0);
+      await this.storage.put('processed', processed);
+      await this.storage.put('total', total);
+      await this.storage.put('updatedAt', Date.now());
+      // Alarm-based expiry: 1 hour
+      await this.state.storage.setAlarm(Date.now() + 60 * 60 * 1000);
+      return new Response(JSON.stringify({ success: true, processed, total }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const processed = (await this.storage.get<number>('processed')) || 0;
+    const total = (await this.storage.get<number>('total')) || 0;
+    const updatedAt = (await this.storage.get<number>('updatedAt')) || 0;
+    return new Response(JSON.stringify({ success: true, processed, total, updatedAt }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  async alarm(): Promise<void> {
+    await this.storage.deleteAll();
   }
 }
 

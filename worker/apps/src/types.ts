@@ -51,8 +51,10 @@ export type ApiErrorCode =
   | 'EMAIL_OTP_SEND_FAILED'
   | 'EMAIL_INVALID_FORMAT'
   | 'EMAIL_ALREADY_VERIFIED'
+  | 'REVIEWER_APPROVAL_REQUIRED'
+  | 'AI_SERVICE_UNAVAILABLE'
 
-export type ApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 429 | 500
+export type ApiStatus = 200 | 201 | 202 | 400 | 401 | 403 | 404 | 409 | 429 | 500 | 502 | 503
 
 export type RegisterInput = {
   email?: unknown

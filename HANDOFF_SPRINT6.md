@@ -1,43 +1,53 @@
 # HANDOFF_SPRINT6.md — Sprint 6 Resume State
 
-## Current State — 2026-07-01 16:00 UTC
+## Current State — 2026-07-01 22:00 UTC
 
 ```text
 Sprint: Sprint 6 (S6A → S6I) — AI Clinical Copilot Runtime + Emergency + WhatsApp AI + Cloudflare AI Platform
-Phase: S6I (Hardening, Security, Release Gate) — DONE
-Status: DONE (all S6I automated tests implemented, docs updated, full regression green)
-Current Task: S6I complete — safety detectors, adversarial tests, resilience, i18n, data retention, local performance benchmark, architecture/API contract docs
-Next Task: MANUAL — T-12 closed beta (100 users), T-15 production rollout
+Phase: S6H (Admin AI Governance + Evaluation) — DONE
+Status: DONE — S6H backend complete, 27 tests pass, full regression green
+Current Task: S6H-T-01..T-11 complete (T-10 UI deferred)
+Next Task: S6G UI + S6I hardening (closed beta, production rollout manual steps remain)
 Workers Active: #1 isehat-api-worker + #2 isehat-ai-worker + #3 isehat-jobs-worker + #4 isehat-webhooks-worker
-Tests: 191 PASS (worker/ai), 338 PASS (worker/apps), 0 FAIL, 13 SKIP (D1 integration)
-  - S6A: 20 safety tests + 5 OM tests
+Tests: 523 PASS (worker/ai), 370 PASS (worker/apps), 6 PASS (worker/cron), 0 FAIL, 13 SKIP
+  - S6A: 20 safety + 5 OM tests
   - S6B: 7 modelRouter tests
   - S6C: 25 vectorize + memory tests
   - S6D: 34 context package tests
   - S6E: 40 E2E + AU + OM + NS tests
-  - S6F: 10 emergency + cron tests
-  - S6G: 10 T-1..T-10 tests
-  - S6I: 6 automated test files (≈420 assertions) + resilience + i18n + retention + perf
-  - T-12 and T-15 remain MANUAL/NOT_STARTED
-tsc: Worker #1 PASS, Worker #2 PASS, Worker #3 PASS, Worker #4 PASS, web PASS
+  - S6F: 32 emergency + first-aid + cron + NS tests
+  - S6G: 10 WA tests
+  - S6H: 27 governance tests (DB-01→05, PM-01→04, EV-01→04, OM-01→06, NS-01→03, extras)
+  - S6I: resilience + i18n + retention + perf
+tsc: Worker #1 PASS, Worker #2 PASS, Worker #3 PASS, Worker #4 PASS
 eslint: n/a
-D1: PRAGMA foreign_key_check clean (migration 006 adds otpHash/otpExpiresAt)
+D1: PRAGMA foreign_key_check clean (migrations 003-008 applied)
 Secrets: CLOUDFLARE_ACCOUNT_ID ✅ CLOUDFLARE_API_TOKEN ✅ 9ROUTER_API_KEY ✅ TELEGRAM_BOT_TOKEN ✅
 AI_KV: id=59ba33a4d92a4e0c852c9df6c63b11e9 ✅
 AI Endpoint: https://9router.krpmerch.biz.id/v1
 9router Models: oc/deepseek-v4-flash-free (default), oc/mimo-v2.5-free (premium)
-Telegram: iSehatApp_bot / userId=8727919072
 ```
 
 ## Last Completed Task
-- Task: S6G — WhatsApp AI via Baileys
-- Result: All 9 S6G task groups implemented; 10/10 new S6G tests pass; full regression 191/191 worker/ai PASS, 338/338 worker/apps PASS
+- Task: S6H Governance Endpoints + Test Suite
+- Result: 9 admin governance endpoints implemented (model-runs, safety-flags, prompt-versions CRUD+activate, evaluations run+review, vectorize/health proxy, whatsapp/sessions, kb/reindex, operating-mode GET/PUT); migration 008; 27 S6H tests; tsc clean all workers; cron queue consumers updated for eval/kbReindex
 - Validation:
-  - `cd worker/ai && npm test` → 191 PASS, 0 FAIL
-  - `cd worker/apps && npm test` → 338 PASS, 0 FAIL
-  - `cd worker/cron && npx tsc -p tsconfig.json` → PASS
-  - `cd worker/webhook && npx tsc -p tsconfig.json` → PASS
-  - `cd web && npx tsc -b` → PASS
+  - `cd worker/apps && node --test test/sprint6h.test.mjs` → 27 PASS, 0 FAIL
+  - `cd worker/apps && npm test` → 370 PASS, 0 FAIL
+  - `cd worker/ai && npm test` → 523 PASS, 0 FAIL, 13 SKIP
+  - `cd worker/cron && npm test` → 6 PASS, 0 FAIL
+  - tsc: all 4 workers clean
+
+## S6F Audit Findings — 2026-07-01
+
+| # | Severity | Bug | Fix | File |
+|---|---|---|---|---|
+| 1 | INFO | Emergency path comment was misleading ("do not inject mode-specific") — code already injected mode disclaimer | Clarified comment: "Emergency behavior identical across modes, but disclaimer includes mode context" | `worker/ai/src/services/clinicalOrchestrator.ts` |
+| 2 | **HIGH** | `/api/ai/clinical/first-aid` emergency path used hardcoded ID text instead of `renderEmergencyTemplate(locale)`, no mode-aware disclaimer | Replaced with `renderEmergencyTemplate(locale)` + full disclaimer with mode additions | `worker/ai/src/index.ts` |
+| 3 | **HIGH** | `/api/ai/clinical/first-aid` emergency path did NOT call `logEmergencyEvent()` → no HL_safetyEvents/HL_auditLogs for first-aid emergencies | Added `logEmergencyEvent()` call when sessionId provided | `worker/ai/src/index.ts` |
+| 4 | **HIGH** | `computeRedFlagPrecheck` only checked `severity='critical'` for safety events — PRD §4 step 5 also requires check for `severity='emergency'` | Changed filter to `severity === 'critical' || severity === 'emergency'` | `worker/ai/src/services/contextPackageBuilder.ts` |
+| 5 | MEDIUM | `formatWhatsAppReply` hardcoded max 400 chars — should accept configurable limit | Added `maxChars` parameter (default 400) | `worker/ai/src/services/clinicalOrchestrator.ts` |
+| 6 | MEDIUM | `logEmergencyEvent` was private function — couldn't be used from `index.ts` first-aid route | Exported `logEmergencyEvent` and added to barrel exports | `worker/ai/src/services/clinicalOrchestrator.ts`, `worker/ai/src/services/index.ts` |
 
 ## S6E Audit Findings — 2026-07-01
 
@@ -233,3 +243,43 @@ If unsure → STOP → mark BLOCKED in this file → append exact evidence to WO
 ```
 
 — end of HANDOFF_SPRINT6 pre-S6A —
+
+## S6G Audit Findings — 2026-07-01
+
+12 bugs found and fixed. Full table in WORK_LOG_SPRINT6.md `## S6G-AUDIT` entry.
+
+| # | Severity | Bug | Fix |
+|---|---|---|---|
+| 1 | **CRITICAL** | Webhook idempotency race (SELECT-then-INSERT) | try/catch on UNIQUE violation -> 200 duplicate |
+| 2 | **CRITICAL** | OTP verify TOCTOU race (double-verification) | Atomic UPDATE ... AND otpHash = ? CAS via meta.changes=0 |
+| 3 | **CRITICAL** | truncateForWhatsapp UTF-16 .slice() breaks emoji codepoints | Array.from() codepoint-aware + boundary drop + trimEnd |
+| 4 | **HIGH** | Missing UNIQUE on HL_whatsappLinks(userId/whatsappNumberHash) + HL_whatsappMessages(providerMessageId) | Migration 007 |
+| 5 | MEDIUM | detectMessageType returned 'video' (violates CHECK) | Folded to 'document' |
+| 6 | MEDIUM | Media ingest: arbitrary MIME + unbounded size (R2 DoS) | MIME allowlist + 10MB + 13.4MB base64 guard |
+| 7 | MEDIUM | Outbound WhatsApp replies unbounded | whatsappAi.maxReplyChars config (default 400) |
+| 8-12 | LOW | as-cast, unlinked orphan rows, XENDIT env inconsistency, test (env as any), getMaxReplyChars<50 accepted | Type binding addition / partial index / env unify / direct export / >=50 floor |
+
+## Migration 007 Preflight (run BEFORE applying in production)
+
+```sql
+-- 1. Duplicate providerMessageId?
+SELECT providerMessageId, COUNT(*) FROM HL_whatsappMessages
+ WHERE providerMessageId IS NOT NULL
+ GROUP BY providerMessageId HAVING COUNT(*) > 1;
+-- Remediation: DELETE FROM HL_whatsappMessages WHERE id NOT IN (
+--   SELECT MIN(rowid) FROM HL_whatsappMessages WHERE providerMessageId IS NOT NULL GROUP BY providerMessageId);
+
+-- 2. Duplicate userId in HL_whatsappLinks?
+SELECT userId, COUNT(*) FROM HL_whatsappLinks GROUP BY userId HAVING COUNT(*) > 1;
+
+-- 3. Duplicate whatsappNumberHash?
+SELECT whatsappNumberHash, COUNT(*) FROM HL_whatsappLinks GROUP BY whatsappNumberHash HAVING COUNT(*) > 1;
+```
+
+## S6F retention cron for unlinked GC MUST use this exact predicate:
+
+```sql
+DELETE FROM HL_whatsappMessages
+ WHERE processedStatus = 'ignored_unlinked' AND createdAt < datetime('now', '-30 day');
+```
+

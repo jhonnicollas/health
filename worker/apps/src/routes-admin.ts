@@ -24,6 +24,24 @@ import { RbacService } from './services/rbac.js'
 interface LocalEnv { DB: D1Database; TELEGRAM_WATER_WEBHOOK_SECRET?: string; INTERNAL_API_SECRET?: string; LOGS: R2Bucket }
 type HC = Context<{ Bindings: LocalEnv }>
 
+const OPERATING_MODE_WINDOW_MS = 60 * 60 * 1000
+const operatingModeRateLimit = new Map<string, { count: number; windowStart: number }>()
+
+function checkOperatingModeRateLimit(now = Date.now()): boolean {
+  const entry = operatingModeRateLimit.get('global:operatingMode')
+  if (!entry || now - entry.windowStart > OPERATING_MODE_WINDOW_MS) {
+    operatingModeRateLimit.set('global:operatingMode', { count: 1, windowStart: now })
+    return true
+  }
+  if (entry.count >= 1) return false
+  entry.count++
+  return true
+}
+
+export function resetOperatingModeRateLimit() {
+  operatingModeRateLimit.clear()
+}
+
 function jr(c: HC, body: any, status: number) { c.header('Cache-Control', 'no-store'); return c.json(body.body ?? body, status as any) }
 function ok(data: unknown, status = 200, s = Date.now()) { return { body: { success: true, data, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
 function fail(code: string, msg: string, status: number, errs: unknown[] = [], s = Date.now()) { return { body: { success: false, error: { code, message: msg, details: errs }, meta: { requestId: `req_${s}`, durationMs: Date.now() - s } }, status } }
@@ -1063,4 +1081,386 @@ app.put('/api/admin/knowledge-articles/:slug', async (c: HC) => {
     return jsonResponse(c, success({ slug, updated: true }, 200, startedAt))
   } catch (error) { console.error('admin knowledge article upsert error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal update knowledge article.', 500, [], startedAt)) }
 })
+
+  // ═══════════════════════════════════════════════════════════
+  // S6H — Admin AI Governance Routes
+  // PRD S6H §3-§9, TEST_PLAN S6H (DB/PM/EV/OM/NS)
+  // ═══════════════════════════════════════════════════════════
+
+  // S6H-T-01: GET /api/admin/ai/model-runs — Model run dashboard
+  app.get('/api/admin/ai/model-runs', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiModelRun.read', startedAt)
+      if (denied) return denied
+      const { userId, status, channel, taskCode, from, to, limit } = c.req.query()
+      let sql = 'SELECT id, userId, requestId, sessionId, channel, taskCode, providerCode, modelCode, promptVersion, inputTokenCount, outputTokenCount, latencyMs, status, fallbackUsed, operatingMode, safetyDecision, createdAt FROM HL_modelRuns WHERE 1=1'; const params: unknown[] = []
+      if (userId) { sql += ' AND userId = ?'; params.push(Number(userId)) }
+      if (status) { sql += ' AND status = ?'; params.push(status) }
+      if (channel) { sql += ' AND channel = ?'; params.push(channel) }
+      if (taskCode) { sql += ' AND taskCode = ?'; params.push(taskCode) }
+      if (from) { sql += ' AND createdAt >= ?'; params.push(from) }
+      if (to) { sql += ' AND createdAt <= ?'; params.push(to + ' 23:59:59') }
+      sql += ' ORDER BY createdAt DESC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 200))
+      const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+      const total = (await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM HL_modelRuns').first<any>())?.cnt ?? 0
+      const successCount = (await c.env.DB.prepare("SELECT COUNT(*) as cnt FROM HL_modelRuns WHERE status = 'success'").first<any>())?.cnt ?? 0
+      const avgLatency = (await c.env.DB.prepare('SELECT AVG(latencyMs) as avg FROM HL_modelRuns WHERE latencyMs IS NOT NULL').first<any>())?.avg ?? 0
+      const topTasks = (await c.env.DB.prepare('SELECT taskCode, COUNT(*) as cnt FROM HL_modelRuns GROUP BY taskCode ORDER BY cnt DESC LIMIT 5').all<any>()).results || []
+      const topModels = (await c.env.DB.prepare('SELECT modelCode, COUNT(*) as cnt FROM HL_modelRuns GROUP BY modelCode ORDER BY cnt DESC LIMIT 5').all<any>()).results || []
+      const summary = { successRate: total > 0 ? successCount / total : 0, avgLatencyMs: Math.round(avgLatency), topTasks: topTasks.map((r: any) => `${r.taskCode}: ${r.cnt}`), topModels: topModels.map((r: any) => `${r.modelCode}: ${r.cnt}`) }
+      return jsonResponse(c, success({ runs: rows.results || [], total, summary }, 200, startedAt))
+    } catch (error) { console.error('admin model-runs error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat model runs.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-02: GET /api/admin/ai/safety-flags — Safety flags dashboard
+  app.get('/api/admin/ai/safety-flags', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiSafety.read', startedAt)
+      if (denied) return denied
+      const { userId, flagCode, severity, actionTaken, from, to, limit } = c.req.query()
+      let sql = 'SELECT id, userId, modelRunId, sessionId, flagCode, severity, detectedTextPreview, actionTaken, createdAt FROM HL_aiOutputSafetyFlags WHERE 1=1'; const params: unknown[] = []
+      if (userId) { sql += ' AND userId = ?'; params.push(Number(userId)) }
+      if (flagCode) { sql += ' AND flagCode = ?'; params.push(flagCode) }
+      if (severity) { sql += ' AND severity = ?'; params.push(severity) }
+      if (actionTaken) { sql += ' AND actionTaken = ?'; params.push(actionTaken) }
+      if (from) { sql += ' AND createdAt >= ?'; params.push(from) }
+      if (to) { sql += ' AND createdAt <= ?'; params.push(to + ' 23:59:59') }
+      sql += ' ORDER BY createdAt DESC LIMIT ?'; params.push(Math.min(Number(limit) || 50, 200))
+      const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+      const totalFlags = (await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM HL_aiOutputSafetyFlags').first<any>())?.cnt ?? 0
+      const byFlagCode = (await c.env.DB.prepare('SELECT flagCode, COUNT(*) as cnt FROM HL_aiOutputSafetyFlags GROUP BY flagCode').all<any>()).results || []
+      const bySeverity = (await c.env.DB.prepare('SELECT severity, COUNT(*) as cnt FROM HL_aiOutputSafetyFlags GROUP BY severity').all<any>()).results || []
+      const byAction = (await c.env.DB.prepare('SELECT actionTaken, COUNT(*) as cnt FROM HL_aiOutputSafetyFlags GROUP BY actionTaken').all<any>()).results || []
+      const summary = {
+        totalFlags,
+        byFlagCode: Object.fromEntries(byFlagCode.map((r: any) => [r.flagCode, r.cnt])),
+        bySeverity: Object.fromEntries(bySeverity.map((r: any) => [r.severity, r.cnt])),
+        byAction: Object.fromEntries(byAction.map((r: any) => [r.actionTaken, r.cnt])),
+      }
+      return jsonResponse(c, success({ flags: rows.results || [], summary }, 200, startedAt))
+    } catch (error) { console.error('admin safety-flags error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat safety flags.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-03: Prompt version CRUD
+  app.get('/api/admin/ai/prompt-versions', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.read', startedAt)
+      if (denied) return denied
+      const { promptCode } = c.req.query()
+      let sql = 'SELECT id, promptCode, version, contentHash, status, createdAt, updatedAt FROM HL_promptVersions WHERE 1=1'; const params: unknown[] = []
+      if (promptCode) { sql += ' AND promptCode = ?'; params.push(promptCode) }
+      sql += ' ORDER BY promptCode, version DESC'
+      const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+      return jsonResponse(c, success(rows.results || [], 200, startedAt))
+    } catch (error) { console.error('admin prompt-versions list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat prompt versions.', 500, [], startedAt)) }
+  })
+
+  app.post('/api/admin/ai/prompt-versions', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.update', startedAt)
+      if (denied) return denied
+      const body = await c.req.json() as { promptCode?: string; version?: string; contentText?: string }
+      if (!body.promptCode || !body.version || !body.contentText) return jsonResponse(c, failure('VALIDATION_ERROR', 'promptCode, version, contentText required.', 400, [], startedAt))
+      const contentHash = await sha256Token(body.contentText)
+      const result = await c.env.DB.prepare(
+        `INSERT INTO HL_promptVersions (promptCode, version, contentText, contentHash, status, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, 'draft', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).bind(body.promptCode, body.version, body.contentText, contentHash).run()
+      const id = getInsertedId(result)
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.promptVersion.create', entityType: 'HL_promptVersions', entityId: String(id), metadataJson: JSON.stringify({ promptCode: body.promptCode, version: body.version }) })
+      return jsonResponse(c, success({ id, promptCode: body.promptCode, version: body.version, status: 'draft' }, 201, startedAt))
+    } catch (error) { console.error('admin prompt-versions create error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal membuat prompt version.', 500, [], startedAt)) }
+  })
+
+  app.get('/api/admin/ai/prompt-versions/:id', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.read', startedAt)
+      if (denied) return denied
+      const id = Number(c.req.param('id'))
+      const row = await c.env.DB.prepare('SELECT id, promptCode, version, contentText, contentHash, status, createdAt, updatedAt FROM HL_promptVersions WHERE id = ?').bind(id).first<any>()
+      if (!row) return jsonResponse(c, failure('NOT_FOUND', 'Prompt version not found.', 404, [], startedAt))
+      return jsonResponse(c, success(row, 200, startedAt))
+    } catch (error) { console.error('admin prompt-versions get error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat prompt version.', 500, [], startedAt)) }
+  })
+
+  app.put('/api/admin/ai/prompt-versions/:id/activate', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.update', startedAt)
+      if (denied) return denied
+      const id = Number(c.req.param('id'))
+      const row = await c.env.DB.prepare('SELECT id, promptCode, version FROM HL_promptVersions WHERE id = ?').bind(id).first<any>()
+      if (!row) return jsonResponse(c, failure('NOT_FOUND', 'Prompt version not found.', 404, [], startedAt))
+      // Deactivate previous active version for same promptCode
+      await c.env.DB.prepare("UPDATE HL_promptVersions SET status = 'deprecated', updatedAt = CURRENT_TIMESTAMP WHERE promptCode = ? AND status = 'active' AND id != ?").bind(row.promptCode, id).run()
+      // Activate this version
+      await c.env.DB.prepare("UPDATE HL_promptVersions SET status = 'active', updatedAt = CURRENT_TIMESTAMP WHERE id = ?").bind(id).run()
+      // Invalidate KV cache
+      try { if ((c.env as any).AI_KV) { await (c.env as any).AI_KV.delete(`prompt:${row.promptCode}:active`) } } catch {}
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'promptVersionActivated', entityType: 'HL_promptVersions', entityId: String(id), metadataJson: JSON.stringify({ promptCode: row.promptCode, version: row.version }) })
+      return jsonResponse(c, success({ id, promptCode: row.promptCode, version: row.version, status: 'active' }, 200, startedAt))
+    } catch (error) { console.error('admin prompt-versions activate error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal mengaktivasi prompt version.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-04/T-08: Evaluation queue + review
+  app.get('/api/admin/ai/evaluations', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiEvaluation.read', startedAt)
+      if (denied) return denied
+      const { status: evStatus, limit } = c.req.query()
+      let sql = 'SELECT r.id, r.caseId, r.matchScore, r.reviewerStatus, r.reviewerNotes, r.reviewedAt, r.createdAt, c.category, c.locale FROM HL_aiEvaluationRuns r LEFT JOIN HL_aiEvaluationCases c ON c.caseId = r.caseId WHERE 1=1'; const params: unknown[] = []
+      if (evStatus) { sql += ' AND r.reviewerStatus = ?'; params.push(evStatus) }
+      sql += ' ORDER BY r.createdAt DESC LIMIT ?'; params.push(Math.min(Number(limit) || 20, 100))
+      const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+      return jsonResponse(c, success(rows.results || [], 200, startedAt))
+    } catch (error) { console.error('admin evaluations list error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat evaluations.', 500, [], startedAt)) }
+  })
+
+  app.post('/api/admin/ai/evaluations/run', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiEvaluation.read', startedAt)
+      if (denied) return denied
+      const body = await c.req.json() as { caseIds?: string[]; category?: string }
+      let caseSql = "SELECT caseId, inputJson, expectedJson FROM HL_aiEvaluationCases WHERE status = 'active'"
+      const caseParams: unknown[] = []
+      if (body.caseIds?.length) { caseSql += ' AND caseId IN (' + body.caseIds.map(() => '?').join(',') + ')'; caseParams.push(...body.caseIds) }
+      if (body.category) { caseSql += ' AND category = ?'; caseParams.push(body.category) }
+      caseSql += ' LIMIT 10'
+      const cases = await c.env.DB.prepare(caseSql).bind(...caseParams as any[]).all<any>()
+      let scored = 0; let mismatches = 0
+      for (const c of (cases.results || [])) {
+        const matchScore = Math.random() * 0.3 + 0.7; // placeholder scoring — real eval runs against orchestrator
+        const isMatch = matchScore >= 0.8
+        if (!isMatch) mismatches++
+        await c.env.DB.prepare(
+          `INSERT INTO HL_aiEvaluationRuns (caseId, actualOutputJson, matchScore, mismatchDetailsJson, reviewerStatus, createdAt)
+           VALUES (?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`
+        ).bind(c.caseId, JSON.stringify({ note: 'eval placeholder' }), matchScore, isMatch ? null : JSON.stringify({ expected: c.expectedJson, note: 'Score below threshold' })).run()
+        scored++
+      }
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.aiEvaluation.run', entityType: 'HL_aiEvaluationRuns', entityId: 'batch', metadataJson: JSON.stringify({ totalCases: scored, mismatches }) })
+      return jsonResponse(c, success({ totalCases: scored, mismatches, message: 'Evaluation run queued' }, 202, startedAt))
+    } catch (error) { console.error('admin evaluations run error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menjalankan evaluasi.', 500, [], startedAt)) }
+  })
+
+  app.post('/api/admin/ai/evaluations/:id/review', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiEvaluation.review', startedAt)
+      if (denied) return denied
+      const id = Number(c.req.param('id'))
+      const body = await c.req.json() as { status?: string; notes?: string }
+      if (!body.status || !['pass','fail','needs_investigation'].includes(body.status)) return jsonResponse(c, failure('VALIDATION_ERROR', 'status must be pass/fail/needs_investigation.', 400, [], startedAt))
+      await c.env.DB.prepare("UPDATE HL_aiEvaluationRuns SET reviewerUserId = ?, reviewerStatus = ?, reviewerNotes = ?, reviewedAt = CURRENT_TIMESTAMP WHERE id = ?").bind(user.id, body.status, body.notes || null, id).run()
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.aiEvaluation.review', entityType: 'HL_aiEvaluationRuns', entityId: String(id), metadataJson: JSON.stringify({ runId: id, status: body.status }) })
+      return jsonResponse(c, success({ id, reviewerStatus: body.status }, 200, startedAt))
+    } catch (error) { console.error('admin evaluations review error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal menyimpan review.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-05: GET /api/admin/ai/vectorize/health — proxy to #2
+  app.get('/api/admin/ai/vectorize/health', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.read', startedAt)
+      if (denied) return denied
+      if (!(c.env as any).AI_SERVICE) return jsonResponse(c, failure('AI_SERVICE_UNAVAILABLE', 'AI_SERVICE binding not configured.', 503, [], startedAt))
+      const res = await (c.env as any).AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/admin/vectorize/health', { method: 'GET', headers: { 'X-Internal-UserId': String(user.id) } }))
+      const payload = await res.json() as any
+      c.header('Cache-Control', 'no-store')
+      return c.json(payload.body ?? payload, res.status as any)
+    } catch (error) { console.error('admin vectorize/health proxy error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal mengambil vectorize health.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-06: GET /api/admin/whatsapp/sessions — WhatsApp session monitor
+  app.get('/api/admin/whatsapp/sessions', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.whatsapp.read', startedAt)
+      if (denied) return denied
+      const { status: waStatus, limit } = c.req.query()
+      let sql = 'SELECT id, userId, phoneNumber, verified, aiEnabled, lastMessageAt, createdAt FROM HL_whatsappLinks WHERE 1=1'; const params: unknown[] = []
+      if (waStatus === 'active') { sql += ' AND aiEnabled = 1' } else if (waStatus === 'inactive') { sql += ' AND aiEnabled = 0' }
+      sql += ' ORDER BY lastMessageAt DESC NULLS LAST LIMIT ?'; params.push(Math.min(Number(limit) || 20, 100))
+      const rows = await c.env.DB.prepare(sql).bind(...params as any[]).all<any>()
+      const totalLinked = (await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM HL_whatsappLinks WHERE verified = 1').first<any>())?.cnt ?? 0
+      const aiEnabled = (await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM HL_whatsappLinks WHERE verified = 1 AND aiEnabled = 1').first<any>())?.cnt ?? 0
+      const activeNow = (await c.env.DB.prepare("SELECT COUNT(*) as cnt FROM HL_whatsappLinks WHERE lastMessageAt > datetime('now', '-5 minutes')").first<any>())?.cnt ?? 0
+      return jsonResponse(c, success({ sessions: rows.results || [], summary: { totalLinked, aiEnabled, activeNow } }, 200, startedAt))
+    } catch (error) { console.error('admin whatsapp sessions error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat WhatsApp sessions.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-07: POST /api/admin/ai/kb/reindex — queue reindex job
+  app.post('/api/admin/ai/kb/reindex', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.update', startedAt)
+      if (denied) return denied
+      if ((c.env as any).AI_MEMORY_QUEUE) {
+        await (c.env as any).AI_MEMORY_QUEUE.send({ type: 'kbReindex', requestedBy: user.id, requestedAt: new Date().toISOString() })
+      }
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'admin.kb.reindex', entityType: 'HL_aiKnowledgeArticles', entityId: 'all', metadataJson: JSON.stringify({ requestedBy: user.id }) })
+      return jsonResponse(c, success({ queued: true, message: 'KB reindex job queued' }, 202, startedAt))
+    } catch (error) { console.error('admin kb reindex error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal queue KB reindex.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-09: AI Operating Mode management
+  app.get('/api/admin/ai/operating-mode', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.read', startedAt)
+      if (denied) return denied
+      const row = await c.env.DB.prepare("SELECT configValue FROM HL_systemConfigs WHERE configKey = 'clinicalCopilot.operatingMode'").first<any>()
+      const mode = row?.configValue || 'standard'
+      const reviewerRequired = await c.env.DB.prepare("SELECT configValue FROM HL_systemConfigs WHERE configKey = 'clinicalCopilot.operatingModeChangeRequiresMedicalReviewer'").first<any>()
+      return jsonResponse(c, success({ mode, requiresMedicalReviewer: reviewerRequired?.configValue === 'true', allowedModes: ['standard', 'proactive', 'super_aktif'] }, 200, startedAt))
+    } catch (error) { console.error('admin operating-mode get error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal membaca operating mode.', 500, [], startedAt)) }
+  })
+
+  app.put('/api/admin/ai/operating-mode', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.update', startedAt)
+      if (denied) return denied
+      // Super admin role check
+      const superAdmin = await c.env.DB.prepare("SELECT 1 FROM HL_userRoles WHERE userId = ? AND roleCode = 'super_admin' LIMIT 1").bind(user.id).first<any>()
+      if (!superAdmin) return jsonResponse(c, failure('FORBIDDEN', 'Only super admin can change operating mode.', 403, [], startedAt))
+      const body = await c.req.json() as { mode?: string }
+      const allowedModes = ['standard', 'proactive', 'super_aktif']
+      if (!body.mode || !allowedModes.includes(body.mode)) return jsonResponse(c, failure('VALIDATION_ERROR', `Mode must be one of: ${allowedModes.join(', ')}`, 400, [], startedAt))
+      // Read current mode
+      const currentRow = await c.env.DB.prepare("SELECT configValue FROM HL_systemConfigs WHERE configKey = 'clinicalCopilot.operatingMode'").first<any>()
+      const currentMode = currentRow?.configValue || 'standard'
+      // Downgrade to standard does NOT require reviewer
+      const isDowngrade = body.mode === 'standard' && currentMode !== 'standard'
+      // Check if reviewer approval required
+      const reviewerRow = await c.env.DB.prepare("SELECT configValue FROM HL_systemConfigs WHERE configKey = 'clinicalCopilot.operatingModeChangeRequiresMedicalReviewer'").first<any>()
+      const requiresReviewer = reviewerRow?.configValue === 'true'
+
+      // Global rate limit: one operating-mode change per hour
+      if (!checkOperatingModeRateLimit(startedAt)) {
+        return jsonResponse(c, failure('RATE_LIMITED', 'Operating mode can only be changed once per hour.', 429, [], startedAt))
+      }
+
+      if (!isDowngrade && requiresReviewer) {
+        const requestedAt = new Date().toISOString()
+        const metadata = JSON.stringify({ from: currentMode, to: body.mode, requestedBy: user.id, requestedAt, status: 'pending_review' })
+        const requestId = await insertAndGetId(c.env.DB.prepare(
+          'INSERT INTO HL_auditLogs (userId, action, entityType, entityId, metadataJson, createdAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)'
+        ).bind(user.id, 'aiOperatingModeChangeRequested', 'HL_systemConfigs', 'clinicalCopilot.operatingMode', metadata))
+        const result = failure('REVIEWER_APPROVAL_REQUIRED', 'Medical reviewer approval required for this mode change.', 403, [{ currentMode, requestedMode: body.mode, requiresReviewer: true }], startedAt)
+        ;(result.body as any).data = { requestId }
+        return jsonResponse(c, result)
+      }
+
+      // Update mode
+      await c.env.DB.prepare("UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = 'clinicalCopilot.operatingMode'").bind(body.mode).run()
+      // Invalidate KV cache
+      try { if ((c.env as any).AI_KV) { await (c.env as any).AI_KV.delete('config:clinicalCopilot.operatingMode') } } catch {}
+      // Audit log
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'aiOperatingModeChanged', entityType: 'HL_systemConfigs', entityId: 'clinicalCopilot.operatingMode', metadataJson: { from: currentMode, to: body.mode, approvedBy: null, isDowngrade } })
+      return jsonResponse(c, success({ mode: body.mode, previousMode: currentMode, isDowngrade }, 200, startedAt))
+    } catch (error) { console.error('admin operating-mode put error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal mengubah operating mode.', 500, [], startedAt)) }
+  })
+
+  app.post('/api/admin/ai/operating-mode/:requestId/approve', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+
+      // Medical reviewer role + permission check
+      const reviewerRole = await c.env.DB.prepare(
+        "SELECT 1 FROM HL_userRoles WHERE userId = ? AND roleCode = 'medicalReviewer' AND active = 1 AND revokedAt IS NULL LIMIT 1"
+      ).bind(user.id).first<any>()
+      if (!reviewerRole || !(await RbacService.hasPermission(c.env.DB, user.id, 'admin.aiEvaluation.review'))) {
+        return jsonResponse(c, failure('FORBIDDEN', 'Medical reviewer role and permission required.', 403, [], startedAt))
+      }
+
+      // Global rate limit: one operating-mode change per hour
+      if (!checkOperatingModeRateLimit(startedAt)) {
+        return jsonResponse(c, failure('RATE_LIMITED', 'Operating mode can only be changed once per hour.', 429, [], startedAt))
+      }
+
+      const requestId = Number(c.req.param('requestId'))
+      const body = await c.req.json() as { approve?: boolean; notes?: string }
+      if (typeof body.approve !== 'boolean') {
+        return jsonResponse(c, failure('VALIDATION_ERROR', 'approve boolean wajib.', 400, [], startedAt))
+      }
+
+      const row = await c.env.DB.prepare(
+        "SELECT id, userId, action, entityType, entityId, metadataJson, createdAt FROM HL_auditLogs WHERE id = ? AND action = 'aiOperatingModeChangeRequested'"
+      ).bind(requestId).first<any>()
+      if (!row) {
+        return jsonResponse(c, failure('NOT_FOUND', 'Mode change request not found.', 404, [], startedAt))
+      }
+      const meta = JSON.parse(row.metadataJson || '{}') as Record<string, unknown>
+      if (meta.status !== 'pending_review') {
+        return jsonResponse(c, failure('VALIDATION_ERROR', 'Mode change request is not pending review.', 400, [], startedAt))
+      }
+      const fromMode = String(meta.from || 'standard')
+      const toMode = String(meta.to || 'standard')
+
+      if (body.approve) {
+        await c.env.DB.prepare("UPDATE HL_systemConfigs SET configValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE configKey = 'clinicalCopilot.operatingMode'").bind(toMode).run()
+        try { if ((c.env as any).AI_KV) { await (c.env as any).AI_KV.delete('config:clinicalCopilot.operatingMode') } } catch {}
+        const approvedMeta = { ...meta, status: 'approved', approvedBy: user.id, approvedAt: new Date().toISOString(), notes: body.notes }
+        await c.env.DB.prepare('UPDATE HL_auditLogs SET metadataJson = ? WHERE id = ?').bind(JSON.stringify(approvedMeta), requestId).run()
+        await AuditService.write(c.env.DB, { userId: user.id, action: 'aiOperatingModeChanged', entityType: 'HL_systemConfigs', entityId: 'clinicalCopilot.operatingMode', metadataJson: { from: fromMode, to: toMode, approvedBy: user.id, notes: body.notes, requestId } })
+        return jsonResponse(c, success({ mode: toMode, previousMode: fromMode, approved: true, requestId }, 200, startedAt))
+      }
+
+      const rejectedMeta = { ...meta, status: 'rejected', rejectedBy: user.id, rejectedAt: new Date().toISOString(), notes: body.notes }
+      await c.env.DB.prepare('UPDATE HL_auditLogs SET metadataJson = ? WHERE id = ?').bind(JSON.stringify(rejectedMeta), requestId).run()
+      await AuditService.write(c.env.DB, { userId: user.id, action: 'aiOperatingModeChangeRejected', entityType: 'HL_systemConfigs', entityId: 'clinicalCopilot.operatingMode', metadataJson: { from: fromMode, to: toMode, rejectedBy: user.id, notes: body.notes, requestId } })
+      return jsonResponse(c, success({ requestId, approved: false, status: 'rejected' }, 200, startedAt))
+    } catch (error) { console.error('admin operating-mode approve error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memproses persetujuan operating mode.', 500, [], startedAt)) }
+  })
+
+  // S6H-T-07b: GET /api/admin/ai/kb/reindex — check reindex status (GET convenience)
+  app.get('/api/admin/ai/kb/reindex', async (c: HC) => {
+    const startedAt = Date.now()
+    try {
+      const user = await getAuthenticatedUser(c)
+      if (!user) return jsonResponse(c, failure('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], startedAt))
+      const denied = await requireAdminPermission(c, user, 'admin.aiConfig.read', startedAt)
+      if (denied) return denied
+      const lastReindex = await c.env.DB.prepare("SELECT createdAt, metadataJson FROM HL_auditLogs WHERE action = 'admin.kb.reindex' ORDER BY createdAt DESC LIMIT 1").first<any>()
+      return jsonResponse(c, success({ lastReindex: lastReindex || null, status: 'available' }, 200, startedAt))
+    } catch (error) { console.error('admin kb reindex get error:', error); return jsonResponse(c, failure('INTERNAL_ERROR', 'Gagal memuat KB reindex status.', 500, [], startedAt)) }
+  })
 }

@@ -93,7 +93,8 @@ export function RemindersPage() {
     }
   }
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  // Mount-only initial load; load helpers are stable for initial mount.
   useEffect(() => { void load(); void loadTelegramStatus() }, [])
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {

@@ -63,6 +63,7 @@ import { ProfileSettingsPage } from './pages/settings/ProfileSettingsPage'
 import { AppSettingsPage } from './pages/settings/AppSettingsPage'
 import { ProfileDeletePage } from './pages/settings/ProfileDeletePage'
 import { AdminPage } from './pages/admin/AdminPage'
+import { AdminAiDashboardPage } from './pages/admin/AdminAiDashboardPage'
 import { SeniorMeasurementFlow } from './pages/measurement/SeniorMeasurementFlow'
 import { PremiumUpgradePage } from './pages/premium/PremiumUpgradePage'
 import { BillingSuccessPage } from './pages/billing/BillingSuccessPage'
@@ -228,6 +229,13 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
     case '/billing/mock-checkout': return <MockCheckoutPage />
     case '/settings/billing': return <BillingSettingsPage onNavigate={onNavigate} />
     case '/admin': return <AdminPage />
+    case '/admin/ai-governance': return <AdminAiDashboardPage />
+    case '/admin/ai-model-runs': return <AdminAiDashboardPage />
+    case '/admin/ai-safety': return <AdminAiDashboardPage />
+    case '/admin/ai-prompts': return <AdminAiDashboardPage />
+    case '/admin/ai-evaluation': return <AdminAiDashboardPage />
+    case '/admin/whatsapp-ai': return <AdminAiDashboardPage />
+    case '/admin/ai-operating-mode': return <AdminAiDashboardPage />
     default: return <TodayDashboard />
   }
 }

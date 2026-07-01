@@ -21,6 +21,7 @@ export const productionCapabilities = {
       "Perbandingan vs 3 hari dan 7 hari",
       "AI report analysis dengan disclaimer",
       "Knowledge base perangkat kesehatan",
+      "AI Clinical Copilot chat dengan safety runtime",
     ],
   },
   monitoring: {
@@ -28,6 +29,7 @@ export const productionCapabilities = {
     items: [
       "Notifikasi Telegram setelah submit",
       "Alert darurat berbasis rule",
+      "Emergency guidance engine (Sprint 6)",
       "Family/caregiver linking",
       "Caregiver dashboard",
       "Alert acknowledgement",
@@ -55,6 +57,26 @@ export const productionCapabilities = {
       "Export data & data deletion request",
     ],
   },
+  aiCompanion: {
+    title: "AI Clinical Companion",
+    items: [
+      "AI Clinical Copilot (3 mode: standard, proactive, super aktif)",
+      "13-detector Safety Runtime v2",
+      "Vectorize AI memory per-user (hingga 500 vektor)",
+      "Emergency guidance engine",
+      "Operating mode governance oleh Super Admin",
+      "Medical disclaimer otomatis di setiap output AI",
+    ],
+  },
+  whatsapp: {
+    title: "WhatsApp Integration",
+    items: [
+      "AI health chat via WhatsApp",
+      "Emergency guidance delivery via WhatsApp",
+      "OTP & notifikasi via WhatsApp",
+      "Unlinked session retention 30 hari",
+    ],
+  },
   commercial: {
     title: "Komersial & Admin",
     items: [
@@ -62,7 +84,7 @@ export const productionCapabilities = {
       "Entitlement & usage quota",
       "Admin dashboard",
       "Audit log",
-      "AI config governance",
+      "AI config governance (16 endpoints)",
     ],
   },
 };

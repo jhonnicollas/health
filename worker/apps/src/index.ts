@@ -1767,9 +1767,11 @@ app.post('/api/billing/webhook/:provider', async (c) => {
     const provider = c.req.param('provider')
     if (!['manual','stripe','midtrans','xendit','mock'].includes(provider)) return jsonResponse(c, failure('VALIDATION_ERROR', 'Provider tidak valid.', 400, [], startedAt))
 
-    // Xendit webhook: verify x-callback-token
+    // Xendit webhook: verify x-callback-token.
+    // Accept both XENDIT_WEBHOOK_SECRET (canonical name used by Worker #4 to forward) and
+    // XENDIT_WEBHOOK_TOKEN (legacy name) so deployments with either variable succeed.
     if (provider === 'xendit') {
-      const xenditToken = (c.env as any).XENDIT_WEBHOOK_TOKEN as string || ''
+      const xenditToken = ((c.env as any).XENDIT_WEBHOOK_SECRET || (c.env as any).XENDIT_WEBHOOK_TOKEN || '') as string
       const callbackToken = c.req.header('x-callback-token') || ''
       if (!xenditToken || callbackToken !== xenditToken) {
         await AuditService.write(c.env.DB, { userId: null, action: 'billing.webhook.rejected', entityType: 'HL_paymentEvents', entityId: 'xendit_callback_token', metadataJson: '{ "reason": "invalid_x_callback_token" }' })

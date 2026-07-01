@@ -38,13 +38,59 @@ async function findActiveSession(env: Bindings, userId: number, whatsappLinkId: 
   return row?.id ?? null;
 }
 
+// PRD §7.1 + §11.1: WhatsApp outbound replies truncated to whatsappAi.maxReplyChars.
+// Default 400 chars; falls back to env WHATSAPP_MAX_REPLY_CHARS if D1 config missing.
+async function getMaxReplyChars(env: Bindings): Promise<number> {
+  try {
+    const row = await env.DB.prepare(
+      "SELECT configValue FROM HL_systemConfigs WHERE configKey = ? LIMIT 1"
+    ).bind("whatsappAi.maxReplyChars").first<{ configValue: string }>();
+    const fromDb = Number(row?.configValue);
+    if (Number.isFinite(fromDb) && fromDb > 50) return fromDb;
+  } catch {
+    // Ignore — fall through to env/default.
+  }
+  const fromEnv = Number(env.WHATSAPP_MAX_REPLY_CHARS);
+  if (Number.isFinite(fromEnv) && fromEnv > 50) return fromEnv;
+  return 400;
+}
+
+// Codepoint-aware truncation: WhatsApp UI breaks on mid-BMP/codepoint slice
+// (emoji 🤒🚨, combining marks, surrogate pairs). Iterate by code points to keep rendering intact.
+// Sentence-boundary cut drops the boundary character (e.g. ". " or "\n\n") itself to avoid
+// double-space artifacts like "X.  ...". trimEnd() finishes cleanup for either branch.
+export function truncateForWhatsapp(text: string, maxChars: number): string {
+  const codePoints = Array.from(text);
+  if (codePoints.length <= maxChars) return text;
+  const sliceLen = Math.max(1, maxChars - 4);
+  const sliceText = codePoints.slice(0, sliceLen).join("");
+  const sentenceFloor = Math.floor(sliceLen * 0.6);
+  // Boundary tokens — when we cut at idx, we keep characters 0..idx-1 (the boundary itself
+  // is excluded). This avoids double-space artifacts like "X.  ..." since '. ' at idx=N
+  // means we keep up to N and start a new sentence with ' ...'.
+  const boundaries = [". ", ".\n", "\n\n", "• "];
+  let latestCut = -1;
+  for (const b of boundaries) {
+    const idx = sliceText.lastIndexOf(b);
+    if (idx >= 0 && idx >= sentenceFloor) latestCut = Math.max(latestCut, idx);
+  }
+  if (latestCut > 0) {
+    // Re-slice via codePoints so any emoji surrogate pair straddling recents without breaking.
+    const keep = codePoints.slice(0, latestCut).join("").trimEnd();
+    return `${keep} ...`;
+  }
+  return `${sliceText.trimEnd()} ...`;
+}
+
 async function enqueueOutbound(
   env: Bindings,
   payload: { whatsappLinkId: number; userId: number; text: string; providerMessageId: string }
 ): Promise<void> {
   if (!env.WHATSAPP_OUTBOUND_QUEUE) return;
+  const maxChars = await getMaxReplyChars(env);
+  const text = truncateForWhatsapp(payload.text, maxChars);
   try {
-    await env.WHATSAPP_OUTBOUND_QUEUE.send({ type: "whatsapp-outbound", ...payload });
+    await env.WHATSAPP_OUTBOUND_QUEUE.send({ type: "whatsapp-outbound", ...payload, text });
   } catch (error) {
     console.error("whatsapp outbound enqueue failed:", error);
   }
@@ -134,6 +180,7 @@ export class WhatsAppSessionDO implements DurableObject {
 
     await updateMessageCompleted(this.env, whatsappLinkId, providerMessageId);
     await updateLinkLastMessage(this.env, whatsappLinkId);
+    // PRD §7.1 — truncate to maxReplyChars before enqueueing outbound (handled in enqueueOutbound).
     await enqueueOutbound(this.env, {
       whatsappLinkId,
       userId,

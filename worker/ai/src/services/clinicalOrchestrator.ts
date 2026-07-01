@@ -115,6 +115,7 @@ export async function processClinicalMessage(
   const locale = input.locale ?? 'id';
   const operatingMode = await getOperatingMode(env);
   const safetyEnabled = await getConfigBoolean(env, 'medicalSafetyRuntime.enabled', true);
+  const strictMode = await getConfigBoolean(env, 'medicalSafetyRuntime.strictMode', true);
 
   // ─── Step 1: Intent Classification ───
   let intent: string;
@@ -281,6 +282,29 @@ export async function processClinicalMessage(
       },
     };
     safetyResult = runSafetyRuntime(safetyInput);
+
+    // PRD AI_SAFETY_RUNTIME_SPEC §8: If strictMode = false, medium detectors log only (no rewrite)
+    if (!strictMode) {
+      // Critical-level detectors still block, but rewrite-safe for medium/low passes through
+      if (safetyResult.finalDecision === SafetyDecision.REWRITE_SAFE) {
+        const hasCriticalFlag = safetyResult.flags.some(f => f.severity === 'critical' || f.severity === 'high');
+        if (!hasCriticalFlag) {
+          safetyResult = {
+            finalDecision: SafetyDecision.ALLOW_WITH_DISCLAIMER,
+            output: modelResult.text,
+            flags: safetyResult.flags.map(f => ({ ...f, actionTaken: SafetyDecision.ALLOW_WITH_DISCLAIMER })),
+          };
+        }
+      }
+      // NEEDS_HUMAN_REVIEW → allow_with_disclaimer in non-strict mode
+      if (safetyResult.finalDecision === SafetyDecision.NEEDS_HUMAN_REVIEW) {
+        safetyResult = {
+          finalDecision: SafetyDecision.ALLOW_WITH_DISCLAIMER,
+          output: modelResult.text,
+          flags: safetyResult.flags.map(f => ({ ...f, actionTaken: SafetyDecision.ALLOW_WITH_DISCLAIMER })),
+        };
+      }
+    }
   } else {
     safetyResult = {
       finalDecision: SafetyDecision.ALLOW_WITH_DISCLAIMER,

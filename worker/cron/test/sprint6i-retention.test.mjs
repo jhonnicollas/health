@@ -6,6 +6,7 @@ import {
   deleteMessages,
   archiveModelRuns,
   archiveSafetyFlags,
+  deleteInactiveVectors,
 } from '../dist/index.js';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -29,18 +30,31 @@ function createInMemoryDB(initialTables = {}) {
   }
 
   function parseWhere(sql) {
-    // We only need to support the specific WHERE patterns used by retention functions.
     const conditions = [];
-    if (sql.includes("status = 'active'")) conditions.push({ col: 'status', val: 'active' });
-    // Date column may appear after AND (e.g. WHERE status='active' AND startedAt < datetime('now', ?))
-    const colMatch = sql.match(/(?:WHERE|AND)\s+(\w+)\s*<\s*datetime\('now',\s*\?\)/i);
-    if (colMatch) conditions.push({ col: colMatch[1], dateCutoff: true });
+    let m;
+    const notNullRe = /(?:WHERE|AND)\s+(\w+)\s+IS NOT NULL/gi;
+    while ((m = notNullRe.exec(sql)) !== null) conditions.push({ col: m[1], notNull: true });
+    const eqLiteralRe = /(?:WHERE|AND)\s+(\w+)\s*=\s*'([^']+)'/gi;
+    while ((m = eqLiteralRe.exec(sql)) !== null) conditions.push({ col: m[1], val: m[2] });
+    const notEqLiteralRe = /(?:WHERE|AND)\s+(\w+)\s*!=\s*'([^']+)'/gi;
+    while ((m = notEqLiteralRe.exec(sql)) !== null) conditions.push({ col: m[1], notVal: m[2] });
+    const eqParamRe = /(?:WHERE|AND)\s+(\w+)\s*=\s*\?/gi;
+    while ((m = eqParamRe.exec(sql)) !== null) conditions.push({ col: m[1], eqParam: true });
+    const dateRe = /(?:WHERE|AND)\s+(\w+)\s*<\s*datetime\('now',\s*\?\)/gi;
+    while ((m = dateRe.exec(sql)) !== null) conditions.push({ col: m[1], dateCutoff: true });
     return conditions;
   }
 
   function matchRow(row, conditions, params) {
+    let paramIndex = 0;
     for (const cond of conditions) {
+      if (cond.notNull && row[cond.col] == null) return false;
       if ('val' in cond && row[cond.col] !== cond.val) return false;
+      if ('notVal' in cond && row[cond.col] === cond.notVal) return false;
+      if (cond.eqParam) {
+        if (row[cond.col] !== params[paramIndex]) return false;
+        paramIndex += 1;
+      }
       if (cond.dateCutoff) {
         const cutoffParam = params[params.length - 1];
         const hours = Number(String(cutoffParam).replace(/[^0-9]/g, ''));
@@ -93,7 +107,7 @@ function createInMemoryDB(initialTables = {}) {
               return null;
             },
             all: async () => {
-              if (sql.startsWith('SELECT * FROM')) {
+              if (sql.startsWith('SELECT')) {
                 const conds = parseWhere(sql);
                 const rows = (tables[tableName] || []).filter((r) => matchRow(r, conds, params));
                 return { results: rows.map((r) => ({ ...r })), meta: {} };
@@ -159,6 +173,7 @@ function createEnv(db) {
     RETENTION_MESSAGES_HOURS: '4320',
     RETENTION_ENCRYPTED_HOURS: '2160',
     RETENTION_MODEL_RUNS_HOURS: '8760',
+    RETENTION_INACTIVE_USERS_HOURS: '8760',
     RETENTION_SAFETY_FLAGS_HOURS: '17520',
   };
 }
@@ -236,12 +251,34 @@ test('S6I-T-11 archiveSafetyFlags archives old rows and deletes from D1', async 
   assert.ok(db.auditLogs.some((l) => l.action === 'dataRetentionCleanup' && l.entityType === 'archiveSafetyFlags'));
 });
 
+test('S6I-T-11 deleteInactiveVectors marks vectors for inactive users as deleted', async () => {
+  const db = createInMemoryDB({
+    HL_users: [
+      { id: 1, lastLoginAt: daysAgo(400) },
+      { id: 2, lastLoginAt: daysAgo(10) },
+    ],
+    HL_vectorDocuments: [
+      { id: 101, userId: 1, status: 'indexed' },
+      { id: 102, userId: 1, status: 'indexed' },
+      { id: 103, userId: 2, status: 'indexed' },
+    ],
+  });
+  const count = await deleteInactiveVectors(createEnv(db));
+  assert.equal(count, 2);
+  assert.equal(db.tables.HL_vectorDocuments[0].status, 'deleted');
+  assert.equal(db.tables.HL_vectorDocuments[1].status, 'deleted');
+  assert.equal(db.tables.HL_vectorDocuments[2].status, 'indexed');
+  assert.ok(db.auditLogs.some((l) => l.action === 'dataRetentionCleanup' && l.entityType === 'deleteInactiveVectors'));
+});
+
 test('S6I-T-11 all retention jobs run without crashing', async () => {
   const db = createInMemoryDB({
     HL_aiClinicalSessions: [{ id: 1, status: 'active', startedAt: daysAgo(400) }],
     HL_aiClinicalMessages: [{ id: 1, contentEncrypted: 'x', createdAt: daysAgo(200) }],
     HL_modelRuns: [{ id: 1, status: 'success', createdAt: daysAgo(400) }],
     HL_aiOutputSafetyFlags: [{ id: 1, flagCode: 'x', createdAt: daysAgo(800) }],
+    HL_users: [{ id: 1, lastLoginAt: daysAgo(400) }],
+    HL_vectorDocuments: [{ id: 101, userId: 1, status: 'indexed' }],
   });
   const env = createEnv(db);
   const r1 = await expireSessions(env);
@@ -249,6 +286,7 @@ test('S6I-T-11 all retention jobs run without crashing', async () => {
   const r3 = await deleteMessages(env);
   const r4 = await archiveModelRuns(env);
   const r5 = await archiveSafetyFlags(env);
-  assert.ok([r1, r2, r3, r4, r5].every((n) => n >= 0));
-  assert.ok(db.auditLogs.length >= 5);
+  const r6 = await deleteInactiveVectors(env);
+  assert.ok([r1, r2, r3, r4, r5, r6].every((n) => n >= 0));
+  assert.ok(db.auditLogs.length >= 6);
 });

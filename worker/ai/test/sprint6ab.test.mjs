@@ -195,7 +195,7 @@ test('S6A-SC-10: Blocked template renders §10.3 — English locale also works',
   assert.ok(en.includes('AI CAN MAKE MISTAKES.'), 'Line 1 EN');
   assert.ok(en.includes('DO NOT RELY ON AI 100%.'), 'Line 2 EN');
   assert.ok(en.includes('DO NOT TRUST AI 100%.'), 'Line 3 EN');
-  assert.ok(en.includes('YOUR RESPONSIBILITY'), 'Line 4 EN');
+  assert.ok(en.includes('1000% YOUR OWN RESPONSIBILITY'), 'Line 4 EN');
 
   const id = renderBlockedTemplate('id');
   assert.ok(id.includes('AI DAPAT MELAKUKAN KESALAHAN.'), 'Line 1 ID');

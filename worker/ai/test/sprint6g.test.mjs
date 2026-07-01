@@ -424,3 +424,120 @@ test('T-8: WA emergency red flag -> abbreviated message < 400 chars', async () =
   assert.equal(env.outboundQueue.length, 1);
   assert.ok(env.outboundQueue[0].text.length < 400, `Reply length ${env.outboundQueue[0].text.length} should be < 400`);
 });
+
+// ─── Audit fix tests (S6G audit 2026-07-01) ───
+
+test('T-11 (audit): video messageType is folded to document', async () => {
+  const number = '+6281234567890';
+  const numberHash = await sha256Token(number);
+  const db = createMockDb({
+    first: {
+      'HL_whatsappMessages': null,
+      'HL_whatsappLinks': { id: 7, userId: 42, verified: 1, aiEnabled: 1, whatsappNumberHash: numberHash },
+      'HL_systemConfigs': { configValue: '100' },
+    },
+  });
+  const env = {
+    DB: db,
+    LOGS: { put: async () => ({}) },
+    WA_GATEWAY_SECRET: 's',
+    AI_SERVICE: { fetch: async () => new Response('{}') },
+    API_SERVICE: { fetch: async () => new Response('{}') },
+    JOBS_SERVICE: { fetch: async () => new Response('{}') },
+  };
+  const res = await fetchApp(webhookApp, {
+    method: 'POST',
+    path: '/api/whatsapp/webhook',
+    headers: { 'X-Gateway-Secret': 's', 'Content-Type': 'application/json' },
+    body: { providerMessageId: 'vid-1', whatsappNumber: number, messageType: 'video' },
+    env,
+  });
+  assert.equal(res.status, 202);
+  const insertCall = db.calls.find((c) => c.sql.includes('INSERT INTO HL_whatsappMessages') && c.sql.includes('processing'));
+  assert.ok(insertCall, 'should have invoked the linked-user INSERT');
+  // Bind order in webhook handler: userId, link.id, providerMessageId, messageType, contentPreview
+  assert.equal(insertCall.args[3], 'document', `video should be folded to document at messageType position; got ${insertCall.args[3]}`);
+});
+
+test('T-12 (audit): media ingest > 10MB -> 400 rejected', async () => {
+  const env = {
+    DB: createMockDb(),
+    LOGS: { put: async () => ({}) },
+    WA_GATEWAY_SECRET: 's',
+    AI_SERVICE: { fetch: async () => new Response('{}') },
+    API_SERVICE: { fetch: async () => new Response('{}') },
+    JOBS_SERVICE: { fetch: async () => new Response('{}') },
+  };
+  // base64 string deliberately over the size cap (14 MB of zeros encoded)
+  const oversizedBase64 = 'A'.repeat(14 * 1024 * 1024);
+  const res = await fetchApp(webhookApp, {
+    method: 'POST',
+    path: '/api/whatsapp/media/ingest',
+    headers: { 'X-Gateway-Secret': 's', 'Content-Type': 'application/json' },
+    body: { providerMessageId: 'big-1', whatsappNumber: '+62812', mediaMimeType: 'image/jpeg', mediaBufferBase64: oversizedBase64 },
+    env,
+  });
+  assert.equal(res.status, 400);
+  const json = await res.json();
+  assert.equal(json.error.code, 'VALIDATION_ERROR');
+  assert.ok(/exceeds/.test(json.error.message) || /limit/.test(json.error.message));
+});
+
+test('T-13 (audit): media ingest disallowed MIME -> 400 rejected', async () => {
+  const env = {
+    DB: createMockDb(),
+    LOGS: { put: async () => ({}) },
+    WA_GATEWAY_SECRET: 's',
+    AI_SERVICE: { fetch: async () => new Response('{}') },
+    API_SERVICE: { fetch: async () => new Response('{}') },
+    JOBS_SERVICE: { fetch: async () => new Response('{}') },
+  };
+  const res = await fetchApp(webhookApp, {
+    method: 'POST',
+    path: '/api/whatsapp/media/ingest',
+    headers: { 'X-Gateway-Secret': 's', 'Content-Type': 'application/json' },
+    body: { providerMessageId: 'mime-1', whatsappNumber: '+62812', mediaMimeType: 'application/zip', mediaBufferBase64: btoa('zipbytes') },
+    env,
+  });
+  assert.equal(res.status, 400);
+  const json = await res.json();
+  assert.equal(json.error.code, 'VALIDATION_ERROR');
+  assert.ok(json.error.message.includes('not allowed') || json.error.message.includes('Allowed'));
+});
+
+test('T-14a (audit): truncateForWhatsapp respects sentence-boundary cut + codepoints', async () => {
+  const { truncateForWhatsapp } = await import('../dist/whatsappSessionDo.js');
+  // Short text passes through unchanged.
+  assert.equal(truncateForWhatsapp('Halo', 80), 'Halo');
+  // Long text without trailing period — truncates at slice boundary + ' ...'.
+  const long = 'a'.repeat(200);
+  const out = truncateForWhatsapp(long, 80);
+  assert.ok(out.length <= 84, `truncated length=${out.length} should be <= 84`);
+  assert.ok(out.endsWith(' ...'), `should have ellipsis suffix, got: ${out.slice(-10)}`);
+
+  // Sentence-boundary cut: picks last ". " within 60-100% of the slice window.
+  const withSentences = 'Sentence one. Sentence two. Sentence three. ' + 'X'.repeat(300);
+  const cut = truncateForWhatsapp(withSentences, 80);
+  assert.ok(cut.endsWith(' ...'), `should end with ellipsis, got: ${cut.slice(-10)}`);
+  assert.ok(cut.length <= 84, `sentence-cut length=${cut.length} should be <= 84`);
+
+  // Unicode-safe: emoji 🤒 + combining characters must not be split mid-BMP.
+  const emoji = '🤒' + 'a'.repeat(120);
+  const emojiOut = truncateForWhatsapp(emoji, 40);
+  assert.ok(emojiOut.length <= 44, `emoji-out length=${emojiOut.length} should be <= 44`);
+  // 🤒 as a surrogate pair counts as one code point; we should NOT see a lone high/low surrogate.
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(emojiOut), 'must not produce lone high surrogate');
+  assert.ok(!/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(emojiOut), 'must not produce lone low surrogate');
+});
+
+test('T-14b (audit): DO integration — outbound text never exceeds maxReplyChars', async () => {
+  // Direct test of truncateForWhatsapp behavior; getMaxReplyChars remains internal (covered by
+  // T-14a indirectly: default 400 truncated, no truncation otherwise).
+  const { truncateForWhatsapp } = await import('../dist/whatsappSessionDo.js');
+  // Default 400 should let up to 400 chars pass; longer must be cut.
+  assert.equal(truncateForWhatsapp('x'.repeat(400), 400).length, 400);
+  const over400 = 'x'.repeat(800);
+  const out = truncateForWhatsapp(over400, 400);
+  assert.ok(out.length <= 404, `length=${out.length} must be <= 404`);
+  assert.ok(out.endsWith(' ...'));
+});

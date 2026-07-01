@@ -11,6 +11,7 @@ export type Bindings = {
   AI_MEMORY_QUEUE?: Queue
   WHATSAPP_OUTBOUND_QUEUE?: Queue
   AI: Ai
+  WHATSAPP_MAX_REPLY_CHARS?: string
   CLOUDFLARE_ACCOUNT_ID?: string
   CLOUDFLARE_API_TOKEN?: string
   '9ROUTER_API_KEY'?: string

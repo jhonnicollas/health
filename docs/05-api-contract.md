@@ -1,6 +1,6 @@
 # API CONTRACT — iSehat
 
-> **Sumber: audit langsung ke `worker/src/index.ts` (122 endpoint), `routes-extra.ts` (28), `routes-admin.ts` (3), `routes-ai.ts` (10), `routes-auth.ts` (20), `routes-cycle.ts` (9), `routes-hydration.ts` (6), `routes-telegram.ts` (3). Total ~200 endpoint aktif.**
+> **Sumber: audit langsung ke `worker/apps/src/index.ts`, `routes-*.ts` (api-worker), `worker/ai/src/index.ts` (ai-worker), `worker/cron/src/index.ts` (jobs-worker), `worker/webhook/src/index.ts` (webhooks-worker). Total ~270 endpoint aktif setelah Sprint 6.**
 > Dokumen lama: `archive/docs_legacy_2025_sprint1-5/05-api-contract.md`.
 
 ---
@@ -11,7 +11,10 @@
 
 | Env | URL |
 |---|---|
-| Production Worker | `https://hl-health-companion-api.indiehomesungairaya.workers.dev` |
+| Production Worker #1 | `https://hl-health-companion-api.indiehomesungairaya.workers.dev` |
+| Production Worker #2 | `https://isehat-ai-worker.indiehomesungairaya.workers.dev` (internal, Service Binding only) |
+| Production Worker #3 | `https://isehat-jobs-worker.indiehomesungairaya.workers.dev` (cron + queues, no public API) |
+| Production Worker #4 | `https://isehat-webhooks-worker.indiehomesungairaya.workers.dev` |
 | Pages (frontend) | `https://app.isehat.biz.id` |
 | Local dev (worker) | `http://localhost:8787` |
 | Local dev (vite) | `http://localhost:5173` (Vite proxy `/api` → worker) |
@@ -21,8 +24,10 @@ Pages mem-proxy `/api/*` → Worker lewat `functions/api/[[path]].ts`.
 ### 1.2 Authentication
 
 - **Cookie**: `hlSession` (HTTP-only, Secure, SameSite=Lax). Diset oleh `POST /api/auth/login`, `POST /api/auth/login/verify`, `/api/auth/google/callback`. Divalidasi server-side via `getCurrentSession(c)` → lookup `HL_sessions` dengan SHA-256 hash token.
-- **Bearer (cron only)**: `Authorization: Bearer ${CRON_SECRET}` untuk `/api/internal/cron/*`.
+- **Bearer (cron only)**: `Authorization: Bearer ${CRON_SECRET}` untuk `/api/internal/cron/*` dan Worker #3 health.
 - **Telegram webhook**: diverifikasi via `telegramBotToken` (resolve dari `HL_systemConfigs` atau `env.TELEGRAM_BOT_TOKEN`).
+- **WhatsApp webhook**: diverifikasi via `WA_GATEWAY_SECRET` (env var, shared antara VPS Baileys gateway ↔ Worker #4).
+- **Xendit webhook**: diverifikasi via `XENDIT_WEBHOOK_SECRET` (env var).
 
 Tidak ada JWT. Tidak ada API key untuk user. RBAC/Entitlement dicek **server-side**.
 
@@ -71,6 +76,8 @@ Semua response JSON mengikuti envelope:
 | `INTERNAL_ERROR` | 500 | Bug / unhandled error |
 | `AI_CLINICAL_COPILOT_DEFERRED` | 403 | Sprint 6 placeholder, belum diaktifkan |
 | `ONBOARDING_REQUIRED` | 403 | User belum `POST /api/profile/onboarding` |
+| `REVIEWER_APPROVAL_REQUIRED` | 403 | Operating mode change butuh medical reviewer approval (S6H) |
+| `AI_SERVICE_UNAVAILABLE` | 503 | AI Worker #2 Service Binding gagal / unavailable (S6E/S6I) |
 
 ### 1.5 Headers penting
 
@@ -159,19 +166,46 @@ Semua response JSON mengikuti envelope:
 | GET | `/api/dashboard/comparison` | 🔒 | avg3Day / avg7Day / avg30Day per metric | routes-extra.ts:744 |
 | GET | `/api/dashboard/daily-health` | 🔒 | today's combined health hub (measurements + symptoms + hydration + cycle summary) | routes-auth.ts:471 |
 
-### 2.7 AI
+### 2.7 AI (Sprint 1–5 + Sprint 6)
 
 | Method | Path | Auth | Body / Response | Sumber |
 |---|---|---|---|---|
 | POST | `/api/ai/recommendation` | 🔒 | `{ sessionId? }` → `{ recommendationId, recommendation, safetyStatus, has3DayComparison, has7DayComparison, dataMessages, summary }` | index.ts:2929 |
 | POST | `/api/ai/assistant` | 🔒 💎 `feature.aiAssistant.use` | `{ question, clinicalCopilotMode? }` → `{ reply, patternScore, disclaimer, model, usedFallback, vitals, profile, dataSufficiencyScore, scoreReason, contextTrace, usedVectorContext }`. Kalau `clinicalCopilotMode:true` → 403 deferred. | index.ts:3022 |
 | GET | `/api/ai/recommendations` | 🔒 | list recommendation history | routes-extra.ts:780 |
-| POST | `/api/ai/context/query` | 🔒 💎 `feature.vectorMemory.use` | `{ queryText, sourceTypes?, topK?, minScore? }` → `{ results: [{vectorId, content, score, metadata}], usedVectorContext, fallbackReason, durationMs }` | routes-ai.ts:30 |
-| GET | `/api/ai/context-package` | 🔒 | assembled context package (untuk AI Clinical Copilot Sprint 6) | routes-ai.ts:57 |
+| POST | `/api/ai/context/query` | 🔒 💎 `feature.aiClinicalCopilot.vectorMemory` (S6) | `{ queryText, sourceTypes?, topK?, minScore? }` → `{ results: [{vectorId, content, score, metadata}], usedVectorContext, fallbackReason, durationMs }` | routes-ai.ts:30 |
+| GET | `/api/ai/context-package` | 🔒 | assembled context package v2 (Sprint 6 upgraded: includes operatingMode, forbiddenActions, dataSufficiencyScore) | routes-ai.ts:57 |
 | GET | `/api/ai/memory/status` | 🔒 | `{ indexedCount, pendingCount, failedCount, lastJobAt }` | routes-ai.ts:67 |
 | POST | `/api/ai/memory/rebuild` | 🔒 | `{ sourceTypes?, rangeStart?, rangeEnd? }` → enqueue `HL_aiMemoryJobs` (jobType=rebuild) | routes-ai.ts:75 |
 | DELETE | `/api/ai/memory` | 🔒 | hapus semua vector documents user | routes-ai.ts:87 |
 | POST | `/api/ai/disclaimer/enforce` | 🔒 | `{ text, modelName }` → `{ text, disclaimerAppended, wasFiltered }` | routes-ai.ts:96 |
+
+### 2.7a AI Clinical Copilot (Sprint 6 — S6E/S6F)
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| POST | `/api/ai/clinical/session/start` | 🔒 💎 `feature.aiClinicalCopilot.use` | `{ channel?, sessionType? }` → proxy ke #2 → `{ sessionId, sessionUuid, dataSufficiencyScore, redFlagStatus, operatingMode }` | routes-ai.ts (→ #2) |
+| POST | `/api/ai/clinical/message` | 🔒 💎 `feature.aiClinicalCopilot.use` | `{ sessionId, message, locale? }` → proxy ke #2 → `{ answerType, content, disclaimer, safetyDecision, contextTrace, dataSufficiencyScore }`. Message max 5000 chars. | routes-ai.ts (→ #2) |
+| GET | `/api/ai/clinical/sessions` | 🔒 | list user sessions | routes-ai.ts (→ #2) |
+| GET | `/api/ai/clinical/sessions/:id` | 🔒 | session detail | routes-ai.ts (→ #2) |
+| POST | `/api/ai/clinical/sessions/:id/close` | 🔒 | close session | routes-ai.ts (→ #2) |
+| POST | `/api/ai/clinical/follow-up` | 🔒 💎 `feature.aiClinicalCopilot.use` | `{ sessionId }` → generate follow-up questions | routes-ai.ts (→ #2) |
+| POST | `/api/ai/clinical/first-aid` | 🔒 💎 `feature.aiClinicalCopilot.firstAid` | `{ keyword, locale? }` → first aid protocol (lookup → AI Search → fallback). Emergency red flags trigger deterministic template. | routes-ai.ts (→ #2) |
+| POST | `/api/ai/clinical/emergency-guidance` | 🔒 💎 `feature.aiClinicalCopilot.emergencyGuidance` | `{ sessionId? }` → deterministic emergency template (119/112/faskes/caregiver). NO LLM freeform. | routes-ai.ts (→ #2) |
+| POST | `/api/ai/clinical/doctor-handoff` | 🔒 💎 `feature.aiClinicalCopilot.doctorHandoff` | `{ sessionId, rangeDays? }` → queue to #3 → R2 report + D1 metadata | routes-ai.ts (→ #2 → #3) |
+| POST | `/api/ai/clinical/safety-check` | 🔒 👑 | `{ text, modelName }` → run Safety Runtime v2 on text (admin test) | #2 internal/admin |
+
+### 2.7b WhatsApp (Sprint 6 — S6G)
+
+| Method | Path | Auth | Body / Response | Sumber |
+|---|---|---|---|---|
+| POST | `/api/whatsapp/link/start` | 🔒 💎 `feature.aiClinicalCopilot.whatsapp` | `{ phoneNumber }` → `{ whatsappLinkId, otpExpiresAt }` → OTP ke WA | routes-whatsapp.ts |
+| POST | `/api/whatsapp/link/verify` | 🔒 | `{ whatsappLinkId, otp }` → verify + link (atomic CAS, OTP_EXPIRED/OTP_INVALID/OTP_ALREADY_USED) | routes-whatsapp.ts |
+| GET | `/api/whatsapp/status` | 🔒 | `{ linked, aiEnabled, phoneNumber, lastMessageAt }` | routes-whatsapp.ts |
+| DELETE | `/api/whatsapp/link` | 🔒 | unlink WA number | routes-whatsapp.ts |
+| POST | `/api/whatsapp/webhook` | 🤖 `WA_GATEWAY_SECRET` | Baileys inbound message → Worker #4 → Service Binding → #2 (clinical) or #1 (link/unlinked) | webhook/src/index.ts |
+| POST | `/api/whatsapp/media/ingest` | 🤖 `WA_GATEWAY_SECRET` | WA media upload → R2 (MIME allowlist: jpeg/png/jpg/pdf, max 10MB) | webhook/src/index.ts |
+| GET | `/api/whatsapp/health` | ⏰ `CRON_SECRET` | Baileys gateway health check | webhook/src/index.ts |
 
 ### 2.8 Reports
 
@@ -296,13 +330,34 @@ Semua response JSON mengikuti envelope:
 |---|---|---|---|---|
 | GET | `/api/admin/dashboard/summary` | 🔒 👑 | counts (users, sessions, alerts, subscriptions, etc) | routes-admin.ts:39 |
 
-### 2.22 Admin — AI / Memory
+### 2.22 Admin — AI / Memory (Sprint 5 + 6)
 
 | Method | Path | Auth | Keterangan | Sumber |
 |---|---|---|---|---|
 | GET | `/api/admin/users/:userId/ai-memory/status` | 🔒 👑 `admin.aiMemory.read` | per-user vector index status | routes-ai.ts:107 |
 | POST | `/api/admin/users/:userId/ai-memory/rebuild` | 🔒 👑 `admin.aiMemory.manage` | trigger rebuild untuk user tertentu | routes-ai.ts:118 |
-| GET | `/api/admin/ai-clinical-copilot/readiness` | 🔒 👑 `admin.aiClinicalCopilot.manage` | `{ ready, missingTables, missingConfigs, clinicalCopilotEnabled, deferredToSprint:6 }` | routes-ai.ts:130 |
+| GET | `/api/admin/ai-clinical-copilot/readiness` | 🔒 👑 `admin.aiClinicalCopilot.manage` | `{ ready, missingTables, missingConfigs, clinicalCopilotEnabled }` | routes-ai.ts:130 |
+
+### 2.22a Admin — AI Governance (Sprint 6 — S6H)
+
+| Method | Path | Auth | Keterangan | Sumber |
+|---|---|---|---|---|
+| GET | `/api/admin/ai/model-runs` | 🔒 👑 `admin.aiModelRun.read` | Model run dashboard (filters: userId, status, channel, taskCode, date). Summary: successRate, avgLatencyMs, topTasks, topModels. | routes-admin.ts |
+| GET | `/api/admin/ai/safety-flags` | 🔒 👑 `admin.aiSafety.read` | Safety flags dashboard (grouped by flagCode, severity, actionTaken) | routes-admin.ts |
+| GET | `/api/admin/ai/prompt-versions` | 🔒 👑 `admin.aiConfig.read` | List prompt versions | routes-admin.ts |
+| POST | `/api/admin/ai/prompt-versions` | 🔒 👑 `admin.aiConfig.update` | Create prompt version (status=draft) | routes-admin.ts |
+| GET | `/api/admin/ai/prompt-versions/:id` | 🔒 👑 `admin.aiConfig.read` | Get single prompt version | routes-admin.ts |
+| PUT | `/api/admin/ai/prompt-versions/:id/activate` | 🔒 👑 `admin.aiConfig.update` | Activate prompt: deprecate previous active + invalidate KV cache + audit log (action=promptVersionActivated) | routes-admin.ts |
+| GET | `/api/admin/ai/evaluations` | 🔒 👑 `admin.aiEvaluation.read` | List evaluation runs | routes-admin.ts |
+| POST | `/api/admin/ai/evaluations/run` | 🔒 👑 `admin.aiEvaluation.review` | Queue eval batch job to #3 | routes-admin.ts |
+| POST | `/api/admin/ai/evaluations/:id/review` | 🔒 👑 `admin.aiEvaluation.review` | Submit review (status: pass/fail/needs_investigation + notes + audit) | routes-admin.ts |
+| GET | `/api/admin/ai/vectorize/health` | 🔒 👑 `admin.aiConfig.read` | Proxy ke #2 → `{ totalVectors, capacityPercent, userCount, avgVectorsPerUser, usersAtLimit, indexStatus }` | routes-admin.ts (→ #2) |
+| GET | `/api/admin/whatsapp/sessions` | 🔒 👑 `admin.whatsapp.read` | WA session monitor (linked users, aiEnabled count, activeNow) | routes-admin.ts |
+| POST | `/api/admin/ai/kb/reindex` | 🔒 👑 `admin.aiConfig.update` | Queue KB reindex job (only approved docs). Returns 202. | routes-admin.ts (→ #3) |
+| GET | `/api/admin/ai/kb/reindex` | 🔒 👑 `admin.aiConfig.read` | KB reindex status | routes-admin.ts |
+| GET | `/api/admin/ai/operating-mode` | 🔒 👑 `admin.aiConfig.read` | Get current operating mode (standard/proactive/super_aktif) | routes-admin.ts |
+| PUT | `/api/admin/ai/operating-mode` | 🔒 👑 `admin.aiConfig.update` | Change operating mode. Super admin only. Reviewer approval gate if config `clinicalCopilot.operatingModeChangeRequiresMedicalReviewer=true`. Downgrade to standard skips reviewer. Audit: action=aiOperatingModeChanged. Max 1 change/hour. | routes-admin.ts |
+| POST | `/api/admin/ai/operating-mode/:requestId/approve` | 🔒 👑 `admin.aiEvaluation.review` | Medical reviewer approves mode change request | routes-admin.ts |
 
 ### 2.23 Billing / Plans / Subscription
 
@@ -490,6 +545,71 @@ Response kalau over limit → trigger `HL_safetyEvents` (severity=warning):
 }
 ```
 
+### 3.5 `POST /api/ai/clinical/message` (Sprint 6)
+
+```json
+// Request
+{ "sessionId": 42, "message": "Apakah tekanan darah saya pagi ini aman?", "locale": "id" }
+```
+
+```json
+// Response
+{
+  "success": true,
+  "data": {
+    "answerType": "safe_summary",
+    "content": "Berdasarkan data Anda...",
+    "disclaimer": "AI DAPAT MELAKUKAN KESALAHAN...",
+    "safetyDecision": "allow_with_disclaimer",
+    "contextTrace": [
+      { "metricCode": "systolic", "measuredAt": "2026-07-01T08:00:00Z", "sourceType": "measurement" }
+    ],
+    "dataSufficiencyScore": 72,
+    "operatingMode": "standard"
+  },
+  "meta": { "requestId": "req_abc123", "durationMs": 1850 }
+}
+```
+
+### 3.6 `PUT /api/admin/ai/operating-mode` (Sprint 6)
+
+```json
+// Request
+{ "operatingMode": "proactive", "reason": "Increase diagnostic capability" }
+```
+
+```json
+// Response (approval needed)
+{
+  "success": true,
+  "data": {
+    "currentMode": "standard",
+    "requestedMode": "proactive",
+    "status": "pending_review",
+    "requestId": "om-req-123",
+    "reviewerApprovalRequired": true
+  }
+}
+```
+
+### 3.7 `POST /api/whatsapp/link/start` (Sprint 6)
+
+```json
+// Request
+{ "phoneNumber": "+6281234567890" }
+```
+
+```json
+// Response
+{
+  "success": true,
+  "data": {
+    "whatsappLinkId": 1,
+    "otpExpiresAt": "2026-07-01T10:05:00Z"
+  }
+}
+```
+
 ---
 
 ## 4. RBAC + Entitlement Checks (Backend)
@@ -551,6 +671,9 @@ Auth: `Authorization: Bearer ${CRON_SECRET}`.
 | `POST /api/measurements/extract` | `ocrRateLimitMax` per `ocrRateLimitWindowMin` menit per user | HL_systemConfigs |
 | `POST /api/auth/otp/resend` | hardcoded (3/hour, 10/day) — `routes-auth.ts` |
 | `POST /api/auth/login/start` | hardcoded (5 failed → lock 15 menit) | `routes-auth.ts` |
+| `POST /api/whatsapp/link/start` | 5/hour per user | `routes-whatsapp.ts` (S6G) |
+| `PUT /api/admin/ai/operating-mode` | 1 per hour | `routes-admin.ts` (S6H) |
+| AI clinical message | Quota-gated per plan | `feature.aiClinicalCopilot.use` + HL_usageCounters (S6E) |
 
 429 response: `{ success:false, error:{ code:'RATE_LIMITED', message, details } }`.
 
@@ -581,24 +704,39 @@ planUpdate
 metricRuleUpdate
 educationCardUpdate
 kbArticleUpdate
+aiOperatingModeChanged     -- Sprint 6 (S6H): operating mode change
+promptVersionActivated     -- Sprint 6 (S6H): prompt version activation
+evaluationReview          -- Sprint 6 (S6H): eval case review submitted
+whatsappLinkCreated        -- Sprint 6 (S6G): WA number linked
+whatsappLinkDeleted        -- Sprint 6 (S6G): WA number unlinked
+whatsappOtpVerified        -- Sprint 6 (S6G): WA OTP verify (atomic CAS)
+emergencyEvent             -- Sprint 6 (S6F): emergency event logged
 ```
 
 Field **dilarang**: `actorId`, `targetType`, `targetId` — gunakan `userId`, `entityType`, `entityId`.
 
 ---
 
-## 9. Known Limits (Sprint 5)
+## 9. Known Limits (Sprint 6)
 
 ```text
-- AI Clinical Copilot runtime       → DEFERRED to Sprint 6 (AI_CLINICAL_COPILOT_DEFERRED)
-- Vectorize runtime                 → infrastructure only; no live index di Sprint 5
-- Payment provider production       → Xendit (Sprint 5F). Midtrans/Stripe deferred.
-- Two-way doctor chat               → out of scope
-- Original image storage            → DILARANG (privacy)
-- Multi-language UI                 → ID (default) + EN (Sprint 5X i18n)
-- Free plan AI Assistant            → 3 / month
-- Free plan medication reminder     → 3 / lifetime
-- Free plan history retention       → 30 hari
+- AI Clinical Copilot runtime       → LIVE (S6A–S6H ✅). Feature flag: clinicalCopilot.enabled
+- AI Operating Mode                  → 3 modes: standard (default), proactive, super_aktif
+- Vectorize runtime                  → Active (S6C). Free Tier, 768-dim, 500 vectors/user
+- AI Search instance                 → NOT YET PROVISIONED (wrangler.toml commented out)
+- Payment provider production        → Xendit (Sprint 5F). Midtrans/Stripe deferred.
+- Two-way doctor chat                → out of scope (doctor handoff report via R2)
+- Original image storage             → DILARANG (privacy)
+- Multi-language UI                  → ID (default) + EN (Sprint 5X i18n)
+- Free plan AI Clinical Copilot      → feature.aiClinicalCopilot.use (premium only)
+- Free plan AI Assistant             → 3 / month
+- Free plan medication reminder      → 3 / lifetime
+- Free plan history retention        → 30 hari
+- WA message max reply chars         → configurable (whatsappAi.maxReplyChars, default 400)
+- Clinical message max length        → 5000 chars
+- Operating mode change rate limit   → 1 per hour
+> Vectorize per-user limit           → 500 vectors default
+- Closed beta                        → T-12/T-15 pending (manual)
 ```
 
 ---
@@ -614,9 +752,12 @@ Field **dilarang**: `actorId`, `targetType`, `targetId` — gunakan `userId`, `e
 
 Lihat juga:
 - Schema: `docs/07-schema.sql`
+- Sprint 6 Schema: `worker/migrations/003_sprint6_schema.sql` (10 tables S6), `004-008` (additive migrations)
 - Design System: `docs/06-design-system.md`
 - Architecture: `docs/04-ARCHITECTURE.md`
 - PRD Sprint 1–5: `docs/01-PRD_SPRINT1-5.md`
+- PRD Sprint 6: `docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md`
+- Sub-PRDs Sprint 6: `docs_sprint6/02-10.PRD_S6A-S6I_*.md`
 
 ---
 
@@ -672,9 +813,30 @@ Lihat juga:
 | delete | `/api/admin/users/:userId/roles/:roleCode` | 🔒 👑 |  |
 | put | `/api/admin/users/:userId/status` | 🔒 👑 |  |
 | post | `/api/admin/users/:userId/subscriptions` | 🔒 👑 |  |
+| get | `/api/admin/ai/model-runs` | 🔒 👑 | S6H governance |
+| get | `/api/admin/ai/safety-flags` | 🔒 👑 | S6H governance |
+| get | `/api/admin/ai/prompt-versions` | 🔒 👑 | S6H governance |
+| post | `/api/admin/ai/prompt-versions` | 🔒 👑 | S6H governance |
+| put | `/api/admin/ai/prompt-versions/:id/activate` | 🔒 👑 | S6H governance |
+| get | `/api/admin/ai/evaluations` | 🔒 👑 | S6H governance |
+| post | `/api/admin/ai/evaluations/run` | 🔒 👑 | S6H governance |
+| post | `/api/admin/ai/evaluations/:id/review` | 🔒 👑 | S6H governance |
+| get | `/api/admin/ai/vectorize/health` | 🔒 👑 | S6H governance |
+| get | `/api/admin/whatsapp/sessions` | 🔒 👑 | S6H governance |
+| post | `/api/admin/ai/kb/reindex` | 🔒 👑 | S6H governance |
+| get | `/api/admin/ai/kb/reindex` | 🔒 👑 | S6H governance |
+| get | `/api/admin/ai/operating-mode` | 🔒 👑 | S6H governance |
+| put | `/api/admin/ai/operating-mode` | 🔒 👑 | S6H governance |
+| post | `/api/admin/ai/operating-mode/:requestId/approve` | 🔒 👑 | S6H governance |
+| get | `/api/whatsapp/status` | 🔒 | S6G |
+| post | `/api/whatsapp/link/start` | 🔒 | 💎 S6G |
+| post | `/api/whatsapp/link/verify` | 🔒 | S6G |
+| delete | `/api/whatsapp/link` | 🔒 | S6G |
+| post | `/api/whatsapp/webhook` | 🤖 | S6G (Worker #4) |
+| post | `/api/whatsapp/media/ingest` | 🤖 | S6G (Worker #4) |
 | post | `/api/ai/assistant` | 🔒 | 💎 |
 | get | `/api/ai/context-package` | 🔒 |  |
-| post | `/api/ai/context/query` | 🔒 |  |
+| post | `/api/ai/context/query` | 🔒 | S6: Vectorize context query |
 | post | `/api/ai/disclaimer/enforce` | 🔒 |  |
 | delete | `/api/ai/memory` | 🔒 |  |
 | post | `/api/ai/memory/rebuild` | 🔒 |  |
@@ -682,6 +844,15 @@ Lihat juga:
 | post | `/api/ai/recommendation` | 🔒 |  |
 | get | `/api/ai/recommendations` | 🔒 |  |
 | post | `/api/ai/report-analysis` | 🔒 |  |
+| post | `/api/ai/clinical/session/start` | 🔒 | 💎 S6E |
+| post | `/api/ai/clinical/message` | 🔒 | 💎 S6E |
+| get | `/api/ai/clinical/sessions` | 🔒 | S6E |
+| get | `/api/ai/clinical/sessions/:id` | 🔒 | S6E |
+| post | `/api/ai/clinical/sessions/:id/close` | 🔒 | S6E |
+| post | `/api/ai/clinical/follow-up` | 🔒 | 💎 S6E |
+| post | `/api/ai/clinical/first-aid` | 🔒 | 💎 S6F |
+| post | `/api/ai/clinical/emergency-guidance` | 🔒 | 💎 S6F |
+| post | `/api/ai/clinical/doctor-handoff` | 🔒 | 💎 S6F |
 | get | `/api/alerts` | 🔒 |  |
 | post | `/api/alerts/:id/acknowledge` | 🔒 |  |
 | post | `/api/auth/change-password` | — |  |

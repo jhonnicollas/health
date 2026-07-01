@@ -14,7 +14,7 @@ export const app = new Hono<{ Bindings: Env }>()
 
 export type { Env }
 
-export type ApiStatus = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 410 | 429 | 500 | 502
+export type ApiStatus = 200 | 201 | 202 | 400 | 401 | 403 | 404 | 409 | 410 | 429 | 500 | 502 | 503
 
 export type RegisterInput = {
   email?: unknown

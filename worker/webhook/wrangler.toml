@@ -20,7 +20,7 @@ bucket_name = "multi-apps-ai-bucket"
 # Names match PRD §6.4 Service Binding Matrix.
 [[services]]
 binding = "API_SERVICE"
-service = "isehat-api-worker"
+service = "isehat-api"
 
 [[services]]
 binding = "AI_SERVICE"

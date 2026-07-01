@@ -1,7 +1,7 @@
 # ARCHITECTURE — iSehat
 
 > **Dokumen ini dibuat berdasarkan audit langsung terhadap source code di repo (worker/, web/, docs/03.SQL_SCHEMA_*, docs_sprint5/04.SQL_SEED_*, worker/migrations/*).**
-> Status: **Sprint 1–5 selesai, Sprint 5F (foundation hardening) & S5X (auth/billing/i18n) delivered, Sprint 6 AI Clinical Copilot di-defer.**
+> Status: **Sprint 6 AI Clinical Copilot delivered (S6A–S6H ✅, S6I automated tests ✅). Closed beta + production rollout pending.**
 > Dokumen lama: lihat `archive/docs_legacy_2025_sprint1-5/04-ARCHITECTURE.md`.
 
 ---
@@ -18,17 +18,19 @@ iSehat adalah aplikasi kesehatan digital yang berjalan 100% di stack Cloudflare.
 6. Melihat dashboard (today / weekly / monthly / comparison / daily-health-hub) dan laporan (daily / weekly / monthly / doctor-ready 30 hari, share token).
 7. Mengatur keluarga/caregiver (RBAC), kontak darurat (encrypted, dengan consent), pengingat minum obat, pattern detection (sleep↔BP, weight↔BP, medication).
 8. Menggunakan fitur Sprint 5: Hydration tracker, Cycle tracking (dengan guardrail), AI Assistant (premium, dengan medical safety filter), Education cards, Symptom logging, Family-sensitive permissions, Xendit/Mock billing, AI Memory (Vectorize-ready infrastructure).
+9. Menggunakan fitur Sprint 6: AI Clinical Copilot (clinical chat, symptom interview, possible explanations), Medical Safety Runtime v2 (13 detectors), AI Gateway + 9router model routing, Vectorize runtime (index/query/rebuild), First Aid Guidance Engine, Emergency Guidance (deterministic), WhatsApp AI via Baileys, Doctor Handoff v2, Admin AI Governance, AI Operating Mode management.
 
 Prinsip desain:
 
 ```text
-Rule-first, AI-assisted        — severity/emergency SELALU dari HL_metricRules.
+Rule-first, AI-assisted        — severity/emergency SELALU dari HL_metricRules. AI boundary depends on operating mode (standard/proactive/super_aktif).
 Manual-verification-first      — setiap nilai AI wajib bisa di-override.
-Cloudflare-native              — Workers + D1 + R2 + Queues + Cron + Workers AI + Vectorize-ready.
-Free-tier-conscious            — kompres + watermark di client, no original image, OCR rate-limited.
+Cloudflare-native              — Workers (4) + D1 + R2 + Queues + Cron + Workers AI + Vectorize + AI Gateway + AI Search + KV + Durable Objects.
+Free-tier-conscious            — kompres + watermark di client, no original image, OCR rate-limited, Vectorize free tier 500 vectors/user.
 Mobile-first, PWA-ready        — Service worker + manifest + bottom-nav + FAB.
-Medical-safety                 — AI tidak boleh diagnose/prescribe/ubah dosis; semua red flag deterministic server-side.
-Privacy-by-design              — sensitive field encrypted (AES-GCM `enc:v1:`); no plaintext secret di D1/log/bundle.
+Medical-safety                 — AI boundary mode-dependent (§0.3 PRD S6); Safety Runtime 13 detectors; medicationChangeDetector ALWAYS blocks; emergency severity never downgraded by AI.
+Privacy-by-design              — sensitive field encrypted (AES-GCM enc:v1:); no plaintext secret di D1/log/bundle; cross-user leak blocked; consent-gated data access.
+Multi-worker                   — 4 Workers: #1 API, #2 AI, #3 Jobs/Cron, #4 Webhooks. Service Bindings for internal communication.
 ```
 
 ---
@@ -41,72 +43,60 @@ Privacy-by-design              — sensitive field encrypted (AES-GCM `enc:v1:`)
 |---|---|---|
 | Frontend | React 19 + Vite + TypeScript | `web/` (npm workspaces) |
 | PWA | `public/manifest.json` + `public/sw.js` + bottom-nav | `web/src/App.tsx`, `web/src/main.tsx` |
-| API Gateway | Hono.js di Cloudflare Workers | `worker/src/index.ts` (6400 LOC) + `routes-*.ts` |
+| API Gateway | Hono.js di Cloudflare Workers (#1) | `worker/apps/src/index.ts` + `routes-*.ts` |
+| AI Worker | Hono.js di Cloudflare Workers (#2) | `worker/ai/src/index.ts` + `services/` |
+| Jobs Worker | Cloudflare Workers (#3) | `worker/cron/src/index.ts` |
+| Webhooks Worker | Hono.js di Cloudflare Workers (#4) | `worker/webhook/src/index.ts` |
 | Database | Cloudflare D1 → `DB` binding `isehat_db` | `worker/wrangler.toml` |
 | Object storage | Cloudflare R2 → `LOGS` binding `multi-apps-ai-bucket` | `worker/wrangler.toml` |
-| Queue producer/consumer | `TELEGRAM_QUEUE` → `telegram-submit-summary`; `AI_MEMORY_QUEUE` → `ai-memory-jobs` | `worker/wrangler.toml` |
-| Scheduler | Cloudflare Cron Triggers (`scheduledHandler`) | `worker/src/routes-extra.ts` |
-| AI Vision | `@cf/meta/llama-3.2-11b-vision-instruct` (Workers AI binding `AI`) | configurable via `HL_systemConfigs` |
-| AI Text | 9router OpenAI-compatible, 3-model fallback | `HL_systemConfigs.aiTextEndpoint`, `aiTextModels`, `aiTextDefaultModel`, `aiTextApiKey` |
-| Auth | HTTP-only cookie `hlSession` + `D1` `HL_sessions` | `routes-extra.ts::getCurrentSession` |
+| Vectorize | Free Tier → `VECTORIZE_INDEX` binding `hl-health-memory` | `worker/ai/wrangler.toml` |
+| AI Gateway | REST API (CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN) | `worker/ai/src/services/modelRouter.ts` |
+| KV Cache | `AI_KV` binding | `worker/ai/wrangler.toml` |
+| Durable Objects | AiChatSessionDO, WhatsAppSessionDO, UserAiLockDO, ModelStreamingDO, JobProgressDO | `worker/ai/wrangler.toml` |
+| Queue producer/consumer | `TELEGRAM_QUEUE` → `telegram-submit-summary`; `AI_MEMORY_QUEUE` → `ai-memory-jobs`; `whatsapp-outbound`; `eval-jobs` | `worker/wrangler.toml`, `worker/cron/wrangler.toml` |
+| Scheduler | Cloudflare Cron Triggers (`scheduledHandler`) di #3 | `worker/cron/src/index.ts` |
+| AI Vision | `@cf/meta/llama-3.2-11b-vision-instruct` (Workers AI binding `AI` di #2) | configurable via `HL_systemConfigs` |
+| AI Text | AI Gateway → 9router (custom provider), 3-model fallback; Workers AI fallback | `worker/ai/src/services/modelRouter.ts` |
+| Embedding | `@cf/baai/bge-base-en-v1.5` (768-dim, free) | `worker/ai/wrangler.toml` |
+| Auth | HTTP-only cookie `hlSession` + `D1` `HL_sessions` | `worker/apps/src/routes-auth.ts::getCurrentSession` |
 | OAuth | Google OAuth 2.0 (`/api/auth/google*`) | `routes-auth.ts` |
 | Email | Email OTP via `email-otp.ts` + `email-sender.ts` | `routes-auth.ts` |
+| WhatsApp | Baileys gateway on VPS/Node.js → Cloudflare Tunnel → Worker #4 | `worker/webhook/src/index.ts` |
 
-### 2.2 Bindings (no new DB / R2 bucket — reuse existing)
+### 2.2 Bindings — 4 Worker Topology
 
-```toml
-# worker/wrangler.toml
-name = "hl-health-companion-api"
-main = "src/index.ts"
-compatibility_date = "2026-06-20"
-workers_dev = true
+```text
+═══════════════════════════════════════════════════════════════
+Worker #1: isehat-api-worker  (worker/apps/)
+═══════════════════════════════════════════════════════════════
+  D1: DB (isehat_db, d777e991-ddc9-4072-8522-06cb08a6538c)
+  R2: LOGS (multi-apps-ai-bucket)
+  Queues: TELEGRAM_QUEUE (telegram-submit-summary), AI_MEMORY_QUEUE (ai-memory-jobs)
+  Service Binding: AI_SERVICE → isehat-ai-worker
 
-[[d1_databases]]
-binding = "DB"
-database_name = "isehat_db"
-database_id = "d777e991-ddc9-4072-8522-06cb08a6538c"
+═══════════════════════════════════════════════════════════════
+Worker #2: isehat-ai-worker  (worker/ai/)
+═══════════════════════════════════════════════════════════════
+  D1: DB (isehat_db, same as #1)
+  Vectorize: VECTORIZE_INDEX (hl-health-memory, free tier)
+  KV: AI_KV (id=59ba33a4d92a4e0c852c9df6c63b11e9)
+  Workers AI: AI (embedding @cf/baai/bge-base-en-v1.5, vision)
+  Durable Objects: AiChatSessionDO, WhatsAppSessionDO, UserAiLockDO, ModelStreamingDO, JobProgressDO
+  Queues: whatsapp-outbound (producer)
 
-[[r2_buckets]]
-binding = "LOGS"
-bucket_name = "multi-apps-ai-bucket"
+═══════════════════════════════════════════════════════════════
+Worker #3: isehat-jobs-worker  (worker/cron/)
+═══════════════════════════════════════════════════════════════
+  D1: DB (isehat_db, same as #1)
+  R2: LOGS (multi-apps-ai-bucket)
+  Queues: consumer for (telegram-submit-summary, ai-memory-jobs, whatsapp-outbound, eval-jobs)
+  Cron: 6 scheduled jobs (expire sessions, nullify encrypted, delete messages, archive model runs, delete vectors, archive safety flags)
 
-[[queues.producers]]
-queue = "telegram-submit-summary"
-binding = "TELEGRAM_QUEUE"
-
-[[queues.producers]]
-queue = "ai-memory-jobs"
-binding = "AI_MEMORY_QUEUE"
-
-[[queues.consumers]]
-queue = "telegram-submit-summary"
-max_batch_size = 10
-max_batch_timeout = 5
-
-[[queues.consumers]]
-queue = "ai-memory-jobs"
-max_batch_size = 5
-max_batch_timeout = 10
-
-[vars]
-EMAIL_PROVIDER = "resend"
-EMAIL_FROM = "iSehat <otp@mail.isehat.biz.id>"
-EMAIL_OTP_TTL_SECONDS = "600"
-EMAIL_OTP_MAX_ATTEMPTS = "5"
-EMAIL_OTP_RESEND_COOLDOWN_SECONDS = "60"
-EMAIL_OTP_MAX_RESENDS = "3"
-EMAIL_OTP_TEST_MODE = "false"
-AI_TEXT_API_BASE = "https://9router.krpmerch.biz.id/v1"
-AI_TEXT_MODEL = "oc/deepseek-v4-flash-free"
-BILLING_PROVIDER = "xendit_test"
-XENDIT_MODE = "test"
-XENDIT_BASE_URL = "https://api.xendit.co"
-BILLING_CURRENCY = "IDR"
-BILLING_SUCCESS_URL = "https://app.isehat.biz.id/billing/success"
-BILLING_CANCEL_URL = "https://app.isehat.biz.id/billing/cancel"
-VAPID_PUBLIC_KEY = "BJazmolj-Nf6eACLfCesD92Uobws77I6X0ADanxIEpc-BBcRATkbBBJwZWxj_A7IIkt042qYKdEkR3jP1myvcRA"
-VAPID_SUBJECT = "mailto:admin@isehat.biz.id"
-# VAPID_PRIVATE_KEY must be set via: wrangler secret put VAPID_PRIVATE_KEY
+═══════════════════════════════════════════════════════════════
+Worker #4: isehat-webhooks-worker  (worker/webhook/)
+═══════════════════════════════════════════════════════════════
+  R2: LOGS (multi-apps-ai-bucket — for WA media)
+  Service Bindings: API_SERVICE → #1, AI_SERVICE → #2, JOBS_SERVICE → #3
 ```
 
 ### 2.3 Secrets (Cloudflare env, NEVER di D1 / seed / log)
@@ -116,12 +106,17 @@ ENCRYPTION_KEY              — AES-GCM key (≥16 char) untuk data sensitif.
 CRON_SECRET                 — bearer token untuk /api/internal/cron/*.
 TELEGRAM_BOT_TOKEN          — fallback kalau HL_systemConfigs.telegramBotToken kosong.
 VAPID_PRIVATE_KEY           — Web Push (optional).
-GOOGLE_OAUTH_CLIENT_ID      — Google OAuth (Spring 5A).
+GOOGLE_OAUTH_CLIENT_ID      — Google OAuth (Sprint 5A).
 GOOGLE_OAUTH_CLIENT_SECRET  — Google OAuth.
 OAUTH_REDIRECT_BASE_URL     — base URL callback.
-XENDIT_SECRET_KEY           — billing (Spring 5F/X).
+XENDIT_SECRET_KEY           — billing (Sprint 5F/X).
 XENDIT_WEBHOOK_SECRET       — billing webhook verification.
 EMAIL_SMTP_* / SENDGRID_*   — email OTP delivery (configurable).
+CLOUDFLARE_ACCOUNT_ID       — AI Gateway REST API (S6B).
+CLOUDFLARE_API_TOKEN        — AI Gateway auth (S6B).
+WA_GATEWAY_SECRET           — WhatsApp Baileys webhook auth (S6G).
+CLINICAL_MESSAGE_ENCRYPTION_KEY — AES-GCM key untuk clinical message content encryption (S6E).
+9ROUTER_API_KEY              — 9router text AI API key (S6B).
 ```
 
 D1 menyimpan HANYA **referensi/metadata** (`HL_configMetadata.storageMode ∈ {'d1','env','secret','reference'}`). Plaintext secret TIDAK boleh ada di `HL_systemConfigs`.
@@ -168,7 +163,7 @@ flowchart LR
   end
 
   subgraph Data["Cloudflare Storage"]
-    D1[(D1: isehat_db<br/>68 tables HL_*)]
+    D1[(D1: isehat_db<br/>78 tables HL_*<br/>68 Sprint 1-5 + 10 Sprint 6)]
     R2[(R2: multi-apps-ai-bucket<br/>LOGS)]
   end
 
@@ -208,101 +203,83 @@ flowchart LR
 
 ```text
 health/
-├── docs/                              # dokumen final (file ini)
+├── docs/                              # dokumen final Sprint 1-5
 │   ├── 04-ARCHITECTURE.md             # file ini
-│   ├── 05-api-contract.md             # API contract
-│   ├── 06-design-system.md            # design system
+│   ├── 05-api-contract.md             # API contract (updated to Sprint 6)
+│   ├── 06-design-system.md            # design system (updated to Sprint 6)
 │   ├── 07-schema.sql                  # Sprint 1-4 baseline D1 schema
 │   ├── 08-seed.sql                    # Sprint 1-4 baseline seed
-│   ├── 03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql  # Sprint 5 additive schema
-│   ├── 01.PRD_SPRINT5_…               # PRD Sprint 5 final revised
-│   └── 02.PRD_USER_STORIES_…          # user stories Sprint 5
-├── docs_sprint5/                      # working file Sprint 5 (planning/seed)
-│   ├── 04.SQL_SEED_SPRINT5_FINAL_…    # Sprint 5 seed (roles, plans, features, configs)
-│   ├── 08.TASK_PLAN_SPRINT5_…         # task plan + mockup
-│   ├── 09–11                          # test, stress, TDD plan
-│   ├── AUDIT_SPRINT5*.md              # audit reports per phase
-│   └── Frontend/                      # mockup HTML (admin, premium, education, audit)
-├── archive/
-│   ├── docs_legacy_2025_sprint1-5/    # arsip dokumen lama yang sudah usang
-│   ├── WORK_LOG_Sprint1-4.md          # log Sprint 1-4
-│   └── Frontend-not-used/             # frontend lama yang sudah tidak dipakai
-├── worker/                            # Cloudflare Worker (Hono)
-│   ├── wrangler.toml                  # binding DB / LOGS / queue
-│   ├── migrations/                    # additive D1 migrations
-│   │   ├── 001_s5x_auth_email_otp.sql
-│   │   └── 002_s5x_whatsapp_profile.sql
-│   ├── scripts/                       # seed-metric-rules, e2e-uat
-│   ├── src/
-│   │   ├── index.ts                   # 6400 LOC — semua route Sprint 1-5 (auth, profile, measurements, dashboard, AI, reports, kb, alerts, notifications, reminders, family, emergency, medications, fasting, badges, streaks, patterns, settings, telegram, kb, dev)
-│   │   ├── routes-admin.ts            # /api/admin/dashboard/summary, /api/plans, /api/me/subscribe (75 LOC)
-│   │   ├── routes-ai.ts               # /api/ai/{context/query,context-package,memory/status,memory/rebuild,memory,disclaimer/enforce} + admin AI (142 LOC)
-│   │   ├── routes-auth.ts             # /api/auth/{google,register/start|verify,login/start|verify,otp/resend,change-password} + /api/education/cards, /api/symptoms/*, /api/dashboard/daily-health (505 LOC)
-│   │   ├── routes-cycle.ts            # /api/cycle/* + /api/family-links/:id/permissions/{cycle,sensitive-health} (180 LOC)
-│   │   ├── routes-extra.ts            # /api/emergency/contacts/:id/consent, /api/family/access-check, /api/patterns/generate/*, /api/emergency/contacts/notify, /api/internal/cron/reminders, /api/medications/adherence, /api/reports/*, /api/fasting/*, /api/streaks, /api/badges, /api/measurements/drafts|/:id, /api/dashboard/comparison, /api/ai/recommendations, /api/kb/:slug, /api/settings/consent, /api/dev/seed-test-data, /api/patterns (1096 LOC) + scheduledHandler
-│   │   ├── routes-hydration.ts        # /api/hydration/{settings,today,logs,history,logs/:logId} (134 LOC)
-│   │   ├── routes-telegram.ts         # /api/webhook/telegram/water, /api/telegram/water-webhook, /api/internal/cron/hydration-reminders (212 LOC)
-│   │   ├── services/                  # 22 service modules
-│   │   │   ├── ai-memory.ts           # buildContextPackage, calculateDataSufficiency, enforceDisclaimer, logQuery, logRebuildJob
-│   │   │   ├── audit.ts               # writeAudit
-│   │   │   ├── billing/               # checkout-session, subscription-activation, config, provider (mock + xendit)
-│   │   │   ├── config.ts              # getSystemConfig{Number,String,Boolean,JSON}, cache TTL 5 min
-│   │   │   ├── crypto.ts              # AES-GCM encrypt/decrypt (enc:v1: prefix)
-│   │   │   ├── cycle.ts               # cycle calendar computation, fertility window, guardrail
-│   │   │   ├── education.ts           # getCards, acknowledgeCard
-│   │   │   ├── email-otp.ts           # generate, hash (PBKDF2), verify, rate limit
-│   │   │   ├── email-sender.ts        # SMTP / SendGrid adapter
-│   │   │   ├── entitlements.ts        # requireEntitlement(plan feature)
-│   │   │   ├── hydration.ts           # daily target calculation, overhydration check
-│   │   │   ├── oauth.ts               # Google OAuth state, exchange, link
-│   │   │   ├── rbac.ts                # requirePermission(userId, code)
-│   │   │   ├── symptom.ts             # red flag detection
-│   │   │   ├── telegram-callback.ts   # callback query parse, quick-add
-│   │   │   ├── telegram-client.ts     # sendMessage helper
-│   │   │   ├── telegram-config.ts     # resolve bot token from systemConfig
-│   │   │   └── web-push.ts            # VAPID send to subscriptions
-│   │   ├── i18n/                      # locale, error-codes, email-templates, disclaimer-templates
-│   │   ├── shared-types/constants.ts  # enum constants (severities, statuses, alert types, role codes, etc)
-│   │   └── types.ts                   # Env, Bindings, ApiError, ApiSuccess
-│   └── test/                          # 22 test files (vitest-style .mjs)
-│       ├── audit-service.test.mjs
-│       ├── config-service.test.mjs
-│       ├── email-otp.test.mjs
-│       ├── entitlements-service.test.mjs
-│       ├── rbac-service.test.mjs
-│       ├── register.test.mjs
-│       ├── sprint5-*.test.mjs         # 5A, 5B, 5C, 5D, 5E, 5F, 5X integration & unit
-│       └── sprint5-types.test.mjs
+│   ├── 03.SQL_SCHEMA_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
+│   └── 01-02.PRD_*.md                # Sprint 5 PRD + user stories
+├── docs_sprint6/                      # Sprint 6 working docs
+│   ├── 01.PRD_S6_AI_CLINICAL_COPILOT.md  # Master PRD (S6A-I, status: S6A-H ✅)
+│   ├── 02-10.PRD_S6A-S6I_*.md        # Per-phase sub-PRDs
+│   ├── TASK_PLAN_SPRINT6_AI.md        # Task plan + dependency
+│   ├── AI_SAFETY_RUNTIME_SPEC.md     # 13 detector specifications
+│   ├── CLINICAL_RESPONSE_SCHEMA.md   # Response format, answerType
+│   ├── PROMPT_GUARDRAIL_SPEC.md      # Prompt templates, versioning
+│   ├── VECTORIZE_MEMORY_SCHEMA.md    # Namespace, vector structure
+│   ├── DATA_PRIVACY_CONSENT_MATRIX.md # Consent gates, sensitive data
+│   ├── WHATSAPP_BAILEYS_ARCHITECTURE.md # WA gateway, VPS, DO
+│   ├── EVAL_DATASET_SPEC_SPRINT6.md  # Evaluation cases, scoring
+│   ├── TEST_PLAN_SPRINT6_AI_SAFETY.md # Test coverage per phase
+│   └── USER_STORIES_SPRINT6_AI.md    # User-facing acceptance criteria
+├── worker/                            # 4-Worker monorepo (npm workspaces)
+│   ├── apps/                          # Worker #1: isehat-api-worker
+│   │   ├── wrangler.toml              # binding DB / LOGS / queues / AI_SERVICE
+│   │   ├── src/
+│   │   │   ├── index.ts               # Main router + Sprint 1-5 routes
+│   │   │   ├── routes-admin.ts        # Admin core + S6H governance endpoints
+│   │   │   ├── routes-ai.ts           # AI proxy routes + S6E clinical proxy
+│   │   │   ├── routes-auth.ts         # Auth, OTP, OAuth, symptoms, education
+│   │   │   ├── routes-cycle.ts        # Cycle tracking + family permissions
+│   │   │   ├── routes-extra.ts        # Extra Sprint 1-5 features
+│   │   │   ├── routes-hydration.ts    # Hydration tracker
+│   │   │   ├── routes-telegram.ts     # Telegram webhook + hydration cron
+│   │   │   ├── routes-whatsapp.ts     # S6G WA link/status/unlink
+│   │   │   └── services/             # Sprint 1-5 services (22 modules)
+│   │   └── test/                      # 370+ tests (S1-5 + S6H + S6I)
+│   ├── ai/                            # Worker #2: isehat-ai-worker (NEW Sprint 6)
+│   │   ├── wrangler.toml              # binding DB / VECTORIZE_INDEX / AI_KV / AI / DO / queues
+│   │   ├── src/
+│   │   │   ├── index.ts               # 19 routes: clinical, memory, context, safety
+│   │   │   ├── services/
+│   │   │   │   ├── clinicalOrchestrator.ts  # Core AI flow + encryption
+│   │   │   │   ├── safetyRuntime.ts   # 13-detector v2 engine
+│   │   │   │   ├── detectors.ts        # Individual detector implementations
+│   │   │   │   ├── modelRouter.ts      # AI Gateway + 9router + fallback
+│   │   │   │   ├── contextPackageBuilder.ts  # D1 + Vectorize + AI Search assembly
+│   │   │   │   ├── firstAidEngine.ts   # Protocol lookup + AI Search + fallback
+│   │   │   │   ├── vectorizeService.ts # Index, query, rebuild, delete
+│   │   │   │   ├── quotaService.ts     # Plan quota consumption
+│   │   │   │   └── whatsappSessionDo.ts # WhatsApp DO + truncate
+│   │   │   └── types.ts               # Bindings, types
+│   │   └── test/                      # 523+ tests (S6A-S6F)
+│   ├── cron/                           # Worker #3: isehat-jobs-worker (NEW Sprint 6F)
+│   │   ├── wrangler.toml              # cron triggers + queue consumers
+│   │   ├── src/index.ts               # 6 cron jobs + queue handlers
+│   │   └── test/                      # 6 tests
+│   ├── webhook/                        # Worker #4: isehat-webhooks-worker (NEW Sprint 6G)
+│   │   ├── wrangler.toml              # Service Bindings to #1/#2/#3
+│   │   ├── src/index.ts               # WA/Telegram/Xendit wildcard webhook
+│   │   └── test/                      # S6G tests
+│   └── migrations/
+│       ├── 001-005                    # Sprint 5 + early S6 migrations
+│       ├── 003_sprint6_schema.sql     # 10 Sprint 6 tables
+│       ├── 006_s6e_clinical_sessions.sql
+│       ├── 007_s6g_whatsapp_uniqueness.sql
+│       └── 008_s6h_governance.sql     # HL_aiEvaluationCases + HL_aiEvaluationRuns
 ├── web/                               # React 19 PWA
-│   ├── index.html                     # SPA shell
-│   ├── vite.config.ts                 # proxy /api → worker
-│   ├── playwright.config.ts           # E2E
-│   ├── functions/api/                 # Pages Functions (mirrors worker routes — production proxy)
-│   ├── public/
-│   │   ├── manifest.json              # PWA manifest
-│   │   ├── sw.js                      # service worker
-│   │   ├── icon-192.svg / icon-512.svg
-│   │   └── favicon.svg
-│   ├── frontend_stitch/               # legacy Stitch mockup HTML (referensi)
-│   ├── e2e/smoke/                     # Playwright smoke (auth, admin, i18n, sprint5a-e, regression)
-│   └── src/
-│       ├── main.tsx                   # bootstrap + SW register + installPrompt capture
-│       ├── App.tsx                    # 510 LOC — SPA shell: AuthProvider → I18nProvider → ToastProvider → AppRoutes
-│       │                              # NAV_GROUPS (Dashboard, Measurements, Reports, Health Tracking, Lifestyle, AI, Family, Education, Settings, Admin), 47 routes
-│       ├── pages/                     # 47 page files (auth, dashboard, measurement, reports, settings, etc)
-│       ├── components/                # 22 components (auth/, dashboard/, measurement/, shared/, i18n/)
-│       ├── context/                   # AuthContext + useAuth
-│       ├── hooks/                     # useAiExtract, useEntitlements
-│       ├── utils/                     # apiRetry, bmiCalculator, csv, dateFormat, imageCompressor, validation, watermark
-│       ├── api/                       # translateError
-│       ├── lib/api.ts                 # fetch wrapper
-│       ├── i18n/                      # index.tsx + locales/{auth, ai, alerts, billing, caregiver, common, cycle, dashboard, doctor, emergency, errors, family, fasting, hydration, kb, medications, nav, onboarding, patterns, reminders, reports, settings, symptom}.ts
-│       ├── types/constants.ts         # FE-side enums
-│       └── styles/                    # senior-mode.css, high-contrast.css
-├── functions/api/[[path]].ts          # Pages Function — proxies /api/* to Worker origin
-├── site/                              # Astro public marketing site (blog, pricing, features)
-├── stress/                            # k6-style stress scripts
-└── package.json                       # monorepo workspaces (web, worker)
+│   ├── src/
+│   │   ├── App.tsx                    # SPA shell, 47+ pages, nav groups
+│   │   ├── pages/                     # All page components
+│   │   ├── components/                # 22+ components
+│   │   ├── i18n/                      # ID/EN locale files (25+)
+│   │   └── styles/                    # senior-mode, high-contrast
+│   └── ...
+├── HANDOFF_SPRINT6.md                 # Sprint 6 resume state
+├── WORK_LOG_SPRINT6.md                # Sprint 6 execution log
+└── AGENTS.md                          # Agent rulebook (Sprint 6)
 ```
 
 ---
@@ -541,7 +518,7 @@ API `ENTITLEMENT_REQUIRED` (403) ketika user Free akses fitur paid.
 
 ---
 
-## 9. Medical & Privacy Safety (Sprint 5 Hard Boundaries)
+## 9. Medical & Privacy Safety (Sprint 5 + Sprint 6 Hard Boundaries)
 
 ```text
 Sprint 5 non-metric safety events  → HL_safetyEvents  (BUKAN HL_alerts).
@@ -553,102 +530,160 @@ Admin mutations                    → HL_auditLogs(userId, action, entityType, 
 Auth, RBAC, entitlement, quota, family permission,
 cycle eligibility, webhook, cron, red flag, disclaimer  → semua server-side.
 Sprint 1-4 behavior                → tetap backward compatible.
+Sprint 6 AI output                 → Medical Safety Runtime v2 (13 detectors, mode-dependent).
+Cross-user data                    → crossUserLeakDetector SELALU blocks.
+Operating mode                     → standard (default) | proactive | super_aktif. Super Admin controlled.
 ```
 
-Forbidden table names (unless explicitly in final docs):
+AI medical behavior (mode-dependent per PRD S6 §0.3):
 
 ```text
-HL_educationViews
-HL_userPreferences (untuk education progress)
-actorId/targetType/targetId in HL_auditLogs
-plaintext Google / OAuth / Telegram / AI / Billing / Internal secrets
-```
+STANDARD mode (default):
+  AI TIDAK BOLEH: diagnosis final, resep, dosis, klaim spesialis, ubah obat.
+  Safety Runtime blocks: diagnosisFinalDetector, prescriptionDosageDetector, specialistClaimDetector.
+  
+PROACTIVE mode:
+  AI BOLEH: diagnosis final.
+  AI TIDAK BOLEH: resep, dosis, klaim spesialis, ubah obat.
+  Safety Runtime blocks: prescriptionDosageDetector, specialistClaimDetector.
+  
+SUPER_AKTIF mode:
+  AI BOLEH: diagnosis final, resep, dosis, klaim spesialis.
+  AI TIDAK BOLEH: ubah obat.
+  Safety Runtime blocks: medicationChangeDetector (ALWAYS active).
 
-AI medical behavior:
-
-```text
-AI TIDAK BOLEH: decide emergency, diagnose definitif, prescribe, change medication dosage,
-                claim replace doctors, satu-satunya sumber medical severity/guardrail.
-
-WAJIB deterministic:
-  - Measurement status/severity  → dari HL_metricRules flow.
-  - Symptom red flag             → deterministic server-side (services/symptom.ts).
-  - Overhydration                → warning-only, BUKAN diagnosis.
-  - Cycle contraception guardrail→ blocking UI (bukan toast-only).
-  - AI medical output            → WAJIB server-side disclaimer (i18n/disclaimer-templates.ts).
-```
-
-Sensitive data (require owner OR explicit family permission OR restricted admin permission + audit):
-
-```text
-symptom detail, red flag detail, cycle, pregnancy, lactation, menopause,
-AI memory, doctor report detail, caregiver access, support/admin sensitive access.
+ALL modes:
+  Emergency severity NEVER downgraded by AI (emergencySeverityDowngradeDetector).
+  Disclaimer WAJIB on all medical output (missingDisclaimerDetector).
+  Deterministic red flag precheck ALWAYS runs before LLM call.
+  medicationChangeDetector ALWAYS blocks (all modes).
+  Vectorize is semantic retrieval, NOT clinical proof (vectorizeAsTruthDetector).
 ```
 
 ---
 
-## 10. AI Infrastructure
+## 10. AI Infrastructure (Sprint 6 Delivered)
 
 ```text
-Workers AI Vision
-  binding AI (default @cf/meta/llama-3.2-11b-vision-instruct)
-  configurable via HL_systemConfigs.aiVisionModel
-  timeout configurable via aiVisionTimeoutMs
+═══════════════════════════════════════════════════════════════
+AI Gateway + 9router (Worker #2)
+═══════════════════════════════════════════════════════════════
+  Control plane: AI Gateway REST API
+  URL: https://gateway.ai.cloudflare.com/v1/{accountId}/{gatewayId}/{provider}/chat/completions
+  Primary: 9router custom provider (oc/deepseek-v4-flash-free default, oc/mimo-v2.5-free premium)
+  Fallback: Workers AI (@cf/meta/llama-3.2-11b-vision-instruct for vision only)
+  Secrets: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (env, never D1)
 
-9router Text AI (OpenAI-compatible)
-  endpoint = HL_systemConfigs.aiTextEndpoint
-  models   = HL_systemConfigs.aiTextModels (JSON array atau comma-separated)
-  default  = HL_systemConfigs.aiTextDefaultModel
-  apiKey   = HL_systemConfigs.aiTextApiKey (reference; real key di Cloudflare Secret)
+═══════════════════════════════════════════════════════════════
+Medical Safety Runtime v2 (Worker #2)
+═══════════════════════════════════════════════════════════════
+  13 detectors (§10.1 PRD S6):
+  Mode-invariant (always active):
+    1. missingDisclaimerDetector → block_and_fallback
+    2. emergencySeverityDowngradeDetector → block_and_fallback
+    3. crossUserLeakDetector → block_and_fallback
+    4. sensitiveDataLeakDetector → block_and_fallback
+    5. unsafeReassuranceDetector → rewrite_safe
+    6. certaintyClaimDetector → rewrite_safe
+    7. vectorizeAsTruthDetector → rewrite_safe
+    8. ruleEngineBypassDetector → block_and_fallback
+    9. delayMedicalCareDetector → block_and_fallback
+    12. medicationChangeDetector → block_and_fallback (ALL modes)
+  Mode-dependent:
+    10. diagnosisFinalDetector → standard: rewrite_safe | proactive: allow | super_aktif: allow
+    11. prescriptionDosageDetector → standard: rewrite_safe | proactive: rewrite_safe | super_aktif: allow
+    13. specialistClaimDetector → standard: rewrite_safe | proactive: rewrite_safe | super_aktif: allow
 
-Safety
-  FORBIDDEN_PHRASES list (worker/src/index.ts) → replace dengan safe fallback
-  enforceDisclaimer(service) → append server-side medical disclaimer (i18n)
+  6 Safety Decisions: allow, allow_with_disclaimer, rewrite_safe, block_and_fallback, emergency_template_only, needs_human_review
 
-Memory (Sprint 5C infrastructure, runtime deferred ke Sprint 6)
-  HL_vectorDocuments   — vectorize-ready index (status pending/indexed/failed/deleted/skipped)
-  HL_aiContextQueries  — log setiap query context
-  HL_aiRecommendationContexts — 1:1 ke HL_aiRecommendations (patternScore 1-100, scoreReason, usedFallback, modelName, disclaimer)
-  HL_aiMemoryJobs      — rebuild/delete/backfill/indexSource job queue
-  services/ai-memory.ts::buildContextPackage / calculateDataSufficiency / logQuery / logRebuildJob
+═══════════════════════════════════════════════════════════════
+Clinical Orchestrator (Worker #2)
+═══════════════════════════════════════════════════════════════
+  Flow: auth → consent → entitlement → intent classify → red flag precheck →
+        D1 context → Vectorize query → AI Search → context package →
+        prompt (mode-specific forbiddenActions) → model router →
+        Safety Runtime → response formatter (disclaimer) → audit + model run log
+
+  Output types: safe_summary, possible_explanations, follow_up_questions,
+    missing_data, first_aid_guidance, emergency_guidance, doctor_handoff,
+    caregiver_summary, medication_adherence_summary, medication_questions_for_doctor,
+    blocked_unsafe_request
+
+═══════════════════════════════════════════════════════════════
+Vectorize Runtime (Worker #2 query, Worker #3 batch)
+═══════════════════════════════════════════════════════════════
+  Index: hl-health-memory (Free Tier, 768-dim)
+  Namespace: user:{userId} (client cannot override)
+  Embedding: @cf/baai/bge-base-en-v1.5 (768-dim, free)
+  Per-user limit: 500 vectors default (configurable vectorize.maxVectorsPerUser)
+  Alert threshold: 80% of 10M global limit (8M vectors)
+
+═══════════════════════════════════════════════════════════════
+Sprint 6 New Tables (10 tables)
+═══════════════════════════════════════════════════════════════
+  HL_aiClinicalSessions, HL_modelRuns, HL_aiClinicalMessages,
+  HL_aiClinicalIntakeAnswers, HL_aiOutputSafetyFlags, HL_promptVersions,
+  HL_whatsappLinks, HL_whatsappMessages, HL_firstAidProtocols,
+  HL_aiKnowledgeDocuments
+  + S6H evaluation tables: HL_aiEvaluationCases, HL_aiEvaluationRuns
+
+═══════════════════════════════════════════════════════════════
+Operating Mode (Super Admin controlled)
+═══════════════════════════════════════════════════════════════
+  3 modes: standard (default), proactive, super_aktif
+  Config: clinicalCopilot.operatingMode
+  Change: requires medical reviewer approval (if config requires)
+  Downgrade to standard: skips reviewer
+  Audit: action=aiOperatingModeChanged
+  Rate: max 1 change per hour
 ```
-
-Sprint 5C **TIDAK** membangun AI Clinical Copilot runtime. Flag `clinicalCopilotEnabled` di config SELALU `false` di Sprint 5. Endpoint `/api/ai/assistant` dengan `clinicalCopilotMode: true` → respond `403 AI_CLINICAL_COPILOT_DEFERRED`.
 
 ---
 
-## 11. Deployment
+## 11. Deployment (4 Workers)
 
 ```text
-1. cd worker
-2. npx tsc -p tsconfig.json
-3. npm test
-4. wrangler d1 execute isehat_db --remote --file=../docs/07-schema.sql
-5. wrangler d1 execute isehat_db --remote --file=../docs/08-seed.sql
-6. wrangler d1 execute isehat_db --remote --file=../docs_sprint5/04.SQL_SEED_SPRINT5_FINAL_REVISED_AI_SPRINT6_READY.sql
-7. wrangler d1 execute isehat_db --remote --command="PRAGMA foreign_key_check;"
-8. wrangler deploy
-9. cd ../web && npm run build && wrangler pages deploy dist
+1. cd worker/apps && npx tsc -p tsconfig.json && npm test
+2. cd worker/ai && npx tsc -p tsconfig.json && npm test
+3. cd worker/cron && npx tsc -p tsconfig.json && npm test
+4. cd worker/webhook && npx tsc -p tsconfig.json && npm test
+5. wrangler d1 execute isehat_db --remote --file=migrations/003_sprint6_schema.sql
+6. wrangler d1 execute isehat_db --remote --file=migrations/006_s6e_clinical_sessions.sql
+7. wrangler d1 execute isehat_db --remote --file=migrations/007_s6g_whatsapp_uniqueness.sql
+8. wrangler d1 execute isehat_db --remote --file=migrations/008_s6h_governance.sql
+9. wrangler d1 execute isehat_db --remote --command="PRAGMA foreign_key_check;"
+10. cd worker/apps && wrangler deploy
+11. cd worker/ai && wrangler deploy
+12. cd worker/cron && wrangler deploy
+13. cd worker/webhook && wrangler deploy
+14. cd ../web && npm run build && wrangler pages deploy dist
 ```
 
 Deployed URLs:
 
 | App | URL |
 |---|---|
-| Worker API | `https://hl-health-companion-api.indiehomesungairaya.workers.dev` |
+| Worker #1 (API) | `https://hl-health-companion-api.indiehomesungairaya.workers.dev` |
+| Worker #2 (AI) | `https://isehat-ai-worker.indiehomesungairaya.workers.dev` (internal, Service Binding) |
+| Worker #3 (Jobs) | `https://isehat-jobs-worker.indiehomesungairaya.workers.dev` (cron/queues only) |
+| Worker #4 (Webhooks) | `https://isehat-webhooks-worker.indiehomesungairaya.workers.dev` |
 | Pages Frontend | `https://app.isehat.biz.id` |
 
-Pages proxy `/api/*` → Worker via `functions/api/[[path]].ts`. `worker/wrangler.toml` uses `app.isehat.biz.id` for billing success/cancel URLs and `mail.isehat.biz.id` for the Resend email sender domain.
+Pages proxy `/api/*` → Worker #1 via `functions/api/[[path]].ts`. Worker #1 proxies `/api/ai/clinical/*` → Worker #2 via Service Binding `AI_SERVICE`.
 
 ---
 
-## 12. Multi-Agent Operating Rules (tetap)
+## 12. Multi-Agent Operating Rules
 
-Lihat `AGENTS.md` (resume-safe, vibe-coding safe). Aturan penting untuk coding agent:
+Lihat `AGENTS.md` + `HANDOFF_SPRINT6.md` + `WORK_LOG_SPRINT6.md`. Aturan penting untuk coding agent:
 
-1. Baca `AGENTS.md` + `HANDOFF.md` + 3–5 entry terakhir `WORK_LOG.md` sebelum edit.
-2. Source of truth order: SQL schema > seed > API contract > PRD > task plan.
+1. Baca `AGENTS.md` + `HANDOFF_SPRINT6.md` + 3–5 entry terakhir `WORK_LOG_SPRINT6.md` sebelum edit.
+2. Source of truth order: PRD S6 → sub-PRDs → TASK_PLAN → spec docs → AGENTS.md → HANDOFF → WORK_LOG.
 3. TDD: RED → GREEN → REFACTOR → SECURITY → LOG → NEXT.
-4. Update `WORK_LOG.md` + `HANDOFF.md` setiap task cycle.
-5. Sprint order: Foundation → 5A → 5B → 5C → 5D → 5E → 5F → 5X → Cross-Phase Release Gate.
-6. Sprint 6 deferred: AI Clinical Copilot runtime.
+4. Update `WORK_LOG_SPRINT6.md` + `HANDOFF_SPRINT6.md` setiap task cycle.
+5. Sprint order: S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H → S6I → Release Gate.
+6. NEVER invent table/endpoint/permission/feature codes not in PRD (anti-hallucination §0).
+7. NEVER cast as `any` — use proper types.
+8. Medical Safety Runtime 13 detectors MUST run on every AI output.
+9. Operating mode standard=default, proactive, super_aktif — mode-dependent AI boundary.
+10. No plaintext secrets. Real secrets in Cloudflare Secrets/Env only.

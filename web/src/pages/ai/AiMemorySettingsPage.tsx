@@ -19,6 +19,8 @@ export function AiMemorySettingsPage() {
     } catch { setMsg(t('ai.connError')) } finally { setLoading(false) }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // load runs once on mount; load() is defined fresh each render and does not need to be a dep.
   useEffect(() => { load() }, [])
 
   const handleRebuild = async () => {

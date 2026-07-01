@@ -424,3 +424,62 @@ Format:
   - Performance benchmark runs 50 concurrent buildContextPackage and 50 concurrent processClinicalMessage flows using deterministic safe-template env.
   - T-12 (closed beta, 100 users) and T-15 (production rollout) marked MANUAL/NOT_STARTED in HANDOFF.
 - Status: DONE (automated gates); T-12/T-15 MANUAL
+
+---
+
+## S6F-AUDIT — 2026-07-01 20:00 UTC
+
+- Task: S6F audit + bug fix + full TEST_PLAN_SPRINT6_AI_SAFETY.md §F execution
+- Worker: #2 (audit/fix) + #3 (cron tests)
+- Files changed:
+  - worker/ai/src/services/clinicalOrchestrator.ts (logEmergencyEvent exported, formatWhatsAppReply maxChars param)
+  - worker/ai/src/services/contextPackageBuilder.ts (computeRedFlagPrecheck severity='emergency' check)
+  - worker/ai/src/services/index.ts (added logEmergencyEvent export)
+  - worker/ai/src/index.ts (first-aid emergency: renderEmergencyTemplate+disclaimer+logEmergencyEvent)
+  - worker/ai/test/sprint6f.test.mjs (REWRITTEN: 32 tests covering EM/FA/JW/NS)
+  - docs_sprint6/07.PRD_S6F_EMERGENCY.md (status ✅ DONE)
+  - HANDOFF_SPRINT6.md (S6F audit results)
+- Tests: 32/32 S6F PASS, 40/40 S6E PASS, 518/518 full regression PASS, 0 FAIL
+- Bugs fixed: 5 (2 HIGH, 1 MEDIUM hardcoded text, 1 HIGH missing safety event check, 1 info comment)
+  1. /first-aid emergency path: hardcoded ID → renderEmergencyTemplate(locale) + mode-aware disclaimer
+  2. /first-aid emergency path: no logEmergencyEvent → added with sessionId gate
+  3. computeRedFlagPrecheck: only severity='critical' → added 'emergency' per PRD §4 step 5
+  4. formatWhatsAppReply: hardcoded maxChars → configurable parameter
+  5. logEmergencyEvent: private → exported for reuse across routes
+- Validation: tsc PASS (ai, apps, cron, webhook), npm test PASS all workspaces
+- Status: DONE
+
+---
+
+## S6G-AUDIT — 2026-07-01 21:00 UTC
+
+- Task: Sprint 6G audit vs PRD S6G + WHATSAPP_BAILEYS_ARCHITECTURE + DATA_PRIVACY_CONSENT_MATRIX + TEST_PLAN §G. Fix ALL bugs found. Re-run tester.
+- Worker: #1 (routes-whatsapp.ts), #2 (whatsappSessionDo.ts/types.ts), #4 (webhook/src/index.ts)
+- Files changed:
+  - `worker/apps/migrations/007_s6g_whatsapp_uniqueness.sql` (NEW): UNIQUE(providerMessageId/userId/whatsappNumberHash) + idx_whatsappMessages_ignoredUnlinked partial index + HL_systemConfigs.whatsappAi.unlinkedRetentionDays=30 + preflight dedup SQL comments + S6F cron predicate documented.
+  - `worker/webhook/src/index.ts`: detectMessageType folds video -> document; MIME allowlist (jpeg/png/jpg/pdf); 10MB + 13.4MB base64 size caps; race-safe INSERT try/catch on UNIQUE violation returns 200 duplicate.
+  - `worker/ai/src/whatsappSessionDo.ts`: exported truncateForWhatsapp; codepoint-aware truncation via Array.from(); sentence-boundary cut drops boundary char + trimEnd (no "X.  ..." double-space); whatsappAi.maxReplyChars D1 config + WHATSAPP_MAX_REPLY_CHARS env fallback + default 400.
+  - `worker/ai/src/types.ts`: added WHATSAPP_MAX_REPLY_CHARS?: string to Bindings (removes as unknown as cast).
+  - `worker/apps/src/routes-whatsapp.ts`: OTP verify UPDATE has AND otpHash = ? atomic CAS; meta.changes=0 returns OTP_ALREADY_USED; rate-limit /link/start 5/hr; structured error codes (OTP_EXPIRED/OTP_INVALID/OTP_ALREADY_USED/NUMBER_ALREADY_LINKED); delete clears otpHash/otpExpiresAt.
+  - `worker/apps/src/index.ts`: XENDIT_WEBHOOK_SECRET env unified worker #1 vs #4.
+  - `worker/ai/test/sprint6g.test.mjs`: T-11 arg[3]=messageType fixed; T-14 -> T-14a (truncateForWhatsapp: sentence cut + codepoint safety + surrogate-pair check) + T-14b (default-400 integration).
+- Tests: 15/15 sprint6g PASS; full regression 534/534 PASS across 18 worker/ai test files.
+- Validation: npx tsc worker/ai + worker/apps + worker/webhook all EXIT=0; npx tsc emits dist/ for worker/ai + worker/webhook.
+- Notes: 12 bugs fixed (3 CRITICAL, 1 HIGH, 4 MEDIUM, 4 LOW). Code reviewer second-pass confirmed 0 CRITICAL/MAJOR remaining.
+- Status: DONE
+
+## S6H-GOVERNANCE — 2026-07-01 22:00 UTC
+
+- Task: S6H Governance Endpoints — implement 9 admin routes per PRD S6H §11; T-01..T-09 backend + T-10a tests + T-11 validation gate
+- Worker: #1 (routes-admin.ts), #3 (cron queue consumer updates)
+- Files changed:
+  - `worker/apps/src/routes-admin.ts`: 9 governance endpoints (GET model-runs, GET safety-flags, GET prompt-versions, POST prompt-versions, PUT prompt-versions/:id/activate, GET evaluations, POST evaluations/run, POST evaluations/:id/review, GET vectorize/health, GET whatsapp/sessions, POST kb/reindex, GET/PUT operating-mode); RBAC gates; audit logging; KV cache invalidation; reviewer approval gate on operating mode change
+  - `worker/apps/src/types.ts`: ApiErrorCode REVIEWER_APPROVAL_REQUIRED, AI_SERVICE_UNAVAILABLE; ApiStatus 202, 503
+  - `worker/apps/src/utils/index-helpers.ts`: ApiStatus 202, 503
+  - `worker/apps/migrations/008_s6h_governance.sql`: HL_aiEvaluationCases + HL_aiEvaluationRuns
+  - `worker/cron/src/index.ts`: if/else queue consumer (evalRun + kbReindex handlers)
+  - `worker/apps/test/sprint6h.test.mjs`: 27 tests (DB-01→05, PM-01→04, EV-01→04, OM-01→06, NS-01→03 + extras)
+- Tests: 27/27 sprint6h PASS; 370/370 apps; 523/523 ai; 6/6 cron; 0 FAIL
+- Validation: tsc clean all 4 workers; npm test green across apps/ai/cron
+- Notes: T-10 UI deferred. OM downgrade skips reviewer, upgrade requires. Prompt activate: deprecate previous + KV invalidation. Eval scoring placeholder.
+- Status: DONE
