@@ -567,6 +567,67 @@ WAJIB:
     }
   })
 
+  // S6F-T-06/T-07: Proxy POST /api/ai/clinical/first-aid → #2
+  app.post('/api/ai/clinical/first-aid', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const denied = await requireClinicalAccess(c, uid, s)
+      if (denied) return jr(c, denied, denied.status as any)
+
+      if (!(await checkClinicalRouteRateLimit(c.env.DB, uid, 'firstAid.maxRequestsPerHour', 10, 3600, s))) {
+        return jr(c, fail('RATE_LIMITED', 'Terlalu banyak permintaan P3K.', 429, [], s), 429)
+      }
+
+      if (!c.env.AI_SERVICE) return jr(c, aiServiceUnavailable(s), 503)
+
+      const body = await c.req.json() as { keyword?: string; locale?: string; sessionId?: number }
+
+      const res = await c.env.AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/clinical/first-aid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-UserId': String(uid) },
+        body: JSON.stringify({ keyword: body.keyword ?? '', locale: body.locale ?? 'id', sessionId: body.sessionId }),
+      }))
+      const payload = await res.json() as any
+      return jr(c, payload, res.status as any)
+    } catch (error) {
+      console.error('clinical first-aid proxy error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal mengambil panduan P3K.', 500, [], s), 500)
+    }
+  })
+
+  // S6F-T-11: Proxy POST /api/ai/clinical/doctor-handoff → #2
+  app.post('/api/ai/clinical/doctor-handoff', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const denied = await requireClinicalAccess(c, uid, s)
+      if (denied) return jr(c, denied, denied.status as any)
+
+      if (!(await checkClinicalRouteRateLimit(c.env.DB, uid, 'clinicalCopilot.maxHandoffsPerHour', 5, 3600, s))) {
+        return jr(c, fail('RATE_LIMITED', 'Terlalu banyak permintaan doctor handoff.', 429, [], s), 429)
+      }
+
+      if (!c.env.AI_SERVICE) return jr(c, aiServiceUnavailable(s), 503)
+
+      const body = await c.req.json() as { sessionId?: number; locale?: string; reason?: string }
+      if (!body.sessionId) return jr(c, fail('VALIDATION_ERROR', 'sessionId wajib.', 400, [], s), 400)
+
+      const res = await c.env.AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/clinical/doctor-handoff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-UserId': String(uid) },
+        body: JSON.stringify({ sessionId: body.sessionId, locale: body.locale ?? 'id', reason: body.reason ?? '' }),
+      }))
+      const payload = await res.json() as any
+      return jr(c, payload, res.status as any)
+    } catch (error) {
+      console.error('clinical doctor-handoff proxy error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal membuat doctor handoff.', 500, [], s), 500)
+    }
+  })
+
   // S6E-T-06: Proxy POST /api/ai/clinical/sessions/:id/close → #2
   app.post('/api/ai/clinical/sessions/:id/close', async (c: HC) => {
     const s = Date.now()

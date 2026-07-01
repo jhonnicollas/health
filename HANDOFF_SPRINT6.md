@@ -1,23 +1,25 @@
 # HANDOFF_SPRINT6.md — Sprint 6 Resume State
 
-## Current State — 2026-06-30 18:00 UTC
+## Current State — 2026-07-01 16:00 UTC
 
 ```text
 Sprint: Sprint 6 (S6A → S6I) — AI Clinical Copilot Runtime + Emergency + WhatsApp AI + Cloudflare AI Platform
-Phase: S6D (Clinical Context Package v2) — AUDIT DONE
-Status: DONE (11/11 tasks complete; 7 bugs found, 5 fixed, 2 noted)
-Current Task: S6D-T-11 (validation gate — PASSED)
-Next Task: S6E-T-01 (Proxy route /api/ai/clinical/* in #1)
-Workers Active: #1 isehat-api-worker + #2 isehat-ai-worker
-Tests: 131 PASS, 0 FAIL, 13 SKIP (D1 integration)
-  - S6A: 20 safety tests
+Phase: S6G (WhatsApp AI via Baileys) — DONE
+Status: DONE (all S6G tasks implemented, 10/10 tests pass, full regression green)
+Current Task: S6G complete — WhatsApp linking, webhook, WhatsAppSessionDO, STOP/START, outbound queue, media ingest, Telegram/Xendit forwarding
+Next Task: S6H-T-01 (Admin AI Governance)
+Workers Active: #1 isehat-api-worker + #2 isehat-ai-worker + #3 isehat-jobs-worker + #4 isehat-webhooks-worker
+Tests: 191 PASS (worker/ai), 338 PASS (worker/apps), 0 FAIL, 13 SKIP (D1 integration)
+  - S6A: 20 safety tests + 5 OM tests
   - S6B: 7 modelRouter tests
   - S6C: 25 vectorize + memory tests
-  - S6D: 34 context package tests (9 original + 25 new plan)
-  - S6A+S6B combined: 25 test plan tests
-tsc: Worker #2 PASS
+  - S6D: 34 context package tests
+  - S6E: 40 E2E + AU + OM + NS tests
+  - S6F: 10 emergency + cron tests
+  - S6G: 10 T-1..T-10 tests
+tsc: Worker #1 PASS, Worker #2 PASS, Worker #3 PASS, Worker #4 PASS, web PASS
 eslint: n/a
-D1: PRAGMA foreign_key_check clean
+D1: PRAGMA foreign_key_check clean (migration 006 adds otpHash/otpExpiresAt)
 Secrets: CLOUDFLARE_ACCOUNT_ID ✅ CLOUDFLARE_API_TOKEN ✅ 9ROUTER_API_KEY ✅ TELEGRAM_BOT_TOKEN ✅
 AI_KV: id=59ba33a4d92a4e0c852c9df6c63b11e9 ✅
 AI Endpoint: https://9router.krpmerch.biz.id/v1
@@ -26,21 +28,25 @@ Telegram: iSehatApp_bot / userId=8727919072
 ```
 
 ## Last Completed Task
-- Task: S6D audit + bug fix + test plan execution
-- Result: 5 bugs fixed (CRITICAL: latest-per-metric, HIGH: context-package route stub, HIGH: timeout enforcement, MEDIUM: trend query optimization, MEDIUM: contentPreview null guard), 34 tests pass
-- Validation: `npx tsc` PASS; `npm test` 131/131 PASS, 13 SKIP, 0 FAIL; `--grep contextPackage` 34 PASS
+- Task: S6G — WhatsApp AI via Baileys
+- Result: All 9 S6G task groups implemented; 10/10 new S6G tests pass; full regression 191/191 worker/ai PASS, 338/338 worker/apps PASS
+- Validation:
+  - `cd worker/ai && npm test` → 191 PASS, 0 FAIL
+  - `cd worker/apps && npm test` → 338 PASS, 0 FAIL
+  - `cd worker/cron && npx tsc -p tsconfig.json` → PASS
+  - `cd worker/webhook && npx tsc -p tsconfig.json` → PASS
+  - `cd web && npx tsc -b` → PASS
 
-## S6D Audit Findings — 2026-06-30
+## S6E Audit Findings — 2026-07-01
 
 | # | Severity | Bug | Fix | File |
 |---|---|---|---|---|
-| 1 | **CRITICAL** | `fetchLatestMeasurements` returned 20 most recent regardless of metric — should return latest PER metric code | Changed to correlated subquery with MAX(measuredAt) per metricCode | `contextPackageBuilder.ts` |
-| 2 | **HIGH** | `/api/ai/context-package` route still returned S6C stub (`contextPackageBuilderReady: false`) instead of full v2 package | Wired to `buildContextPackage()`, accepts `?query=` and `?disclaimerAcknowledged=true` params | `index.ts` |
-| 3 | **HIGH** | No timeout enforcement in `buildContextPackage` — if D1/Vectorize hangs, build hangs forever | Added `checkTime()` after each I/O stage; returns partial package with `partial:` prefix in scoreReason | `contextPackageBuilder.ts` |
-| 4 | **MEDIUM** | Trend fetcher made 3 separate D1 queries (7d, 30d, 90d) — exceeded 200ms budget | Replaced `computeTrendSummaryParallel` (3 round-trips) with `computeTrendSummaryOptimized` (1 query, 90d, in-memory split) | `contextPackageBuilder.ts` |
-| 5 | **MEDIUM** | `vm.contentPreview.slice(0, 200)` crashes if contentPreview is undefined | Added nullish coalescing: `(vm.contentPreview ?? '').slice(0, 200)` | `contextPackageBuilder.ts` |
-| 6 | INFO | `sourceTable: 'HL_waterIntakeLogs'` vs PRD `HL_hydrationLogs` — code uses real D1 table name (correct) | No fix needed — code matches actual schema | — |
-| 7 | INFO | `computeDataSufficiencyScore` double-counts 7d+30d (25+15=40 for single recent measurement). PRD §4 wording allows this; Math.min(score,100) caps. | No fix needed — matches PRD literal wording | — |
+| 1 | **CRITICAL** | Quota checked but never consumed after successful `/session/start` or `/message` proxy → unlimited messages | Added `QuotaService.consumeQuota()` after successful proxy response in both routes | `worker/apps/src/routes-ai.ts` |
+| 2 | **HIGH** | `encryptContent()` read key from `globalThis.CLINICAL_MESSAGE_ENCRYPTION_KEY` instead of `env` → AES-GCM path always dead, always falls back to XOR | Changed signature to `encryptContent(env, text, userId)`, read from `(env as any).CLINICAL_MESSAGE_ENCRYPTION_KEY` | `worker/ai/src/services/clinicalOrchestrator.ts` |
+| 3 | **HIGH** | Session never updated with `dataSufficiencyScore`/`redFlagStatus` after first message → stale session data | Added `UPDATE HL_aiClinicalSessions SET dataSufficiencyScore=?, redFlagStatus=? WHERE id=? AND userId=?` after message storage (both normal and emergency paths) | `worker/ai/src/services/clinicalOrchestrator.ts` |
+| 4 | **MEDIUM** | No input validation on message length → potential DoS vector | Added `if (body.message.length > 5000) → 400` validation | `worker/ai/src/index.ts` |
+| 5 | INFO | Web UI still calls `/api/ai/assistant` (Sprint 5) not new `/api/ai/clinical/message`; no `AiClinicalChatPage`, `ContextTraceDrawer`, `SafetyDisclaimerBox` components exist | Tracked; UI migration not in S6E scope per TASK_PLAN (S6E backend focus) | `web/src/pages/ai/AiAssistantPage.tsx` |
+| 6 | INFO | Rate limit in-memory `Map` → lost on worker restart | Acceptable for beta; upgrade to KV in S6I | `worker/apps/src/routes-ai.ts` |
 
 ## S6B Audit + DevOps — 2026-06-30
 

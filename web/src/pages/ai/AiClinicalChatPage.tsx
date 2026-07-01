@@ -4,16 +4,17 @@ import { translateErrorCode } from '../../api/translateError'
 import { SafetyDisclaimerBox } from '../../components/ai/SafetyDisclaimerBox'
 import { DataSufficiencyBadge } from '../../components/ai/DataSufficiencyBadge'
 import { ContextTraceDrawer, type ContextTraceItem } from '../../components/ai/ContextTraceDrawer'
+import { EmergencyGuidanceCard } from '../../components/ai/EmergencyGuidanceCard'
+import { FirstAidProtocolCard } from '../../components/ai/FirstAidProtocolCard'
 
-type ChatMessage = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-}
+
 
 type ClinicalResponse = {
   success: boolean
   data?: {
+    sessionId?: number
+    sessionUuid?: string
+    status?: string
     messageId?: number
     reply?: string
     answerType?: string
@@ -24,8 +25,54 @@ type ClinicalResponse = {
     followUpQuestions?: string[]
     modelName?: string
     usedFallback?: boolean
+    protocolCode?: string | null
+    protocolTitle?: string
   }
   error?: { code: string; message?: string }
+}
+
+type ChatMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  answerType?: string
+  protocol?: {
+    title: string
+    redFlags: string[]
+    doSteps: string[]
+    dontSteps: string[]
+    seekHelp: string[]
+    reviewerStatus: string
+  }
+}
+
+function parseFirstAidProtocol(text: string, fallbackTitle?: string) {
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+  const title = lines[0] || fallbackTitle || 'Panduan P3K'
+  const redFlags: string[] = []
+  const doSteps: string[] = []
+  const dontSteps: string[] = []
+  const seekHelp: string[] = []
+  let current: string[] | null = null
+  let reviewerStatus = 'approved'
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (/status reviewer|reviewer status/i.test(line)) {
+      const m = line.match(/:\s*(.+)/)
+      if (m) reviewerStatus = m[1].trim()
+      continue
+    }
+    if (/^🔴\s*(TANDA BAHAYA|RED FLAGS)/i.test(line)) { current = redFlags; continue }
+    if (/^🟢\s*(LAKUKAN|DO)/i.test(line)) { current = doSteps; continue }
+    if (/^🔴\s*(JANGAN DILAKUKAN|DON'T)/i.test(line)) { current = dontSteps; continue }
+    if (/^🟠\s*(SEGERA CARI BANTUAN|SEEK HELP)/i.test(line)) { current = seekHelp; continue }
+    if (current && (line.startsWith('-') || /^\d+\./.test(line))) {
+      current.push(line.replace(/^[-\d.\s]+/, '').trim())
+    }
+  }
+
+  return { title, redFlags, doSteps, dontSteps, seekHelp, reviewerStatus }
 }
 
 export function AiClinicalChatPage() {
@@ -86,7 +133,14 @@ export function AiClinicalChatPage() {
         return
       }
       const data = body.data
-      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: data.reply ?? '' }])
+      const assistantMsg: ChatMessage = {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: data.reply ?? '',
+        answerType: data.answerType,
+        protocol: data.answerType === 'first_aid_guidance' ? parseFirstAidProtocol(data.reply ?? '', data.protocolTitle) : undefined,
+      }
+      setMessages((prev) => [...prev, assistantMsg])
       setSufficiency({ score: data.dataSufficiencyScore, label: data.dataSufficiencyLabel })
       setTrace(data.contextTrace ?? [])
     } catch {
@@ -139,14 +193,32 @@ export function AiClinicalChatPage() {
           <p className="loading-text">{t('ai.clinicalLoading')}</p>
         ) : (
           <>
-            {messages.map((msg) => (
-              <article className={`chat-bubble ${msg.role}`} key={msg.id}>
-                <div className="chat-meta">
-                  <span>{msg.role === 'user' ? t('ai.you') : t('ai.hlAi')}</span>
-                </div>
-                <p>{msg.content}</p>
-              </article>
-            ))}
+            {messages.map((msg) => {
+              if (msg.role === 'assistant' && msg.answerType === 'emergency_guidance') {
+                return <EmergencyGuidanceCard key={msg.id} text={msg.content} />
+              }
+              if (msg.role === 'assistant' && msg.answerType === 'first_aid_guidance' && msg.protocol) {
+                return (
+                  <FirstAidProtocolCard
+                    key={msg.id}
+                    title={msg.protocol.title}
+                    redFlags={msg.protocol.redFlags}
+                    doSteps={msg.protocol.doSteps}
+                    dontSteps={msg.protocol.dontSteps}
+                    seekHelp={msg.protocol.seekHelp}
+                    reviewerStatus={msg.protocol.reviewerStatus}
+                  />
+                )
+              }
+              return (
+                <article className={`chat-bubble ${msg.role}`} key={msg.id}>
+                  <div className="chat-meta">
+                    <span>{msg.role === 'user' ? t('ai.you') : t('ai.hlAi')}</span>
+                  </div>
+                  <p>{msg.content}</p>
+                </article>
+              )
+            })}
             {loading && (
               <article className="chat-bubble assistant typing">
                 <div className="chat-meta"><span>{t('ai.hlAi')}</span><span>{t('ai.typing')}</span></div>

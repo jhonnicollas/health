@@ -7,6 +7,7 @@ import { mountTelegramRoutes } from "./routes-telegram.js"
 import { mountAdminRoutes } from "./routes-admin.js"
 import { mountMeasurementRoutes } from './routes-measurements.js'
 import { mountDashboardRoutes } from "./routes-dashboard.js"
+import { mountWhatsappRoutes } from "./routes-whatsapp.js"
 import { getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
 import type { Env, ApiErrorCode } from './types.js'
@@ -1600,6 +1601,7 @@ mountAiRoutes(app as any)
 mountReportsRoutes(app as any)
 mountCycleRoutes(app as any)
 mountTelegramRoutes(app as any)
+mountWhatsappRoutes(app as any)
 mountAdminRoutes(app as any)
 mountMeasurementRoutes(app as any)
 mountDashboardRoutes(app as any)

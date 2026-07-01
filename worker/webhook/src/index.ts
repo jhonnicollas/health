@@ -1,13 +1,7 @@
 // isehat-webhooks-worker — Sprint 6 Worker #4
-// Public-but-single-purpose: only receives external webhooks (WhatsApp / Telegram /
-// Xendit / Resend). Validates signatures, dedups via providerMessageId UNIQUE, then
+// Public-but-single-purpose: receives external webhooks (WhatsApp / Telegram /
+// Xendit / Resend), validates signatures, dedups via providerMessageId UNIQUE, then
 // forwards to the correct internal Worker via Service Binding.
-//
-// Business logic lands in S6G / S6H:
-//   S6G-T-01 — this skeleton (S6G-T-02..T-15 wire each webhook)
-//   S6G-T-08 — /api/whatsapp/webhook forwards to AI_SERVICE
-//   S6G-T-13 — /api/whatsapp/media/ingest stores R2 + forwards
-//   S6G-T-14 — /api/telegram/webhook + /api/billing/webhook/xendit forward to API_SERVICE
 
 import { Hono } from "hono";
 
@@ -25,8 +19,6 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// timingSafeEqual-equivalent: this Worker runs in V8 isolated context; we
-// implement with constant-time per-char XOR. Used in validateGatewaySecret below.
 function timingSafeStringEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -34,10 +26,81 @@ function timingSafeStringEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+function base64Url(bytes: ArrayBuffer | Uint8Array): string {
+  const byteArray = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let binary = "";
+  for (let i = 0; i < byteArray.length; i += 1) binary += String.fromCharCode(byteArray[i]);
+  return btoa(binary).replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+async function sha256Token(value: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return `sha256:${base64Url(buf)}`;
+}
+
 function validateGatewaySecret(c: any, env: Bindings): boolean {
   const provided = c.req.header("X-Gateway-Secret") ?? "";
   if (!env.WA_GATEWAY_SECRET) return false;
   return timingSafeStringEqual(provided, env.WA_GATEWAY_SECRET);
+}
+
+function normalizeWhatsappNumber(raw: string): string {
+  const stripped = raw.replace(/@s\.whatsapp\.net$/i, "").replace(/[^\d+]/g, "");
+  return stripped.startsWith("+") ? stripped : `+${stripped.replace(/^\+/, "")}`;
+}
+
+function detectMessageType(body: Record<string, unknown>): string {
+  if (typeof body.messageType === "string") return body.messageType;
+  const msg = (body.message as Record<string, unknown>) ?? {};
+  if (msg.imageMessage || body.mediaMimeType?.toString().startsWith("image/")) return "image";
+  if (msg.audioMessage || body.mediaMimeType?.toString().startsWith("audio/")) return "audio";
+  if (msg.videoMessage || body.mediaMimeType?.toString().startsWith("video/")) return "video";
+  if (msg.documentMessage || body.mediaMimeType?.toString().startsWith("application/")) return "document";
+  return "text";
+}
+
+function extractTextContent(body: Record<string, unknown>): string | undefined {
+  if (typeof body.textContent === "string") return body.textContent;
+  const msg = (body.message as Record<string, unknown>) ?? {};
+  const conversation = (msg.conversation as string) ?? undefined;
+  if (conversation) return conversation;
+  const extended = (msg.extendedTextMessage as Record<string, unknown>) ?? {};
+  if (typeof extended.text === "string") return extended.text;
+  return undefined;
+}
+
+async function getConfigNumber(db: D1Database, key: string, fallback: number): Promise<number> {
+  try {
+    const row = await db.prepare("SELECT configValue FROM HL_systemConfigs WHERE configKey = ?").bind(key).first<{ configValue: string }>();
+    const n = row?.configValue ? Number(row.configValue) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// Per-number per-minute inbound rate limit (in-memory; PRD §14 upgrade to KV in S6I)
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+async function checkInboundRateLimit(db: D1Database, whatsappNumber: string, now = Date.now()): Promise<boolean> {
+  const limit = await getConfigNumber(db, "whatsappAi.maxInboundPerMinute", 100);
+  const windowMs = 60_000;
+  const bucket = Math.floor(now / windowMs);
+  const key = `${whatsappNumber}:${bucket}`;
+  const entry = rateLimitMap.get(key);
+  if (!entry || now - entry.windowStart > windowMs) {
+    rateLimitMap.set(key, { count: 1, windowStart: now });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count += 1;
+  return true;
+}
+
+function linkingInstruction(locale: "id" | "en"): string {
+  return locale === "en"
+    ? "This WhatsApp number is not linked to iSehat. Please link it in the iSehat app: Settings > WhatsApp AI."
+    : "Nomor WhatsApp ini belum tertaut ke iSehat. Hubungkan melalui aplikasi iSehat: Pengaturan > WhatsApp AI.";
 }
 
 // Health — exposed for VPS Baileys heartbeat + Cloudflare monitoring.
@@ -59,58 +122,225 @@ app.get("/health", (c) => {
   });
 });
 
-// 11.3 WhatsApp webhook — S6G-T-08. Stub delegates to AI_SERVICE.
+interface NormalizedInbound {
+  providerMessageId: string;
+  whatsappNumber: string;
+  messageType: string;
+  textContent?: string;
+  mediaUrl?: string;
+  timestamp: number;
+}
+
+function normalizeInbound(body: Record<string, unknown>): NormalizedInbound | null {
+  const messages = body.messages as Array<Record<string, unknown>> | undefined;
+  const first = messages?.[0] ?? body;
+  const providerMessageId = (first.providerMessageId as string) ?? (first.key && (first.key as Record<string, unknown>).id as string) ?? "";
+  const rawNumber = (first.whatsappNumber as string) ?? (first.key && (first.key as Record<string, unknown>).remoteJid as string) ?? "";
+  const whatsappNumber = normalizeWhatsappNumber(rawNumber);
+  if (!providerMessageId || !whatsappNumber) return null;
+  const textContent = extractTextContent(first);
+  const mediaUrl = typeof first.mediaUrl === "string" ? first.mediaUrl : undefined;
+  const timestamp = first.messageTimestamp ? Number(first.messageTimestamp) * 1000 : Date.now();
+  const messageType = detectMessageType(first);
+  return { providerMessageId, whatsappNumber, messageType, textContent, mediaUrl, timestamp };
+}
+
+// 11.3 WhatsApp webhook — S6G-T-08
 app.post("/api/whatsapp/webhook", async (c) => {
   if (!validateGatewaySecret(c, c.env)) {
     return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
   }
-  // S6G-T-08 real impl:
-  //   1. Parse normalized inbound payload (providerMessageId, whatsappNumber, messageType, textContent)
-  //   2. Idempotency: SELECT HL_whatsappMessages WHERE providerMessageId=...
-  //      → if exists, return 200 (dup) without further processing
-  //   3. HL_whatsappLinks lookup: SELECT userId WHERE whatsappNumberHash=sha256(number) AND verified=1 AND aiEnabled=1
-  //      → unlinked / not-verified / aiEnabled=0: respond with onboarding / link instruction / STOP-AI confirmation
-  //   4. Forward to AI_SERVICE /api/ai/clinical/event (Worker #2 WhatsAppSessionDO serializes; orchestrator runs)
-  //   5. queue outbound reply via whatsapp-outbound queue (Worker #3 consumer drives Baileys sendMessage)
-  // For skeleton: reject all real calls until S6G-T-08 implementations lands.
-  return c.json(
-    {
-      success: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Land in S6G-T-08" },
-    },
-    501
-  );
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+  }
+
+  const inbound = normalizeInbound(body);
+  if (!inbound) {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Missing providerMessageId or whatsappNumber" } }, 400);
+  }
+
+  // Idempotency
+  const existing = await c.env.DB.prepare(
+    "SELECT id FROM HL_whatsappMessages WHERE providerMessageId = ? LIMIT 1"
+  ).bind(inbound.providerMessageId).first<{ id: number }>();
+  if (existing) {
+    return c.json({ success: true, duplicate: true }, 200);
+  }
+
+  // Rate limit
+  if (!(await checkInboundRateLimit(c.env.DB, inbound.whatsappNumber))) {
+    return c.json({ success: false, error: { code: "RATE_LIMITED", message: "Too many messages. Try again later." } }, 429);
+  }
+
+  const numberHash = await sha256Token(inbound.whatsappNumber);
+  const link = await c.env.DB.prepare(
+    "SELECT id, userId, verified, aiEnabled FROM HL_whatsappLinks WHERE whatsappNumberHash = ? LIMIT 1"
+  ).bind(numberHash).first<{ id: number; userId: number; verified: number; aiEnabled: number }>();
+
+  const locale: "id" | "en" = body.locale === "en" ? "en" : "id";
+
+  if (!link || link.verified !== 1 || link.aiEnabled !== 1) {
+    await c.env.DB.prepare(
+      `INSERT INTO HL_whatsappMessages
+        (userId, whatsappLinkId, providerMessageId, direction, messageType, contentPreview, processedStatus, createdAt)
+       VALUES (NULL, NULL, ?, 'inbound', ?, ?, 'ignored_unlinked', CURRENT_TIMESTAMP)`
+    ).bind(inbound.providerMessageId, inbound.messageType, inbound.textContent?.slice(0, 200) ?? null).run();
+    return c.json({ success: true, unlinked: true, reply: linkingInstruction(locale) }, 200);
+  }
+
+  await c.env.DB.prepare(
+    `INSERT INTO HL_whatsappMessages
+      (userId, whatsappLinkId, providerMessageId, direction, messageType, contentPreview, processedStatus, createdAt)
+     VALUES (?, ?, ?, 'inbound', ?, ?, 'processing', CURRENT_TIMESTAMP)`
+  ).bind(link.userId, link.id, inbound.providerMessageId, inbound.messageType, inbound.textContent?.slice(0, 200) ?? null).run();
+
+  if (!c.env.AI_SERVICE) {
+    return c.json({ success: false, error: { code: "AI_SERVICE_UNAVAILABLE" } }, 503);
+  }
+
+  try {
+    const res = await c.env.AI_SERVICE.fetch(new Request("https://ai-service.internal/api/ai/clinical/whatsapp/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Internal-UserId": String(link.userId) },
+      body: JSON.stringify({
+        whatsappLinkId: link.id,
+        userId: link.userId,
+        whatsappNumber: inbound.whatsappNumber,
+        messageType: inbound.messageType,
+        textContent: inbound.textContent,
+        providerMessageId: inbound.providerMessageId,
+        locale,
+      }),
+    }));
+    return c.json({ success: true, accepted: true }, (res.ok ? 202 : res.status) as any);
+  } catch (error) {
+    console.error("whatsapp webhook forward failed:", error);
+    return c.json({ success: false, error: { code: "AI_SERVICE_ERROR" } }, 502);
+  }
 });
 
-// 11.3 WhatsApp media ingest — S6G-T-13 stub.
+// 11.3 WhatsApp media ingest — S6G-T-13
 app.post("/api/whatsapp/media/ingest", async (c) => {
   if (!validateGatewaySecret(c, c.env)) {
     return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
   }
-  return c.json(
-    { success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6G-T-13" } },
-    501
-  );
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+  }
+
+  const providerMessageId = typeof body.providerMessageId === "string" ? body.providerMessageId : "";
+  const rawNumber = typeof body.whatsappNumber === "string" ? body.whatsappNumber : "";
+  const mediaMimeType = typeof body.mediaMimeType === "string" ? body.mediaMimeType : "application/octet-stream";
+  const mediaBufferBase64 = typeof body.mediaBufferBase64 === "string" ? body.mediaBufferBase64 : "";
+
+  if (!providerMessageId || !rawNumber || !mediaBufferBase64) {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "providerMessageId, whatsappNumber and mediaBufferBase64 are required" } }, 400);
+  }
+
+  const whatsappNumber = normalizeWhatsappNumber(rawNumber);
+  const numberHash = await sha256Token(whatsappNumber);
+  const link = await c.env.DB.prepare(
+    "SELECT id, userId FROM HL_whatsappLinks WHERE whatsappNumberHash = ? LIMIT 1"
+  ).bind(numberHash).first<{ id: number; userId: number }>();
+
+  const extension = mediaMimeType.split("/").pop()?.replace(/[^a-z0-9]/gi, "") || "bin";
+  const ownerId = link ? String(link.userId) : "unlinked";
+  const mediaR2Key = `whatsapp-media/${ownerId}/${providerMessageId}.${extension}`;
+
+  const binary = atob(mediaBufferBase64);
+  const buffer = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) buffer[i] = binary.charCodeAt(i);
+
+  if (c.env.LOGS) {
+    try {
+      await c.env.LOGS.put(mediaR2Key, buffer, { httpMetadata: { contentType: mediaMimeType } });
+    } catch (error) {
+      console.error("whatsapp media R2 put failed:", error);
+    }
+  }
+
+  await c.env.DB.prepare(
+    `INSERT INTO HL_whatsappMessages
+      (userId, whatsappLinkId, providerMessageId, direction, messageType, contentPreview, mediaR2Key, processedStatus, createdAt)
+     VALUES (?, ?, ?, 'inbound', ?, ?, ?, 'received', CURRENT_TIMESTAMP)`
+  ).bind(link?.userId ?? null, link?.id ?? null, providerMessageId, detectMessageType(body), mediaMimeType, mediaR2Key).run();
+
+  return c.json({ success: true, mediaR2Key }, 200);
 });
 
-// 11.3 Telegram webhook — S6G-T-14 stub. Forwards to API_SERVICE.
+// 11.3 Telegram webhook — S6G-T-14
 app.post("/api/telegram/webhook", async (c) => {
-  // S6G-T-14 validation: bot token in path or header; signature validation per
-  // Telegram docs. For skeleton: 501.
-  void c.env.API_SERVICE;
-  return c.json(
-    { success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6G-T-14" } },
-    501
-  );
+  const token = c.env.TELEGRAM_BOT_TOKEN ?? "";
+  if (!token) {
+    return c.json({ success: false, error: { code: "NOT_CONFIGURED", message: "TELEGRAM_BOT_TOKEN not set" } }, 503);
+  }
+  const provided = c.req.header("X-Telegram-Bot-Api-Secret-Token") ?? c.req.query("secret") ?? "";
+  if (!timingSafeStringEqual(provided, token)) {
+    return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+  }
+
+  if (!c.env.API_SERVICE) {
+    return c.json({ success: false, error: { code: "API_SERVICE_UNAVAILABLE" } }, 503);
+  }
+
+  try {
+    const res = await c.env.API_SERVICE.fetch(new Request("https://api-service.internal/api/webhook/telegram/water", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-HL-Telegram-Water-Secret": token },
+      body: JSON.stringify(body),
+    }));
+    return new Response(res.body, { status: res.status, headers: res.headers });
+  } catch (error) {
+    console.error("telegram webhook forward failed:", error);
+    return c.json({ success: false, error: { code: "API_SERVICE_ERROR" } }, 502);
+  }
 });
 
-// 11.3 Xendit billing webhook — S6G-T-14 stub.
+// 11.3 Xendit billing webhook — S6G-T-14
 app.post("/api/billing/webhook/xendit", async (c) => {
-  // S6G-T-14 validation: verify Xendit signature using XENDIT_WEBHOOK_SECRET.
-  return c.json(
-    { success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6G-T-14" } },
-    501
-  );
+  const secret = c.env.XENDIT_WEBHOOK_SECRET ?? "";
+  const provided = c.req.header("X-Callback-Token") ?? "";
+  if (!secret || !timingSafeStringEqual(provided, secret)) {
+    return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+  }
+
+  if (!c.env.API_SERVICE) {
+    return c.json({ success: false, error: { code: "API_SERVICE_UNAVAILABLE" } }, 503);
+  }
+
+  try {
+    const res = await c.env.API_SERVICE.fetch(new Request("https://api-service.internal/api/billing/webhook/xendit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Callback-Token": provided },
+      body: JSON.stringify(body),
+    }));
+    return new Response(res.body, { status: res.status, headers: res.headers });
+  } catch (error) {
+    console.error("xendit webhook forward failed:", error);
+    return c.json({ success: false, error: { code: "API_SERVICE_ERROR" } }, 502);
+  }
 });
 
 export default app;

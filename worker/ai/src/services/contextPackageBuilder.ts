@@ -629,7 +629,7 @@ export function computeRedFlagPrecheck(
   if (symptoms.redFlagCount > 0) {
     return {
       hasRedFlag: true,
-      severity: 'warning',
+      severity: 'emergency',
       source: 'symptom_log',
     };
   }

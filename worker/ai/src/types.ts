@@ -8,6 +8,8 @@ export type Bindings = {
   USER_AI_LOCK_DO: DurableObjectNamespace
   MODEL_STREAMING_DO: DurableObjectNamespace
   JOB_PROGRESS_DO: DurableObjectNamespace
+  AI_MEMORY_QUEUE?: Queue
+  WHATSAPP_OUTBOUND_QUEUE?: Queue
   AI: Ai
   CLOUDFLARE_ACCOUNT_ID?: string
   CLOUDFLARE_API_TOKEN?: string

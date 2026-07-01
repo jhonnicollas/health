@@ -235,7 +235,7 @@ test('S6D-CP-extra: computeRedFlagPrecheck — symptom red flag → hasRedFlag=t
     []
   );
   assert.equal(result.hasRedFlag, true, 'red flag from symptom');
-  assert.equal(result.severity, 'warning', 'severity=warning for symptom red flag');
+  assert.equal(result.severity, 'emergency', 'severity=emergency for symptom red flag (S6F)');
   assert.equal(result.source, 'symptom_log', 'source=symptom_log');
 });
 

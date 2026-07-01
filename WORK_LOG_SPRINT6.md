@@ -334,3 +334,49 @@ Format:
   (4) P2: 9ROUTER_API_KEY added to types.ts with TS quoted-key syntax.
   DevOps: CLOUDFLARE_ACCOUNT_ID ✅, CLOUDFLARE_API_TOKEN ✅, AI_KV id=59ba33a4d9... ✅
 - Status: DONE
+
+---
+
+## S6E Audit + Bug Fix + Test Plan — 2026-07-01
+
+- Task: Audit S6E code vs PRD S6E, fix bugs, execute TEST_PLAN §E (E2E-01→10, AU-01→05, OM-01→05, NS-01→03 + extras)
+- Worker: #1 (routes-ai.ts) + #2 (clinicalOrchestrator.ts, index.ts)
+- Files changed: worker/apps/src/routes-ai.ts, worker/ai/src/services/clinicalOrchestrator.ts, worker/ai/src/index.ts, worker/ai/test/sprint6e.test.mjs (new)
+- Tests: 171/171 PASS (40 new S6E tests), 13 SKIP (D1 integration), 0 FAIL
+- Validation: npx tsc PASS; npm test 171/171 PASS
+- Notes: Found and fixed 4 bugs:
+  (1) CRITICAL: Quota checked but not consumed after proxy success → unlimited messages. Added QuotaService.consumeQuota() in routes-ai.ts for /session/start and /message.
+  (2) HIGH: encryptContent() read key from globalThis instead of env → AES-GCM always dead code. Changed signature to accept env, read from env.CLINICAL_MESSAGE_ENCRYPTION_KEY.
+  (3) HIGH: HL_aiClinicalSessions never updated with dataSufficiencyScore/redFlagStatus after first message. Added UPDATE after storeMessages (both normal + emergency paths).
+  (4) MEDIUM: No message length validation. Added 5000 char limit in /clinical/message route.
+  Wrote 40 S6E tests covering: E2E(10), AU(5), OM(5), NS(3), ATYPE(3), DSS(2), FA(4), RF(3), PIPE(2), MAP(1), CPS(1)
+- Status: DONE
+
+---
+
+## S6G-T-07..T-15 — 2026-07-01
+
+- Task: Implement WhatsApp AI via Baileys — linking APIs, inbound webhook, WhatsAppSessionDO ordering, STOP/START commands, outbound queue consumer, media ingest, Telegram/Xendit forwarding, and 10 tests.
+- Worker: #1 (routes-whatsapp.ts), #2 (whatsappSessionDo.ts, /api/ai/clinical/whatsapp/event), #3 (whatsapp-outbound queue handler), #4 (webhook routes)
+- Files changed:
+  - worker/apps/src/routes-whatsapp.ts (NEW), worker/apps/src/index.ts (mount), worker/apps/migrations/006_s6g_whatsapp_otp.sql (NEW)
+  - worker/ai/src/whatsappSessionDo.ts (NEW), worker/ai/src/index.ts (endpoint + DO export), worker/ai/src/types.ts (WHATSAPP_OUTBOUND_QUEUE), worker/ai/wrangler.toml (queue producer), worker/ai/test/sprint6g.test.mjs (NEW)
+  - worker/webhook/src/index.ts (full S6G implementation), worker/webhook/tsconfig.json (no change)
+  - worker/cron/src/index.ts (whatsapp-outbound consumer), worker/cron/src/index.ts (BAILEYS_GATEWAY_URL/WA_GATEWAY_SECRET optional)
+- Tests: 10/10 S6G tests PASS (T-1→T-10); full worker/ai regression 191/191 PASS (13 D1-skip), worker/apps 338/338 PASS
+- Validation:
+  - cd worker/ai && npm test → PASS
+  - cd worker/apps && npm test → PASS
+  - cd worker/cron && npx tsc -p tsconfig.json → PASS
+  - cd worker/webhook && npx tsc -p tsconfig.json → PASS
+  - cd web && npx tsc -b → PASS
+- Notes:
+  - Added HL_whatsappLinks.otpHash + otpExpiresAt columns via migration 006.
+  - WhatsApp linking APIs: start (OTP), verify, status, delete; gated by feature.aiClinicalCopilot.whatsapp entitlement.
+  - Webhook validates X-Gateway-Secret, dedups providerMessageId, rate-limits per number, routes linked users to AI_SERVICE.
+  - WhatsAppSessionDO serializes per whatsappLinkId, handles STOP/START AI commands, runs clinical orchestrator, enqueues outbound replies.
+  - Worker #3 whatsapp-outbound consumer inserts outbound HL_whatsappMessages + audit log; optional Baileys HTTP POST.
+  - Media ingest stores base64 buffer to R2 and records mediaR2Key.
+  - Telegram + Xendit webhooks validate secrets and forward to API_SERVICE.
+  - No hardcoded secrets; all auth values read from env/secrets.
+- Status: DONE

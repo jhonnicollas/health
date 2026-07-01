@@ -31,6 +31,16 @@ index_name = "hl-health-memory"
 binding = "AI_KV"
 id = "59ba33a4d92a4e0c852c9df6c63b11e9"
 
+# Queue producer — doctor-handoff reports enqueued for Worker #3
+[[queues.producers]]
+queue = "ai-memory-jobs"
+binding = "AI_MEMORY_QUEUE"
+
+# Queue producer — WhatsApp outbound replies enqueued for Worker #3
+[[queues.producers]]
+queue = "whatsapp-outbound"
+binding = "WHATSAPP_OUTBOUND_QUEUE"
+
 # Durable Objects — 5 classes per PRD §8.12
 # Bindings declared but classes not yet implemented; added via S6E / S6G as those phases land.
 [[durable_objects.bindings]]

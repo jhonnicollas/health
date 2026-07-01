@@ -77,6 +77,32 @@ const MODE_DISCLAIMER_EN: Record<OperatingMode, string> = {
   super_aktif: '\n\nSuper Active Mode: AI may prescribe medication and dosage. Still consult with a doctor.',
 };
 
+// PRD §4.5 / AI_SAFETY_RUNTIME_SPEC §3.2 emergency template
+export function renderEmergencyTemplate(locale: 'id' | 'en'): string {
+  if (locale === 'en') {
+    return `⚠️ EMERGENCY ALERT
+
+Based on the data recorded, you have a danger sign that requires immediate medical attention. DO NOT DELAY.
+
+Call emergency services now:
+- Emergency: 119 / 112
+- Go to the nearest healthcare facility (faskes)
+- Contact your caregiver (if available)
+
+This is an AI-generated emergency guidance. Your own judgment and local emergency services are decisive.`;
+  }
+  return `⚠️ PERINGATAN DARURAT
+
+Berdasarkan data yang tercatat, Anda memiliki tanda bahaya yang memerlukan perhatian medis segera. JANGAN MENUNDA.
+
+Segera hubungi layanan darurat:
+- Layanan Darurat: 119 / 112
+- Kunjungi Fasilitas Kesehatan (faskes) terdekat
+- Hubungi caregiver Anda (jika tersedia)
+
+Ini adalah panduan darurat dari AI. Keputusan Anda dan layanan darurat setempat yang menentukan.`;
+}
+
 /**
  * Process a clinical message through the full orchestrator flow.
  * PRD S6E §5: Full flow from message to formatted response.
@@ -110,14 +136,15 @@ export async function processClinicalMessage(
 
   // PRD S6E §9.3: Emergency → emergency_template_only, NO LLM freeform
   if (hasRedFlag && redFlagSeverity === 'emergency') {
-    const emergencyText = renderSafeTemplate({
-      taskCode: 'emergency_guidance',
-      locale,
-      contextSummary: contextPackage.dataSufficiencyScore ? `score=${contextPackage.dataSufficiencyScore}` : '',
-    });
-
+    const emergencyBody = renderEmergencyTemplate(locale);
     const disclaimer = getDisclaimer(locale, operatingMode);
-    const fullReply = `${emergencyText.text}\n\n${disclaimer}`;
+    // Emergency behavior is identical across operating modes — do not inject mode-specific additions.
+    let fullReply = `${emergencyBody}\n\n${disclaimer}`;
+
+    // PRD S6F-T-08: WhatsApp short format also applies to emergency replies.
+    if (input.channel === 'whatsapp') {
+      fullReply = formatWhatsAppReply(fullReply, locale);
+    }
 
     // Store user message + emergency response
     const messageId = await storeMessages(env, {
@@ -166,6 +193,9 @@ export async function processClinicalMessage(
          WHERE id = ? AND userId = ?`
       ).bind(contextPackage.dataSufficiencyScore, input.sessionId, input.userId).run();
     } catch {}
+
+    // PRD S6F: persist emergency escalation event + audit log
+    await logEmergencyEvent(env, input.userId, input.sessionId, modelRunId);
 
     return {
       messageId,
@@ -264,18 +294,27 @@ export async function processClinicalMessage(
   let finalText = safetyResult.output;
   let answerType = mapIntentToAnswerType(intent);
 
-  // Ensure disclaimer is always present (PRD S6E §8)
-  const hasDisclaimerInText = /ai dapat melakukan kesalahan|ai can make mistakes/i.test(finalText.slice(-300));
-  if (!hasDisclaimerInText) {
-    finalText = `${finalText}\n\n${disclaimer}`;
-  }
-
   // Handle blocked responses
   if (safetyResult.finalDecision === SafetyDecision.BLOCK_AND_FALLBACK) {
     answerType = 'blocked_unsafe_request';
     finalText = `${renderBlockedTemplate(locale)}\n\n${disclaimer}`;
   } else if (safetyResult.finalDecision === SafetyDecision.EMERGENCY_TEMPLATE_ONLY) {
     answerType = 'emergency_guidance';
+    finalText = `${renderEmergencyTemplate(locale)}\n\n${disclaimer}`;
+  }
+
+  // Ensure disclaimer is always present (PRD S6E §8)
+  const hasDisclaimerInText = /ai dapat melakukan kesalahan|ai can make mistakes/i.test(finalText.slice(-300));
+  if (!hasDisclaimerInText) {
+    finalText = `${finalText}\n\n${disclaimer}`;
+  }
+
+  // PRD S6F-T-08: WhatsApp short format
+  if (input.channel === 'whatsapp') {
+    finalText = formatWhatsAppReply(finalText, locale);
+  } else if (safetyResult.finalDecision === SafetyDecision.EMERGENCY_TEMPLATE_ONLY) {
+    // Ensure emergency events are audited even when Safety Runtime produces them (non-deterministic path)
+    await logEmergencyEvent(env, input.userId, input.sessionId, modelResult.modelRunId);
   }
 
   // Map safety decision to safety level for storage
@@ -458,6 +497,92 @@ function getDisclaimer(locale: 'id' | 'en', operatingMode: OperatingMode): strin
   return base + modeAddition;
 }
 
+/**
+ * Persist emergency escalation metadata.
+ * PRD S6F-T-04: HL_safetyEvents row (severity='emergency', sourceType='ai', eventType='emergencyEscalation')
+ * and HL_auditLogs row (action='emergencyEscalation').
+ */
+async function logEmergencyEvent(
+  env: Bindings,
+  userId: number,
+  sessionId: number,
+  modelRunId?: number
+): Promise<void> {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO HL_safetyEvents
+        (userId, sourceType, sourceId, eventType, severity, title, message, metadataJson, createdAt)
+       VALUES (?, 'ai', ?, 'emergencyEscalation', 'emergency', ?, ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(
+      userId,
+      sessionId ? String(sessionId) : null,
+      'AI Emergency Escalation Triggered',
+      'Deterministic red flag precheck or safety runtime detected emergency severity.',
+      JSON.stringify({ sessionId, modelRunId: modelRunId ?? null })
+    ).run();
+  } catch (error) {
+    console.error('logEmergencyEvent: safety event insert failed', error);
+  }
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO HL_auditLogs
+        (userId, action, entityType, entityId, metadataJson, createdAt)
+       VALUES (?, 'emergencyEscalation', 'HL_aiClinicalSessions', ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(
+      userId,
+      String(sessionId),
+      JSON.stringify({ modelRunId: modelRunId ?? null })
+    ).run();
+  } catch (error) {
+    console.error('logEmergencyEvent: audit log insert failed', error);
+  }
+}
+
+/**
+ * Format a clinical reply for WhatsApp.
+ * PRD S6F-T-08: max whatsappAi.maxReplyChars (default 400), short disclaimer, numbered steps.
+ */
+export function formatWhatsAppReply(text: string, locale: 'id' | 'en'): string {
+  const maxChars = 400;
+  const shortDisclaimer = locale === 'en'
+    ? '⚕️ AI can be wrong. Decision = your responsibility.'
+    : '⚕️ AI bisa salah. Keputusan = tanggung jawab Anda.';
+
+  // Strip the long disclaimer footer; we append the short one later.
+  const bodyOnly = text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .filter((line) => {
+      const lower = line.toLowerCase();
+      return !lower.includes('ai dapat melakukan kesalahan') &&
+             !lower.includes('ai can make mistakes') &&
+             !lower.includes('tanggung jawab anda') &&
+             !lower.includes('your responsibility') &&
+             !lower.includes('tidak boleh mengandalkan') &&
+             !lower.includes('do not rely on ai');
+    })
+    .map((line) => line.replace(/^[-•*]\s*/, '').trim())
+    .filter((line) => line.length > 0);
+
+  const reserve = shortDisclaimer.length + 4;
+  const budget = maxChars - reserve;
+  let numbered = '';
+  let n = 1;
+  for (const line of bodyOnly) {
+    const prefix = `${numbered}${numbered ? '\n' : ''}${n}. `;
+    if (prefix.length + line.length > budget) break;
+    numbered = `${prefix}${line}`;
+    n++;
+  }
+
+  if (!numbered) {
+    numbered = bodyOnly.join(' ').slice(0, Math.max(0, budget));
+  }
+
+  return `${numbered}\n\n${shortDisclaimer}`;
+}
+
 function mapIntentToTaskCode(intent: string): string {
   const mapping: Record<string, string> = {
     health_summary: 'clinical_copilot',
@@ -637,7 +762,7 @@ async function storeMessages(env: Bindings, input: StoreMessagesInput): Promise<
  *
  * Falls back to obfuscated base64 if the secret is missing or crypto unavailable.
  */
-async function encryptContent(env: Bindings, text: string, userId?: number): Promise<string> {
+export async function encryptContent(env: Bindings, text: string, userId?: number): Promise<string> {
   const passphrase = (env as any).CLINICAL_MESSAGE_ENCRYPTION_KEY || '';
 
   if (!passphrase) {
