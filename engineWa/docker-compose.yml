@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  baileys-gateway:
+    build: .
+    container_name: isehat-baileys
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - WEBHOOK_URL=${WEBHOOK_URL:-https://isehat-webhooks-worker.indiehomesungairaya.workers.dev/api/whatsapp/webhook}
+      - WEBHOOK_SECRET=${WA_GATEWAY_SECRET}
+      - OUTBOUND_LISTEN_PORT=3001
+      - HEALTH_CHECK_PORT=3002
+      - QR_DISPLAY_MODE=file
+      - QR_FILE_PATH=/app/qr/latest.png
+    volumes:
+      - ./auth:/app/auth
+      - ./qr:/app/qr
+      - ./logs:/app/logs
+    ports:
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3

@@ -37,7 +37,7 @@ app.get("/health", (c) => {
     data: {
       worker: "isehat-jobs-worker",
       status: "ok",
-      cronsConfigured: 0,
+      cronsConfigured: 1,
       queueConsumers: 4,
     },
     meta: { checkedAt: new Date().toISOString() },
@@ -77,16 +77,15 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (contr
   const cron = controller.cron;
   switch (cron) {
     case "0 2 * * *":
-      ctx.waitUntil(Promise.all([expireSessions(env), cleanupUnlinkedWhatsApp(env)]));
-      break;
-    case "30 2 * * *":
-      ctx.waitUntil(nullifyEncrypted(env));
-      break;
-    case "0 3 * * *":
-      ctx.waitUntil(deleteMessages(env));
-      break;
-    case "0 4 * * 1":
-      ctx.waitUntil(Promise.all([archiveModelRuns(env), archiveSafetyFlags(env), deleteInactiveVectors(env)]));
+      ctx.waitUntil(Promise.all([
+        expireSessions(env),
+        nullifyEncrypted(env),
+        deleteMessages(env),
+        cleanupUnlinkedWhatsApp(env),
+        archiveModelRuns(env),
+        archiveSafetyFlags(env),
+        deleteInactiveVectors(env),
+      ]));
       break;
     default:
       console.warn(`scheduled: unknown cron fired: ${cron}`);

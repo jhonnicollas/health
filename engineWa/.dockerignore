@@ -1,0 +1,8 @@
+node_modules/
+dist/
+auth/
+qr/
+logs/
+.env
+.git/
+*.md

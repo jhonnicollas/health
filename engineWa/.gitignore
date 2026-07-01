@@ -1,0 +1,7 @@
+node_modules/
+dist/
+auth/
+qr/
+logs/
+.env
+*.log
