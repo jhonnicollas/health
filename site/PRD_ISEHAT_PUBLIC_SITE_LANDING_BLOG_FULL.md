@@ -86,6 +86,15 @@ Production/core app capabilities to represent on the public website:
 32. Sprint 5C AI Clinical Infrastructure and Vectorize foundation.
 33. Sprint 5D cycle tracking with privacy and contraception guardrail.
 34. Sprint 5E Telegram inline hydration quick action.
+35. Sprint 6A AI Clinical Copilot foundation: Safety Runtime v2 (13 detectors), operating mode governance, model router.
+36. Sprint 6B AI Platform: AI Gateway (9router), Vectorize hardening, KV namespace.
+37. Sprint 6C Vectorize memory pipeline: per-user namespace, 500 vector limit, upsert/query flows.
+38. Sprint 6D Context package assembly: clinical context, metric history, active medications, symptom log.
+39. Sprint 6E Web runtime: clinical chat UI, emergency card, first aid card, AI session management.
+40. Sprint 6F Emergency engine: emergency guidance (template-only, no LLM freeform), 6 data retention cron jobs.
+41. Sprint 6G WhatsApp AI: health chat via WhatsApp, OTP, emergency guidance delivery, unlinked retention 30 days.
+42. Sprint 6H Governance: 16 admin governance endpoints, AI audit logs, operating mode management, medical reviewer workflow.
+43. Sprint 6I Hardening + release gate: 65 safety tests, 100 prompt injection tests, 100 red flag tests, eval dataset, closed beta.
 ```
 
 The public site must not expose internal credentials, tokens, chat IDs, database IDs, private production identifiers, or sensitive operational details.
@@ -261,6 +270,8 @@ The site project must not import app backend code or app private env bindings.
 | `/use-cases/tekanan-darah` | Blood pressure use case | P1 |
 | `/use-cases/gula-darah` | Blood glucose use case | P1 |
 | `/use-cases/laporan-dokter` | Doctor report use case | P1 |
+| `/use-cases/ai-clinical-companion` | AI Clinical Copilot use case | P0 |
+| `/use-cases/whatsapp-kesehatan` | WhatsApp AI health use case | P0 |
 | `/about` | About iSehat | P1 |
 | `/contact` | Contact / partnership / support direction | P1 |
 | `/privacy` | Privacy policy | P0 |
@@ -435,6 +446,21 @@ Commercial / Admin:
 - Admin dashboard
 - Audit log
 - AI config governance
+
+AI Clinical Companion (Sprint 6):
+- AI Clinical Copilot (3 operating modes: standard, proactive, super aktif)
+- 13-detector Safety Runtime v2
+- Vectorize AI memory per-user (500 vectors)
+- Emergency guidance engine (template-only, no LLM freeform)
+- Operating mode governance by Super Admin
+- Medical reviewer approval for mode changes
+- Automatic medical disclaimer on every AI output
+
+WhatsApp Integration (Sprint 6):
+- AI health chat via WhatsApp
+- Emergency guidance delivery via WhatsApp
+- OTP and notifications via WhatsApp
+- Unlinked session retention 30 days
 ```
 
 ### 7.7 Device and Metric Section
@@ -532,8 +558,11 @@ Feature page must group capabilities into:
 10. Hydration Tracker
 11. Cycle Tracking dengan Privacy Guardrail
 12. PWA, Offline, Export, dan Accessibility
-13. AI Clinical Infrastructure untuk Sprint 6 Readiness
-14. Admin, Subscription, Entitlement, dan Audit
+12. PWA, Offline, Export, dan Accessibility
+13. AI Clinical Copilot dan 13-Detector Safety Runtime
+14. WhatsApp AI Kesehatan
+15. Admin, Subscription, Entitlement, dan Audit
+16. AI Governance dan Operating Mode Management
 ```
 
 ### 8.3 Feature Detail Card Requirements
@@ -645,6 +674,8 @@ Caregiver
 Laporan Dokter
 Panduan Alat Kesehatan
 AI dan Kesehatan Digital
+AI Clinical Copilot
+WhatsApp AI
 Privasi Data Kesehatan
 ```
 
@@ -765,6 +796,10 @@ AI agent must create at least these MDX placeholder articles:
 18. cara-keluarga-memantau-orang-tua-dari-jauh
 19. apa-itu-ai-vision-untuk-membaca-alat-kesehatan
 20. privasi-data-kesehatan-di-aplikasi-digital
+21. apa-itu-ai-clinical-copilot-iSehat
+22. cara-kerja-13-detector-safety-runtime-iSehat
+23. whatsapp-ai-kesehatan-iSehat
+24. emergency-guidance-di-aplikasi-kesehatan
 ```
 
 ---

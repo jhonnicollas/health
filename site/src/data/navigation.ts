@@ -3,6 +3,7 @@ export const navigation = [
   { label: "Harga", href: "/pricing" },
   { label: "Blog", href: "/blog" },
   { label: "Use Case", href: "/use-cases/keluarga" },
+  { label: "AI Companion", href: "/use-cases/ai-clinical-companion" },
   { label: "Tentang", href: "/about" },
   { label: "Kontak", href: "/contact" },
 ];

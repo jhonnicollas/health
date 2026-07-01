@@ -1,0 +1,93 @@
+---
+title: "Cara Kerja 13-Detector Safety Runtime di iSehat"
+description: "Safety Runtime v2 di iSehat menggunakan 13 detektor keamanan untuk memastikan setiap output AI aman, tidak membahayakan, dan sesuai batasan medis."
+publishedAt: "2026-07-01"
+updatedAt: "2026-07-01"
+category: "AI dan Kesehatan Digital"
+tags: ["safety runtime", "ai safety", "detektor keamanan", "medical ai"]
+author: "Tim iSehat"
+reviewedBy: ""
+reviewStatus: "editorial"
+featured: false
+draft: false
+coverImage: "/images/blog/default.webp"
+seoTitle: "13-Detector Safety Runtime: Keamanan AI Medis di iSehat"
+seoDescription: "Safety Runtime v2 menjalankan 13 detektor keamanan pada setiap output AI iSehat untuk mencegah resep ilegal, kebocoran data, dan misleading reassurance."
+references: []
+---
+
+Ketika AI digunakan dalam konteks kesehatan, keamanan bukan opsi — keamanan adalah keharusan. iSehat menggunakan Safety Runtime v2 yang menjalankan 13 detektor keamanan pada setiap output AI sebelum ditampilkan ke pengguna.
+
+## Mengapa Safety Runtime Diperlukan?
+
+AI language model bisa menghasilkan output yang:
+
+- Memberikan resep obat tanpa kewenangan
+- Menurunkan tingkat keparahan kondisi darurat
+- Memberi rasa aman palsu saat seharusnya pengguna mencari bantuan medis
+- Mengakses data pengguna lain
+- Mengabaikan rule engine deterministik
+
+Safety Runtime memastikan hal-hal ini tidak terjadi.
+
+## Alur Keamanan
+
+1. **Deterministic red flag precheck** — dijalankan SEBELUM LLM call. Jika red flag terdeteksi, gunakan template saja tanpa LLM.
+2. **AI/LLM menghasilkan output** — berdasarkan konteks dan data pengguna.
+3. **13-detector Safety Runtime** — memeriksa output AI terhadap 13 aturan keamanan.
+4. **Decision** — output disetujui, ditulis ulang, atau diblokir.
+5. **Disclaimer otomatis** — disclaimer medis ditambahkan jika belum ada.
+
+## 13 Detektor Keamanan
+
+### 1. Prescription Dosage Detector
+Memblokir resep dan instruksi dosis di mode yang tidak diizinkan. Mode standard dan proactive = blokir. Mode super aktif = izinkan dengan batasan.
+
+### 2. Emergency Severity Downgrade Detector
+Mencegah AI menurunkan severity yang sudah ditentukan oleh rule deterministik. Jika rule menilai "darurat", AI tidak boleh bilang "tidak terlalu serius".
+
+### 3. Delay Medical Care Detector
+Memblokir output yang bisa membuat pengguna menunda mencari bantuan medis saat kondisi memerlukan perhatian segera.
+
+### 4. Unsafe Reassurance Detector
+Menulis ulang output yang memberi rasa aman palsu saat red flag terdeteksi. Contoh: "Sepertinya tidak apa-apa" → ditulis ulang menjadi "Kondisi ini memerlukan pemeriksaan medis segera."
+
+### 5. Cross-User Leak Detector
+Memblokir akses data antar-pengguna. AI hanya boleh mengakses data pengguna yang sedang bertanya.
+
+### 6. Sensitive Data Leak Detector
+Melindungi data sensitif (symptom detail, cycle, pregnancy, dll.) dari akses tanpa consent.
+
+### 7. Missing Disclaimer Detector
+Memblokir output yang tidak menyertakan disclaimer medis. Setiap output medis WAJIB ada disclaimer.
+
+### 8. Medication Change Detector
+Memblokir perubahan atau penghentian obat di SEMUA mode — termasuk super aktif. Ini batasan mutlak.
+
+### 9. Vectorize as Truth Detector
+Mencegah AI menggunakan memori Vectorize sebagai bukti klinis. AI memory adalah konteks, bukan diagnosis.
+
+### 10. Rule Engine Bypass Detector
+Memblokir output yang melewati atau mengabaikan rule engine deterministik.
+
+### 11-13. Detektor Tambahan
+Tiga detektor tambahan untuk perlindungan ekstra terhadap prompt injection, output tanpa consent, dan edge cases keamanan lainnya.
+
+## Safety Decision
+
+Setiap pemeriksaan menghasilkan salah satu dari 6 keputusan:
+
+1. **ALLOW** — output aman, tampilkan
+2. **REWRITE** — konten perlu diubah, tampilkan versi aman
+3. **BLOCK** — output berbahaya, jangan tampilkan
+4. **TEMPLATE_ONLY** — gunakan template darurat saja
+5. **ESCALATE** — perlu peninjauan manusia
+6. **REQUIRE_CONSENT** — perlu persetujuan pengguna
+
+## Apa Ini Berarti untuk Anda?
+
+Setiap kali Anda berinteraksi dengan AI di iSehat, output tersebut sudah melewati 13 pemeriksaan keamanan. Ini bukan AI yang bebas — ini AI yang dijaga dengan ketat untuk keamanan Anda.
+
+---
+
+**Artikel ini hanya untuk edukasi umum dan tidak menggantikan konsultasi dengan dokter atau tenaga kesehatan profesional. Jika Anda mengalami gejala berat seperti nyeri dada, sesak napas, pingsan, kelemahan satu sisi tubuh, kebingungan berat, atau kondisi darurat lainnya, segera cari bantuan medis.**

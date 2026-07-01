@@ -1,0 +1,51 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import CTASection from "@/components/common/CTASection.astro";
+import MedicalDisclaimerBox from "@/components/common/MedicalDisclaimerBox.astro";
+import { t } from "@/i18n/translations";
+
+const locale = "id" as const;
+const alternateUrls = {
+  id: `https://isehat.biz.id${Astro.url.pathname}`,
+  en: `https://isehat.biz.id/en${Astro.url.pathname}`,
+};
+---
+
+<BaseLayout title={t(locale, "usecase.copilot.title")} description={t(locale, "usecase.copilot.subtitle")} locale={locale} alternateUrls={alternateUrls}>
+  <section class="section-padding">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6" style="color: var(--color-text);">{t(locale, "usecase.copilot.title")}</h1>
+      <p class="text-lg mb-8" style="color: var(--color-text-muted);">{t(locale, "usecase.copilot.subtitle")}</p>
+
+      <MedicalDisclaimerBox locale={locale} />
+
+      <div class="space-y-8 mt-8">
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🤖 {t(locale, "usecase.copilot.chat")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.copilot.chat.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🛡️ {t(locale, "usecase.copilot.safety")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.copilot.safety.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">⚙️ {t(locale, "usecase.copilot.modes")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.copilot.modes.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🧠 {t(locale, "usecase.copilot.memory")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.copilot.memory.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">🚨 {t(locale, "usecase.copilot.emergency")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.copilot.emergency.desc")}</p>
+        </div>
+        <div class="card">
+          <h2 class="text-xl font-bold mb-3" style="color: var(--color-text);">📋 {t(locale, "usecase.copilot.governance")}</h2>
+          <p class="text-sm" style="color: var(--color-text-muted);">{t(locale, "usecase.copilot.governance.desc")}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <CTASection locale={locale} />
+</BaseLayout>

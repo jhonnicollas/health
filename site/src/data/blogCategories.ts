@@ -16,5 +16,7 @@ export const blogCategories = [
   "Laporan Dokter",
   "Panduan Alat Kesehatan",
   "AI dan Kesehatan Digital",
+  "AI Clinical Copilot",
+  "WhatsApp AI",
   "Privasi Data Kesehatan",
 ];

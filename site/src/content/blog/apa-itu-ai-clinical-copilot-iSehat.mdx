@@ -1,0 +1,72 @@
+---
+title: "Apa Itu AI Clinical Copilot di iSehat"
+description: "AI Clinical Copilot adalah asisten AI klinis di iSehat yang membantu memahami data kesehatan dengan 3 mode operasi dan 13-detector Safety Runtime untuk keamanan."
+publishedAt: "2026-07-01"
+updatedAt: "2026-07-01"
+category: "AI dan Kesehatan Digital"
+tags: ["ai clinical copilot", "safety runtime", "ai kesehatan", "operating mode"]
+author: "Tim iSehat"
+reviewedBy: ""
+reviewStatus: "editorial"
+featured: false
+draft: false
+coverImage: "/images/blog/default.webp"
+seoTitle: "AI Clinical Copilot: Asisten AI Klinis dengan Safety Runtime | iSehat"
+seoDescription: "AI Clinical Copilot membantu memahami data kesehatan dengan 3 mode operasi dan 13-detector Safety Runtime. Bukan AI tanpa pengawasan."
+references: []
+---
+
+iSehat kini dilengkapi AI Clinical Copilot — asisten AI klinis yang membantu Anda memahami data kesehatan harian. Tidak seperti chatbot kesehatan umum, AI Clinical Copilot dilengkapi sistem keamanan berlapis yang memastikan setiap output aman dan bertanggung jawab.
+
+## Apa Itu AI Clinical Copilot?
+
+AI Clinical Copilot adalah fitur AI di iSehat yang dapat:
+
+- Menjelaskan hasil pengukuran kesehatan Anda dalam konteks yang mudah dipahami
+- Memberikan edukasi kesehatan umum berdasarkan data yang Anda catat
+- Membantu memahami tren dan pola dari catatan kesehatan harian
+- Mengirimkan panduan darurat saat kondisi merah terdeteksi
+
+## 3 Mode Operasi
+
+AI Clinical Copilot beroperasi dalam 3 mode yang dikontrol oleh Super Admin:
+
+1. **Standard** (default) — AI TIDAK memberi diagnosis final. AI hanya membantu menjelaskan dan memberi edukasi. Ini mode yang paling aman.
+2. **Proactive** — AI BOLEH memberi diagnosis final, TAPI TIDAK boleh memberi resep obat atau dosis. Cocok untuk pengguna yang ingin insight lebih dalam.
+3. **Super Aktif** — AI BOLEH diagnosis final DAN resep obat DAN instruksi dosis. Mode ini memerlukan persetujuan medical reviewer sebelum diaktifkan.
+
+**Penting:** Semua mode tidak boleh mengubah atau menghentikan obat yang sedang Anda konsumsi. Perubahan mode wajib disetujui medical reviewer dan dicatat di audit log.
+
+## 13-Detector Safety Runtime v2
+
+Setiap output AI melewati 13 detektor keamanan sebelum sampai ke Anda:
+
+- **Prescription Dosage Detector** — memblokir resep di mode yang tidak diizinkan
+- **Emergency Severity Downgrade Detector** — mencegah AI menurunkan tingkat keparahan darurat
+- **Delay Medical Care Detector** — memblokir output yang bisa menunda pencarian bantuan medis
+- **Unsafe Reassurance Detector** — menulis ulang output yang memberi rasa aman palsu pada red flag
+- **Cross-User Leak Detector** — memblokir kebocoran data antar-pengguna
+- **Sensitive Data Leak Detector** — melindungi data sensitif tanpa consent
+- **Missing Disclaimer Detector** — memastikan disclaimer medis selalu ada
+- **Medication Change Detector** — memblokir perubahan/penghentian obat (semua mode)
+- **Vectorize as Truth Detector** — mencegah AI menggunakan memori vektor sebagai bukti klinis
+- **Rule Engine Bypass Detector** — memblokir output yang melewati rule engine deterministik
+- Dan 3 detektor lainnya untuk keamanan tambahan
+
+## AI Memory (Vectorize)
+
+AI Clinical Copilot dapat mengingat konteks percakapan Anda melalui teknologi Vectorize — hingga 500 vektor per pengguna. Ini membantu AI memberikan respons yang lebih relevan dengan riwayat kesehatan Anda.
+
+**Penting:** Data memori terisolasi per pengguna. Tidak ada pengguna lain yang dapat mengakses memori AI Anda.
+
+## Emergency Guidance
+
+Saat kondisi darurat terdeteksi oleh rule deterministik, AI Clinical Copilot menggunakan **template panduan saja** — tanpa LLM freeform. Prioritas utama: cari bantuan medis segera.
+
+## Medical Disclaimer
+
+Setiap output AI Clinical Copilot selalu dilengkapi disclaimer medis otomatis. iSehat bukan pengganti dokter. Selalu konsultasikan dengan tenaga kesehatan profesional untuk keputusan medis.
+
+---
+
+**Artikel ini hanya untuk edukasi umum dan tidak menggantikan konsultasi dengan dokter atau tenaga kesehatan profesional. Jika Anda mengalami gejala berat seperti nyeri dada, sesak napas, pingsan, kelemahan satu sisi tubuh, kebingungan berat, atau kondisi darurat lainnya, segera cari bantuan medis.**

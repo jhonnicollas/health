@@ -1,0 +1,72 @@
+---
+title: "Emergency Guidance di Aplikasi Kesehatan iSehat"
+description: "Emergency guidance di iSehat menggunakan rule deterministik dan template panduan untuk kondisi darurat, bukan output AI bebas yang bisa menyesatkan."
+publishedAt: "2026-07-01"
+updatedAt: "2026-07-01"
+category: "Kesehatan Keluarga"
+tags: ["emergency guidance", "red flag", "alert darurat", "safety"]
+author: "Tim iSehat"
+reviewedBy: ""
+reviewStatus: "editorial"
+featured: false
+draft: false
+coverImage: "/images/blog/default.webp"
+seoTitle: "Emergency Guidance: Panduan Darurat Berbasis Aturan di iSehat"
+seoDescription: "Emergency guidance iSehat menggunakan template dan rule deterministik untuk kondisi darurat. Bukan AI freeform. Prioritas: cari bantuan medis segera."
+references: []
+---
+
+Saat kondisi darurat terdeteksi, respons yang cepat dan benar bisa menyelamatkan nyawa. iSehat menggunakan pendekatan berbeda dari kebanyakan chatbot kesehatan: untuk kondisi darurat, kami menggunakan template panduan, bukan AI freeform.
+
+## Apa Itu Emergency Guidance?
+
+Emergency guidance adalah sistem panduan darurat di iSehat yang diaktifkan secara otomatis ketika rule deterministik mendeteksi kondisi yang memerlukan perhatian medis segera.
+
+## Cara Kerjanya
+
+1. **Rule deterministik** — HL_metricRules (aturan terstruktur) memeriksa setiap data pengukuran
+2. **Red flag terdeteksi** — jika data masuk ke zona merah (misal: sistolik > 180, SpO2 < 90%)
+3. **Emergency flag diaktifkan** — sistem menandai kondisi sebagai darurat
+4. **Template guidance** — panduan darurat dikirim menggunakan template yang sudah ditinjau, BUKAN AI freeform
+5. **Notifikasi multi-saluran** — alert dikirim via aplikasi, Telegram, dan WhatsApp
+
+## Mengapa Template, Bukan AI?
+
+AI language model bisa menghasilkan respons yang:
+
+- Terlalu menenangkan pada kondisi yang sebenarnya serius
+- Memberikan saran yang menunda pencarian bantuan medis
+- Tidak konsisten antar respons untuk kondisi yang sama
+- Mengandung informasi yang tidak akurat untuk situasi darurat
+
+Template panduan sudah ditinjau dan konsisten. Isinya selalu: **Cari bantuan medis segera.**
+
+## Emergency Severity Downgrade Detector
+
+Sebagai lapisan keamanan tambahan, Emergency Severity Downgrade Detector memastikan AI TIDAK PERNAH menurunkan tingkat keparahan yang sudah ditentukan oleh rule deterministik. Jika rule bilang "darurat", maka darurat — AI tidak bisa bilang "tidak terlalu serius".
+
+## Saluran Pengiriman
+
+Emergency guidance dikirim melalui:
+
+- **Notifikasi di aplikasi** — alert visual dan suara
+- **Telegram** — pesan otomatis ke keluarga/caregiver yang terhubung
+- **WhatsApp** — pesan panduan darurat langsung ke HP Anda
+- **Email** — jika dikonfigurasi
+
+## Apa yang Harus Anda Lakukan?
+
+Jika Anda menerima emergency alert dari iSehat:
+
+1. **Jangan panik** — baca pesan panduan dengan seksama
+2. **Cari bantuan medis segera** — pergi ke IGD/rumah sakit terdekat atau hubungi nomor darurat
+3. **Jangan menunggu** — jangan menunda untuk "memastikan lagi" atau "melihat apakah membaik"
+4. **Bawa catatan kesehatan** — jika memungkinkan, bawa laporan iSehat untuk membantu dokter
+
+## Ingat
+
+iSehat bukan alat diagnosis dan bukan pengganti dokter. Emergency guidance adalah panduan, bukan diagnosis. Prioritas utama Anda selalu: **cari bantuan medis profesional segera.**
+
+---
+
+**Artikel ini hanya untuk edukasi umum dan tidak menggantikan konsultasi dengan dokter atau tenaga kesehatan profesional. Jika Anda mengalami gejala berat seperti nyeri dada, sesak napas, pingsan, kelemahan satu sisi tubuh, kebingungan berat, atau kondisi darurat lainnya, segera cari bantuan medis.**

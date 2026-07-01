@@ -41,21 +41,16 @@ max_batch_timeout = 30
 
 # Cron triggers — 6 retention jobs per PRD §15.4.
 # Schedule format: minute hour day-of-month month day-of-week (UTC).
-#   02:00 daily  — expire AI clinical sessions > 365 days
+#   02:00 daily  — expire sessions + cleanup unlinked WA messages
 #   02:30 daily  — nullify contentEncrypted > 90 days
 #   03:00 daily  — hard-delete AI clinical messages > 180 days
-#   04:00 weekly — archive model runs > 365 days (+ delete from D1)
-#   04:30 weekly — delete Vectorize vectors for users inactive > 365 days
-#   05:00 1st    — archive safety flags > 730 days (+ delete from D1)
+#   04:00 weekly (Mon) — archive model runs + safety flags + delete inactive vectors
 [triggers]
-crons = [
-  "0 2 * * *",
-  "30 2 * * *",
-  "0 3 * * *",
-  "0 4 * * 0",
-  "30 4 * * 0",
-  "0 5 1 * *"
-]
+# Schedule format: minute hour day-of-month month day-of-week (UTC).
+# NOTE: Account cron limit 5/5 reached. 0 cron slots available.
+# To enable: upgrade plan or free cron slots from other workers.
+[triggers]
+crons = []
 
 [vars]
 # CRON_SECRET used by Worker #4 GET /api/whatsapp/health probe and by any

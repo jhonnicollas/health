@@ -34,6 +34,22 @@ const faqData: Record<Locale, { question: string; answer: string }[]> = {
       question: "Berapa harga iSehat?",
       answer: "iSehat memiliki paket Gratis, Premium bulanan, Premium 3 bulan, Premium tahunan, dan Family Premium. Harga detail akan diumumkan. Daftar gratis untuk mulai mencatat.",
     },
+    {
+      question: "Apa itu AI Clinical Copilot di iSehat?",
+      answer: "AI Clinical Copilot adalah asisten AI klinis yang membantu Anda memahami data kesehatan. Tersedia dalam 3 mode: standard (AI tidak memberi diagnosis), proactive (AI boleh memberi diagnosis, bukan resep), dan super aktif (AI boleh diagnosis dan resep). Mode diatur oleh Super Admin dan memerlukan persetujuan medical reviewer. Setiap output AI melewati 13-detector Safety Runtime dan selalu dilengkapi disclaimer medis.",
+    },
+    {
+      question: "Apakah AI di iSehat bisa mendiagnosis di semua mode?",
+      answer: "Tidak. Dalam mode standard (default), AI tidak memberikan diagnosis final. Hanya dalam mode proactive dan super aktif, AI boleh memberikan diagnosis dengan batasan ketat. Mode proactive tidak boleh memberi resep atau dosis. Mode super aktif boleh memberi resep dan dosis. Semua mode tidak boleh mengubah/menghentikan obat pengguna. Perubahan mode harus disetujui medical reviewer.",
+    },
+    {
+      question: "Apa itu WhatsApp AI di iSehat?",
+      answer: "WhatsApp AI memungkinkan Anda berinteraksi dengan AI Clinical Copilot iSehat melalui WhatsApp. Anda bisa bertanya tentang data kesehatan, mendapatkan edukasi, dan menerima emergency guidance. WhatsApp AI tunduk pada aturan Safety Runtime yang sama dan selalu menyertakan disclaimer medis.",
+    },
+    {
+      question: "Bagaimana iSehat menjaga keamanan output AI?",
+      answer: "Setiap output AI di iSehat melewati 13-detector Safety Runtime v2 yang meliputi deteksi dosis resep, penurunan severity darurat, reassurance tidak aman, kebocoran data antar-pengguna, dan lainnya. Red flag deterministik dijalankan sebelum LLM call. Emergency condition menggunakan template saja, tanpa LLM freeform.",
+    },
   ],
   en: [
     {
@@ -67,6 +83,22 @@ const faqData: Record<Locale, { question: string; answer: string }[]> = {
     {
       question: "How much does iSehat cost?",
       answer: "iSehat has Free, Premium Monthly, Premium 3-Month, Premium Yearly, and Family Premium plans. Detailed pricing will be announced. Sign up for free to start recording.",
+    },
+    {
+      question: "What is the AI Clinical Copilot in iSehat?",
+      answer: "AI Clinical Copilot is a clinical AI assistant that helps you understand your health data. Available in 3 modes: standard (AI cannot diagnose), proactive (AI may diagnose, no prescriptions), and super aktif (AI may diagnose and prescribe). Modes are managed by Super Admin and require medical reviewer approval. Every AI output goes through a 13-detector Safety Runtime and always includes a medical disclaimer.",
+    },
+    {
+      question: "Can AI in iSehat diagnose in all modes?",
+      answer: "No. In standard mode (default), AI cannot give final diagnoses. Only in proactive and super aktif modes can AI provide diagnoses with strict limits. Proactive mode cannot prescribe or give dosages. Super aktif mode can prescribe and give dosages. All modes cannot change or stop user medications. Mode changes require medical reviewer approval.",
+    },
+    {
+      question: "What is WhatsApp AI in iSehat?",
+      answer: "WhatsApp AI lets you interact with iSehat's AI Clinical Copilot via WhatsApp. You can ask about health data, get education, and receive emergency guidance. WhatsApp AI follows the same Safety Runtime rules and always includes a medical disclaimer.",
+    },
+    {
+      question: "How does iSehat ensure AI output safety?",
+      answer: "Every AI output in iSehat goes through a 13-detector Safety Runtime v2 covering prescription dosage detection, emergency severity downgrade prevention, unsafe reassurance detection, cross-user data leak prevention, and more. Deterministic red flag checks run before any LLM call. Emergency conditions use templates only, no LLM freeform.",
     },
   ],
 };

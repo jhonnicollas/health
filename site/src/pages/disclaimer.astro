@@ -27,16 +27,29 @@ const alternateUrls = {
           <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> User memverifikasi data sebelum disimpan</li>
           <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> Membuat laporan untuk dibawa ke dokter</li>
           <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> Edukasi kesehatan umum</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> AI Clinical Copilot membantu memahami data kesehatan dengan 13-detector Safety Runtime</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-success);">✓</span> WhatsApp AI untuk edukasi dan emergency guidance</li>
         </ul>
+
+        <h2 class="text-2xl font-bold" style="color: var(--color-text);">Mode AI dan Batasannya</h2>
+        <p>iSehat AI Clinical Copilot beroperasi dalam 3 mode yang dikontrol oleh Super Admin:</p>
+        <ul class="space-y-2 list-none">
+          <li class="flex items-start gap-2"><span style="color: var(--color-info);">●</span> <strong>Standard</strong> (default): AI TIDAK memberi diagnosis final, TIDAK resep, TIDAK dosis. AI hanya membantu menjelaskan.</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-warning);">●</span> <strong>Proactive</strong>: AI BOLEH memberi diagnosis final, TAPI TIDAK resep obat, TIDAK dosis. Perubahan mode memerlukan persetujuan medical reviewer.</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">●</span> <strong>Super Aktif</strong>: AI BOLEH diagnosis final DAN resep obat DAN dosis. Perubahan mode memerlukan persetujuan medical reviewer.</li>
+        </ul>
+        <p class="text-sm" style="color: var(--color-text-muted);"><strong>Semua mode:</strong> AI TIDAK BOLEH mengubah/menghentikan obat pengguna. Setiap output AI melewati 13-detector Safety Runtime v2 dan selalu dilengkapi disclaimer medis otomatis.</p>
 
         <h2 class="text-2xl font-bold" style="color: var(--color-text);">Apa yang iSehat TIDAK Lakukan</h2>
         <ul class="space-y-2 list-none">
-          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Mendiagnosis penyakit</li>
-          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Memberikan resep obat</li>
-          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Mengatur dosis obat</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Mendiagnosis penyakit (mode standard)</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Memberikan resep obat (mode standard dan proactive)</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Mengatur dosis obat (mode standard dan proactive)</li>
           <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Menggantikan dokter</li>
-          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Menentukan kondisi darurat</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Menentukan kondisi darurat tanpa rule deterministik</li>
           <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Menjamin kesembuhan</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Mengubah/menghentikan obat pengguna (semua mode)</li>
+          <li class="flex items-start gap-2"><span style="color: var(--color-danger);">✗</span> Menggunakan AI tanpa pengawasan Safety Runtime</li>
         </ul>
       </div>
     </div>
