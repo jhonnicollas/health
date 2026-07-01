@@ -1,4 +1,4 @@
-const WORKER_URL = 'https://hl-health-companion.indiehomesungairaya.workers.dev'
+const WORKER_URL = 'https://isehat-api.indiehomesungairaya.workers.dev'
 
 export async function onRequest(context) {
   const { request } = context
