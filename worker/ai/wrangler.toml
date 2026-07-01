@@ -20,11 +20,10 @@ binding = "VECTORIZE_INDEX"
 index_name = "hl-health-memory"
 
 # AI Search — open beta, free within platform limits (PRD §8.10)
-# BLOCKED until AI Search instance is provisioned in Cloudflare dashboard.
-# Set instance_id after creating the index; uncomment and deploy.
-# [[ai_search]]
-# binding = "AI_SEARCH"
-# instance_id = "<ai-search-instance-id>"
+# AI Search — knowledge base for education, first aid, FAQ (PRD §8.10)
+[[ai_search]]
+binding = "AI_SEARCH"
+instance_name = "isehatapp"
 
 # KV cache — prompt / routing / config / education / search / disclaimer (PRD §8.11)
 [[kv_namespaces]]
