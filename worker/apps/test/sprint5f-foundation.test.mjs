@@ -113,13 +113,14 @@ test('toSafeAuditMetadataJson handles raw JSON string', () => {
   assert.equal(parsed.safe, 'ok')
 })
 
-test('Source scan: no plaintext API keys/tokens in worker or web source', () => {
-  const root = '/home/ubuntu/repositoryGIT/health'
+test('Source scan: no plaintext API keys/tokens in worker or web source', () => {  // Ponytail-friendliness: resolve from CWD so tests run from any worktree.
+  const root = process.env.PROJECT_ROOT ?? `${process.cwd()}/../..`
   const files = [
-    ...globSync('worker/src/**/*.ts', { cwd: root }),
+    ...globSync('worker/apps/src/**/*.ts', { cwd: root }),
+    ...globSync('worker/ai/src/**/*.ts', { cwd: root }),
     ...globSync('web/src/**/*.ts', { cwd: root }),
     ...globSync('web/src/**/*.tsx', { cwd: root })
-  ]
+  ] 
   const riskyPatterns = [
     /(?:AI_TEXT_API_KEY|TELEGRAM_BOT_TOKEN|GOOGLE_OAUTH_CLIENT_SECRET|BILLING_WEBHOOK_SECRET)\s*[:=]\s*['"][A-Za-z0-9_\-]{16,}['"]/,
     /['"]\d{16,}['"]/,

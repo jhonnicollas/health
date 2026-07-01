@@ -10,7 +10,8 @@ import { AuditService, sanitizeAuditMetadata } from '../dist/services/audit.js'
 import { RbacService } from '../dist/services/rbac.js'
 import { HydrationService } from '../dist/services/hydration.js'
 
-const ROOT = '/home/ubuntu/repositoryGIT/health'
+// Ponytail-friendliness: resolve from CWD so tests run from any worktree.
+const ROOT = process.env.PROJECT_ROOT ?? `${process.cwd()}/../..`
 
 test('§12.1 Secret leakage: no real secret in built worker output', () => {
   const files = globSync('worker/dist/**/*.js', { cwd: ROOT })

@@ -7,11 +7,23 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-e2e/
+# E2E test scaffolding (regression suite + Sprint 6 specs) is CHECKED IN.
+# Per docs_sprint6/E2E_PLAYWRIGHT_SCENARIOS_SPRINT1_6.md + AGENTS.md §4 TDD rule,
+# every Sprint task must ship a Playwright spec — they are source-of-truth test code
+# under web/e2e/{smoke,support}/ and web/e2e/run-smoke.sh.
+# Generated run-time artifacts (playwright-report/, test-results/, *.trace, *.tmp
+# under web/e2e/) are excluded via the root .gitignore + the explicit patterns below.
+
 node_modules/
 dist/
 dist-ssr/
 *.local
+
+# Exclude generated artifacts INSIDE the committed e2e/ tree (per CI runs).
+**/e2e/playwright-report
+**/e2e/test-results
+**/e2e/**/*.tmp
+**/e2e/**/*.trace
 
 # Editor directories and files
 .vscode/*

@@ -11,6 +11,10 @@ SPECS=(
   sprint5d-cycle.spec.ts
   sprint5e-telegram.spec.ts
   regression-sprint1-4.spec.ts
+  sprint6-ai-clinical.spec.ts
+  sprint6-whatsapp-linking.spec.ts
+  sprint6-webhook.spec.ts
+  sprint6-cross-worker.spec.ts
 )
 
 PASSED=()

@@ -21,6 +21,14 @@ stress/
 .env
 .env.*
 
+# Cryptographic keys / certificates / private SSH keys NEVER go in the repo
+# (per AGENTS.md §0 + MEDICAL-domain data classification).
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
 # Section B: Build/test/stress artifact patterns (no leading / = any depth; Sprint 6 add for lean agent context).
 
 # TypeScript incremental build cache (regenerated on tsc).
