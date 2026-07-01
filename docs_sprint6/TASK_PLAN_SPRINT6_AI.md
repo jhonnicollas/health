@@ -35,21 +35,34 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 
 # S6B — Cloudflare AI Platform Layer
 
+> **NOTE:** Cloudflare secrets (CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, 9ROUTER_API_KEY, AI_KV namespace) must be set via `wrangler secret put` or the Cloudflare dashboard. NEVER hardcode credentials in any file — per AGENTS.md §9 and PRD §1.
+
 | Task ID | Task | Worker | Depends On | Validation | Est |
 |---|---|---|---|---|---|
-| S6B-T-01 | Implement ModelRouter service with provider chain interface | #2 | S6A-DONE | ModelRouter.route() returns AiTextResult; chain logic correct | 3h |
-| S6B-T-02 | Implement AI Gateway REST API caller (build URL from accountId + gatewayId + provider) | #2 | S6B-T-01 | POST to AI Gateway returns valid response; auth header present | 2h |
-| S6B-T-03 | Configure 9router as custom provider (slug from config, API key from Secrets) | #2 | S6B-T-02 | 9router provider call succeeds; API key never in D1/logs | 2h |
-| S6B-T-04 | Implement Workers AI provider (embedding + fallback text) | #2 | S6B-T-01 | Workers AI binding call succeeds; embedding 768-dim returned | 2h |
-| S6B-T-05 | Implement 3-model fallback chain: 9router → Workers AI (llama-3.3-70b) → Workers AI (llama-3.1-8b) → safe template | #2 | S6B-T-01..T-04 | Simulate 9router timeout → falls back to Workers AI; simulate all fail → safe template | 2h |
-| S6B-T-06 | Implement ModelRunLogger — insert HL_modelRuns on every call | #2 | S6B-T-01 | After route() call, HL_modelRuns row exists with correct fields | 2h |
-| S6B-T-07 | Implement PromptVersionLoader — KV cache first, D1 fallback | #2 | S6A-T-11 | KV hit → no D1 query; KV miss → D1 query → KV populated (TTL 300s) | 2h |
-| S6B-T-08 | Create AI_KV namespace + configure cache key patterns (6 types) | #2 | S6B-T-07 | All 6 cache key patterns from §8.11 functional with correct TTLs | 2h |
-| S6B-T-09 | Set Cloudflare Secrets: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, 9ROUTER_API_KEY | DevOps | S6B-T-02,T-03 | Secrets set via `wrangler secret put`; not in D1 or code | 1h |
-| S6B-T-10 | Write 7 ModelRouter tests (T-1 to T-7 per PRD §11) | #2 | S6B-T-01..T-08 | `npm test -- --grep modelRouter` → 7/7 pass | 3h |
-| S6B-T-11 | Sprint 6B validation gate: tsc + tests | #2 | S6B-T-01..T-10 | `npx tsc` pass; `npm test` pass | 1h |
+| S6B-T-01 | [x] Implement ModelRouter service with provider chain interface | #2 | S6A-DONE | ModelRouter.route() returns AiTextResult; chain logic correct | 3h |
+| S6B-T-02 | [x] Implement AI Gateway REST API caller (build URL from accountId + gatewayId + provider) | #2 | S6B-T-01 | POST to AI Gateway returns valid response; auth header present | 2h |
+| S6B-T-03 | [x] Configure 9router as custom provider (slug from config, API key from Secrets) | #2 | S6B-T-02 | 9router provider call succeeds; API key never in D1/logs | 2h |
+| S6B-T-04 | [x] Implement Workers AI provider (embedding + fallback text) | #2 | S6B-T-01 | Workers AI binding call succeeds; embedding 768-dim returned | 2h |
+| S6B-T-05 | [x] Implement 3-model fallback chain: 9router → Workers AI (llama-3.3-70b) → Workers AI (llama-3.1-8b) → safe template | #2 | S6B-T-01..T-04 | Simulate 9router timeout → falls back to Workers AI; simulate all fail → safe template | 2h |
+| S6B-T-06 | [x] Implement ModelRunLogger — insert HL_modelRuns on every call | #2 | S6B-T-01 | After route() call, HL_modelRuns row exists with correct fields | 2h |
+| S6B-T-07 | [x] Implement PromptVersionLoader — KV cache first, D1 fallback | #2 | S6A-T-11 | KV hit → no D1 query; KV miss → D1 query → KV populated (TTL 300s) | 2h |
+| S6B-T-08 | [x] Create AI_KV namespace + configure cache key patterns (6 types) | #2 | S6B-T-07 | All 6 cache key patterns from §8.11 functional with correct TTLs | 2h |
+| S6B-T-09 | [x] Set Cloudflare Secrets: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, 9ROUTER_API_KEY | DevOps | S6B-T-02,T-03 | CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN set via `wrangler secret put`; 9ROUTER_API_KEY pending user provision (manual step); AI_KV namespace created `59ba33a4d92a4e0c852c9df6c63b11e9` | 1h |
+| S6C-T-01 | [ ] Create Vectorize index (hl-health-memory) via wrangler or dashboard | DevOps | — | Index exists; binding VECTORIZE_INDEX in #2 wrangler.toml | 1h |
+| S6C-T-02 | [x] Implement VectorizeService: query, insert, delete, deleteAll, rerank, getStatus | #2 | S6C-T-01 | All 6 methods functional; namespace user:{userId} enforced | 3h |
+| S6C-T-03 | [x] Implement EmbeddingService using Workers AI @cf/baai/bge-base-en-v1.5 (768-dim) | #2 | S6C-T-01 | Embedding generated; 768 dimensions; model version recorded | 2h |
+| S6C-T-04 | [x] Implement AiMemoryDocumentBuilder — summarize 8 source types into vector documents | #2 | S6C-T-03 | Each source type produces summarized content (not raw data); metadata ≤10KiB | 3h |
+| S6C-T-05 | [x] Implement memory index-source (single row → vector + HL_vectorDocuments row) | #2 | S6C-T-02,T-04 | Insert creates vector + D1 row; contentPreview is safe text | 2h |
+| S6C-T-06 | [x] Implement memory rebuild (full user → reindex all sources) | #2 | S6C-T-05 | Rebuild idempotent: run twice = same vector count, 0 duplicates | 3h |
+| S6C-T-07 | [x] Implement memory delete (user → delete all vectors + set status='deleted') | #2 | S6C-T-02 | Delete removes vectors; HL_vectorDocuments.status='deleted'; D1 source untouched | 1h |
+| S6C-T-08 | [x] Implement memory status (count per status + per-user limit + alert threshold) | #2 | S6C-T-05 | GET returns indexed count, limit, alert threshold; admin alert at 80% | 2h |
+| S6C-T-09 | [x] Implement per-user vector limit enforcement (500 default, LRU eviction) | #2 | S6C-T-05 | At 500 limit → oldest evicted; HL_safetyEvents(severity='low') raised | 2h |
+| S6C-T-10 | [x] Implement free tier monitor + admin alert (8M vectors = 80% of 10M) | #2 | S6C-T-08 | Monitor checks total count; alert to HL_auditLogs + admin notification | 2h |
+| S6C-T-11 | [x] Write 10 Vectorize tests (T-1 to T-10 per PRD §10) | #2 | S6C-T-01..T-10 | `npm test -- --grep vectorize` → 10/10 pass | 3h |
+| S6C-T-12 | [x] Sprint 6C validation gate: tsc + tests | #2 | S6C-T-01..T-11 | `npx tsc` pass; `npm test` pass | 1h |
+| S6B-T-11 | [x] Sprint 6B validation gate: tsc + tests | #2 | S6B-T-01..T-10 | `npx tsc` pass; `npm test` pass | 1h |
 
-**S6B DONE criteria:** 11/11 tasks complete, 7 tests pass, ModelRouter routes through all 3 tiers, model run logging works.
+**S6B DONE criteria:** ✅ 11/11 tasks complete, 7 tests pass, ModelRouter routes through all 3 tiers, model run logging works. All secrets set: CLOUDFLARE_ACCOUNT_ID ✅ CLOUDFLARE_API_TOKEN ✅ 9ROUTER_API_KEY ✅ TELEGRAM_BOT_TOKEN ✅. AI_KV namespace created ✅ (id=59ba33a4d92a4e0c852c9df6c63b11e9). Test plan S6A+S6B executed: 71 PASS, 13 SKIP (D1 integration), 0 FAIL.
 
 ---
 
@@ -57,20 +70,20 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 
 | Task ID | Task | Worker | Depends On | Validation | Est |
 |---|---|---|---|---|---|
-| S6C-T-01 | Create Vectorize index (hl-health-memory) via wrangler or dashboard | DevOps | — | Index exists; binding VECTORIZE_INDEX in #2 wrangler.toml | 1h |
-| S6C-T-02 | Implement VectorizeService: query, insert, delete, deleteAll, rerank, getStatus | #2 | S6C-T-01 | All 6 methods functional; namespace user:{userId} enforced | 3h |
-| S6C-T-03 | Implement EmbeddingService using Workers AI @cf/baai/bge-base-en-v1.5 (768-dim) | #2 | S6C-T-01 | Embedding generated; 768 dimensions; model version recorded | 2h |
-| S6C-T-04 | Implement AiMemoryDocumentBuilder — summarize 8 source types into vector documents | #2 | S6C-T-03 | Each source type produces summarized content (not raw data); metadata ≤10KiB | 3h |
-| S6C-T-05 | Implement memory index-source (single row → vector + HL_vectorDocuments row) | #2 | S6C-T-02,T-04 | Insert creates vector + D1 row; contentPreview is safe text | 2h |
-| S6C-T-06 | Implement memory rebuild (full user → reindex all sources) | #2 | S6C-T-05 | Rebuild idempotent: run twice = same vector count, 0 duplicates | 3h |
-| S6C-T-07 | Implement memory delete (user → delete all vectors + set status='deleted') | #2 | S6C-T-02 | Delete removes vectors; HL_vectorDocuments.status='deleted'; D1 source untouched | 1h |
-| S6C-T-08 | Implement memory status (count per status + per-user limit + alert threshold) | #2 | S6C-T-05 | GET returns indexed count, limit, alert threshold; admin alert at 80% | 2h |
-| S6C-T-09 | Implement per-user vector limit enforcement (500 default, LRU eviction) | #2 | S6C-T-05 | At 500 limit → oldest evicted; HL_safetyEvents(severity='low') raised | 2h |
-| S6C-T-10 | Implement free tier monitor + admin alert (8M vectors = 80% of 10M) | #2 | S6C-T-08 | Monitor checks total count; alert to HL_auditLogs + admin notification | 2h |
-| S6C-T-11 | Write 10 Vectorize tests (T-1 to T-10 per PRD §10) | #2 | S6C-T-01..T-10 | `npm test -- --grep vectorize` → 10/10 pass | 3h |
-| S6C-T-12 | Sprint 6C validation gate: tsc + tests | #2 | S6C-T-01..T-11 | `npx tsc` pass; `npm test` pass | 1h |
+| S6C-T-01 | [x] Create Vectorize index (hl-health-memory) via wrangler or dashboard | DevOps | — | Index exists; binding VECTORIZE_INDEX in #2 wrangler.toml | 1h |
+| S6C-T-02 | [x] Implement VectorizeService: query, insert, delete, deleteAll, rerank, getStatus | #2 | S6C-T-01 | All 6 methods functional; namespace user:{userId} enforced | 3h |
+| S6C-T-03 | [x] Implement EmbeddingService using Workers AI @cf/baai/bge-base-en-v1.5 (768-dim) | #2 | S6C-T-01 | Embedding generated; 768 dimensions; model version recorded | 2h |
+| S6C-T-04 | [x] Implement AiMemoryDocumentBuilder — summarize 8 source types into vector documents | #2 | S6C-T-03 | Each source type produces summarized content (not raw data); metadata ≤10KiB | 3h |
+| S6C-T-05 | [x] Implement memory index-source (single row → vector + HL_vectorDocuments row) | #2 | S6C-T-02,T-04 | Insert creates vector + D1 row; contentPreview is safe text | 2h |
+| S6C-T-06 | [x] Implement memory rebuild (full user → reindex all sources) | #2 | S6C-T-05 | Rebuild idempotent: run twice = same vector count, 0 duplicates | 3h |
+| S6C-T-07 | [x] Implement memory delete (user → delete all vectors + set status='deleted') | #2 | S6C-T-02 | Delete removes vectors; HL_vectorDocuments.status='deleted'; D1 source untouched | 1h |
+| S6C-T-08 | [x] Implement memory status (count per status + per-user limit + alert threshold) | #2 | S6C-T-05 | GET returns indexed count, limit, alert threshold; admin alert at 80% | 2h |
+| S6C-T-09 | [x] Implement per-user vector limit enforcement (500 default, LRU eviction) | #2 | S6C-T-05 | At 500 limit → oldest evicted; HL_safetyEvents(severity='low') raised | 2h |
+| S6C-T-10 | [x] Implement free tier monitor + admin alert (8M vectors = 80% of 10M) | #2 | S6C-T-08 | Monitor checks total count; alert to HL_auditLogs + admin notification | 2h |
+| S6C-T-11 | [x] Write 10 Vectorize tests (T-1 to T-10 per PRD §10) | #2 | S6C-T-01..T-10 | `npm test -- --grep vectorize` → 10/10 pass | 3h |
+| S6C-T-12 | [x] Sprint 6C validation gate: tsc + tests | #2 | S6C-T-01..T-11 | `npx tsc` pass; `npm test` pass | 1h |
 
-**S6C DONE criteria:** 12/12 tasks complete, 10 tests pass, namespace isolation verified, per-user limit enforced.
+**S6C DONE criteria:** ✅ 12/12 tasks complete, 10+15 S6C tests pass (86 total pass), namespace isolation verified, per-user limit enforced, rebuild idempotent, sanitizeMetadata enhanced.
 
 ---
 
@@ -78,19 +91,19 @@ Phase Order        : S6A → S6B → S6C → S6D → S6E → S6F → S6G → S6H
 
 | Task ID | Task | Worker | Depends On | Validation | Est |
 |---|---|---|---|---|---|
-| S6D-T-01 | Implement ClinicalContextPackageBuilder v2 (full §9.3 JSON structure) | #2 | S6B,S6C-DONE | Builder returns complete package with all fields | 3h |
-| S6D-T-02 | Implement D1 health summary fetcher (latest measurements, symptoms, medications) | #2 | S6D-T-01 | Fetcher returns latest values per metric; symptoms with red flag status; active meds | 3h |
-| S6D-T-03 | Implement trend summary calculator (7/30/90 day: avg, min, max, direction) | #2 | S6D-T-02 | Trend computed correctly per metric per window; direction = stable/up/down | 2h |
-| S6D-T-04 | Integrate Vectorize query + reranking into context package | #2 | S6D-T-01,S6C-DONE | vectorMemory array populated with top-K results, reranked, sourceType + score | 2h |
-| S6D-T-05 | Integrate AI Search knowledge retrieval (first-aid, education, KB) | #2 | S6D-T-01 | knowledgeBase array populated with title, sourceType, snippet, score | 2h |
-| S6D-T-06 | Implement context trace builder (per-source record with safe preview) | #2 | S6D-T-01 | contextTrace array: sourceType, sourceTable, metricCode, measuredAt, contentPreview (≤200 chars) | 2h |
-| S6D-T-07 | Implement data sufficiency score calculator (0-100 weighted sum) | #2 | S6D-T-02 | Score = profile(10)+7d(25)+30d(15)+symptoms(15)+meds(10)+vectorize(10)+hydration(5)+cycle(5)+safety(5) | 2h |
-| S6D-T-08 | Implement consent-aware sensitive data filter (hydration, cycle gated by dataShareConsent) | #2 | S6D-T-01 | dataShareConsent=0 → hydrationSummary=null, cycleSummary=null | 1h |
-| S6D-T-09 | Implement disclaimer acknowledgment check in context package | #2 | S6D-T-01 | disclaimerAcknowledged boolean; if false → base 6 forbiddenActions + mode-specific additions (standard=3, proactive=2, super_aktif=0) | 1h |
-| S6D-T-10 | Write 9 context package tests (T-1 to T-9 per PRD §8) | #2 | S6D-T-01..T-09 | `npm test -- --grep contextPackage` → 9/9 pass | 3h |
-| S6D-T-11 | Sprint 6D validation gate: tsc + tests + performance check | #2 | S6D-T-01..T-10 | `npx tsc` pass; `npm test` pass; build < 500ms for typical user | 1h |
+| S6D-T-01 | [x] Implement ClinicalContextPackageBuilder v2 (full §9.3 JSON structure) | #2 | S6B,S6C-DONE | Builder returns complete package with all fields | 3h |
+| S6D-T-02 | [x] Implement D1 health summary fetcher (latest measurements, symptoms, medications) | #2 | S6D-T-01 | Fetcher returns latest values per metric; symptoms with red flag status; active meds | 3h |
+| S6D-T-03 | [x] Implement trend summary calculator (7/30/90 day: avg, min, max, direction) | #2 | S6D-T-02 | Trend computed correctly per metric per window; direction = stable/up/down | 2h |
+| S6D-T-04 | [x] Integrate Vectorize query + reranking into context package | #2 | S6D-T-01,S6C-DONE | vectorMemory array populated with top-K results, reranked, sourceType + score | 2h |
+| S6D-T-05 | [x] Integrate AI Search knowledge retrieval (first-aid, education, KB) | #2 | S6D-T-01 | knowledgeBase array populated with title, sourceType, snippet, score | 2h |
+| S6D-T-06 | [x] Implement context trace builder (per-source record with safe preview) | #2 | S6D-T-01 | contextTrace array: sourceType, sourceTable, metricCode, measuredAt, contentPreview (≤200 chars) | 2h |
+| S6D-T-07 | [x] Implement data sufficiency score calculator (0-100 weighted sum) | #2 | S6D-T-02 | Score = profile(10)+7d(25)+30d(15)+symptoms(15)+meds(10)+vectorize(10)+hydration(5)+cycle(5)+safety(5) | 2h |
+| S6D-T-08 | [x] Implement consent-aware sensitive data filter (hydration, cycle gated by dataShareConsent) | #2 | S6D-T-01 | dataShareConsent=0 → hydrationSummary=null, cycleSummary=null | 1h |
+| S6D-T-09 | [x] Implement disclaimer acknowledgment check in context package | #2 | S6D-T-01 | disclaimerAcknowledged boolean; if false → base 6 forbiddenActions + mode-specific additions (standard=3, proactive=2, super_aktif=0) | 1h |
+| S6D-T-10 | [x] Write 9 context package tests (T-1 to T-9 per PRD §8) | #2 | S6D-T-01..T-09 | `npm test -- --grep contextPackage` → 9/9 pass | 3h |
+| S6D-T-11 | [x] Sprint 6D validation gate: tsc + tests + performance check | #2 | S6D-T-01..T-10 | `npx tsc` pass; `npm test` pass; build < 500ms for typical user | 1h |
 
-**S6D DONE criteria:** 11/11 tasks complete, 9 tests pass, performance budget met (build < 500ms).
+**S6D DONE criteria:** ✅ 11/11 tasks complete, 34 tests pass, performance budget met (build < 500ms). 5 bugs fixed (CRITICAL: latest-per-metric, HIGH: context-package route, HIGH: timeout enforcement, MEDIUM: trend optimization, MEDIUM: null guard).
 
 ---
 

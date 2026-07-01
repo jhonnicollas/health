@@ -1,7 +1,12 @@
 export const HL_TABLES = [
+  'HL_aiClinicalIntakeAnswers',
+  'HL_aiClinicalMessages',
+  'HL_aiClinicalSessions',
   'HL_aiContextQueries',
   'HL_aiExtractions',
+  'HL_aiKnowledgeDocuments',
   'HL_aiMemoryJobs',
+  'HL_aiOutputSafetyFlags',
   'HL_aiRecommendationContexts',
   'HL_aiRecommendations',
   'HL_alerts',
@@ -23,6 +28,7 @@ export const HL_TABLES = [
   'HL_familyPermissions',
   'HL_fastingSessions',
   'HL_featureFlags',
+  'HL_firstAidProtocols',
   'HL_hydrationSettings',
   'HL_hydrationTargets',
   'HL_knowledgeArticles',
@@ -36,6 +42,7 @@ export const HL_TABLES = [
   'HL_medications',
   'HL_metricCatalog',
   'HL_metricRules',
+  'HL_modelRuns',
   'HL_notificationSettings',
   'HL_notifications',
   'HL_oauthAccounts',
@@ -45,6 +52,7 @@ export const HL_TABLES = [
   'HL_permissions',
   'HL_planFeatures',
   'HL_plans',
+  'HL_promptVersions',
   'HL_pushSubscriptions',
   'HL_reminderSettings',
   'HL_reportShares',
@@ -68,7 +76,9 @@ export const HL_TABLES = [
   'HL_userRoles',
   'HL_users',
   'HL_vectorDocuments',
-  'HL_waterIntakeLogs'
+  'HL_waterIntakeLogs',
+  'HL_whatsappLinks',
+  'HL_whatsappMessages'
 ] as const
 
 export const HL_ROLE_CODES = [

@@ -6,6 +6,7 @@ import { RegisterPage } from './pages/auth/RegisterPage'
 import { OnboardingPage } from './pages/onboarding/OnboardingPage'
 import { HistoryPage } from './pages/measurement/HistoryPage'
 import { AiAssistantPage } from './pages/ai/AiAssistantPage'
+import { AiClinicalChatPage } from './pages/ai/AiClinicalChatPage'
 import { TrackerPage } from './pages/tracker/TrackerPage'
 import { SeniorAppShell } from './components/SeniorAppShell'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -126,6 +127,7 @@ const NAV_GROUPS: (NavGroup | NavLink)[] = [
   ]},
   { label: 'AI & Insights', labelKey: 'nav.aiInsights', icon: 'psychology', shortLabel: 'AI', children: [
     { path: '/ai-assistant', label: 'AI Assistant', labelKey: 'nav.aiAssistant', shortLabel: 'AI', icon: 'smart_toy', featureCode: 'feature.aiAssistant.use' },
+    { path: '/ai-clinical', label: 'AI Clinical Copilot', labelKey: 'nav.aiClinical', shortLabel: 'Clinical', icon: 'stethoscope', featureCode: 'feature.aiClinicalCopilot.use', paidOnly: true },
     { path: '/ai-memory', label: 'AI Memory', labelKey: 'nav.aiMemory', shortLabel: 'Memory', icon: 'memory', visible: false, featureCode: 'feature.vectorMemory.use', paidOnly: true },
   ]},
   { label: 'Family & Safety', labelKey: 'nav.familySafety', icon: 'family_restroom', shortLabel: 'Family', children: [
@@ -192,6 +194,7 @@ function renderRoute(appPath: string, onNavigate?: (path: string) => void) {
     case '/measurements/senior': return <SeniorMeasurementFlow />
     case '/tracker': return <TrackerPage />
     case '/ai-assistant': return <AiAssistantPage />
+    case '/ai-clinical': return <AiClinicalChatPage />
     case '/reports/daily': return <DailyReportPage />
     case '/reports/weekly': return <WeeklyReportPage />
     case '/reports/monthly': return <MonthlyReportPage />

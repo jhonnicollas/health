@@ -14,6 +14,20 @@
 
 import { Hono } from "hono";
 import type { Bindings } from "./types.js";
+import {
+  VectorizeService,
+  indexSource,
+  rebuildMemory,
+  deleteMemory,
+  fetchAllSources,
+  checkFreeTierStatus,
+  processClinicalMessage,
+  createClinicalSession,
+  closeClinicalSession,
+  getSessionDetail,
+  listSessions,
+  buildContextPackage,
+} from "./services/index.js";
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -45,29 +59,164 @@ function requireAuth(c: any): { ok: true; userId: number } | { ok: false; status
   return { ok: true, userId };
 }
 
-// 11.1 Clinical Copilot routes (PRD §11.1) — stubbed for S6E implementation.
-app.post("/api/ai/clinical/session/start", (c) => {
+// 11.1 Clinical Copilot routes (PRD §11.1) — S6E implementation.
+// PRD S6E §3: Proxy flow — #1 forwards to #2 via Service Binding.
+// These routes are called by #1 with X-Internal-UserId header.
+
+// S6E-T-03: Start session
+app.post("/api/ai/clinical/session/start", async (c) => {
   const auth = requireAuth(c);
   if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
   if (c.env.CLINICAL_COPILOT_ENABLED !== "true") {
     return c.json({ success: false, error: { code: "CLINICAL_COPILOT_DEFERRED" } }, 503);
   }
-  return c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6E-T-03" } }, 501);
+
+  try {
+    const body = await c.req.json().catch(() => ({})) as { sessionType?: string; channel?: string };
+    const channel = (body.channel === "whatsapp" ? "whatsapp" : "web") as "web" | "whatsapp";
+    const sessionType = body.sessionType ?? "general";
+
+    const { sessionId, sessionUuid } = await createClinicalSession(c.env, userId, channel, sessionType);
+
+    return c.json({
+      success: true,
+      data: { sessionId, sessionUuid, channel, sessionType, status: "active" },
+    });
+  } catch (error) {
+    console.error("session/start error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to create session" } }, 500);
+  }
 });
 
-app.post("/api/ai/clinical/message", (c) => {
+// S6E-T-04: Send message — full orchestrator flow
+app.post("/api/ai/clinical/message", async (c) => {
   const auth = requireAuth(c);
   if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
   if (c.env.CLINICAL_COPILOT_ENABLED !== "true") {
     return c.json({ success: false, error: { code: "CLINICAL_COPILOT_DEFERRED" } }, 503);
   }
-  return c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6E-T-04" } }, 501);
+
+  try {
+    const body = await c.req.json() as { sessionId?: number; message?: string; locale?: string };
+    if (!body.sessionId || !body.message) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "sessionId and message are required" } }, 400);
+    }
+    if (body.message.length > 5000) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Message too long (max 5000 chars)" } }, 400);
+    }
+
+    // Verify session belongs to user and is active
+    const session = await c.env.DB.prepare(
+      "SELECT id, status FROM HL_aiClinicalSessions WHERE id = ? AND userId = ?"
+    ).bind(body.sessionId, userId).first<{ id: number; status: string }>();
+
+    if (!session) {
+      return c.json({ success: false, error: { code: "NOT_FOUND", message: "Session not found" } }, 404);
+    }
+    if (session.status !== "active") {
+      return c.json({ success: false, error: { code: "SESSION_CLOSED", message: "Session is not active" } }, 400);
+    }
+
+    const locale = (body.locale === "en" ? "en" : "id") as "id" | "en";
+
+    const result = await processClinicalMessage(c.env, {
+      userId,
+      sessionId: body.sessionId,
+      message: body.message,
+      channel: "web",
+      locale,
+    });
+
+    return c.json({
+      success: true,
+      data: {
+        messageId: result.messageId,
+        reply: result.reply,
+        answerType: result.answerType,
+        disclaimer: result.disclaimer,
+        contextTrace: result.contextTrace,
+        dataSufficiencyScore: result.dataSufficiencyScore,
+        dataSufficiencyLabel: result.dataSufficiencyLabel,
+        redFlagStatus: result.redFlagStatus,
+        followUpQuestions: result.followUpQuestions,
+        modelName: result.modelName,
+        usedFallback: result.usedFallback,
+        safetyDecision: result.safetyDecision,
+      },
+      meta: { requestId: `req_${Date.now()}`, durationMs: result.durationMs },
+    });
+  } catch (error) {
+    console.error("clinical/message error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to process message" } }, 500);
+  }
 });
 
-app.post("/api/ai/clinical/sessions/:id/close", (c) => {
+// S6E-T-05: List sessions
+app.get("/api/ai/clinical/sessions", async (c) => {
   const auth = requireAuth(c);
   if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
-  return c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Land in S6E-T-06" } }, 501);
+  const userId = auth.userId;
+
+  try {
+    const limit = Math.min(Number(c.req.query("limit")) || 20, 50);
+    const sessions = await listSessions(c.env, userId, limit);
+    return c.json({ success: true, data: sessions });
+  } catch (error) {
+    console.error("sessions list error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to list sessions" } }, 500);
+  }
+});
+
+// S6E-T-05: Get session detail
+app.get("/api/ai/clinical/sessions/:id", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    const sessionId = Number(c.req.param("id"));
+    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid session ID" } }, 400);
+    }
+
+    const detail = await getSessionDetail(c.env, userId, sessionId);
+    if (!detail.session) {
+      return c.json({ success: false, error: { code: "NOT_FOUND", message: "Session not found" } }, 404);
+    }
+
+    return c.json({ success: true, data: detail });
+  } catch (error) {
+    console.error("session detail error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to get session" } }, 500);
+  }
+});
+
+// S6E-T-06: Close session
+app.post("/api/ai/clinical/sessions/:id/close", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    const sessionId = Number(c.req.param("id"));
+    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid session ID" } }, 400);
+    }
+
+    const closed = await closeClinicalSession(c.env, userId, sessionId);
+    if (!closed) {
+      return c.json({ success: false, error: { code: "NOT_FOUND", message: "Session not found or already closed" } }, 404);
+    }
+
+    return c.json({ success: true, data: { sessionId, status: "closed" } });
+  } catch (error) {
+    console.error("session close error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to close session" } }, 500);
+  }
 });
 
 app.post("/api/ai/clinical/follow-up", (c) => {
@@ -92,25 +241,196 @@ app.post("/api/ai/clinical/safety-check", (c) =>
   c.json({ success: false, error: { code: "NOT_IMPLEMENTED", message: "Internal-only; land in S6H" } }, 501)
 );
 
-// 11.2 AI Memory routes — stubs (S6C-T-02..T-08 real impls).
-app.post("/api/ai/memory/index-source", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED" } }, 501)
-);
-app.post("/api/ai/memory/rebuild", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED" } }, 501)
-);
-app.delete("/api/ai/memory", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED" } }, 501)
-);
-app.get("/api/ai/memory/status", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED" } }, 501)
-);
-app.post("/api/ai/context/query", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED" } }, 501)
-);
-app.get("/api/ai/context-package", (c) =>
-  c.json({ success: false, error: { code: "NOT_IMPLEMENTED" } }, 501)
-);
+// 11.2 AI Memory routes — S6C implementation.
+// PRD S6C §5: VectorizeService query/insert/delete/deleteAll/getStatus
+// Namespace is ALWAYS user:{userId} — derived from auth, never from client.
+
+app.post("/api/ai/memory/index-source", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    const body = await c.req.json() as { sourceType?: string; sourceId?: string; content?: string; metadata?: Record<string, unknown> };
+    if (!body.sourceType || !body.sourceId || !body.content) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "sourceType, sourceId, content are required" } }, 400);
+    }
+
+    const vectorId = await indexSource(c.env, {
+      userId,
+      sourceType: body.sourceType,
+      sourceId: body.sourceId,
+      content: body.content,
+      metadata: body.metadata ?? {},
+    });
+
+    return c.json({ success: true, data: { vectorId, namespace: `user:${userId}` } });
+  } catch (error) {
+    console.error("memory/index-source error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to index source" } }, 500);
+  }
+});
+
+app.post("/api/ai/memory/rebuild", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    // Check aiConsent + dataShareConsent
+    const consent = await c.env.DB.prepare(
+      "SELECT aiConsent, dataShareConsent FROM HL_userProfiles WHERE userId = ?"
+    ).bind(userId).first<{ aiConsent: number; dataShareConsent: number }>();
+
+    if (!consent || consent.aiConsent !== 1) {
+      return c.json({ success: false, error: { code: "CONSENT_REQUIRED", message: "AI consent required for memory operations" } }, 403);
+    }
+
+    const includeConsentGated = consent.dataShareConsent === 1;
+
+    // Fetch all source data
+    const sources = await fetchAllSources(c.env, userId, includeConsentGated);
+
+    // Rebuild (idempotent)
+    const result = await rebuildMemory(c.env, userId, sources);
+
+    return c.json({
+      success: true,
+      data: {
+        jobId: result.jobId,
+        totalProcessed: result.totalProcessed,
+        totalIndexed: result.totalIndexed,
+        totalFailed: result.totalFailed,
+        durationMs: result.durationMs,
+        namespace: `user:${userId}`,
+      },
+    });
+  } catch (error) {
+    console.error("memory/rebuild error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to rebuild memory" } }, 500);
+  }
+});
+
+app.delete("/api/ai/memory", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    const result = await deleteMemory(c.env, userId);
+    return c.json({
+      success: true,
+      data: {
+        jobId: result.jobId,
+        vectorsDeleted: result.vectorsDeleted,
+        durationMs: result.durationMs,
+        namespace: `user:${userId}`,
+      },
+    });
+  } catch (error) {
+    console.error("memory/delete error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to delete memory" } }, 500);
+  }
+});
+
+app.get("/api/ai/memory/status", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    const service = new VectorizeService(c.env);
+    const status = await service.getStatus(userId);
+    return c.json({ success: true, data: status });
+  } catch (error) {
+    console.error("memory/status error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to get memory status" } }, 500);
+  }
+});
+
+app.post("/api/ai/context/query", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  try {
+    const body = await c.req.json() as { query?: string; topK?: number; minScore?: number };
+    if (!body.query) {
+      return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "query is required" } }, 400);
+    }
+
+    const topK = Math.min(Math.max(body.topK ?? 8, 1), 20);
+    const minScore = body.minScore ?? 0;
+
+    const service = new VectorizeService(c.env);
+    const results = await service.query(userId, body.query, topK, minScore);
+
+    return c.json({
+      success: true,
+      data: {
+        namespace: `user:${userId}`,
+        topK,
+        minScore,
+        matches: results,
+        count: results.length,
+      },
+    });
+  } catch (error) {
+    console.error("context/query error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to query context" } }, 500);
+  }
+});
+
+  app.get("/api/ai/context-package", async (c) => {
+    const auth = requireAuth(c);
+    if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+    const userId = auth.userId;
+
+    try {
+      const queryText = c.req.query("query") ?? "";
+      const disclaimerAcknowledged = c.req.query("disclaimerAcknowledged") === "true";
+      const pkg = await buildContextPackage(c.env, userId, {
+        queryText,
+        disclaimerAcknowledged,
+        timeoutMs: 3000,
+      });
+      return c.json({ success: true, data: pkg });
+    } catch (error) {
+      console.error("context-package error:", error);
+      return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to get context package" } }, 500);
+    }
+  });
+
+// Admin: free tier monitor (S6C-T-10)
+// RBAC check: requires admin.aiModelRun.read permission (defense-in-depth even behind Service Binding)
+app.get("/api/ai/admin/vectorize/health", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+  const userId = auth.userId;
+
+  // RBAC check — verify admin permission
+  try {
+    const permRow = await c.env.DB.prepare(
+      `SELECT 1 FROM HL_rolePermissions rp
+       JOIN HL_userRoles ur ON ur.roleCode = rp.roleCode
+       WHERE ur.userId = ? AND rp.permissionCode = 'admin.aiModelRun.read'
+       LIMIT 1`
+    ).bind(userId).first();
+    if (!permRow) {
+      return c.json({ success: false, error: { code: "FORBIDDEN", message: "Admin permission required" } }, 403);
+    }
+  } catch {
+    return c.json({ success: false, error: { code: "FORBIDDEN", message: "Permission check failed" } }, 403);
+  }
+
+  try {
+    const status = await checkFreeTierStatus(c.env);
+    return c.json({ success: true, data: status });
+  } catch (error) {
+    console.error("vectorize/health error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to get vectorize health" } }, 500);
+  }
+});
 
 // Durable Object stubs — required by wrangler.toml bindings.
 // Real implementations land in S6E (AiChatSessionDO), S6G (WhatsAppSessionDO),

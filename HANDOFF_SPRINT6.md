@@ -1,19 +1,65 @@
 # HANDOFF_SPRINT6.md — Sprint 6 Resume State
 
-## Current State — 2026-06-30
+## Current State — 2026-06-30 18:00 UTC
 
 ```text
 Sprint: Sprint 6 (S6A → S6I) — AI Clinical Copilot Runtime + Emergency + WhatsApp AI + Cloudflare AI Platform
-Phase: S6A (Foundation + Safety Contract)
-Status: DONE (post-audit fix pass — 9 bugs found and fixed)
-Current Task: S6A-T-12 (S6A validation gate) — COMPLETE with audit corrections
-Next Task: S6B-T-01 (Cloudflare AI Platform — AI Gateway + model router)
+Phase: S6D (Clinical Context Package v2) — AUDIT DONE
+Status: DONE (11/11 tasks complete; 7 bugs found, 5 fixed, 2 noted)
+Current Task: S6D-T-11 (validation gate — PASSED)
+Next Task: S6E-T-01 (Proxy route /api/ai/clinical/* in #1)
 Workers Active: #1 isehat-api-worker + #2 isehat-ai-worker
-Tests: worker/ai 20/20 PASS; worker/apps 338/338 PASS
-D1: PRAGMA foreign_key_check clean (0 rows)
-tsc: worker/ai PASS; worker/apps PASS
+Tests: 131 PASS, 0 FAIL, 13 SKIP (D1 integration)
+  - S6A: 20 safety tests
+  - S6B: 7 modelRouter tests
+  - S6C: 25 vectorize + memory tests
+  - S6D: 34 context package tests (9 original + 25 new plan)
+  - S6A+S6B combined: 25 test plan tests
+tsc: Worker #2 PASS
 eslint: n/a
+D1: PRAGMA foreign_key_check clean
+Secrets: CLOUDFLARE_ACCOUNT_ID ✅ CLOUDFLARE_API_TOKEN ✅ 9ROUTER_API_KEY ✅ TELEGRAM_BOT_TOKEN ✅
+AI_KV: id=59ba33a4d92a4e0c852c9df6c63b11e9 ✅
+AI Endpoint: https://9router.krpmerch.biz.id/v1
+9router Models: oc/deepseek-v4-flash-free (default), oc/mimo-v2.5-free (premium)
+Telegram: iSehatApp_bot / userId=8727919072
 ```
+
+## Last Completed Task
+- Task: S6D audit + bug fix + test plan execution
+- Result: 5 bugs fixed (CRITICAL: latest-per-metric, HIGH: context-package route stub, HIGH: timeout enforcement, MEDIUM: trend query optimization, MEDIUM: contentPreview null guard), 34 tests pass
+- Validation: `npx tsc` PASS; `npm test` 131/131 PASS, 13 SKIP, 0 FAIL; `--grep contextPackage` 34 PASS
+
+## S6D Audit Findings — 2026-06-30
+
+| # | Severity | Bug | Fix | File |
+|---|---|---|---|---|
+| 1 | **CRITICAL** | `fetchLatestMeasurements` returned 20 most recent regardless of metric — should return latest PER metric code | Changed to correlated subquery with MAX(measuredAt) per metricCode | `contextPackageBuilder.ts` |
+| 2 | **HIGH** | `/api/ai/context-package` route still returned S6C stub (`contextPackageBuilderReady: false`) instead of full v2 package | Wired to `buildContextPackage()`, accepts `?query=` and `?disclaimerAcknowledged=true` params | `index.ts` |
+| 3 | **HIGH** | No timeout enforcement in `buildContextPackage` — if D1/Vectorize hangs, build hangs forever | Added `checkTime()` after each I/O stage; returns partial package with `partial:` prefix in scoreReason | `contextPackageBuilder.ts` |
+| 4 | **MEDIUM** | Trend fetcher made 3 separate D1 queries (7d, 30d, 90d) — exceeded 200ms budget | Replaced `computeTrendSummaryParallel` (3 round-trips) with `computeTrendSummaryOptimized` (1 query, 90d, in-memory split) | `contextPackageBuilder.ts` |
+| 5 | **MEDIUM** | `vm.contentPreview.slice(0, 200)` crashes if contentPreview is undefined | Added nullish coalescing: `(vm.contentPreview ?? '').slice(0, 200)` | `contextPackageBuilder.ts` |
+| 6 | INFO | `sourceTable: 'HL_waterIntakeLogs'` vs PRD `HL_hydrationLogs` — code uses real D1 table name (correct) | No fix needed — code matches actual schema | — |
+| 7 | INFO | `computeDataSufficiencyScore` double-counts 7d+30d (25+15=40 for single recent measurement). PRD §4 wording allows this; Math.min(score,100) caps. | No fix needed — matches PRD literal wording | — |
+
+## S6B Audit + DevOps — 2026-06-30
+
+S6B-T-09 completed:
+
+| Action | Result |
+|---|---|
+| CLOUDFLARE_API_TOKEN secret set | ✅ via `wrangler secret put` |
+| CLOUDFLARE_ACCOUNT_ID secret set | ✅ via `wrangler secret put` |
+| AI_KV namespace created | ✅ id=59ba33a4d92a4e0c852c9df6c63b11e9 |
+| wrangler.toml KV id updated | ✅ |
+| 9ROUTER_API_KEY | ⏳ NOT SET — user must provide key |
+
+Audit findings (5 items, 0 blockers):
+1. MEDIUM: requestId uses Math.random() — acceptable for correlation; upgrade to crypto.randomUUID() in S6I.
+2. LOW: AI Gateway response parsing only checks OpenAI-compatible format — correct per PRD §5.
+3. LOW: Workers AI model name cast — unavoidable given Workers AI typing.
+4. LOW: getConfigString null for empty-string configs — intended.
+5. INFO: CLOUDFLARE_GATEWAY_ID in types but loaded from D1 config — correct per PRD §8.14.
 
 ## S6A Post-Phase Audit — 2026-06-30
 

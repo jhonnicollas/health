@@ -11,7 +11,7 @@ export type Bindings = {
   AI: Ai
   CLOUDFLARE_ACCOUNT_ID?: string
   CLOUDFLARE_API_TOKEN?: string
-  CLOUDFLARE_GATEWAY_ID?: string
+  '9ROUTER_API_KEY'?: string
   AI_GATEWAY_ENABLED?: string
   VECTORIZE_MAX_VECTORS_PER_USER?: string
   VECTORIZE_ALERT_THRESHOLD_PERCENT?: string

@@ -3,7 +3,7 @@ import { getCookie } from 'hono/cookie'
 import { AiMemoryService } from './services/ai-memory.js'
 import { AuditService } from './services/audit.js'
 import { RbacService } from './services/rbac.js'
-import { EntitlementService } from './services/entitlements.js'
+import { EntitlementService, QuotaService } from './services/entitlements.js'
 import {
   insertAndGetId,
   getRecentValues,
@@ -371,6 +371,223 @@ WAJIB:
     } catch (error) {
       console.error('ai assistant endpoint error:', error)
       return jr(c, fail('INTERNAL_ERROR', 'Asisten AI gagal merespons.', 500, [], s), 500)
+    }
+  })
+
+  // ─── S6E: Clinical Copilot Proxy Routes ───
+  // PRD S6E §3: Proxy routes in #1 → forward to #2 via Service Binding.
+  // Entitlement + consent + quota + rate limit check at #1 BEFORE proxy.
+
+  // Per-user rate limiter keyed by userId + minute bucket (in-memory for unit tests; upgrade to KV for prod)
+  const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+  async function getClinicalConfig(db: D1Database, key: string, defaultValue: number): Promise<number> {
+    try {
+      const row = await db.prepare('SELECT configValue FROM HL_systemConfigs WHERE configKey = ?').bind(key).first<{ configValue: string }>()
+      const n = row?.configValue ? Number(row.configValue) : NaN
+      return Number.isFinite(n) && n > 0 ? n : defaultValue
+    } catch {
+      return defaultValue
+    }
+  }
+
+  /**
+   * Generic rate-limit check for clinical copilot endpoints, keyed by userId + window.
+   * PRD §14 rate-limit window+limit per endpoint (10/hr session/start, 30/min message, etc.).
+   * NOTE: In-memory map; upgrade to KV for multi-instance Workers per PRD §8.11 (deferred to S6I).
+   */
+  async function checkClinicalRouteRateLimit(
+    db: D1Database,
+    userId: number,
+    configKey: string,
+    defaultLimit: number,
+    windowSeconds: number,
+    now = Date.now()
+  ): Promise<boolean> {
+    const limit = await getClinicalConfig(db, configKey, defaultLimit)
+    const windowMs = windowSeconds * 1000
+    const bucket = Math.floor(now / windowMs)
+    const key = `${userId}:${configKey}:${bucket}`
+    const entry = rateLimitMap.get(key)
+    if (!entry || now - entry.windowStart > windowMs) {
+      rateLimitMap.set(key, { count: 1, windowStart: now })
+      return true
+    }
+    if (entry.count >= limit) return false
+    entry.count++
+    return true
+  }
+
+  /**
+   * @deprecated retained for backward compatibility with the message endpoint —
+   * callers should pass the explicit (db, userId, configKey, defaultLimit, windowSeconds) signature.
+   */
+  async function checkRateLimit(db: D1Database, userId: number, now = Date.now()): Promise<boolean> {
+    return checkClinicalRouteRateLimit(
+      db,
+      userId,
+      'clinicalCopilot.maxMessagesPerMinute',
+      30,
+      60,
+      now
+    )
+  }
+
+  /**
+   * Shared gate checks for every clinical copilot route.
+   * a) entitlement for feature.aiClinicalCopilot.use
+   * c) aiConsent = 1 on HL_userProfiles
+   * d) quota for feature.aiClinicalCopilot.use
+   */
+  async function requireClinicalAccess(c: HC, userId: number, startedAt: number): Promise<null | ReturnType<typeof fail>> {
+    const ent = await EntitlementService.requireEntitlement(c.env.DB, userId, 'feature.aiClinicalCopilot.use')
+    if (!ent.allowed) return fail('ENTITLEMENT_REQUIRED', 'Fitur AI Clinical Copilot memerlukan paket Premium atau lebih tinggi.', 403, [], startedAt)
+
+    const quotaOk = await QuotaService.requireQuota(c.env.DB, userId, 'feature.aiClinicalCopilot.use')
+    if (!quotaOk?.allowed) return fail('QUOTA_EXCEEDED', 'Kuota pesan AI bulanan telah habis.', 403, [], startedAt)
+
+    const profile = await c.env.DB.prepare('SELECT aiConsent FROM HL_userProfiles WHERE userId = ?').bind(userId).first<{ aiConsent: number }>()
+    if (!profile || profile.aiConsent !== 1) return fail('CONSENT_REQUIRED', 'Persetujuan AI belum diberikan. Aktifkan di pengaturan.', 403, [], startedAt)
+
+    return null
+  }
+
+  function aiServiceUnavailable(startedAt: number) {
+    return fail('AI_SERVICE_UNAVAILABLE', 'AI_SERVICE binding not configured.', 503, [], startedAt)
+  }
+
+  // S6E-T-01/T-02: Proxy POST /api/ai/clinical/session/start → #2
+  app.post('/api/ai/clinical/session/start', async (c: HC) => {
+    const s = Date.now();
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const denied = await requireClinicalAccess(c, uid, s)
+      if (denied) return jr(c, denied, denied.status as any)
+
+      // PRD §14: session/start limit = 10/hour per user (config: clinicalCopilot.maxSessionStartsPerHour)
+      if (!(await checkClinicalRouteRateLimit(c.env.DB, uid, 'clinicalCopilot.maxSessionStartsPerHour', 10, 3600, s))) {
+        return jr(c, fail('RATE_LIMITED', 'Terlalu banyak permintaan session start.', 429, [], s), 429)
+      }
+
+      if (!c.env.AI_SERVICE) return jr(c, aiServiceUnavailable(s), 503)
+
+      const body = await c.req.json().catch(() => ({})) as { sessionType?: string }
+
+      const res = await c.env.AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/clinical/session/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-UserId': String(uid) },
+        body: JSON.stringify({ sessionType: body.sessionType ?? 'general', channel: 'web' }),
+      }))
+      const payload = await res.json() as any
+      return jr(c, payload, res.status as any)
+    } catch (error) {
+      console.error('clinical session/start proxy error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal membuat sesi klinis.', 500, [], s), 500)
+    }
+  })
+
+  // S6E-T-01/T-02/T-04: Proxy POST /api/ai/clinical/message → #2
+  app.post('/api/ai/clinical/message', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const denied = await requireClinicalAccess(c, uid, s)
+      if (denied) return jr(c, denied, denied.status as any)
+
+      if (!(await checkRateLimit(c.env.DB, uid, s))) return jr(c, fail('RATE_LIMITED', 'Terlalu banyak permintaan.', 429, [], s), 429)
+
+      if (!c.env.AI_SERVICE) return jr(c, aiServiceUnavailable(s), 503)
+
+      const body = await c.req.json() as { sessionId?: number; message?: string; locale?: string }
+      if (!body.sessionId || !body.message) return jr(c, fail('VALIDATION_ERROR', 'sessionId dan message wajib.', 400, [], s), 400)
+
+      const res = await c.env.AI_SERVICE.fetch(new Request('https://ai-service.internal/api/ai/clinical/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Internal-UserId': String(uid) },
+        body: JSON.stringify({ sessionId: body.sessionId, message: body.message, locale: body.locale ?? 'id' }),
+      }))
+      const payload = await res.json() as any
+      if (res.ok && payload?.success) {
+        try { await QuotaService.consumeQuota(c.env.DB, uid, 'feature.aiClinicalCopilot.use') } catch {}
+      }
+      return jr(c, payload, res.status as any)
+    } catch (error) {
+      console.error('clinical message proxy error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal memproses pesan.', 500, [], s), 500)
+    }
+  })
+
+  // S6E-T-05: Proxy GET /api/ai/clinical/sessions → #2
+  app.get('/api/ai/clinical/sessions', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const denied = await requireClinicalAccess(c, uid, s)
+      if (denied) return jr(c, denied, denied.status as any)
+
+      if (!c.env.AI_SERVICE) return jr(c, aiServiceUnavailable(s), 503)
+
+      const limit = Math.min(Number(c.req.query('limit')) || 20, 50)
+      const res = await c.env.AI_SERVICE.fetch(new Request(`https://ai-service.internal/api/ai/clinical/sessions?limit=${limit}`, {
+        method: 'GET',
+        headers: { 'X-Internal-UserId': String(uid) },
+      }))
+      const payload = await res.json() as any
+      return jr(c, payload, res.status as any)
+    } catch (error) {
+      console.error('clinical sessions list proxy error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal mengambil daftar sesi.', 500, [], s), 500)
+    }
+  })
+
+  // S6E-T-05: Proxy GET /api/ai/clinical/sessions/:id → #2
+  app.get('/api/ai/clinical/sessions/:id', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const denied = await requireClinicalAccess(c, uid, s)
+      if (denied) return jr(c, denied, denied.status as any)
+
+      if (!c.env.AI_SERVICE) return jr(c, aiServiceUnavailable(s), 503)
+
+      const sessionId = c.req.param('id')
+      const res = await c.env.AI_SERVICE.fetch(new Request(`https://ai-service.internal/api/ai/clinical/sessions/${sessionId}`, {
+        method: 'GET',
+        headers: { 'X-Internal-UserId': String(uid) },
+      }))
+      const payload = await res.json() as any
+      return jr(c, payload, res.status as any)
+    } catch (error) {
+      console.error('clinical session detail proxy error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal mengambil detail sesi.', 500, [], s), 500)
+    }
+  })
+
+  // S6E-T-06: Proxy POST /api/ai/clinical/sessions/:id/close → #2
+  app.post('/api/ai/clinical/sessions/:id/close', async (c: HC) => {
+    const s = Date.now()
+    try {
+      const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
+
+      const denied = await requireClinicalAccess(c, uid, s)
+      if (denied) return jr(c, denied, denied.status as any)
+
+      if (!c.env.AI_SERVICE) return jr(c, aiServiceUnavailable(s), 503)
+
+      const sessionId = c.req.param('id')
+      const res = await c.env.AI_SERVICE.fetch(new Request(`https://ai-service.internal/api/ai/clinical/sessions/${sessionId}/close`, {
+        method: 'POST',
+        headers: { 'X-Internal-UserId': String(uid) },
+      }))
+      const payload = await res.json() as any
+      return jr(c, payload, res.status as any)
+    } catch (error) {
+      console.error('clinical session close proxy error:', error)
+      return jr(c, fail('INTERNAL_ERROR', 'Gagal menutup sesi.', 500, [], s), 500)
     }
   })
 

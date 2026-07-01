@@ -1,0 +1,28 @@
+// Service barrel export for worker/ai/src/services/
+export { getConfigString, getConfigNumber, getConfigBoolean, invalidateConfigCache, getOperatingMode } from './config.js';
+export type { ConfigBindings } from './config.js';
+export { callAiGateway, callDirect9router, get9routerConfig } from './aiGateway.js';
+export type { ChatMessage, AiGatewayCallInput, AiGatewayCallResult } from './aiGateway.js';
+export { generateEmbedding, callWorkersAiText, classifyIntent, EMBEDDING_MODEL, FALLBACK_MODEL_1, FALLBACK_MODEL_2 } from './workersAi.js';
+export type { EmbeddingResult, WorkersAiBindings } from './workersAi.js';
+export { routeModel } from './modelRouter.js';
+export type { ModelRouterInput, ModelRouterResult } from './modelRouter.js';
+export { logModelRun, updateModelRunSafety } from './modelRunLogger.js';
+export type { ModelRunLogInput } from './modelRunLogger.js';
+export { loadPromptVersion, invalidatePromptCache, buildSystemPrompt } from './promptLoader.js';
+export type { PromptVersion } from './promptLoader.js';
+export { renderSafeTemplate } from './safeTemplate.js';
+export type { SafeTemplateInput } from './safeTemplate.js';
+export { KvCache, getKvCache, KV_TTL } from './kvCache.js';
+export { VectorizeService } from './vectorizeService.js';
+export type { VectorizeServiceInterface, VectorInsertInput, VectorResult, MemoryStatus, RerankedResult } from './vectorizeService.js';
+export { buildMemoryDocument, buildMemoryDocuments } from './memoryDocumentBuilder.js';
+export type { MemoryDocument, SourceData } from './memoryDocumentBuilder.js';
+export { indexSource, rebuildMemory, deleteMemory, fetchAllSources } from './memoryOperations.js';
+export type { IndexSourceInput, RebuildResult, DeleteResult } from './memoryOperations.js';
+export { checkFreeTierStatus } from './freeTierMonitor.js';
+export type { FreeTierStatus } from './freeTierMonitor.js';
+export { buildContextPackage, getSufficiencyLabel, computeTrendFromValues, computeRedFlagPrecheck, buildContextTrace, computeDataSufficiencyScore, buildForbiddenActions } from './contextPackageBuilder.js';
+export type { ContextPackage, TrendData, ContextTraceItem } from './contextPackageBuilder.js';
+export { processClinicalMessage, createClinicalSession, closeClinicalSession, getSessionDetail, listSessions, mapSafetyDecisionToLevel, generateFollowUpQuestions } from './clinicalOrchestrator.js';
+export type { ClinicalMessageInput, ClinicalMessageResult } from './clinicalOrchestrator.js';

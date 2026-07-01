@@ -27,11 +27,9 @@ index_name = "hl-health-memory"
 # instance_id = "<ai-search-instance-id>"
 
 # KV cache — prompt / routing / config / education / search / disclaimer (PRD §8.11)
-# BLOCKED until KV namespace is created. Run: wrangler kv:namespace create AI_KV
-# Then replace the id below; deploy will fail with [TBD].
 [[kv_namespaces]]
 binding = "AI_KV"
-id = "[TBD — run: wrangler kv:namespace create AI_KV]"
+id = "59ba33a4d92a4e0c852c9df6c63b11e9"
 
 # Durable Objects — 5 classes per PRD §8.12
 # Bindings declared but classes not yet implemented; added via S6E / S6G as those phases land.

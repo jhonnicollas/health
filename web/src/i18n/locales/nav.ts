@@ -40,6 +40,7 @@ registerTranslations('nav', {
   reminders: { 'id-ID': 'Pengingat', 'en-US': 'Reminders' },
   // AI
   aiAssistant: { 'id-ID': 'Asisten AI', 'en-US': 'AI Assistant' },
+  aiClinical: { 'id-ID': 'AI Clinical Copilot', 'en-US': 'AI Clinical Copilot' },
   aiMemory: { 'id-ID': 'Memori AI', 'en-US': 'AI Memory' },
   // Family & Safety
   familyCaregiver: { 'id-ID': 'Keluarga / Caregiver', 'en-US': 'Family / Caregiver' },
