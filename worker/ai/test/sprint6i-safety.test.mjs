@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   SafetyDecision,
   missingDisclaimerDetector,
@@ -393,4 +396,11 @@ test('S6I-T-01 runSafetyRuntime: medication change → block_and_fallback', () =
 test('S6I-T-01 runSafetyRuntime: specialist claim → rewrite_safe', () => {
   const result = runSafetyRuntime(baseInput(safe('Saya setara dengan dokter spesialis.')));
   expectRunDecision(result, SafetyDecision.REWRITE_SAFE, 'run specialist claim');
+});
+
+test('S6I-T-01-SUMMARY safety suite contains exactly 65 detector-vector tests', () => {
+  const __filename = fileURLToPath(import.meta.url);
+  const content = readFileSync(__filename, 'utf-8');
+  const matches = [...content.matchAll(/test\('S6I-T-01 (?!runSafetyRuntime:)/g)];
+  assert.equal(matches.length, 65, `Expected 65 detector-vector tests, got ${matches.length}`);
 });
