@@ -24,7 +24,7 @@ export { checkFreeTierStatus } from './freeTierMonitor.js';
 export type { FreeTierStatus } from './freeTierMonitor.js';
 export { buildContextPackage, getSufficiencyLabel, computeTrendFromValues, computeRedFlagPrecheck, buildContextTrace, computeDataSufficiencyScore, buildForbiddenActions } from './contextPackageBuilder.js';
 export type { ContextPackage, TrendData, ContextTraceItem } from './contextPackageBuilder.js';
-export { processClinicalMessage, createClinicalSession, closeClinicalSession, getSessionDetail, listSessions, mapSafetyDecisionToLevel, generateFollowUpQuestions, encryptContent, renderEmergencyTemplate, formatWhatsAppReply } from './clinicalOrchestrator.js';
+export { processClinicalMessage, createClinicalSession, closeClinicalSession, getSessionDetail, listSessions, mapSafetyDecisionToLevel, generateFollowUpQuestions, encryptContent, renderEmergencyTemplate, formatWhatsAppReply, logEmergencyEvent } from './clinicalOrchestrator.js';
 export type { ClinicalMessageInput, ClinicalMessageResult } from './clinicalOrchestrator.js';
 export { lookupFirstAidProtocol, renderFirstAidProtocol, renderFirstAidFallback } from './firstAidEngine.js';
 export type { FirstAidProtocol, FirstAidLookupInput, FirstAidRenderInput } from './firstAidEngine.js';

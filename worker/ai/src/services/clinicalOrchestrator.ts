@@ -138,7 +138,7 @@ export async function processClinicalMessage(
   if (hasRedFlag && redFlagSeverity === 'emergency') {
     const emergencyBody = renderEmergencyTemplate(locale);
     const disclaimer = getDisclaimer(locale, operatingMode);
-    // Emergency behavior is identical across operating modes — do not inject mode-specific additions.
+    // PRD S6F §7.4: Emergency behavior identical across modes, but disclaimer includes mode context.
     let fullReply = `${emergencyBody}\n\n${disclaimer}`;
 
     // PRD S6F-T-08: WhatsApp short format also applies to emergency replies.
@@ -502,7 +502,7 @@ function getDisclaimer(locale: 'id' | 'en', operatingMode: OperatingMode): strin
  * PRD S6F-T-04: HL_safetyEvents row (severity='emergency', sourceType='ai', eventType='emergencyEscalation')
  * and HL_auditLogs row (action='emergencyEscalation').
  */
-async function logEmergencyEvent(
+export async function logEmergencyEvent(
   env: Bindings,
   userId: number,
   sessionId: number,
@@ -543,8 +543,7 @@ async function logEmergencyEvent(
  * Format a clinical reply for WhatsApp.
  * PRD S6F-T-08: max whatsappAi.maxReplyChars (default 400), short disclaimer, numbered steps.
  */
-export function formatWhatsAppReply(text: string, locale: 'id' | 'en'): string {
-  const maxChars = 400;
+export function formatWhatsAppReply(text: string, locale: 'id' | 'en', maxChars: number = 400): string {
   const shortDisclaimer = locale === 'en'
     ? '⚕️ AI can be wrong. Decision = your responsibility.'
     : '⚕️ AI bisa salah. Keputusan = tanggung jawab Anda.';

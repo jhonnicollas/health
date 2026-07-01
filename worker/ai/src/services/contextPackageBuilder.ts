@@ -644,9 +644,9 @@ export function computeRedFlagPrecheck(
     };
   }
 
-  // Check safety events
-  const criticalEvents = safetyEvents.filter((e) => e.severity === 'critical');
-  if (criticalEvents.length > 0) {
+  // Check safety events — PRD S6F §4 step 5: severity = 'emergency'?
+  const emergencyOrCriticalEvents = safetyEvents.filter((e) => e.severity === 'critical' || e.severity === 'emergency');
+  if (emergencyOrCriticalEvents.length > 0) {
     return {
       hasRedFlag: true,
       severity: 'emergency',

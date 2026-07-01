@@ -75,6 +75,8 @@ async function updateLinkLastMessage(env: Bindings, whatsappLinkId: number): Pro
 }
 
 export class WhatsAppSessionDO implements DurableObject {
+  private processedIds = new Set<string>();
+
   constructor(private state: DurableObjectState, private env: Bindings) {}
 
   async fetch(request: Request): Promise<Response> {
@@ -91,6 +93,15 @@ export class WhatsAppSessionDO implements DurableObject {
     if (!whatsappLinkId || !userId || !providerMessageId) {
       return new Response(JSON.stringify({ success: false, error: { code: "VALIDATION_ERROR" } }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
+
+    // Idempotency: duplicate providerMessageId within this DO session is acknowledged without reprocessing.
+    if (this.processedIds.has(providerMessageId)) {
+      return new Response(
+        JSON.stringify({ success: true, duplicate: true, providerMessageId }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    this.processedIds.add(providerMessageId);
 
     const normalizedText = (textContent ?? "").trim().toUpperCase();
     if (normalizedText === "STOP" || normalizedText === "STOP AI" || normalizedText === "START AI" || normalizedText === "START") {

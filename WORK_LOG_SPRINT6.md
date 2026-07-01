@@ -380,3 +380,47 @@ Format:
   - Telegram + Xendit webhooks validate secrets and forward to API_SERVICE.
   - No hardcoded secrets; all auth values read from env/secrets.
 - Status: DONE
+
+---
+
+## S6I — Hardening, Security, Release Gate — 2026-07-01
+
+- Task: Implement automated test files T-01→T-11, local performance benchmark, resilience tests, i18n tests, data-retention cron tests, docs, and release gates. Mark T-12/T-15 manual.
+- Worker: #1 (resilience), #2 (safety/adversarial/idempotency/WhatsApp), #3 (retention), #4 (tsc), web (i18n)
+- Files changed:
+  - worker/ai/test/sprint6i-safety.test.mjs (NEW)
+  - worker/ai/test/sprint6i-prompt-injection.test.mjs (NEW)
+  - worker/ai/test/sprint6i-cross-user.test.mjs (NEW)
+  - worker/ai/test/sprint6i-forbidden-output.test.mjs (NEW)
+  - worker/ai/test/sprint6i-red-flag.test.mjs (NEW)
+  - worker/ai/test/sprint6i-whatsapp-order.test.mjs (NEW)
+  - worker/ai/test/sprint6i-vectorize-idempotent.test.mjs (NEW)
+  - worker/ai/src/whatsappSessionDo.ts (in-memory duplicate providerMessageId guard)
+  - worker/apps/test/sprint6i-resilience.test.mjs (NEW)
+  - web/test/sprint6i-i18n.test.mjs (NEW); web/package.json (test glob update)
+  - worker/cron/test/sprint6i-retention.test.mjs (NEW)
+  - scripts/perf/sprint6i-perf.mjs (NEW)
+  - docs_sprint6/ARCHITECTURE_SPRINT6.md (NEW)
+  - docs_sprint6/API_CONTRACT_SPRINT6.md (NEW)
+  - docs_sprint6/01.PRD_S6_AI_CLINICAL_COPILOT.md (status banner updated)
+  - HANDOFF_SPRINT6.md (S6I status + manual tasks)
+- Tests:
+  - worker/ai: 496 PASS, 13 SKIP (D1 integration), 0 FAIL
+  - worker/apps: 343 PASS, 0 SKIP, 0 FAIL
+  - worker/cron: 6 PASS, 0 FAIL
+  - web: 2398 PASS, 0 FAIL
+- Validation:
+  - cd worker/ai && npm test → PASS
+  - cd worker/apps && npm test → PASS
+  - cd worker/cron && npx tsc -p tsconfig.json && node --test test/*.test.mjs → PASS
+  - cd worker/webhook && npx tsc -p tsconfig.json → PASS
+  - cd web && npx tsc -b → PASS
+  - node scripts/perf/sprint6i-perf.mjs → PASS (context p50=29ms p95=29ms, orchestrator p50=70ms p95=70ms)
+- Notes:
+  - Added duplicate WhatsApp message guard in WhatsAppSessionDO using per-instance processedIds Set.
+  - Implemented lightweight D1 mock for cron retention tests covering expireSessions, nullifyEncrypted, deleteMessages, archiveModelRuns, archiveSafetyFlags.
+  - Resilience tests mock AI_SERVICE.fetch in worker/apps to verify 200/502/503 behavior.
+  - i18n tests verify all locales in registry plus disclaimer presence in both English and Indonesian.
+  - Performance benchmark runs 50 concurrent buildContextPackage and 50 concurrent processClinicalMessage flows using deterministic safe-template env.
+  - T-12 (closed beta, 100 users) and T-15 (production rollout) marked MANUAL/NOT_STARTED in HANDOFF.
+- Status: DONE (automated gates); T-12/T-15 MANUAL

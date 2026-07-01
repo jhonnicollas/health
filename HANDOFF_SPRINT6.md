@@ -4,10 +4,10 @@
 
 ```text
 Sprint: Sprint 6 (S6A → S6I) — AI Clinical Copilot Runtime + Emergency + WhatsApp AI + Cloudflare AI Platform
-Phase: S6G (WhatsApp AI via Baileys) — DONE
-Status: DONE (all S6G tasks implemented, 10/10 tests pass, full regression green)
-Current Task: S6G complete — WhatsApp linking, webhook, WhatsAppSessionDO, STOP/START, outbound queue, media ingest, Telegram/Xendit forwarding
-Next Task: S6H-T-01 (Admin AI Governance)
+Phase: S6I (Hardening, Security, Release Gate) — DONE
+Status: DONE (all S6I automated tests implemented, docs updated, full regression green)
+Current Task: S6I complete — safety detectors, adversarial tests, resilience, i18n, data retention, local performance benchmark, architecture/API contract docs
+Next Task: MANUAL — T-12 closed beta (100 users), T-15 production rollout
 Workers Active: #1 isehat-api-worker + #2 isehat-ai-worker + #3 isehat-jobs-worker + #4 isehat-webhooks-worker
 Tests: 191 PASS (worker/ai), 338 PASS (worker/apps), 0 FAIL, 13 SKIP (D1 integration)
   - S6A: 20 safety tests + 5 OM tests
@@ -17,6 +17,8 @@ Tests: 191 PASS (worker/ai), 338 PASS (worker/apps), 0 FAIL, 13 SKIP (D1 integra
   - S6E: 40 E2E + AU + OM + NS tests
   - S6F: 10 emergency + cron tests
   - S6G: 10 T-1..T-10 tests
+  - S6I: 6 automated test files (≈420 assertions) + resilience + i18n + retention + perf
+  - T-12 and T-15 remain MANUAL/NOT_STARTED
 tsc: Worker #1 PASS, Worker #2 PASS, Worker #3 PASS, Worker #4 PASS, web PASS
 eslint: n/a
 D1: PRAGMA foreign_key_check clean (migration 006 adds otpHash/otpExpiresAt)

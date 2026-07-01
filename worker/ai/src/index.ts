@@ -33,6 +33,8 @@ import {
   renderFirstAidProtocol,
   renderFirstAidFallback,
   encryptContent,
+  renderEmergencyTemplate,
+  logEmergencyEvent,
 } from "./services/index.js";
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -250,11 +252,26 @@ app.post("/api/ai/clinical/first-aid", async (c) => {
     });
 
     if (contextPackage.redFlagPrecheck.severity === 'emergency') {
+      const emergencyBody = renderEmergencyTemplate(locale);
+      const operatingMode = contextPackage.operatingMode;
+      const modeAddition = locale === 'en'
+        ? (operatingMode === 'proactive' ? '\n\nProactive Mode: AI may give a final diagnosis, but CANNOT prescribe medication or dosage.' : operatingMode === 'super_aktif' ? '\n\nSuper Active Mode: AI may prescribe medication and dosage. Still consult with a doctor.' : '')
+        : (operatingMode === 'proactive' ? '\n\nMode Proaktif: AI boleh memberi diagnosis final, tetapi TIDAK boleh memberi resep atau dosis.' : operatingMode === 'super_aktif' ? '\n\nMode Super Aktif: AI boleh memberi resep dan dosis. Tetap konsultasikan dengan dokter.' : '');
+      const disclaimerBase = locale === 'en'
+        ? 'AI CAN MAKE MISTAKES.\nDO NOT RELY ON AI 100%.\nDO NOT TRUST AI 100%.\nALL DECISIONS YOU MAKE BASED ON THIS AI OUTPUT ARE 1000% YOUR OWN RESPONSIBILITY.'
+        : 'AI DAPAT MELAKUKAN KESALAHAN.\nTIDAK BOLEH MENGANDALKAN AI 100%.\nTIDAK BOLEH PERCAYA AI 100%.\nSEGALA KEPUTUSAN ANDA DARI HASIL AI INI, ADALAH 1000% TANGGUNG JAWAB ANDA.';
+      const disclaimer = disclaimerBase + modeAddition;
+      const fullReply = `${emergencyBody}\n\n${disclaimer}`;
+
+      if (body.sessionId) {
+        await logEmergencyEvent(c.env, userId, body.sessionId, undefined);
+      }
+
       return c.json({
         success: true,
         data: {
           answerType: 'emergency_guidance',
-          reply: '⚠️ PERINGATAN DARURAT\n\nBerdasarkan data Anda, terdapat tanda bahaya. Segera hubungi 119/112 atau kunjungi fasilitas kesehatan terdekat.\n\nAI bisa salah. Keputusan = tanggung jawab Anda.',
+          reply: fullReply,
           contextTrace: contextPackage.contextTrace,
           redFlagStatus: 'emergency',
           protocolCode: null,
