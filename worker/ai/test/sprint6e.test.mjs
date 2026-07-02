@@ -470,11 +470,18 @@ test('S6E-FA-03: buildForbiddenActions — super_aktif without disclaimer acknow
   assert.ok(actions.includes('medication_change'), 'medication_change ALWAYS forbidden');
 });
 
-test('S6E-FA-04: buildForbiddenActions — with disclaimer acknowledged (any mode) → base only', () => {
-  for (const mode of ['standard', 'proactive', 'super_aktif']) {
-    const actions = buildForbiddenActions(mode, true);
-    assert.equal(actions.length, 6, `Mode ${mode}+ack=6 base only, got ${actions.length}`);
-  }
+test('S6E-FA-04: buildForbiddenActions — with disclaimer acknowledged (any mode) → full forbidden actions (mode-specific are hard boundaries)', () => {
+  const standardActions = buildForbiddenActions('standard', true);
+  assert.equal(standardActions.length, 9, `Standard+ack=9 (base+mode-specific), got ${standardActions.length}`);
+  assert.ok(standardActions.includes('diagnosis_final'), 'diagnosis_final ALWAYS forbidden in standard');
+  assert.ok(standardActions.includes('prescription_or_dosage'), 'prescription_or_dosage ALWAYS forbidden in standard');
+
+  const proactiveActions = buildForbiddenActions('proactive', true);
+  assert.equal(proactiveActions.length, 8, `Proactive+ack=8 (base+mode-specific), got ${proactiveActions.length}`);
+  assert.ok(proactiveActions.includes('prescription_or_dosage'), 'prescription_or_dosage ALWAYS forbidden in proactive');
+
+  const superActions = buildForbiddenActions('super_aktif', true);
+  assert.equal(superActions.length, 6, `Super aktif+ack=6 (base only), got ${superActions.length}`);
 });
 
 // ─── Red flag precheck ───

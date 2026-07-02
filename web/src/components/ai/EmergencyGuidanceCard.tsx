@@ -3,7 +3,6 @@ import { useI18n } from '../../i18n/useI18n'
 export function EmergencyGuidanceCard({ text }: { text: string }) {
   const { locale } = useI18n()
   const isEn = locale === 'en-US'
-  const emergencyNumber = '119 / 112'
   const callLabel = isEn ? 'Call Emergency' : 'Panggil Darurat'
   const caregiverLabel = isEn ? 'Contact Caregiver' : 'Hubungi Caregiver'
 
@@ -22,13 +21,13 @@ export function EmergencyGuidanceCard({ text }: { text: string }) {
           emergency
         </span>
         <span style={{ color: 'var(--colorStatusCritical, #d32f2f)', fontWeight: 700 }}>
-          {isEn ? 'EMERGENCY GUIDANCE' : 'PANDUAN DARURAT'}
+          {isEn ? 'EMERGENCY WARNING' : 'PERINGATAN DARURAT'}
         </span>
       </div>
       <p style={{ color: 'var(--colorTextPrimary)' }}>{text}</p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
         <a
-          href={`tel:${emergencyNumber.replace(/\s/g, '').replace('/', '')}`}
+          href="tel:119"
           className="btn-primary"
           style={{
             background: 'var(--colorStatusCritical, #d32f2f)',
@@ -37,7 +36,7 @@ export function EmergencyGuidanceCard({ text }: { text: string }) {
           }}
         >
           <span className="material-symbols-outlined" aria-hidden="true">phone</span>
-          {callLabel} {emergencyNumber}
+          {callLabel} 119 / 112
         </a>
         <a
           href="/family"

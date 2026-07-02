@@ -1,0 +1,11 @@
+name = "isehat-content-worker"
+main = "src/index.ts"
+compatibility_date = "2026-06-10"
+workers_dev = true
+
+# Source of truth: app/contentApp/docs/03.DB_SCHEMA.sql
+# CE-1 uses the existing multi_Ai_db D1 database. No new database is created.
+[[d1_databases]]
+binding = "DB"
+database_name = "multi_Ai_db"
+database_id = "b80ca989-6771-427f-a656-c7ab6ffc17ce"

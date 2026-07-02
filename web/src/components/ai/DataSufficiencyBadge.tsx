@@ -8,7 +8,7 @@ type Props = {
 export function DataSufficiencyBadge({ score, label }: Props) {
   const { t } = useI18n()
   if (score == null && !label) return null
-  const displayLabel = label ?? (score == null ? '' : `${score}/100`)
+  const displayLabel = label && score != null ? `${score}/100 (${label})` : label ?? (score == null ? '' : `${score}/100`)
   return (
     <div className="data-sufficiency-badge" aria-label={t('ai.clinicalDataSufficiency')}>
       <span className="material-symbols-outlined" aria-hidden="true">bar_chart</span>

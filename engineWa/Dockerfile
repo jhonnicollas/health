@@ -5,11 +5,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY src/ ./src/
 RUN npm run build
+
+RUN npm prune --omit=dev && rm -rf /root/.npm
 
 RUN npm install -g pm2
 

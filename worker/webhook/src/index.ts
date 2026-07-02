@@ -128,7 +128,7 @@ function linkingInstruction(locale: "id" | "en"): string {
 app.get("/health", (c) => {
   const provided = c.req.query("secret") ?? c.req.header("X-Cron-Secret");
   if (provided !== c.env.CRON_SECRET) {
-    return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
+    return c.json({ success: true, data: { worker: "isehat-webhooks-worker", status: "ok" } });
   }
   return c.json({
     success: true,

@@ -1171,10 +1171,31 @@ export async function getAiTextModels(c: Context<{ Bindings: Env }>): Promise<st
 export async function callConfiguredTextAi(
   c: Context<{ Bindings: Env }>,
   messages: AiChatMessage[],
-  maxTokens: number
+  maxTokens: number,
+  userId?: number
 ): Promise<AiTextResult | null> {
   const endpoint = await getSystemConfigString(c, 'aiTextEndpoint')
   const models = await getAiTextModels(c)
+
+  if (c.env.AI_SERVICE) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (userId) headers['X-Internal-UserId'] = String(userId)
+      const res = await c.env.AI_SERVICE.fetch('https://ai-service.internal/api/ai/text-generate', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ messages, maxTokens, temperature: 0.3 }),
+        signal: AbortSignal.timeout(20000)
+      })
+      if (res.ok) {
+        const payload = await res.json() as { success?: boolean; data?: { text?: string; model?: string } }
+        if (payload.data?.text) return { text: payload.data.text, model: payload.data.model || 'ai-service' }
+      }
+    } catch (error) {
+      console.error('AI_SERVICE text-generate failed:', error)
+    }
+  }
+
   if (!endpoint || models.length === 0) return null
 
   const apiKey = await getSystemConfigString(c, 'aiTextApiKey')
@@ -1194,7 +1215,8 @@ export async function callConfiguredTextAi(
           temperature: 0.3,
           max_tokens: maxTokens,
           stream: false
-        })
+        }),
+        signal: AbortSignal.timeout(5000)
       })
 
       if (!response.ok) continue

@@ -2,6 +2,7 @@ export type Bindings = {
   DB: D1Database
   LOGS: R2Bucket
   VECTORIZE_INDEX: VectorizeIndex
+  AI_SEARCH: any
   AI_KV: KVNamespace
   AI_CHAT_SESSION_DO: DurableObjectNamespace
   WHATSAPP_SESSION_DO: DurableObjectNamespace
@@ -19,6 +20,7 @@ export type Bindings = {
   VECTORIZE_MAX_VECTORS_PER_USER?: string
   VECTORIZE_ALERT_THRESHOLD_PERCENT?: string
   CLINICAL_COPILOT_ENABLED?: string
+  CLINICAL_MESSAGE_ENCRYPTION_KEY?: string
   MEDICAL_SAFETY_RUNTIME_ENABLED?: string
   MEDICAL_SAFETY_RUNTIME_STRICT_MODE?: string
 }

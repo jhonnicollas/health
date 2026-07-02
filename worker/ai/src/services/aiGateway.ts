@@ -180,7 +180,8 @@ export async function callDirect9router(
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
 
-    const text = payload.choices?.[0]?.message?.content?.trim() || '';
+    const text = payload.choices?.[0]?.message?.content?.trim()
+      || '';
     if (!text) return null;
 
     return {

@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n/useI18n'
 export type ContextTraceItem = {
   sourceType: string
   contentPreview?: string
+  sourceTable?: string
   source?: string
   metricCode?: string
   measuredAt?: string

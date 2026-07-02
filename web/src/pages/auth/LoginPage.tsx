@@ -70,7 +70,7 @@ export function LoginPage({ onShowRegister }: { onShowRegister: () => void }) {
     setMessage('')
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/login/start', {
         method: 'POST',
         credentials: 'include',
         headers: {

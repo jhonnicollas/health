@@ -27,6 +27,8 @@ type ClinicalResponse = {
     usedFallback?: boolean
     protocolCode?: string | null
     protocolTitle?: string
+    redFlagStatus?: string
+    safetyDecision?: string
   }
   error?: { code: string; message?: string }
 }

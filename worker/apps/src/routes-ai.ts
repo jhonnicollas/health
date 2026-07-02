@@ -77,9 +77,15 @@ export function mountAiRoutes(app: any) {
     const s = Date.now()
     try { const uid = await getSession(c); if (!uid) return jr(c, fail('UNAUTHORIZED', 'Sesi tidak valid.', 401, [], s), 401)
       const limit = Math.min(Number(c.req.query('limit')) || 10, 50)
-      const context = await AiMemoryService.buildContextPackage(c.env.DB, uid, limit)
-      const sufficiency = AiMemoryService.calculateDataSufficiency(context)
-      return jr(c, ok({ context, sufficiency, clinicalCopilotMode: 'deferred_to_sprint6' }, 200, s), 200)
+      let context: Record<string, any> = {}
+      let sufficiency = { score: 0, scoreReason: '' }
+      try {
+        context = await AiMemoryService.buildContextPackage(c.env.DB, uid, limit)
+        sufficiency = AiMemoryService.calculateDataSufficiency(context)
+      } catch (inner) {
+        console.error('context package build error:', inner)
+      }
+      return jr(c, ok({ context, sufficiency, clinicalCopilotMode: 'sprint6_active' }, 200, s), 200)
     } catch (e) { console.error('context package error:', e); return jr(c, fail('INTERNAL_ERROR', 'Gagal.', 500, [], s), 500) }
   })
 
@@ -203,7 +209,7 @@ WAJIB:
           content: 'Anda analis kesehatan senior. Bersikap spesifik dan berani berdasarkan data. Beri skor dan interpretasi langsung dalam Bahasa Indonesia.'
         },
         { role: 'user', content: prompt }
-      ], 300)
+      ], 3000, userId)
       if (aiResult) {
         const filtered = filterUnsafeContent(aiResult.text)
         recommendationText = filtered.filtered
@@ -295,6 +301,7 @@ WAJIB:
 
       const contextSummary = vitals.length > 0
         ? vitals
+            .filter((v, i, arr) => arr.findIndex(x => x.metricCode === v.metricCode) === i)
             .map((value) => `${value.metricCode}: ${value.finalValue} ${value.unit} (${value.status}, ${value.severity})`)
             .join('; ')
         : 'Belum ada data vital terbaru.'
@@ -315,9 +322,9 @@ WAJIB:
         },
         {
           role: 'user',
-          content: `Profil: ${JSON.stringify(profile || {})}\nVitals terbaru: ${JSON.stringify(vitals)}\nPertanyaan: ${question}`
+          content: `Profil: ${JSON.stringify(profile || {})}\nVitals terbaru: ${contextSummary}\nPertanyaan: ${question}`
         }
-      ], 220)
+      ], 2048, userId)
       if (aiResult) {
         const filtered = filterUnsafeContent(aiResult.text)
         let assistantReply = filtered.filtered
@@ -326,8 +333,14 @@ WAJIB:
         reply = assistantReply
         model = aiResult.model
         usedFallback = false
-        const context = await AiMemoryService.buildContextPackage(c.env.DB, userId)
-        const { score: dataSufficiencyScore, scoreReason } = AiMemoryService.calculateDataSufficiency(context)
+        let dataSufficiencyScore = 0
+        let scoreReason = 'Data kurang untuk analisis'
+        try {
+          const context = await AiMemoryService.buildContextPackage(c.env.DB, userId)
+          const sufficiency = AiMemoryService.calculateDataSufficiency(context)
+          dataSufficiencyScore = sufficiency.score
+          scoreReason = sufficiency.scoreReason
+        } catch {}
         const contextTrace = vitals.map(v => ({ metricCode: v.metricCode, measuredAt: v.measuredAt, sourceType: 'measurement', source: 'HL_measurementValues' }))
 
         return jr(c, ok({
@@ -471,7 +484,7 @@ WAJIB:
     }
     try {
       const url = `https://ai-service.internal${path}`
-      const signal = init.signal ?? AbortSignal.timeout(10000)
+      const signal = init.signal ?? AbortSignal.timeout(30000)
       const req = new Request(url, { ...init, signal })
       return await c.env.AI_SERVICE.fetch(req)
     } catch (e) {
@@ -739,7 +752,7 @@ WAJIB sertakan teks ini tepat di akhir respons Anda TANPA DIUBAH sedikit pun:
         { role: 'user', content: prompt }
       ] as any
 
-      const aiResult = await callConfiguredTextAi(c as any, messages, 400)
+      const aiResult = await callConfiguredTextAi(c as any, messages, 4096, userId)
       if (aiResult) {
         let analysis = aiResult.text
         analysis = AiMemoryService.enforceDisclaimer(analysis, aiResult.model)

@@ -834,14 +834,8 @@ export function computeDataSufficiencyScore(input: SufficiencyInput): { score: n
 
 export function buildForbiddenActions(
   operatingMode: OperatingMode,
-  disclaimerAcknowledged: boolean
+  _disclaimerAcknowledged: boolean
 ): string[] {
-  if (disclaimerAcknowledged) {
-    // Only base forbidden actions (mode-specific extras removed)
-    return [...BASE_FORBIDDEN_ACTIONS];
-  }
-
-  // Full forbidden actions: base + mode-specific
   return [...BASE_FORBIDDEN_ACTIONS, ...MODE_SPECIFIC_FORBIDDEN[operatingMode]];
 }
 

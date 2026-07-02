@@ -38,6 +38,7 @@ import {
   generateFollowUpQuestions,
   getOperatingMode,
   getConfigBoolean,
+  routeModel,
 } from "./services/index.js";
 import { runSafetyRuntime } from "./safety/safetyRuntime.js";
 import { SafetyDecision } from "./safety/safetyDecision.js";
@@ -76,6 +77,38 @@ function requireAuth(c: any): { ok: true; userId: number } | { ok: false; status
 // 11.1 Clinical Copilot routes (PRD §11.1) — S6E implementation.
 // PRD S6E §3: Proxy flow — #1 forwards to #2 via Service Binding.
 // These routes are called by #1 with X-Internal-UserId header.
+
+// Text generation fallback for API Worker (internal use only)
+app.post("/api/ai/text-generate", async (c) => {
+  const auth = requireAuth(c);
+  if (!auth.ok) return c.json({ success: false, error: { code: auth.code } }, auth.status);
+
+  try {
+    const body = await c.req.json() as { messages?: Array<{ role: string; content: string }>; maxTokens?: number; temperature?: number };
+    if (!body.messages?.length) return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "messages required" } }, 400);
+
+    const messages = body.messages.map(m => ({ role: m.role as 'system' | 'user' | 'assistant', content: m.content }));
+    const maxTokens = body.maxTokens ?? 2048;
+    const temperature = body.temperature ?? 0.3;
+
+    const result = await routeModel(c.env, {
+      taskCode: 'text_generate',
+      messages,
+      userId: auth.userId,
+      channel: 'internal',
+      maxTokens,
+      temperature,
+    });
+
+    return c.json({
+      success: true,
+      data: { text: result.text, model: result.model },
+    });
+  } catch (error) {
+    console.error("text-generate error:", error);
+    return c.json({ success: false, error: { code: "INTERNAL_ERROR", message: "Failed to generate text" } }, 500);
+  }
+});
 
 // S6E-T-03: Start session
 app.post("/api/ai/clinical/session/start", async (c) => {
@@ -157,6 +190,7 @@ app.post("/api/ai/clinical/message", async (c) => {
         dataSufficiencyLabel: result.dataSufficiencyLabel,
         redFlagStatus: result.redFlagStatus,
         followUpQuestions: result.followUpQuestions,
+        forbiddenActions: result.forbiddenActions ?? [],
         modelName: result.modelName,
         usedFallback: result.usedFallback,
         safetyDecision: result.safetyDecision,

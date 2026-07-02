@@ -30,7 +30,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.get("/health", (c) => {
   const provided = c.req.query("secret") ?? c.req.header("X-Cron-Secret");
   if (provided !== c.env.CRON_SECRET) {
-    return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
+    return c.json({ success: true, data: { worker: "isehat-jobs-worker", status: "ok" } });
   }
   return c.json({
     success: true,

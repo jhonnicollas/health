@@ -97,19 +97,19 @@ test('S6D-CP-04: dataShareConsent=OFF → hydrationSummary=null, cycleSummary=nu
   assert.equal(pkg.cycleSummary, null, 'cycleSummary null when no consent');
 });
 
-// S6D-CP-05: Disclaimer acknowledged → base forbiddenActions only (6)
-test('S6D-CP-05: disclaimerAcknowledged=true → only 6 base forbiddenActions', () => {
+// S6D-CP-05: Disclaimer acknowledged → full forbiddenActions include mode-specific (hard boundaries per PRD §0.3)
+test('S6D-CP-05: disclaimerAcknowledged=true → full forbiddenActions (mode-specific are hard boundaries)', () => {
   const actions = buildForbiddenActions('standard', true);
-  assert.equal(actions.length, 6, '6 base forbiddenActions');
+  assert.equal(actions.length, 9, '9 forbiddenActions (6 base + 3 mode-specific for standard)');
   assert.ok(actions.includes('cross_user_access'), 'includes cross_user_access');
   assert.ok(actions.includes('missing_consent'), 'includes missing_consent');
   assert.ok(actions.includes('emergency_severity_downgrade'), 'includes emergency_severity_downgrade');
   assert.ok(actions.includes('medication_change'), 'includes medication_change');
   assert.ok(actions.includes('delay_medical_care'), 'includes delay_medical_care');
   assert.ok(actions.includes('rule_engine_bypass'), 'includes rule_engine_bypass');
-  assert.ok(!actions.includes('diagnosis_final'), 'excludes mode-specific diagnosis_final');
-  assert.ok(!actions.includes('prescription_or_dosage'), 'excludes mode-specific prescription_or_dosage');
-  assert.ok(!actions.includes('specialist_claim'), 'excludes mode-specific specialist_claim');
+  assert.ok(actions.includes('diagnosis_final'), 'includes mode-specific diagnosis_final (hard boundary)');
+  assert.ok(actions.includes('prescription_or_dosage'), 'includes mode-specific prescription_or_dosage (hard boundary)');
+  assert.ok(actions.includes('specialist_claim'), 'includes mode-specific specialist_claim (hard boundary)');
 });
 
 // S6D-CP-06: Disclaimer not acknowledged → full forbiddenActions (6 base + mode-specific)

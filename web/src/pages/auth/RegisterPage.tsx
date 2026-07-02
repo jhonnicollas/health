@@ -64,7 +64,7 @@ export function RegisterPage({ onShowLogin }: { onShowLogin: () => void }) {
     setFieldErrors({})
 
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch('/api/auth/register/start', {
         method: 'POST',
         credentials: 'include',
         headers: {

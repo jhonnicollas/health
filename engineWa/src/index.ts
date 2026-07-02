@@ -7,6 +7,8 @@ import { saveQRImage, printQRTerminal } from './qr.js';
 import pino from 'pino';
 import fs from 'node:fs';
 import path from 'node:path';
+import { HttpProxyAgent } from 'http-proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'debug' });
 
@@ -29,12 +31,24 @@ async function startBaileys() {
 
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
+  const proxyUrl = process.env.WA_PROXY_URL;
+  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+  const fetchAgent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+
+  if (proxyUrl) {
+    logger.info('Using proxy: %s', proxyUrl.replace(/\/\/[^@]+@/, '//***@'));
+  }
+
   sock = makeWASocket({
     auth: state,
-    printQRInTerminal: process.env.QR_DISPLAY_MODE === 'terminal',
-    qrTimeout: 60_000,
+    printQRInTerminal: false,
+    qrTimeout: 120_000,
     logger: logger.child({ module: 'baileys' }),
-    browser: ['iSehat Gateway', 'Chrome', '1.0.0'],
+    browser: ['Chrome (Linux)', '', ''],
+    connectTimeoutMs: 30_000,
+    keepAliveIntervalMs: 30_000,
+    agent,
+    fetchAgent,
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -57,12 +71,14 @@ async function startBaileys() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      if (process.env.QR_DISPLAY_MODE === 'file') {
+      try {
         await saveQRImage(qr);
-        logger.info('QR saved to %s', process.env.QR_FILE_PATH || '/app/qr/latest.png');
-      } else {
+        logger.info('QR image saved to /app/qr/latest.png');
+      } catch (err) {
+        logger.warn({ err }, 'Failed to save QR image, printing to terminal');
         printQRTerminal(qr);
       }
+      printQRTerminal(qr);
     }
 
     if (connection === 'close') {
@@ -71,6 +87,7 @@ async function startBaileys() {
 
       logger.warn({ code }, 'Connection closed. Reconnect=%s', shouldReconnect);
 
+      sock = null;
       if (shouldReconnect && restartCount < MAX_RESTART) {
         restartCount++;
         setTimeout(() => startBaileys(), 5000);

@@ -5,6 +5,7 @@ export function SafetyDisclaimerBox() {
   return (
     <div className="ai-safety-note clinical-disclaimer" role="alert" aria-live="polite">
       <span className="material-symbols-outlined" aria-hidden="true">health_and_safety</span>
+      <p><strong>{t('ai.clinicalDisclaimerFull')}</strong></p>
       <p>{t('ai.clinicalDisclaimer')}</p>
     </div>
   )

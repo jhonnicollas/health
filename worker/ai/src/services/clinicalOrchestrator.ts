@@ -45,6 +45,7 @@ export interface ClinicalMessageResult {
   dataSufficiencyLabel: string;
   redFlagStatus: string;
   followUpQuestions: string[];
+  forbiddenActions: string[];
   modelName: string;
   usedFallback: boolean;
   safetyDecision: string;
@@ -208,6 +209,7 @@ export async function processClinicalMessage(
       dataSufficiencyLabel: getSufficiencyLabel(contextPackage.dataSufficiencyScore),
       redFlagStatus: 'emergency',
       followUpQuestions: [],
+      forbiddenActions: contextPackage.forbiddenActions ?? [],
       modelName: 'emergency-template',
       usedFallback: true,
       safetyDecision: SafetyDecision.EMERGENCY_TEMPLATE_ONLY,
@@ -264,7 +266,7 @@ export async function processClinicalMessage(
     const safetyInput: DetectorInput = {
       aiOutput: modelResult.text,
       locale,
-      deterministicEmergencyLevel: hasRedFlag ? (redFlagSeverity as 'emergency' | 'warning') : 'none',
+      deterministicEmergencyLevel: hasRedFlag ? (redFlagSeverity === 'emergency' ? 'emergency' : 'warning') : 'none',
       redFlagPresent: hasRedFlag,
       operatingMode,
       consents: {
@@ -407,6 +409,7 @@ export async function processClinicalMessage(
     dataSufficiencyLabel: getSufficiencyLabel(contextPackage.dataSufficiencyScore),
     redFlagStatus: hasRedFlag ? redFlagSeverity : 'none',
     followUpQuestions,
+    forbiddenActions: contextPackage.forbiddenActions ?? [],
     modelName: modelResult.model,
     usedFallback: modelResult.fallbackUsed,
     safetyDecision: safetyResult.finalDecision,
@@ -786,14 +789,16 @@ async function storeMessages(env: Bindings, input: StoreMessagesInput): Promise<
  * Falls back to obfuscated base64 if the secret is missing or crypto unavailable.
  */
 export async function encryptContent(env: Bindings, text: string, userId?: number): Promise<string> {
-  const passphrase = (env as any).CLINICAL_MESSAGE_ENCRYPTION_KEY || '';
+  const passphrase = env.CLINICAL_MESSAGE_ENCRYPTION_KEY || '';
 
   if (!passphrase) {
+    if (env.CLOUDFLARE_ACCOUNT_ID) {
+      console.error('encryptContent: CLINICAL_MESSAGE_ENCRYPTION_KEY missing in production — using base64 fallback');
+    }
     return xorEncrypt(text, 'isehat-static-mask-v1-2026');
   }
 
   try {
-    // Derive a key from the passphrase using PBKDF2
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
